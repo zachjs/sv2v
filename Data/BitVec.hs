@@ -8,7 +8,6 @@ module Data.BitVec
   ) where
 
 import Data.Bits
-import Data.Semigroup
 
 data BitVec = BitVec Int Integer deriving (Show, Eq)
 
@@ -18,13 +17,13 @@ instance Num BitVec where
   BitVec w1 v1 * BitVec w2 v2 = bitVec (max w1 w2) (v1 * v2)
   abs = id
   signum (BitVec _ v) = if v == 0 then bitVec 1 0 else bitVec 1 1
-  fromInteger i = bitVec (width i) i
+  fromInteger i = bitVec (wid i) i
     where
-    width :: Integer -> Int
-    width a
+    wid :: Integer -> Int
+    wid a
       | a ==  0   = 0
       | a == -1   = 1
-      | otherwise = 1 + width (shiftR a 1)
+      | otherwise = 1 + wid (shiftR a 1)
 
 instance Bits BitVec where
   BitVec w1 v1 .&.   BitVec w2 v2 = bitVec (max w1 w2) (v1 .&.   v2)
