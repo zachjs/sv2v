@@ -221,7 +221,7 @@ LHS :: { LHS }
 | "{" LHSs "}"            { LHSConcat $2 }
 
 LHSs :: { [LHS] }
-:          LHS  { [$1] } 
+:          LHS  { [$1] }
 | LHSs "," LHS  { $1 ++ [$3] }
 
 Sense :: { Sense }
@@ -356,7 +356,7 @@ toNumber = number . tokenString
     where
     w = takeWhile (/= '\'') a
     b = dropWhile (/= '\'') a
-    f a 
+    f a
       | isPrefixOf "'d" a = read $ drop 2 a
       | isPrefixOf "'h" a = read $ "0x" ++ drop 2 a
       | isPrefixOf "'b" a = foldl (\ n b -> shiftL n 1 .|. (if b == '1' then 1 else 0)) 0 (drop 2 a)

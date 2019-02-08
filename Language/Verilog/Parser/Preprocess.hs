@@ -16,7 +16,7 @@ uncomment file a = uncomment a
 
   removeEOL a = case a of
     ""          -> ""
-    '\n' : rest -> '\n' : uncomment rest 
+    '\n' : rest -> '\n' : uncomment rest
     '\t' : rest -> '\t' : removeEOL rest
     _    : rest -> ' '  : removeEOL rest
 
@@ -42,7 +42,7 @@ uncomment file a = uncomment a
     '\\' : '"' : rest -> "\\\"" ++ ignoreString rest
     a : rest          -> a : ignoreString rest
 
--- | A simple `define preprocessor.  
+-- | A simple `define preprocessor.
 preprocess :: [(String, String)] -> FilePath -> String -> String
 preprocess env file content = unlines $ pp True [] env $ lines $ uncomment file content
   where
@@ -50,8 +50,8 @@ preprocess env file content = unlines $ pp True [] env $ lines $ uncomment file 
   pp _ _ _ [] = []
   pp on stack env (a : rest) = case words a of
     "`define" : name : value -> "" : pp on stack (if on then (name, ppLine env $ unwords value) : env else env) rest
-    "`ifdef"  : name : _     -> "" : pp (on && (elem    name $ fst $ unzip env)) (on : stack) env rest 
-    "`ifndef" : name : _     -> "" : pp (on && (notElem name $ fst $ unzip env)) (on : stack) env rest 
+    "`ifdef"  : name : _     -> "" : pp (on && (elem    name $ fst $ unzip env)) (on : stack) env rest
+    "`ifndef" : name : _     -> "" : pp (on && (notElem name $ fst $ unzip env)) (on : stack) env rest
     "`else" : _
       | not $ null stack     -> "" : pp (head stack && not on) stack env rest
       | otherwise            -> error $ "`else  without associated `ifdef/`ifndef: " ++ file

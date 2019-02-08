@@ -56,7 +56,7 @@ getSignalId netlist path = case lookup path paths' of
   Nothing -> Nothing
   Just i  -> Just $ Id i
   where
-  paths = [ (paths, id) | Reg id _ paths _ <- netlist ] ++ [ (paths, id) | Var id _ paths _ <- netlist ] 
+  paths = [ (paths, id) | Reg id _ paths _ <- netlist ] ++ [ (paths, id) | Var id _ paths _ <- netlist ]
   paths' = [ (path, id) | (paths, id) <- paths, path <- paths ]
 
 type Memory = IOArray Int BitVec
@@ -75,7 +75,7 @@ memory netlist
 initialize :: Netlist BlackBoxInit -> Memory -> IORef (Maybe VCDHandle) -> Maybe FilePath -> IORef (IO ()) -> IORef (IO ()) -> IO (Maybe SimResponse)
 initialize netlist memory vcd file sample step = do
   close vcd sample step
-  mapM_ (initializeNet memory) netlist 
+  mapM_ (initializeNet memory) netlist
   case file of
     Nothing -> return ()
     Just file -> do

@@ -17,6 +17,7 @@ module Language.Verilog.AST
 import Data.Bits
 import Data.List
 import Data.Maybe
+import Data.Semigroup
 import Text.Printf
 
 import Data.BitVec
@@ -75,7 +76,7 @@ instance Show ModuleItem where
     showAssign a = case a of
       Nothing -> ""
       Just a -> printf " = %s" $ show a
-  
+
 showRange :: Maybe Range -> String
 showRange Nothing = ""
 showRange (Just (h, l)) = printf "[%s:%s] " (showExprConst h) (showExprConst l)
@@ -117,24 +118,24 @@ instance Show UniOp where
     USub  -> "-"
 
 data BinOp
-  = And   
-  | Or    
-  | BWAnd 
-  | BWXor 
-  | BWOr  
-  | Mul   
-  | Div   
-  | Mod   
-  | Add   
-  | Sub   
+  = And
+  | Or
+  | BWAnd
+  | BWXor
+  | BWOr
+  | Mul
+  | Div
+  | Mod
+  | Add
+  | Sub
   | ShiftL
   | ShiftR
-  | Eq    
-  | Ne    
-  | Lt    
-  | Le    
-  | Gt    
-  | Ge    
+  | Eq
+  | Ne
+  | Lt
+  | Le
+  | Gt
+  | Ge
   deriving Eq
 
 instance Show BinOp where
@@ -210,6 +211,8 @@ instance Bits Expr where
   bit          = error "Not supported: bit"
   popCount     = error "Not supported: popCount"
 
+instance Semigroup Expr where
+  (<>) = mappend
 
 instance Monoid Expr where
   mempty      = 0

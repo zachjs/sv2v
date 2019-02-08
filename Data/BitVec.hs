@@ -8,6 +8,7 @@ module Data.BitVec
   ) where
 
 import Data.Bits
+import Data.Semigroup
 
 data BitVec = BitVec Int Integer deriving (Show, Eq)
 
@@ -38,6 +39,9 @@ instance Bits BitVec where
   bitSizeMaybe (BitVec w _) = Just w
   isSigned _ = False
   popCount (BitVec _ v) = popCount v
+
+instance Semigroup BitVec where
+  (<>) = mappend
 
 instance Monoid BitVec where
   mempty = BitVec 0 0
