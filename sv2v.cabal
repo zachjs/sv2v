@@ -49,7 +49,14 @@ executable sv2v
     array,
     base
   other-modules:
+    Data.BitVec
+    Language.SystemVerilog
+    Language.SystemVerilog.AST
     Language.SystemVerilog.Parser
+    Language.SystemVerilog.Parser.Lex
+    Language.SystemVerilog.Parser.Parse
+    Language.SystemVerilog.Parser.Preprocess
+    Language.SystemVerilog.Parser.Tokens
   ghc-options:
     -O3
     -threaded
