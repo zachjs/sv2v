@@ -1,0 +1,61 @@
+name:    sv2v
+version: 0.0.1
+
+category: Language, Hardware, Embedded
+
+synopsis: SystemVerilog to Verilog conversion
+
+description:
+  A tool for coverting SystemVerilog to Verilog. Also exposes a limited
+  SystemVerilog parser and AST. Forked from the Verilog parser found at
+  https://github.com/tomahawkins/verilog
+
+author:     Zachary Snow <zach@zachjs.com>, Tom Hawkins <tomahawkins@gmail.com>
+maintainer: Zachary Snow <zach@zachjs.com>
+
+license:      BSD3
+license-file: LICENSE
+
+homepage: https://github.com/zachjs/sv2v
+
+build-type:    Simple
+cabal-version: >= 1.10
+
+library
+  default-language: Haskell2010
+  build-tools:
+    alex  >= 3 && < 4,
+    happy >= 1 && < 2
+  build-depends:
+    base       >= 4.8.2.0   && < 5.0,
+    array      >= 0.5.1.0   && < 0.6
+
+  exposed-modules:
+    Data.BitVec
+    Language.SystemVerilog
+    Language.SystemVerilog.AST
+    Language.SystemVerilog.Parser
+    Language.SystemVerilog.Parser.Lex
+    Language.SystemVerilog.Parser.Parse
+    Language.SystemVerilog.Parser.Preprocess
+    Language.SystemVerilog.Parser.Tokens
+
+  ghc-options: -W
+
+executable sv2v
+  default-language: Haskell2010
+  main-is: sv2v.hs
+  Build-Depends:
+    base
+  ghc-options:
+    -O3
+    -threaded
+    -rtsopts
+    -with-rtsopts=-N
+    -funbox-strict-fields
+    -Wall
+
+source-repository head
+  type:     git
+  location: git://github.com/zachjs/sv2v.git
+

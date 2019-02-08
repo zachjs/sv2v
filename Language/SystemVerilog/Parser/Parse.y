@@ -1,12 +1,12 @@
 {
-module Language.Verilog.Parser.Parse (modules) where
+module Language.SystemVerilog.Parser.Parse (modules) where
 
 import Data.Bits
 import Data.List
 
 import Data.BitVec
-import Language.Verilog.AST
-import Language.Verilog.Parser.Tokens
+import Language.SystemVerilog.AST
+import Language.SystemVerilog.Parser.Tokens
 }
 
 %name modules

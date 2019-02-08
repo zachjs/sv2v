@@ -1,4 +1,4 @@
-module Language.Verilog.AST
+module Language.SystemVerilog.AST
   ( Identifier
   , Module     (..)
   , ModuleItem (..)

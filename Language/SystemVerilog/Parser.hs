@@ -1,13 +1,13 @@
-module Language.Verilog.Parser
+module Language.SystemVerilog.Parser
   ( parseFile
   , preprocess
   ) where
 
-import Language.Verilog.AST
-import Language.Verilog.Parser.Lex
-import Language.Verilog.Parser.Parse
-import Language.Verilog.Parser.Preprocess
-import Language.Verilog.Parser.Tokens
+import Language.SystemVerilog.AST
+import Language.SystemVerilog.Parser.Lex
+import Language.SystemVerilog.Parser.Parse
+import Language.SystemVerilog.Parser.Preprocess
+import Language.SystemVerilog.Parser.Tokens
 
 -- | Parses a file given a table of predefined macros, the file name, and the file contents.
 parseFile :: [(String, String)] -> FilePath -> String -> [Module]

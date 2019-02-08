@@ -1,10 +1,10 @@
 {
 {-# OPTIONS_GHC -w #-}
-module Language.Verilog.Parser.Lex
+module Language.SystemVerilog.Parser.Lex
   ( alexScanTokens
   ) where
 
-import Language.Verilog.Parser.Tokens
+import Language.SystemVerilog.Parser.Tokens
 
 }
 

@@ -1,4 +1,4 @@
-module Language.Verilog.Simulator
+module Language.SystemVerilog.Simulator
   ( Simulator
   , SimCommand  (..)
   , SimResponse (..)
@@ -16,7 +16,7 @@ import Data.VCD hiding (Var, step)
 import qualified Data.VCD as VCD
 
 import Data.BitVec
-import Language.Verilog.Netlist
+import Language.SystemVerilog.Netlist
 
 --check msg = putStrLn msg >> hFlush stdout
 
