@@ -19,6 +19,7 @@ main = do
     case res of
         Left  err -> do
             hPrint stderr err
-            exitFailure
+            exitSuccess
+            --exitFailure
         Right _ -> do
             exitSuccess

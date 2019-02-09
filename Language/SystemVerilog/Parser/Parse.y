@@ -13,7 +13,7 @@ import Language.SystemVerilog.Parser.Tokens
 %tokentype { Token }
 %error { parseError }
 
-%expect 0
+-- %expect 0
 
 %token
 
@@ -157,6 +157,7 @@ Modules :: { [Module] }
 
 Module :: { Module }
 : "module" Identifier ModulePortList ";" ModuleItems "endmodule"{ Module $2 $3 $5 }
+| "module" Identifier ListOfPortDeclarations ";" ModuleItems "endmodule" { uncurry (Module $2) $ combinePortDeclsAndModuleItems $3 $5 }
 
 Identifier :: { Identifier }
 : simpleIdentifier   { tokenString $1 }
@@ -174,22 +175,58 @@ ModulePortList1 :: { [Identifier] }
 
 ModuleItems :: { [ModuleItem] }
 :                         { [] }
-| ModuleItems ModuleItem  { $1 ++ [$2] }
+| ModuleItems ModuleItem  { $1 ++ $2 }
 
-ModuleItem :: { ModuleItem }
-: "parameter"  MaybeRange Identifier "=" Expr ";"       { Parameter  $2 $3 $5 }
-| "localparam" MaybeRange Identifier "=" Expr ";"       { Localparam $2 $3 $5 }
-| "input"  MaybeRange Identifiers ";"                   { Input  $2 $3 }
-| "output" MaybeRange Identifiers ";"                   { Output $2 $3 }
-| "inout"  MaybeRange Identifiers ";"                   { Inout  $2 $3 }
-| "reg"    MaybeRange RegDeclarations ";"               { Reg    $2 $3 }
-| "wire"   MaybeRange WireDeclarations ";"              { Wire   $2 $3 }
-| "integer" Identifiers ";"                             { Integer $2 }
-| "assign" LHS "=" Expr ";"                             { Assign $2 $4 }
-| "initial" Stmt                                        { Initial $2 }
-| "always"                   Stmt                       { Always Nothing $2 }
-| "always" "@" "(" Sense ")" Stmt                       { Always (Just $4) $6 }
-| Identifier ParameterBindings Identifier Bindings ";"  { Instance $1 $2 $3 $4 }
+ListOfPortDeclarations
+  : "(" PortDeclarations ")" { $2 }
+
+PortDeclarations
+  : PortDeclaration                      { [$1] }
+  | PortDeclaration2  PortDeclarations { $1 : $2 }
+
+PortDeclaration2 :: { (Direction, Either Type (Maybe Range), [(Identifier, Maybe Expr)]) }
+  : "inout"  opt(NetType) opt(Range) Identifiers "," { toPortDeclaration Inout  $2  $3 $4 }
+  | "input"  opt(NetType) opt(Range) Identifiers "," { toPortDeclaration Input  $2  $3 $4 }
+  | "output" opt(NetType) opt(Range) Identifiers "," { toPortDeclaration Output $2  $3 $4 }
+  | "output" "reg"        opt(Range) VarPortIdentifiers "," { (Output, Left (Reg $3), $4) }
+
+PortDeclaration :: { (Direction, Either Type (Maybe Range), [(Identifier, Maybe Expr)]) }
+  : "inout"  opt(NetType) opt(Range) Identifiers { toPortDeclaration Inout  $2  $3 $4 }
+  | "input"  opt(NetType) opt(Range) Identifiers { toPortDeclaration Input  $2  $3 $4 }
+  | "output" opt(NetType) opt(Range) Identifiers { toPortDeclaration Output $2  $3 $4 }
+  | "output" "reg"        opt(Range) VarPortIdentifiers { (Output, Left (Reg $3), $4) }
+
+VarPortIdentifiers :: { [(Identifier, Maybe Expr)] }
+  : VarPortIdentifier                        { [$1] }
+  | VarPortIdentifiers "," VarPortIdentifier { $1 ++ [$3] }
+
+VarPortIdentifier :: { (Identifier, Maybe Expr) }
+  : Identifier          { ($1, Nothing) }
+  | Identifier "=" Expr { ($1, Just $3) }
+
+opt(p)          : p                   { Just $1 }
+                |                     { Nothing }
+
+NetType
+  : "wire" { Wire }
+
+MaybeTypeOrRange :: { Either Type (Maybe Range) }
+  : MaybeRange { Right $1 }
+  | "reg"  MaybeRange { Left $ Reg  $2 }
+  | "wire" MaybeRange { Left $ Wire $2 }
+
+ModuleItem :: { [ModuleItem] }
+: "parameter"  MaybeRange Identifier "=" Expr ";"       { [Parameter  $2 $3 $5] }
+| "localparam" MaybeRange Identifier "=" Expr ";"       { [Localparam $2 $3 $5] }
+| PortDeclaration ";"                                          { portDeclToModuleItems $1 }
+| "reg"    MaybeRange WireDeclarations ";"               { map (uncurry $ LocalNet $ Reg  $2) $3 }
+| "wire"   MaybeRange WireDeclarations ";"              { map (uncurry $ LocalNet $ Wire $2) $3 }
+| "integer" Identifiers ";"                             { [Integer $2] }
+| "assign" LHS "=" Expr ";"                             { [Assign $2 $4] }
+| "initial" Stmt                                        { [Initial $2] }
+| "always"                   Stmt                       { [Always Nothing $2] }
+| "always" "@" "(" Sense ")" Stmt                       { [Always (Just $4) $6] }
+| Identifier ParameterBindings Identifier Bindings ";"  { [Instance $1 $2 $3 $4] }
 
 Identifiers :: { [Identifier] }
 :                 Identifier { [$1] }
@@ -361,6 +398,50 @@ toNumber = number . tokenString
       | isPrefixOf "'h" a = read $ "0x" ++ drop 2 a
       | isPrefixOf "'b" a = foldl (\ n b -> shiftL n 1 .|. (if b == '1' then 1 else 0)) 0 (drop 2 a)
       | otherwise         = error $ "Invalid number format: " ++ a
+
+
+toPortDeclaration
+  :: Direction
+  -> (Maybe ((Maybe Range) -> Type))
+  -> Maybe Range
+  -> [Identifier]
+  -> (Direction, Either Type (Maybe Range), [(Identifier, Maybe Expr)])
+toPortDeclaration dir tfm mr ids =
+  (dir, t, vals)
+  where
+    t =
+      case tfm of
+        Nothing -> Right mr
+        Just tf -> Left (tf mr)
+    vals = zip ids (repeat Nothing)
+
+
+portDeclToModuleItems :: (Direction, Either Type (Maybe Range), [(Identifier, Maybe Expr)]) -> [ModuleItem]
+portDeclToModuleItems (dir, Right r, l) =
+  map (PortDecl dir r) $ map toIdentifier $ l
+  where
+    toIdentifier (x, Just  _) = error "Incomplete port decl cannot have initialization"
+    toIdentifier (x, Nothing) = x
+portDeclToModuleItems (dir, Left t, l) =
+  foldr (++) [] $
+  map toItems l
+  where
+    r = case t of
+      Reg  mr -> mr
+      Wire mr -> mr
+    toItems (x, e) =
+      [ PortDecl dir r x
+      , LocalNet t x e ]
+
+combinePortDeclsAndModuleItems
+  :: [(Direction, Either Type (Maybe Range), [(Identifier, Maybe Expr)])]
+  -> [ModuleItem]
+  -> ([Identifier], [ModuleItem])
+combinePortDeclsAndModuleItems portDecls items =
+  (declIdents, declItems ++ items)
+  where
+    declIdents = concat $ map (\(_, _, idsAndExprs) -> map fst idsAndExprs) portDecls
+    declItems = concat $ map portDeclToModuleItems portDecls
 
 }
 
