@@ -5,6 +5,7 @@ import Data.Bits
 import Data.List
 
 import Data.BitVec
+import Data.Maybe
 import Language.SystemVerilog.AST
 import Language.SystemVerilog.Parser.Tokens
 }
@@ -151,61 +152,55 @@ string             { Token Lit_string    _ _ }
 
 %%
 
+opt(p) :: { Maybe a }
+  : p { Just $1 }
+  |   { Nothing }
+
 Modules :: { [Module] }
-:                { [] }
-| Modules Module { $1 ++ [$2] }
+  : {- empty -}    { [] }
+  | Modules Module { $1 ++ [$2] }
 
 Module :: { Module }
-: "module" Identifier ModulePortList ";" ModuleItems "endmodule"{ Module $2 $3 $5 }
-| "module" Identifier ListOfPortDeclarations ";" ModuleItems "endmodule" { uncurry (Module $2) $ combinePortDeclsAndModuleItems $3 $5 }
+  : "module" Identifier           ";" ModuleItems "endmodule" { Module $2 [] $4 }
+  | "module" Identifier PortNames ";" ModuleItems "endmodule" { Module $2 $3 $5 }
+  | "module" Identifier PortDecls ";" ModuleItems "endmodule" { Module $2 (getPortNames $3) ($3 ++ $5) }
 
 Identifier :: { Identifier }
-: simpleIdentifier   { tokenString $1 }
-| escapedIdentifier  { tokenString $1 }
-| systemIdentifier   { tokenString $1 }
+  : simpleIdentifier  { tokenString $1 }
+  | escapedIdentifier { tokenString $1 }
+  | systemIdentifier  { tokenString $1 }
 
-ModulePortList :: { [Identifier] }
-:                         { [] }
-| "("                 ")" { [] }
-| "(" ModulePortList1 ")" { $2 }
+Identifiers :: { [Identifier] }
+  :                 Identifier { [$1] }
+  | Identifiers "," Identifier { $1 ++ [$3] }
 
-ModulePortList1 :: { [Identifier] }
-:                     Identifier  { [$1] }
-| ModulePortList1 "," Identifier  { $1 ++ [$3] }
+PortNames :: { [Identifier] }
+  : "(" Identifiers ")" { $2 }
+
+-- abuses delimiter propogation hack to avoid conflicts
+PortDecls :: { [ModuleItem] }
+  : "(" PortDeclsFollow { $2 }
+PortDeclsFollow :: { [ModuleItem] }
+  : ")"                           { [] }
+  | PortDecl(")")                 { $1 }
+  | PortDecl(",") PortDeclsFollow { $1 ++ $2 }
+
+PortDecl(delim) :: { [ModuleItem] }
+  : "inout"  opt(NetType) opt(Range) Identifiers             delim { portDeclToModuleItems Inout  $2 $3 (zip $4 (repeat Nothing)) }
+  | "input"  opt(NetType) opt(Range) Identifiers             delim { portDeclToModuleItems Input  $2 $3 (zip $4 (repeat Nothing)) }
+  | "output" opt(NetType) opt(Range) Identifiers             delim { portDeclToModuleItems Output $2 $3 (zip $4 (repeat Nothing)) }
+  | "output" "reg"        opt(Range) VariablePortIdentifiers delim { portDeclToModuleItems Output (Just Reg) $3 $4 }
+
+VariablePortIdentifiers :: { [(Identifier, Maybe Expr)] }
+  : VariablePortIdentifier                             { [$1] }
+  | VariablePortIdentifiers "," VariablePortIdentifier { $1 ++ [$3] }
+VariablePortIdentifier :: { (Identifier, Maybe Expr) }
+  : Identifier          { ($1, Nothing) }
+  | Identifier "=" Expr { ($1, Just $3) }
 
 ModuleItems :: { [ModuleItem] }
 :                         { [] }
 | ModuleItems ModuleItem  { $1 ++ $2 }
-
-ListOfPortDeclarations
-  : "(" PortDeclarations ")" { $2 }
-
-PortDeclarations
-  : PortDeclaration                      { [$1] }
-  | PortDeclaration2  PortDeclarations { $1 : $2 }
-
-PortDeclaration2 :: { (Direction, Either Type (Maybe Range), [(Identifier, Maybe Expr)]) }
-  : "inout"  opt(NetType) opt(Range) Identifiers "," { toPortDeclaration Inout  $2  $3 $4 }
-  | "input"  opt(NetType) opt(Range) Identifiers "," { toPortDeclaration Input  $2  $3 $4 }
-  | "output" opt(NetType) opt(Range) Identifiers "," { toPortDeclaration Output $2  $3 $4 }
-  | "output" "reg"        opt(Range) VarPortIdentifiers "," { (Output, Left (Reg $3), $4) }
-
-PortDeclaration :: { (Direction, Either Type (Maybe Range), [(Identifier, Maybe Expr)]) }
-  : "inout"  opt(NetType) opt(Range) Identifiers { toPortDeclaration Inout  $2  $3 $4 }
-  | "input"  opt(NetType) opt(Range) Identifiers { toPortDeclaration Input  $2  $3 $4 }
-  | "output" opt(NetType) opt(Range) Identifiers { toPortDeclaration Output $2  $3 $4 }
-  | "output" "reg"        opt(Range) VarPortIdentifiers { (Output, Left (Reg $3), $4) }
-
-VarPortIdentifiers :: { [(Identifier, Maybe Expr)] }
-  : VarPortIdentifier                        { [$1] }
-  | VarPortIdentifiers "," VarPortIdentifier { $1 ++ [$3] }
-
-VarPortIdentifier :: { (Identifier, Maybe Expr) }
-  : Identifier          { ($1, Nothing) }
-  | Identifier "=" Expr { ($1, Just $3) }
-
-opt(p)          : p                   { Just $1 }
-                |                     { Nothing }
 
 NetType
   : "wire" { Wire }
@@ -218,7 +213,7 @@ MaybeTypeOrRange :: { Either Type (Maybe Range) }
 ModuleItem :: { [ModuleItem] }
 : "parameter"  MaybeRange Identifier "=" Expr ";"       { [Parameter  $2 $3 $5] }
 | "localparam" MaybeRange Identifier "=" Expr ";"       { [Localparam $2 $3 $5] }
-| PortDeclaration ";"                                          { portDeclToModuleItems $1 }
+| PortDecl(";")                                         { $1 }
 | "reg"    MaybeRange WireDeclarations ";"               { map (uncurry $ LocalNet $ Reg  $2) $3 }
 | "wire"   MaybeRange WireDeclarations ";"              { map (uncurry $ LocalNet $ Wire $2) $3 }
 | "integer" Identifiers ";"                             { [Integer $2] }
@@ -227,10 +222,6 @@ ModuleItem :: { [ModuleItem] }
 | "always"                   Stmt                       { [Always Nothing $2] }
 | "always" "@" "(" Sense ")" Stmt                       { [Always (Just $4) $6] }
 | Identifier ParameterBindings Identifier Bindings ";"  { [Instance $1 $2 $3 $4] }
-
-Identifiers :: { [Identifier] }
-:                 Identifier { [$1] }
-| Identifiers "," Identifier { $1 ++ [$3] }
 
 RegDeclarations :: { [(Identifier, Maybe Range)] }
 :                     Identifier MaybeRange    { [($1, $2)]       }
@@ -400,48 +391,32 @@ toNumber = number . tokenString
       | otherwise         = error $ "Invalid number format: " ++ a
 
 
-toPortDeclaration
+portDeclToModuleItems
   :: Direction
   -> (Maybe ((Maybe Range) -> Type))
   -> Maybe Range
-  -> [Identifier]
-  -> (Direction, Either Type (Maybe Range), [(Identifier, Maybe Expr)])
-toPortDeclaration dir tfm mr ids =
-  (dir, t, vals)
-  where
-    t =
-      case tfm of
-        Nothing -> Right mr
-        Just tf -> Left (tf mr)
-    vals = zip ids (repeat Nothing)
-
-
-portDeclToModuleItems :: (Direction, Either Type (Maybe Range), [(Identifier, Maybe Expr)]) -> [ModuleItem]
-portDeclToModuleItems (dir, Right r, l) =
-  map (PortDecl dir r) $ map toIdentifier $ l
-  where
-    toIdentifier (x, Just  _) = error "Incomplete port decl cannot have initialization"
-    toIdentifier (x, Nothing) = x
-portDeclToModuleItems (dir, Left t, l) =
-  foldr (++) [] $
-  map toItems l
-  where
-    r = case t of
-      Reg  mr -> mr
-      Wire mr -> mr
-    toItems (x, e) =
-      [ PortDecl dir r x
-      , LocalNet t x e ]
-
-combinePortDeclsAndModuleItems
-  :: [(Direction, Either Type (Maybe Range), [(Identifier, Maybe Expr)])]
+  -> [(Identifier, Maybe Expr)]
   -> [ModuleItem]
-  -> ([Identifier], [ModuleItem])
-combinePortDeclsAndModuleItems portDecls items =
-  (declIdents, declItems ++ items)
+portDeclToModuleItems dir Nothing mr l =
+  map (PortDecl dir mr) $ map toIdentifier $ l
   where
-    declIdents = concat $ map (\(_, _, idsAndExprs) -> map fst idsAndExprs) portDecls
-    declItems = concat $ map portDeclToModuleItems portDecls
+    toIdentifier (x, Just  _) = error "ParseError: Incomplete port decl cannot have initialization"
+    toIdentifier (x, Nothing) = x
+portDeclToModuleItems dir (Just tf) mr l =
+  concat $ map toItems l
+  where
+    toItems (x, e) =
+      [ PortDecl dir mr x
+      , LocalNet (tf mr) x e ]
+
+getPortNames :: [ModuleItem] -> [Identifier]
+getPortNames items =
+  mapMaybe getPortName items
+  where
+    getPortName :: ModuleItem -> Maybe Identifier
+    getPortName (PortDecl _ _ ident) = Just ident
+    getPortName _ = Nothing
+
 
 }
 
