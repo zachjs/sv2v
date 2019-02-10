@@ -14,7 +14,7 @@ import Language.SystemVerilog.Parser.Tokens
 %tokentype { Token }
 %error { parseError }
 
--- %expect 0
+%expect 0
 
 %token
 
@@ -147,7 +147,7 @@ string             { Token Lit_string    _ _ }
 %left  "<<" ">>"
 %left  "+" "-"
 %left  "*" "/" "%"
-%left  UPlus UMinus "!" "~"
+%left  UPlus UMinus "!" "~" RedOps
 
 
 %%
@@ -161,9 +161,9 @@ Modules :: { [Module] }
   | Modules Module { $1 ++ [$2] }
 
 Module :: { Module }
-  : "module" Identifier           ";" ModuleItems "endmodule" { Module $2 [] $4 }
-  | "module" Identifier PortNames ";" ModuleItems "endmodule" { Module $2 $3 $5 }
-  | "module" Identifier PortDecls ";" ModuleItems "endmodule" { Module $2 (getPortNames $3) ($3 ++ $5) }
+  : "module" Identifier           ";" ModuleItems "endmodule" opt(";") { Module $2 [] $4 }
+  | "module" Identifier PortNames ";" ModuleItems "endmodule" opt(";") { Module $2 $3 $5 }
+  | "module" Identifier PortDecls ";" ModuleItems "endmodule" opt(";") { Module $2 (getPortNames $3) ($3 ++ $5) }
 
 Identifier :: { Identifier }
   : simpleIdentifier  { tokenString $1 }
@@ -221,6 +221,9 @@ ModuleItem :: { [ModuleItem] }
 | "initial" Stmt                                        { [Initial $2] }
 | "always"                   Stmt                       { [Always Nothing $2] }
 | "always" "@" "(" Sense ")" Stmt                       { [Always (Just $4) $6] }
+| "always" "@" "(" "*"   ")" Stmt                       { [Always (Just SenseStar) $6] }
+| "always" "@" "*"           Stmt                       { [Always (Just SenseStar) $4] }
+| "always" "@*"              Stmt                       { [Always (Just SenseStar) $3] }
 | Identifier ParameterBindings Identifier Bindings ";"  { [Instance $1 $2 $3 $4] }
 
 RegDeclarations :: { [(Identifier, Maybe Range)] }
@@ -271,6 +274,7 @@ Bindings1 :: { [(Identifier, Maybe Expr)] }
 Binding :: { (Identifier, Maybe Expr) }
 : "." Identifier "(" MaybeExpr ")" { ($2, $4) }
 | "." Identifier                   { ($2, Just $ Ident $2) }
+| Expr                             { ("", Just $1) }
 
 ParameterBindings :: { [(Identifier, Maybe Expr)] }
 :              { [] }
@@ -355,12 +359,19 @@ Expr :: { Expr }
 | Expr "+"  Expr              { BinOp Add $1 $3 }
 | Expr "-"  Expr              { BinOp Sub $1 $3 }
 | Expr "*"  Expr              { BinOp Mul $1 $3 }
-| Expr"/"   Expr              { BinOp Div $1 $3 }
+| Expr "/"  Expr              { BinOp Div $1 $3 }
 | Expr "%"  Expr              { BinOp Mod $1 $3 }
 | "!" Expr                    { UniOp Not $2 }
 | "~" Expr                    { UniOp BWNot $2 }
 | "+" Expr %prec UPlus        { UniOp UAdd $2 }
 | "-" Expr %prec UMinus       { UniOp USub $2 }
+| "&"  Expr %prec RedOps      { UniOp RedAnd  $2 }
+| "~&" Expr %prec RedOps      { UniOp RedNand $2 }
+| "|"  Expr %prec RedOps      { UniOp RedOr   $2 }
+| "~|" Expr %prec RedOps      { UniOp RedNor  $2 }
+| "^"  Expr %prec RedOps      { UniOp RedXor  $2 }
+| "~^" Expr %prec RedOps      { UniOp RedXnor $2 }
+| "^~" Expr %prec RedOps      { UniOp RedXnor $2 }
 
 
 {

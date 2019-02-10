@@ -15,11 +15,11 @@ main = do
     [filePath] <- getArgs
     content <- readFile filePath
     let ast = parseFile [] filePath content
-    let res = Left ast
+    let res = Right ast
     case res of
-        Left  err -> do
-            hPrint stderr err
-            exitSuccess
-            --exitFailure
-        Right _ -> do
+        Left  _ -> do
+            --hPrint stderr err
+            exitFailure
+        Right str -> do
+            hPrint stdout str
             exitSuccess

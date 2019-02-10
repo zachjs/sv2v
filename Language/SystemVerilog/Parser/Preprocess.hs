@@ -58,6 +58,7 @@ preprocess env file content = unlines $ pp True [] env $ lines $ uncomment file 
     "`endif" : _
       | not $ null stack     -> "" : pp (head stack) (tail stack) env rest
       | otherwise            -> error $ "`endif  without associated `ifdef/`ifndef: " ++ file
+    "`default_nettype" : _   -> "" : pp on stack env rest
     _                        -> (if on then ppLine env a else "") : pp on stack env rest
 
 ppLine :: [(String, String)] -> String -> String

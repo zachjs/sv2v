@@ -40,6 +40,7 @@ data Module
   deriving Eq
 
 instance Show Module where
+  showList modules _ = intercalate "\n\n" $ map show modules
   show (Module name ports items) = unlines
     [ "module " ++ name ++ (if null ports then "" else "(" ++ commas ports ++ ")") ++ ";"
     , unlines' $ map show items
@@ -114,7 +115,7 @@ instance Show ModuleItem where
       | otherwise   -> printf "%s #%s %s %s;" m (showPorts showExprConst params) i (showPorts show ports)
     where
     showPorts :: (Expr -> String) -> [(Identifier, Maybe Expr)] -> String
-    showPorts s ports = printf "(%s)" $ commas [ printf ".%s(%s)" i (if isJust arg then s $ fromJust arg else "") | (i, arg) <- ports ]
+    showPorts s ports = printf "(%s)" $ commas [ if i == "" then show (fromJust arg) else printf ".%s(%s)" i (if isJust arg then s $ fromJust arg else "") | (i, arg) <- ports ]
 
 showRange :: Maybe Range -> String
 showRange Nothing = ""
@@ -147,14 +148,30 @@ data Expr
   | Bit        Expr Int
   deriving Eq
 
-data UniOp = Not | BWNot | UAdd | USub deriving Eq
+data UniOp
+  = Not
+  | BWNot
+  | UAdd
+  | USub
+  | RedAnd
+  | RedNand
+  | RedOr
+  | RedNor
+  | RedXor
+  | RedXnor
+  deriving Eq
 
 instance Show UniOp where
-  show a = case a of
-    Not   -> "!"
-    BWNot -> "~"
-    UAdd  -> "+"
-    USub  -> "-"
+  show Not     = "!"
+  show BWNot   = "~"
+  show UAdd    = "+"
+  show USub    = "-"
+  show RedAnd  = "&"
+  show RedNand = "~&"
+  show RedOr   = "|"
+  show RedNor  = "~|"
+  show RedXor  = "^"
+  show RedXnor = "~^"
 
 data BinOp
   = And
@@ -319,6 +336,7 @@ data Sense
   | SenseOr      Sense Sense
   | SensePosedge LHS
   | SenseNegedge LHS
+  | SenseStar
   deriving Eq
 
 instance Show Sense where
@@ -326,6 +344,7 @@ instance Show Sense where
   show (SenseOr      a b) = printf "%s or %s" (show a) (show b)
   show (SensePosedge a  ) = printf "posedge %s" (show a)
   show (SenseNegedge a  ) = printf "negedge %s" (show a)
+  show (SenseStar       ) = "*"
 
 type Range = (Expr, Expr)
 
