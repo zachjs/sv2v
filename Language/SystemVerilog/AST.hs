@@ -79,7 +79,6 @@ data ModuleItem
   | PortDecl   Direction (Maybe Range) Identifier
   | LocalNet   Type Identifier (Maybe Expr)
   | Integer    [Identifier]
-  | Initial    Stmt
   | Always     (Maybe Sense) Stmt
   | Assign     LHS Expr
   | Instance   Identifier [PortBinding] Identifier [PortBinding]
@@ -100,7 +99,6 @@ instance Show ModuleItem where
             then ""
             else " = " ++ show (fromJust v)
     Integer      a   -> printf "integer %s;"  $ commas a
-    Initial    a     -> printf "initial\n%s" $ indent $ show a
     Always     Nothing  b -> printf "always\n%s" $ indent $ show b
     Always     (Just a) b -> printf "always @(%s)\n%s" (show a) $ indent $ show b
     Assign     a b   -> printf "assign %s = %s;" (show a) (show b)
@@ -292,7 +290,6 @@ data Stmt
   | For                   (Identifier, Expr) Expr (Identifier, Expr) Stmt
   | If                    Expr Stmt Stmt
   | StmtCall              Call
-  | Delay                 Expr Stmt
   | Null
   deriving Eq
 
@@ -312,7 +309,6 @@ instance Show Stmt where
   show (If                    a b Null         ) = printf "if (%s)\n%s"           (show a) (indent $ show b)
   show (If                    a b c            ) = printf "if (%s)\n%s\nelse\n%s" (show a) (indent $ show b) (indent $ show c)
   show (StmtCall              a                ) = printf "%s;" (show a)
-  show (Delay                 a b              ) = printf "#%s %s" (showExprConst a) (show b)
   show (Null                                   ) = ";"
 
 type Case = ([Expr], Stmt)

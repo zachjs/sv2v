@@ -218,7 +218,6 @@ ModuleItem :: { [ModuleItem] }
 | "wire"   MaybeRange WireDeclarations ";"              { map (uncurry $ LocalNet $ Wire $2) $3 }
 | "integer" Identifiers ";"                             { [Integer $2] }
 | "assign" LHS "=" Expr ";"                             { [Assign $2 $4] }
-| "initial" Stmt                                        { [Initial $2] }
 | "always"                   Stmt                       { [Always Nothing $2] }
 | "always" "@" "(" Sense ")" Stmt                       { [Always (Just $4) $6] }
 | "always" "@" "(" "*"   ")" Stmt                       { [Always (Just SenseStar) $6] }
@@ -295,7 +294,6 @@ Stmt :: { Stmt }
 | "for" "(" Identifier "=" Expr ";" Expr ";" Identifier "=" Expr ")" Stmt { For ($3, $5) $7 ($9, $11) $13 }
 | LHS "=" Expr ";"                                 { BlockingAssignment $1 $3 }
 | LHS "<=" Expr ";"                                { NonBlockingAssignment $1 $3 }
-| "#" Expr Stmt                                    { Delay $2 $3 }
 | Call ";"                                         { StmtCall $1 }
 | "case"  "(" Expr ")" Cases  CaseDefault "endcase"  { Case  $3 $5 $6 }
 
