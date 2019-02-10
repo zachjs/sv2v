@@ -40,12 +40,16 @@ data Module
   deriving Eq
 
 instance Show Module where
-  showList modules _ = intercalate "\n\n" $ map show modules
+  showList modules _ = intercalate "\n" $ map show modules
   show (Module name ports items) = unlines
-    [ "module " ++ name ++ (if null ports then "" else "(" ++ commas ports ++ ")") ++ ";"
-    , unlines' $ map show items
-    , "endmodule"
-    ]
+    [ "module " ++ name ++ portsStr ++ ";"
+    , indent $ unlines' $ map show items
+    , "endmodule" ]
+    where
+      portsStr =
+        if null ports
+          then ""
+          else indentedParenList ports
 
 data Direction
   = Input
@@ -74,11 +78,6 @@ data ModuleItem
   | Localparam (Maybe Range) Identifier Expr
   | PortDecl   Direction (Maybe Range) Identifier
   | LocalNet   Type Identifier (Maybe Expr)
---  | Input      (Maybe Range) [Identifier]
---  | Output     (Maybe Range) [Identifier]
---  | Inout      (Maybe Range) [Identifier]
---  | Wire       (Maybe Range) [(Identifier, Maybe $ Either Range Expr)]
---  | Reg        (Maybe Range) [(Identifier, Maybe $ Either Range Expr)]
   | Integer    [Identifier]
   | Initial    Stmt
   | Always     (Maybe Sense) Stmt
@@ -100,11 +99,6 @@ instance Show ModuleItem where
           if v == Nothing
             then ""
             else " = " ++ show (fromJust v)
---    Input      r a   -> printf "input  %s%s;" (showRange r) (commas a)
---    Output     r a   -> printf "output %s%s;" (showRange r) (commas a)
---    Inout      r a   -> printf "inout  %s%s;" (showRange r) (commas a)
---    Wire       r a   -> printf "wire   %s%s;" (showRange r) (commas [ a ++ showAssign r | (a, r) <- a ])
---    Reg        r a   -> printf "reg    %s%s;" (showRange r) (commas [ a ++ showRange  r | (a, r) <- a ])
     Integer      a   -> printf "integer %s;"  $ commas a
     Initial    a     -> printf "initial\n%s" $ indent $ show a
     Always     Nothing  b -> printf "always\n%s" $ indent $ show b
@@ -115,7 +109,7 @@ instance Show ModuleItem where
       | otherwise   -> printf "%s #%s %s %s;" m (showPorts showExprConst params) i (showPorts show ports)
     where
     showPorts :: (Expr -> String) -> [(Identifier, Maybe Expr)] -> String
-    showPorts s ports = printf "(%s)" $ commas [ if i == "" then show (fromJust arg) else printf ".%s(%s)" i (if isJust arg then s $ fromJust arg else "") | (i, arg) <- ports ]
+    showPorts s ports = indentedParenList [ if i == "" then show (fromJust arg) else printf ".%s(%s)" i (if isJust arg then s $ fromJust arg else "") | (i, arg) <- ports ]
 
 showRange :: Maybe Range -> String
 showRange Nothing = ""
@@ -348,3 +342,8 @@ instance Show Sense where
 
 type Range = (Expr, Expr)
 
+indentedParenList :: [String] -> String
+indentedParenList [] = "()"
+indentedParenList [x] = "(" ++ x ++ ")"
+indentedParenList l =
+  "(\n" ++ (indent $ intercalate ",\n" l) ++ "\n)"
