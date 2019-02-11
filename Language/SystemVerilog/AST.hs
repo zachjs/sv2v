@@ -92,7 +92,7 @@ instance Show ModuleItem where
     Parameter  r n e -> printf "parameter %s%s = %s;"  (showRange r) n (showExprConst e)
     Localparam r n e -> printf "localparam %s%s = %s;" (showRange r) n (showExprConst e)
     PortDecl   d r x -> printf "%s %s%s;" (show d) (showRange r) x
-    LocalNet   t x v -> (show t) ++ " " ++ x ++ assignment ++ ";"
+    LocalNet   t x v -> printf "%s%s%s;" (show t) x assignment
       where
         assignment =
           if v == Nothing

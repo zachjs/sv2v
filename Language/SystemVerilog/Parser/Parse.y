@@ -211,8 +211,8 @@ MaybeTypeOrRange :: { Either Type (Maybe Range) }
   | "wire" MaybeRange { Left $ Wire $2 }
 
 ModuleItem :: { [ModuleItem] }
-: "parameter"  MaybeRange Identifier "=" Expr ";"       { [Parameter  $2 $3 $5] }
-| "localparam" MaybeRange Identifier "=" Expr ";"       { [Localparam $2 $3 $5] }
+: "parameter"  MaybeRange DeclAsgns ";"                 { map (uncurry $ Parameter  $2) $3 }
+| "localparam" MaybeRange DeclAsgns ";"                 { map (uncurry $ Localparam $2) $3 }
 | PortDecl(";")                                         { $1 }
 | "reg"    MaybeRange WireDeclarations ";"               { map (uncurry $ LocalNet $ Reg  $2) $3 }
 | "wire"   MaybeRange WireDeclarations ";"              { map (uncurry $ LocalNet $ Wire $2) $3 }
@@ -224,6 +224,13 @@ ModuleItem :: { [ModuleItem] }
 | "always" "@" "*"           Stmt                       { [Always (Just SenseStar) $4] }
 | "always" "@*"              Stmt                       { [Always (Just SenseStar) $3] }
 | Identifier ParameterBindings Identifier Bindings ";"  { [Instance $1 $2 $3 $4] }
+
+DeclAsgns :: { [(Identifier, Expr)] }
+  : DeclAsgn               { [$1] }
+  | DeclAsgn "," DeclAsgns { $1 : $3 }
+
+DeclAsgn :: { (Identifier, Expr) }
+  : Identifier "=" Expr { ($1, $3) }
 
 RegDeclarations :: { [(Identifier, Maybe Range)] }
 :                     Identifier MaybeRange    { [($1, $2)]       }
