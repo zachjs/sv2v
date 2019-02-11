@@ -77,7 +77,7 @@ data ModuleItem
   | Parameter  (Maybe Range) Identifier Expr
   | Localparam (Maybe Range) Identifier Expr
   | PortDecl   Direction (Maybe Range) Identifier
-  | LocalNet   Type Identifier (Maybe Expr)
+  | LocalNet   Type Identifier (Either [Range] (Maybe Expr))
   | Integer    [Identifier]
   | Always     (Maybe Sense) Stmt
   | Assign     LHS Expr
@@ -92,12 +92,13 @@ instance Show ModuleItem where
     Parameter  r n e -> printf "parameter %s%s = %s;"  (showRange r) n (showExprConst e)
     Localparam r n e -> printf "localparam %s%s = %s;" (showRange r) n (showExprConst e)
     PortDecl   d r x -> printf "%s %s%s;" (show d) (showRange r) x
-    LocalNet   t x v -> printf "%s%s%s;" (show t) x assignment
+    LocalNet   t x v -> printf "%s%s%s;" (show t) x extra
       where
-        assignment =
-          if v == Nothing
-            then ""
-            else " = " ++ show (fromJust v)
+        extra =
+          case v of
+            Left ranges -> (intercalate "\b" $ map (showRange . Just) ranges) ++ "\b"
+            Right Nothing -> ""
+            Right (Just val) -> " = " ++ show val
     Integer      a   -> printf "integer %s;"  $ commas a
     Always     Nothing  b -> printf "always\n%s" $ indent $ show b
     Always     (Just a) b -> printf "always @(%s)\n%s" (show a) $ indent $ show b

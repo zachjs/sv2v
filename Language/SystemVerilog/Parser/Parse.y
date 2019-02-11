@@ -214,8 +214,8 @@ ModuleItem :: { [ModuleItem] }
 : "parameter"  MaybeRange DeclAsgns ";"                 { map (uncurry $ Parameter  $2) $3 }
 | "localparam" MaybeRange DeclAsgns ";"                 { map (uncurry $ Localparam $2) $3 }
 | PortDecl(";")                                         { $1 }
-| "reg"    MaybeRange WireDeclarations ";"               { map (uncurry $ LocalNet $ Reg  $2) $3 }
-| "wire"   MaybeRange WireDeclarations ";"              { map (uncurry $ LocalNet $ Wire $2) $3 }
+| "reg"    MaybeRange VariableIdentifiers ";"           { map (uncurry $ LocalNet $ Reg  $2) $3 }
+| "wire"   MaybeRange VariableIdentifiers ";"           { map (uncurry $ LocalNet $ Wire $2) $3 }
 | "integer" Identifiers ";"                             { [Integer $2] }
 | "assign" LHS "=" Expr ";"                             { [Assign $2 $4] }
 | "always"                   Stmt                       { [Always Nothing $2] }
@@ -224,6 +224,18 @@ ModuleItem :: { [ModuleItem] }
 | "always" "@" "*"           Stmt                       { [Always (Just SenseStar) $4] }
 | "always" "@*"              Stmt                       { [Always (Just SenseStar) $3] }
 | Identifier ParameterBindings Identifier Bindings ";"  { [Instance $1 $2 $3 $4] }
+
+VariableIdentifiers :: { [(Identifier, Either [Range] (Maybe Expr))] }
+  : VariableType                         { [$1] }
+  | VariableIdentifiers "," VariableType { $1 ++ [$3] }
+VariableType :: { (Identifier, Either [Range] (Maybe Expr)) }
+  : Identifier            { ($1, Right $ Nothing) }
+  | Identifier "=" Expr   { ($1, Right $ Just $3) }
+  | Identifier Dimensions { ($1, Left $2) }
+
+Dimensions :: { [Range] }
+  : Range            { [$1] }
+  | Dimensions Range { $1 ++ [$2] }
 
 DeclAsgns :: { [(Identifier, Expr)] }
   : DeclAsgn               { [$1] }
@@ -423,7 +435,7 @@ portDeclToModuleItems dir (Just tf) mr l =
   where
     toItems (x, e) =
       [ PortDecl dir mr x
-      , LocalNet (tf mr) x e ]
+      , LocalNet (tf mr) x (Right e) ]
 
 getPortNames :: [ModuleItem] -> [Identifier]
 getPortNames items =
