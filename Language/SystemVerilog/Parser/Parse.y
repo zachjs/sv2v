@@ -172,7 +172,7 @@ ParamDecls :: { [ModuleItem] }
   : ParamDecl(")")            { $1 }
   | ParamDecl(",") ParamDecls { $1 ++ $2 }
 ParamDecl(delim) :: { [ModuleItem] }
-  : "parameter" MaybeRange DeclAsgns delim { map (uncurry $ Parameter $2) $3 }
+  : "parameter" opt(Range) DeclAsgns delim { map (uncurry $ Parameter $2) $3 }
 
 Identifier :: { Identifier }
   : simpleIdentifier  { tokenString $1 }
@@ -199,7 +199,8 @@ PortDecl(delim) :: { [ModuleItem] }
   | "input"  opt(NetType) opt(Range) Identifiers             delim { portDeclToModuleItems Input  $2 $3 (zip $4 (repeat Nothing)) }
   | "output" opt(NetType) opt(Range) Identifiers             delim { portDeclToModuleItems Output $2 $3 (zip $4 (repeat Nothing)) }
   | "output" "reg"        opt(Range) VariablePortIdentifiers delim { portDeclToModuleItems Output (Just Reg) $3 $4 }
-
+NetType
+  : "wire" { Wire }
 VariablePortIdentifiers :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifier                             { [$1] }
   | VariablePortIdentifiers "," VariablePortIdentifier { $1 ++ [$3] }
@@ -208,31 +209,25 @@ VariablePortIdentifier :: { (Identifier, Maybe Expr) }
   | Identifier "=" Expr { ($1, Just $3) }
 
 ModuleItems :: { [ModuleItem] }
-:                         { [] }
-| ModuleItems ModuleItem  { $1 ++ $2 }
-
-NetType
-  : "wire" { Wire }
-
-MaybeTypeOrRange :: { Either Type (Maybe Range) }
-  : MaybeRange { Right $1 }
-  | "reg"  MaybeRange { Left $ Reg  $2 }
-  | "wire" MaybeRange { Left $ Wire $2 }
+  : {- empty -}            { [] }
+  | ModuleItems ModuleItem { $1 ++ $2 }
 
 ModuleItem :: { [ModuleItem] }
-: "parameter"  MaybeRange DeclAsgns ";"                 { map (uncurry $ Parameter  $2) $3 }
-| "localparam" MaybeRange DeclAsgns ";"                 { map (uncurry $ Localparam $2) $3 }
-| PortDecl(";")                                         { $1 }
-| "reg"    MaybeRange VariableIdentifiers ";"           { map (uncurry $ LocalNet $ Reg  $2) $3 }
-| "wire"   MaybeRange VariableIdentifiers ";"           { map (uncurry $ LocalNet $ Wire $2) $3 }
-| "integer"           VariableIdentifiers ";"           { map (uncurry Integer) $2 }
-| "assign" LHS "=" Expr ";"                             { [Assign $2 $4] }
-| "always"                   Stmt                       { [Always Nothing $2] }
-| "always" "@" "(" Sense ")" Stmt                       { [Always (Just $4) $6] }
-| "always" "@" "(" "*"   ")" Stmt                       { [Always (Just SenseStar) $6] }
-| "always" "@" "*"           Stmt                       { [Always (Just SenseStar) $4] }
-| "always" "@*"              Stmt                       { [Always (Just SenseStar) $3] }
-| Identifier ParameterBindings Identifier Bindings ";"  { [Instance $1 $2 $3 $4] }
+  : "parameter"  opt(Range) DeclAsgns ";"                { map (uncurry $ Parameter  $2) $3 }
+  | "localparam" opt(Range) DeclAsgns ";"                { map (uncurry $ Localparam $2) $3 }
+  | PortDecl(";")                                        { $1 }
+  | "reg"    opt(Range) VariableIdentifiers ";"          { map (uncurry $ LocalNet $ Reg  $2) $3 }
+  | "wire"   opt(Range) VariableIdentifiers ";"          { map (uncurry $ LocalNet $ Wire $2) $3 }
+  | "integer"           VariableIdentifiers ";"          { map (uncurry Integer) $2 }
+  | "assign" LHS "=" Expr ";"                            { [Assign $2 $4] }
+  | "always" opt(EventControl) Stmt                      { [Always $2 $3] }
+  | Identifier ParameterBindings Identifier Bindings ";" { [Instance $1 $2 $3 $4] }
+
+EventControl :: { Sense }
+  : "@" "(" Sense ")" { $3 }
+  | "@" "(" "*"   ")" { SenseStar }
+  | "@" "*"           { SenseStar }
+  | "@*"              { SenseStar }
 
 VariableIdentifiers :: { [(Identifier, Either [Range] (Maybe Expr))] }
   : VariableType                         { [$1] }
@@ -249,28 +244,11 @@ Dimensions :: { [Range] }
 DeclAsgns :: { [(Identifier, Expr)] }
   : DeclAsgn               { [$1] }
   | DeclAsgns "," DeclAsgn { $1 ++ [$3] }
-
 DeclAsgn :: { (Identifier, Expr) }
   : Identifier "=" Expr { ($1, $3) }
 
-RegDeclarations :: { [(Identifier, Maybe Range)] }
-:                     Identifier MaybeRange    { [($1, $2)]       }
-| RegDeclarations "," Identifier MaybeRange    { $1 ++ [($3, $4)] }
-
-WireDeclarations :: { [(Identifier, Maybe Expr)] }
-:                      WireDeclaration    { [$1] }
-| WireDeclarations "," WireDeclaration    { $1 ++ [$3] }
-
-WireDeclaration :: { (Identifier, Maybe Expr) }
-: Identifier               { ($1, Nothing) }
-| Identifier "=" Expr      { ($1, Just $3) }
-
-MaybeRange :: { Maybe Range }
-:         { Nothing }
-| Range   { Just $1 }
-
 Range :: { Range }
-: "[" Expr ":" Expr "]"  { ($2, $4) }
+  : "[" Expr ":" Expr "]"  { ($2, $4) }
 
 LHS :: { LHS }
 : Identifier              { LHS       $1    }
@@ -304,18 +282,18 @@ Binding :: { (Identifier, Maybe Expr) }
 | Expr                             { ("", Just $1) }
 
 ParameterBindings :: { [(Identifier, Maybe Expr)] }
-:              { [] }
-| "#" Bindings { $2 }
+  : {- empty -}  { [] }
+  | "#" Bindings { $2 }
 
 Stmts :: { [Stmt] }
-:            { [] }
-| Stmts Stmt { $1 ++ [$2] }
+  : {- empty -} { [] }
+  | Stmts Stmt  { $1 ++ [$2] }
 
 Stmt :: { Stmt }
   : ";" { Null }
   | "begin"                Stmts "end"               { Block Nothing   $2 }
   | "begin" ":" Identifier Stmts "end"               { Block (Just $3) $4 }
-  | "reg" MaybeRange BlockRegIdentifiers ";"         { stmtsToStmt $ map (uncurry $ StmtReg $2) $3 }
+  | "reg" opt(Range) BlockRegIdentifiers ";"         { stmtsToStmt $ map (uncurry $ StmtReg $2) $3 }
   | "integer" VariableIdentifiers ";"                { stmtsToStmt $ map (uncurry StmtInteger) $2 }
   | "if" "(" Expr ")" Stmt "else" Stmt               { If $3 $5 $7        }
   | "if" "(" Expr ")" Stmt %prec NoElse              { If $3 $5 Null      }
