@@ -225,7 +225,7 @@ ModuleItem :: { [ModuleItem] }
 | PortDecl(";")                                         { $1 }
 | "reg"    MaybeRange VariableIdentifiers ";"           { map (uncurry $ LocalNet $ Reg  $2) $3 }
 | "wire"   MaybeRange VariableIdentifiers ";"           { map (uncurry $ LocalNet $ Wire $2) $3 }
-| "integer" Identifiers ";"                             { [Integer $2] }
+| "integer"           VariableIdentifiers ";"           { map (uncurry Integer) $2 }
 | "assign" LHS "=" Expr ";"                             { [Assign $2 $4] }
 | "always"                   Stmt                       { [Always Nothing $2] }
 | "always" "@" "(" Sense ")" Stmt                       { [Always (Just $4) $6] }
@@ -312,18 +312,25 @@ Stmts :: { [Stmt] }
 | Stmts Stmt { $1 ++ [$2] }
 
 Stmt :: { Stmt }
-: ";" { Null }
-| "begin"                Stmts "end"               { Block Nothing   $2 }
-| "begin" ":" Identifier Stmts "end"               { Block (Just $3) $4 }
-| "reg" MaybeRange RegDeclarations ";"             { StmtReg $2 $3      }
-| "integer" Identifiers ";"                        { StmtInteger $2     }
-| "if" "(" Expr ")" Stmt "else" Stmt               { If $3 $5 $7        }
-| "if" "(" Expr ")" Stmt %prec NoElse              { If $3 $5 Null      }
-| "for" "(" Identifier "=" Expr ";" Expr ";" Identifier "=" Expr ")" Stmt { For ($3, $5) $7 ($9, $11) $13 }
-| LHS "=" Expr ";"                                 { BlockingAssignment $1 $3 }
-| LHS "<=" Expr ";"                                { NonBlockingAssignment $1 $3 }
-| Call ";"                                         { StmtCall $1 }
-| "case"  "(" Expr ")" Cases  CaseDefault "endcase"  { Case  $3 $5 $6 }
+  : ";" { Null }
+  | "begin"                Stmts "end"               { Block Nothing   $2 }
+  | "begin" ":" Identifier Stmts "end"               { Block (Just $3) $4 }
+  | "reg" MaybeRange BlockRegIdentifiers ";"         { stmtsToStmt $ map (uncurry $ StmtReg $2) $3 }
+  | "integer" VariableIdentifiers ";"                { stmtsToStmt $ map (uncurry StmtInteger) $2 }
+  | "if" "(" Expr ")" Stmt "else" Stmt               { If $3 $5 $7        }
+  | "if" "(" Expr ")" Stmt %prec NoElse              { If $3 $5 Null      }
+  | "for" "(" Identifier "=" Expr ";" Expr ";" Identifier "=" Expr ")" Stmt { For ($3, $5) $7 ($9, $11) $13 }
+  | LHS "=" Expr ";"                                 { BlockingAssignment $1 $3 }
+  | LHS "<=" Expr ";"                                { NonBlockingAssignment $1 $3 }
+  | Call ";"                                         { StmtCall $1 }
+  | "case"  "(" Expr ")" Cases  CaseDefault "endcase"  { Case  $3 $5 $6 }
+
+BlockRegIdentifiers :: { [(Identifier, [Range])] }
+  : BlockRegIdentifier                         { [$1] }
+  | BlockRegIdentifiers "," BlockRegIdentifier { $1 ++ [$3] }
+BlockRegIdentifier :: { (Identifier, [Range]) }
+  : Identifier            { ($1, []) }
+  | Identifier Dimensions { ($1, $2) }
 
 Cases :: { [Case] }
 :              { [] }
@@ -454,6 +461,10 @@ getPortNames items =
     getPortName (PortDecl _ _ ident) = Just ident
     getPortName _ = Nothing
 
+stmtsToStmt :: [Stmt] -> Stmt
+stmtsToStmt [] = error "stmtsToStmt given empty list!"
+stmtsToStmt [s] = s
+stmtsToStmt ss = Block Nothing ss
 
 }
 

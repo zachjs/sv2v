@@ -77,8 +77,8 @@ data ModuleItem
   | Parameter  (Maybe Range) Identifier Expr
   | Localparam (Maybe Range) Identifier Expr
   | PortDecl   Direction (Maybe Range) Identifier
-  | LocalNet   Type Identifier (Either [Range] (Maybe Expr))
-  | Integer    [Identifier]
+  | LocalNet   Type Identifier RangesOrAssignment
+  | Integer         Identifier RangesOrAssignment
   | Always     (Maybe Sense) Stmt
   | Assign     LHS Expr
   | Instance   Identifier [PortBinding] Identifier [PortBinding]
@@ -92,14 +92,8 @@ instance Show ModuleItem where
     Parameter  r n e -> printf "parameter %s%s = %s;"  (showRange r) n (showExprConst e)
     Localparam r n e -> printf "localparam %s%s = %s;" (showRange r) n (showExprConst e)
     PortDecl   d r x -> printf "%s %s%s;" (show d) (showRange r) x
-    LocalNet   t x v -> printf "%s%s%s;" (show t) x extra
-      where
-        extra =
-          case v of
-            Left ranges -> (intercalate "\b" $ map (showRange . Just) ranges) ++ "\b"
-            Right Nothing -> ""
-            Right (Just val) -> " = " ++ show val
-    Integer      a   -> printf "integer %s;"  $ commas a
+    LocalNet   t x v -> printf "%s%s%s;" (show t) x (showRangesOrAssignment v)
+    Integer    x v   -> printf "integer %s%s;" x (showRangesOrAssignment v)
     Always     Nothing  b -> printf "always\n%s" $ indent $ show b
     Always     (Just a) b -> printf "always @(%s)\n%s" (show a) $ indent $ show b
     Assign     a b   -> printf "assign %s = %s;" (show a) (show b)
@@ -109,6 +103,20 @@ instance Show ModuleItem where
     where
     showPorts :: (Expr -> String) -> [(Identifier, Maybe Expr)] -> String
     showPorts s ports = indentedParenList [ if i == "" then show (fromJust arg) else printf ".%s(%s)" i (if isJust arg then s $ fromJust arg else "") | (i, arg) <- ports ]
+
+type RangesOrAssignment = Either [Range] (Maybe Expr)
+
+showRangesOrAssignment :: Either [Range] (Maybe Expr) -> String
+showRangesOrAssignment (Left ranges) = showRanges ranges
+showRangesOrAssignment (Right val) = showAssignment val
+
+showAssignment :: Maybe Expr -> String
+showAssignment Nothing = ""
+showAssignment (Just val) = " = " ++ show val
+
+showRanges :: [Range] -> String
+showRanges = concat . (map rangeToString)
+  where rangeToString d = (showRange $ Just d) ++ "\b"
 
 showRange :: Maybe Range -> String
 showRange Nothing = ""
@@ -283,8 +291,8 @@ instance Show LHS where
 
 data Stmt
   = Block                 (Maybe Identifier) [Stmt]
-  | StmtReg               (Maybe Range) [(Identifier, Maybe Range)]
-  | StmtInteger           [Identifier]
+  | StmtReg               (Maybe Range) Identifier [Range]
+  | StmtInteger           Identifier RangesOrAssignment
   | Case                  Expr [Case] (Maybe Stmt)
   | BlockingAssignment    LHS Expr
   | NonBlockingAssignment LHS Expr
@@ -300,8 +308,8 @@ commas = intercalate ", "
 instance Show Stmt where
   show (Block                 Nothing  b       ) = printf "begin\n%s\nend" $ indent $ unlines' $ map show b
   show (Block                 (Just a) b       ) = printf "begin : %s\n%s\nend" a $ indent $ unlines' $ map show b
-  show (StmtReg               a b              ) = printf "reg    %s%s;" (showRange a) (commas [ x ++ showRange  r | (x, r) <- b ])
-  show (StmtInteger           a                ) = printf "integer %s;" $ commas a
+  show (StmtReg               r x a            ) = printf "reg %s%s%s;" (showRange r) x (showRanges a)
+  show (StmtInteger           x v              ) = printf "integer %s%s;" x (showRangesOrAssignment v)
   show (Case                  a b Nothing      ) = printf "case (%s)\n%s\nendcase"                 (show a) (indent $ unlines' $ map showCase b)
   show (Case                  a b (Just c)     ) = printf "case (%s)\n%s\n\tdefault:\n%s\nendcase" (show a) (indent $ unlines' $ map showCase b) (indent $ indent $ show c)
   show (BlockingAssignment    a b              ) = printf "%s = %s;" (show a) (show b)
