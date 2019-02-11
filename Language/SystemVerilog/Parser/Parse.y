@@ -161,9 +161,18 @@ Modules :: { [Module] }
   | Modules Module { $1 ++ [$2] }
 
 Module :: { Module }
-  : "module" Identifier           ";" ModuleItems "endmodule" opt(";") { Module $2 [] $4 }
-  | "module" Identifier PortNames ";" ModuleItems "endmodule" opt(";") { Module $2 $3 $5 }
-  | "module" Identifier PortDecls ";" ModuleItems "endmodule" opt(";") { Module $2 (getPortNames $3) ($3 ++ $5) }
+  : "module" Identifier Params           ";" ModuleItems "endmodule" opt(";") { Module $2 [] ($3 ++ $5) }
+  | "module" Identifier Params PortNames ";" ModuleItems "endmodule" opt(";") { Module $2 $4 ($3 ++ $6) }
+  | "module" Identifier Params PortDecls ";" ModuleItems "endmodule" opt(";") { Module $2 (getPortNames $4) ($3 ++ $4 ++ $6) }
+
+Params :: { [ModuleItem] }
+  : {- empty -}        { [] }
+  | "#" "(" ParamDecls { $3 }
+ParamDecls :: { [ModuleItem] }
+  : ParamDecl(")")            { $1 }
+  | ParamDecl(",") ParamDecls { $1 ++ $2 }
+ParamDecl(delim) :: { [ModuleItem] }
+  : "parameter" MaybeRange DeclAsgns delim { map (uncurry $ Parameter $2) $3 }
 
 Identifier :: { Identifier }
   : simpleIdentifier  { tokenString $1 }
@@ -239,7 +248,7 @@ Dimensions :: { [Range] }
 
 DeclAsgns :: { [(Identifier, Expr)] }
   : DeclAsgn               { [$1] }
-  | DeclAsgn "," DeclAsgns { $1 : $3 }
+  | DeclAsgns "," DeclAsgn { $1 ++ [$3] }
 
 DeclAsgn :: { (Identifier, Expr) }
   : Identifier "=" Expr { ($1, $3) }
