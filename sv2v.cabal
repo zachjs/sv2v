@@ -45,6 +45,9 @@ library
 executable sv2v
   default-language: Haskell2010
   main-is: sv2v.hs
+  build-tools:
+    alex  >= 3 && < 4,
+    happy >= 1 && < 2
   build-depends:
     array,
     base
