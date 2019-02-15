@@ -27,7 +27,9 @@ import Language.SystemVerilog.Parser.Tokens
 "else"             { Token KW_else       _ _ }
 "end"              { Token KW_end        _ _ }
 "endcase"          { Token KW_endcase    _ _ }
+"endfunction"      { Token KW_endfunction _ _ }
 "endmodule"        { Token KW_endmodule  _ _ }
+"function"         { Token KW_function   _ _ }
 "for"              { Token KW_for        _ _ }
 "if"               { Token KW_if         _ _ }
 "initial"          { Token KW_initial    _ _ }
@@ -172,7 +174,7 @@ ParamDecls :: { [ModuleItem] }
   : ParamDecl(")")            { $1 }
   | ParamDecl(",") ParamDecls { $1 ++ $2 }
 ParamDecl(delim) :: { [ModuleItem] }
-  : "parameter" opt(Range) DeclAsgns delim { map (uncurry $ Parameter $2) $3 }
+  : "parameter" opt(Range) DeclAsgns delim { map (MIParameter . (uncurry $ Parameter $2)) $3 }
 
 Identifier :: { Identifier }
   : simpleIdentifier  { tokenString $1 }
@@ -213,15 +215,45 @@ ModuleItems :: { [ModuleItem] }
   | ModuleItems ModuleItem { $1 ++ $2 }
 
 ModuleItem :: { [ModuleItem] }
-  : "parameter"  opt(Range) DeclAsgns ";"                { map (uncurry $ Parameter  $2) $3 }
-  | "localparam" opt(Range) DeclAsgns ";"                { map (uncurry $ Localparam $2) $3 }
-  | PortDecl(";")                                        { $1 }
+  : PortDecl(";")                                        { $1 }
   | "reg"    opt(Range) VariableIdentifiers ";"          { map (uncurry $ LocalNet $ Reg  $2) $3 }
   | "wire"   opt(Range) VariableIdentifiers ";"          { map (uncurry $ LocalNet $ Wire $2) $3 }
-  | "integer"           VariableIdentifiers ";"          { map (uncurry Integer) $2 }
+  | ParameterDeclaration                                 { map MIParameter  $1 }
+  | LocalparamDeclaration                                { map MILocalparam $1 }
+  | IntegerDeclaration                                   { map MIIntegerV   $1 }
   | "assign" LHS "=" Expr ";"                            { [Assign $2 $4] }
   | "always" opt(EventControl) Stmt                      { [Always $2 $3] }
   | Identifier ParameterBindings Identifier Bindings ";" { [Instance $1 $2 $3 $4] }
+  | "function" opt(RangeOrType) Identifier FunctionItems Stmt "endfunction" { [Function $2 $3 $4 $5] }
+
+FunctionItems :: { [(Bool, BlockItemDeclaration)] }
+  : "(" FunctionPortList ";" BlockItemDeclarations { (map ((,) True) $2) ++ (map ((,) False) $4) }
+  | ";" FunctionItemDeclarations                   { $2 }
+FunctionPortList :: { [BlockItemDeclaration] }
+  : FunctionInputDeclaration(")")                  { $1 }
+  | FunctionInputDeclaration(",") FunctionPortList { $1 ++ $2 }
+FunctionItemDeclarations :: { [(Bool, BlockItemDeclaration)] }
+  : FunctionItemDeclaration                          { $1 }
+  | FunctionItemDeclarations FunctionItemDeclaration { $1 ++ $2 }
+FunctionItemDeclaration :: { [(Bool, BlockItemDeclaration)] }
+  : BlockItemDeclaration          { map ((,) False) $1 }
+  | FunctionInputDeclaration(";") { map ((,) True ) $1 }
+FunctionInputDeclaration(delim) :: { [BlockItemDeclaration] }
+  : "input" opt("reg") opt(Range) Identifiers delim { map (\x -> BIDReg $3 x []) $4 }
+  | "input" "integer"             Identifiers delim { map (\x -> BIDIntegerV $ IntegerV x $ Left []) $3 }
+
+ParameterDeclaration :: { [Parameter] }
+  : "parameter"  opt(Range) DeclAsgns ";" { map (uncurry $ Parameter  $2) $3 }
+
+LocalparamDeclaration :: { [Localparam] }
+  : "localparam" opt(Range) DeclAsgns ";" { map (uncurry $ Localparam $2) $3 }
+
+IntegerDeclaration :: { [IntegerV] }
+  : "integer" VariableIdentifiers ";" { map (uncurry IntegerV) $2 }
+
+RangeOrType :: { Either Range () }
+  : Range     { Left $1 }
+  | "integer" { Right () }
 
 EventControl :: { Sense }
   : "@" "(" Sense ")" { $3 }
@@ -291,22 +323,30 @@ Stmts :: { [Stmt] }
 
 Stmt :: { Stmt }
   : ";" { Null }
-  | "begin"                Stmts "end"               { Block Nothing   $2 }
-  | "begin" ":" Identifier Stmts "end"               { Block (Just $3) $4 }
-  | "reg" opt(Range) BlockRegIdentifiers ";"         { stmtsToStmt $ map (uncurry $ StmtReg $2) $3 }
-  | "integer" VariableIdentifiers ";"                { stmtsToStmt $ map (uncurry StmtInteger) $2 }
+  | "begin"                                      Stmts "end" { Block Nothing         $2 }
+  | "begin" ":" Identifier                       Stmts "end" { Block (Just ($3, [])) $4 }
+  | "begin" ":" Identifier BlockItemDeclarations Stmts "end" { Block (Just ($3, $4)) $5 }
   | "if" "(" Expr ")" Stmt "else" Stmt               { If $3 $5 $7        }
   | "if" "(" Expr ")" Stmt %prec NoElse              { If $3 $5 Null      }
   | "for" "(" Identifier "=" Expr ";" Expr ";" Identifier "=" Expr ")" Stmt { For ($3, $5) $7 ($9, $11) $13 }
   | LHS "=" Expr ";"                                 { BlockingAssignment $1 $3 }
   | LHS "<=" Expr ";"                                { NonBlockingAssignment $1 $3 }
-  | Call ";"                                         { StmtCall $1 }
+  -- | Call ";"                                         { StmtCall $1 }
   | "case"  "(" Expr ")" Cases  CaseDefault "endcase"  { Case  $3 $5 $6 }
 
-BlockRegIdentifiers :: { [(Identifier, [Range])] }
-  : BlockRegIdentifier                         { [$1] }
-  | BlockRegIdentifiers "," BlockRegIdentifier { $1 ++ [$3] }
-BlockRegIdentifier :: { (Identifier, [Range]) }
+BlockItemDeclarations :: { [BlockItemDeclaration] }
+  : BlockItemDeclaration                       { $1 }
+  | BlockItemDeclarations BlockItemDeclaration { $1 ++ $2 }
+
+BlockItemDeclaration :: { [BlockItemDeclaration] }
+  : "reg" opt(Range) BlockVariableIdentifiers { map (uncurry $ BIDReg $2) $3 }
+  | ParameterDeclaration                      { map BIDParameter  $1 }
+  | LocalparamDeclaration                     { map BIDLocalparam $1 }
+  | IntegerDeclaration                        { map BIDIntegerV   $1 }
+BlockVariableIdentifiers :: { [(Identifier, [Range])] }
+  : BlockVariableType                              { [$1] }
+  | BlockVariableIdentifiers "," BlockVariableType { $1 ++ [$3] }
+BlockVariableType :: { (Identifier, [Range]) }
   : Identifier            { ($1, []) }
   | Identifier Dimensions { ($1, $2) }
 

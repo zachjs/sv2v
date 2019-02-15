@@ -11,6 +11,10 @@ module Language.SystemVerilog.AST
   , BinOp      (..)
   , Sense      (..)
   , Call       (..)
+  , BlockItemDeclaration (..)
+  , Parameter  (..)
+  , Localparam (..)
+  , IntegerV   (..)
   , PortBinding
   , Case
   , Range
@@ -74,35 +78,62 @@ instance Show Type where
 
 data ModuleItem
   = Comment    String
-  | Parameter  (Maybe Range) Identifier Expr
-  | Localparam (Maybe Range) Identifier Expr
+  | MIParameter  Parameter
+  | MILocalparam Localparam
+  | MIIntegerV   IntegerV
   | PortDecl   Direction (Maybe Range) Identifier
   | LocalNet   Type Identifier RangesOrAssignment
-  | Integer         Identifier RangesOrAssignment
   | Always     (Maybe Sense) Stmt
   | Assign     LHS Expr
   | Instance   Identifier [PortBinding] Identifier [PortBinding]
+  | Function   (Maybe FuncRet) Identifier [(Bool, BlockItemDeclaration)] Stmt
   deriving Eq
 
+-- "function inputs and outputs are inferred to be of type reg if no internal
+-- data types for the ports are declared"
+
 type PortBinding = (Identifier, Maybe Expr)
+
+data Parameter  = Parameter  (Maybe Range) Identifier Expr deriving Eq
+instance Show Parameter where
+    show (Parameter  r n e) = printf "parameter %s%s = %s;"  (showRange r) n (showExprConst e)
+
+data Localparam = Localparam (Maybe Range) Identifier Expr deriving Eq
+instance Show Localparam where
+    show (Localparam r n e) = printf "localparam %s%s = %s;" (showRange r) n (showExprConst e)
+
+data IntegerV   = IntegerV   Identifier RangesOrAssignment deriving Eq
+instance Show IntegerV where
+    show (IntegerV   x v  ) = printf "integer %s%s;" x (showRangesOrAssignment v)
 
 instance Show ModuleItem where
   show thing = case thing of
     Comment    c     -> "// " ++ c
-    Parameter  r n e -> printf "parameter %s%s = %s;"  (showRange r) n (showExprConst e)
-    Localparam r n e -> printf "localparam %s%s = %s;" (showRange r) n (showExprConst e)
+    MIParameter  nest -> show nest
+    MILocalparam nest -> show nest
+    MIIntegerV   nest -> show nest
     PortDecl   d r x -> printf "%s %s%s;" (show d) (showRange r) x
     LocalNet   t x v -> printf "%s%s%s;" (show t) x (showRangesOrAssignment v)
-    Integer    x v   -> printf "integer %s%s;" x (showRangesOrAssignment v)
     Always     Nothing  b -> printf "always\n%s" $ indent $ show b
     Always     (Just a) b -> printf "always @(%s)\n%s" (show a) $ indent $ show b
     Assign     a b   -> printf "assign %s = %s;" (show a) (show b)
     Instance   m params i ports
       | null params -> printf "%s %s %s;"     m                                  i (showPorts show ports)
       | otherwise   -> printf "%s #%s %s %s;" m (showPorts showExprConst params) i (showPorts show ports)
+    Function   t x i b -> printf "function %s%s;\n%s\n%s\nendfunction" (showFuncRet t) x (indent $ unlines' $ map showFunctionItem i) (indent $ show b)
     where
     showPorts :: (Expr -> String) -> [(Identifier, Maybe Expr)] -> String
     showPorts s ports = indentedParenList [ if i == "" then show (fromJust arg) else printf ".%s(%s)" i (if isJust arg then s $ fromJust arg else "") | (i, arg) <- ports ]
+    showFunctionItem :: (Bool, BlockItemDeclaration) -> String
+    showFunctionItem (b, item) = prefix ++ (show item)
+      where prefix = if b then "input " else ""
+
+type FuncRet = Either Range ()
+
+showFuncRet :: Maybe FuncRet -> String
+showFuncRet Nothing = ""
+showFuncRet (Just (Left r)) = showRange $ Just r
+showFuncRet (Just (Right ())) = "integer "
 
 type RangesOrAssignment = Either [Range] (Maybe Expr)
 
@@ -290,15 +321,12 @@ instance Show LHS where
   show (LHSConcat  a       ) = printf "{%s}" (commas $ map show a)
 
 data Stmt
-  = Block                 (Maybe Identifier) [Stmt]
-  | StmtReg               (Maybe Range) Identifier [Range]
-  | StmtInteger           Identifier RangesOrAssignment
+  = Block                 (Maybe (Identifier, [BlockItemDeclaration])) [Stmt]
   | Case                  Expr [Case] (Maybe Stmt)
   | BlockingAssignment    LHS Expr
   | NonBlockingAssignment LHS Expr
   | For                   (Identifier, Expr) Expr (Identifier, Expr) Stmt
   | If                    Expr Stmt Stmt
-  | StmtCall              Call
   | Null
   deriving Eq
 
@@ -306,10 +334,8 @@ commas :: [String] -> String
 commas = intercalate ", "
 
 instance Show Stmt where
-  show (Block                 Nothing  b       ) = printf "begin\n%s\nend" $ indent $ unlines' $ map show b
-  show (Block                 (Just a) b       ) = printf "begin : %s\n%s\nend" a $ indent $ unlines' $ map show b
-  show (StmtReg               r x a            ) = printf "reg %s%s%s;" (showRange r) x (showRanges a)
-  show (StmtInteger           x v              ) = printf "integer %s%s;" x (showRangesOrAssignment v)
+  show (Block                 Nothing       b  ) = printf "begin\n%s\nend" $ indent $ unlines' $ map show b
+  show (Block                 (Just (a, i)) b  ) = printf "begin : %s\n%s%s\nend" a $ indent $ unlines' $ (map show i ++ map show b)
   show (Case                  a b Nothing      ) = printf "case (%s)\n%s\nendcase"                 (show a) (indent $ unlines' $ map showCase b)
   show (Case                  a b (Just c)     ) = printf "case (%s)\n%s\n\tdefault:\n%s\nendcase" (show a) (indent $ unlines' $ map showCase b) (indent $ indent $ show c)
   show (BlockingAssignment    a b              ) = printf "%s = %s;" (show a) (show b)
@@ -317,8 +343,24 @@ instance Show Stmt where
   show (For                   (a, b) c (d, e) f) = printf "for (%s = %s; %s; %s = %s)\n%s" a (show b) (show c) d (show e) $ indent $ show f
   show (If                    a b Null         ) = printf "if (%s)\n%s"           (show a) (indent $ show b)
   show (If                    a b c            ) = printf "if (%s)\n%s\nelse\n%s" (show a) (indent $ show b) (indent $ show c)
-  show (StmtCall              a                ) = printf "%s;" (show a)
   show (Null                                   ) = ";"
+
+  -- It's not obvious to me how this can be done in a top level
+  --show (StmtCall              a                ) = printf "%s;" (show a)
+  -- | StmtCall              Call
+
+data BlockItemDeclaration
+  = BIDReg        (Maybe Range) Identifier [Range]
+  | BIDParameter  Parameter
+  | BIDLocalparam Localparam
+  | BIDIntegerV   IntegerV
+  deriving Eq
+
+instance Show BlockItemDeclaration where
+  show (BIDReg     mr x rs) = printf "reg %s%s%s;" (showRange mr) x (showRanges rs)
+  show (BIDParameter  nest) = show nest
+  show (BIDLocalparam nest) = show nest
+  show (BIDIntegerV   nest) = show nest
 
 type Case = ([Expr], Stmt)
 
