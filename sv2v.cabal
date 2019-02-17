@@ -31,7 +31,6 @@ library
     array      >= 0.5.1.0   && < 0.6
 
   exposed-modules:
-    Data.BitVec
     Language.SystemVerilog
     Language.SystemVerilog.AST
     Language.SystemVerilog.Parser
@@ -52,7 +51,6 @@ executable sv2v
     array,
     base
   other-modules:
-    Data.BitVec
     Language.SystemVerilog
     Language.SystemVerilog.AST
     Language.SystemVerilog.Parser

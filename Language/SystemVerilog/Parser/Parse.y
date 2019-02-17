@@ -4,7 +4,6 @@ module Language.SystemVerilog.Parser.Parse (modules) where
 import Data.Bits
 import Data.List
 
-import Data.BitVec
 import Data.Maybe
 import Language.SystemVerilog.AST
 import Language.SystemVerilog.Parser.Tokens
@@ -362,8 +361,8 @@ CaseDefault  :: { Maybe Stmt }
 :                     { Nothing }
 | "default" ":" Stmt  { Just $3 }
 
-Number :: { BitVec }
-: number    { toNumber $1 }
+Number :: { String }
+  : number    { tokenString $1 }
 
 String :: { String }
 : string    { toString $1 }
@@ -434,25 +433,6 @@ parseError a = case a of
 
 toString :: Token -> String
 toString = tail . init . tokenString
-
-toNumber :: Token -> BitVec
-toNumber = number . tokenString
-  where
-  number :: String -> BitVec
-  number a
-    | all (flip elem ['0' .. '9']) a = fromInteger $ read a
-    | head a == '\''                 = fromInteger $ f a
-    | isInfixOf  "'"  a              = bitVec (read w) (f b)
-    | otherwise                      = error $ "Invalid number format: " ++ a
-    where
-    w = takeWhile (/= '\'') a
-    b = dropWhile (/= '\'') a
-    f a
-      | isPrefixOf "'d" a = read $ drop 2 a
-      | isPrefixOf "'h" a = read $ "0x" ++ drop 2 a
-      | isPrefixOf "'b" a = foldl (\ n b -> shiftL n 1 .|. (if b == '1' then 1 else 0)) 0 (drop 2 a)
-      | otherwise         = error $ "Invalid number format: " ++ a
-
 
 portDeclToModuleItems
   :: Direction

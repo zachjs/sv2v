@@ -25,8 +25,6 @@ import Data.List
 import Data.Maybe
 import Text.Printf
 
-import Data.BitVec
-
 type Identifier = String
 
 -- Note: Verilog allows modules to be declared with either a simple list of
@@ -96,11 +94,11 @@ type PortBinding = (Identifier, Maybe Expr)
 
 data Parameter  = Parameter  (Maybe Range) Identifier Expr deriving Eq
 instance Show Parameter where
-    show (Parameter  r n e) = printf "parameter %s%s = %s;"  (showRange r) n (showExprConst e)
+    show (Parameter  r n e) = printf "parameter %s%s = %s;"  (showRange r) n (show e)
 
 data Localparam = Localparam (Maybe Range) Identifier Expr deriving Eq
 instance Show Localparam where
-    show (Localparam r n e) = printf "localparam %s%s = %s;" (showRange r) n (showExprConst e)
+    show (Localparam r n e) = printf "localparam %s%s = %s;" (showRange r) n (show e)
 
 data IntegerV   = IntegerV   Identifier RangesOrAssignment deriving Eq
 instance Show IntegerV where
@@ -119,7 +117,7 @@ instance Show ModuleItem where
     Assign     a b   -> printf "assign %s = %s;" (show a) (show b)
     Instance   m params i ports
       | null params -> printf "%s %s %s;"     m                                  i (showPorts show ports)
-      | otherwise   -> printf "%s #%s %s %s;" m (showPorts showExprConst params) i (showPorts show ports)
+      | otherwise   -> printf "%s #%s %s %s;" m (showPorts show params) i (showPorts show ports)
     Function   t x i b -> printf "function %s%s;\n%s\n%s\nendfunction" (showFuncRet t) x (indent $ unlines' $ map showFunctionItem i) (indent $ show b)
     where
     showPorts :: (Expr -> String) -> [(Identifier, Maybe Expr)] -> String
@@ -151,7 +149,7 @@ showRanges = concat . (map rangeToString)
 
 showRange :: Maybe Range -> String
 showRange Nothing = ""
-showRange (Just (h, l)) = printf "[%s:%s] " (showExprConst h) (showExprConst l)
+showRange (Just (h, l)) = printf "[%s:%s] " (show h) (show l)
 
 indent :: String -> String
 indent a = '\t' : f a
@@ -166,7 +164,7 @@ unlines' = intercalate "\n"
 
 data Expr
   = String     String
-  | Number     BitVec
+  | Number     String
   | ConstBool  Bool
   | Ident      Identifier
   | IdentRange Identifier Range
@@ -247,43 +245,21 @@ instance Show BinOp where
     Gt     -> ">"
     Ge     -> ">="
 
-showBitVecDefault :: BitVec -> String
-showBitVecDefault a = printf "%d'h%x" (width a) (value a)
-
-showBitVecConst :: BitVec -> String
-showBitVecConst a = show $ value a
-
-instance Show Expr where show = showExpr showBitVecDefault
-
-showExprConst :: Expr -> String
-showExprConst = showExpr showBitVecConst
-
-showExpr :: (BitVec -> String) -> Expr -> String
-showExpr bv x = case x of
-  String     a        -> printf "\"%s\"" a
-  Number     a        -> bv a
-  ConstBool  a        -> printf "1'b%s" (if a then "1" else "0")
-  Ident      a        -> a
-  IdentBit   a b      -> printf "%s[%s]"    a (showExprConst b)
-  IdentRange a (b, c) -> printf "%s[%s:%s]" a (showExprConst b) (showExprConst c)
-  Repeat     a b      -> printf "{%s {%s}}" (showExprConst a) (commas $ map s b)
-  Concat     a        -> printf "{%s}" (commas $ map show a)
-  ExprCall   a        -> show a
-  UniOp      a b      -> printf "(%s %s)" (show a) (s b)
-  BinOp      a b c    -> printf "(%s %s %s)" (s b) (show a) (s c)
-  Mux        a b c    -> printf "(%s ? %s : %s)" (s a) (s b) (s c)
-  Bit        a b      -> printf "(%s [%d])" (s a) b
-  where
-  s = showExpr bv
-
-instance Num Expr where
-  (+) = BinOp Add
-  (-) = BinOp Sub
-  (*) = BinOp Mul
-  negate = UniOp USub
-  abs = undefined
-  signum = undefined
-  fromInteger = Number . fromInteger
+instance Show Expr where
+  show x = case x of
+    String     a        -> printf "\"%s\"" a
+    Number     a        -> a
+    ConstBool  a        -> printf "1'b%s" (if a then "1" else "0")
+    Ident      a        -> a
+    IdentBit   a b      -> printf "%s[%s]"    a (show b)
+    IdentRange a (b, c) -> printf "%s[%s:%s]" a (show b) (show c)
+    Repeat     a b      -> printf "{%s {%s}}" (show a) (commas $ map show b)
+    Concat     a        -> printf "{%s}" (commas $ map show a)
+    ExprCall   a        -> show a
+    UniOp      a b      -> printf "(%s %s)" (show a) (show b)
+    BinOp      a b c    -> printf "(%s %s %s)" (show b) (show a) (show c)
+    Mux        a b c    -> printf "(%s ? %s : %s)" (show a) (show b) (show c)
+    Bit        a b      -> printf "(%s [%d])" (show a) b
 
 instance Bits Expr where
   (.&.) = BinOp BWAnd
@@ -299,14 +275,6 @@ instance Bits Expr where
   bit          = error "Not supported: bit"
   popCount     = error "Not supported: popCount"
 
-instance Semigroup Expr where
-  (<>) = mappend
-
-instance Monoid Expr where
-  mempty      = 0
-  mappend a b = mconcat [a, b]
-  mconcat     = Concat
-
 data LHS
   = LHS       Identifier
   | LHSBit    Identifier Expr
@@ -316,8 +284,8 @@ data LHS
 
 instance Show LHS where
   show (LHS        a       ) = a
-  show (LHSBit     a b     ) = printf "%s[%s]"    a (showExprConst b)
-  show (LHSRange   a (b, c)) = printf "%s[%s:%s]" a (showExprConst b) (showExprConst c)
+  show (LHSBit     a b     ) = printf "%s[%s]"    a (show b)
+  show (LHSRange   a (b, c)) = printf "%s[%s:%s]" a (show b) (show c)
   show (LHSConcat  a       ) = printf "{%s}" (commas $ map show a)
 
 data Stmt
