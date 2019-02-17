@@ -50,7 +50,7 @@ preprocess env file content = unlines $ pp True [] env $ lines $ uncomment file 
   pp _ _ _ [] = []
   pp on stack env (a : rest) =
     if a /= "" && last a == '\\' && head a == '`'
-    then pp on stack env $ ((init a) ++ " " ++ (head rest)) : (tail rest)
+    then "" : (pp on stack env $ ((init a) ++ " " ++ (head rest)) : (tail rest))
     else case words a of
       "`define" : name : value -> "" : pp on stack (if on then (name, ppLine env $ unwords value) : env else env) rest
       "`ifdef"  : name : _     -> "" : pp (on && (elem    name $ fst $ unzip env)) (on : stack) env rest
