@@ -15,9 +15,11 @@ module Language.SystemVerilog.AST
   , Parameter  (..)
   , Localparam (..)
   , IntegerV   (..)
+  , GenItem    (..)
   , PortBinding
   , Case
   , Range
+  , GenCase
   ) where
 
 import Data.Bits
@@ -85,6 +87,8 @@ data ModuleItem
   | Assign     LHS Expr
   | Instance   Identifier [PortBinding] Identifier [PortBinding]
   | Function   (Maybe FuncRet) Identifier [(Bool, BlockItemDeclaration)] Stmt
+  | Genvar     Identifier
+  | Generate   [GenItem]
   deriving Eq
 
 -- "function inputs and outputs are inferred to be of type reg if no internal
@@ -119,6 +123,8 @@ instance Show ModuleItem where
       | null params -> printf "%s %s %s;"     m                                  i (showPorts show ports)
       | otherwise   -> printf "%s #%s %s %s;" m (showPorts show params) i (showPorts show ports)
     Function   t x i b -> printf "function %s%s;\n%s\n%s\nendfunction" (showFuncRet t) x (indent $ unlines' $ map showFunctionItem i) (indent $ show b)
+    Genvar     x -> printf "genvar %s;" x
+    Generate   b -> printf "generate\n%s\nendgenerate" (indent $ unlines' $ map show b)
     where
     showPorts :: (Expr -> String) -> [(Identifier, Maybe Expr)] -> String
     showPorts s ports = indentedParenList [ if i == "" then show (fromJust arg) else printf ".%s(%s)" i (if isJust arg then s $ fromJust arg else "") | (i, arg) <- ports ]
@@ -332,7 +338,7 @@ instance Show BlockItemDeclaration where
 
 type Case = ([Expr], Stmt)
 
-showCase :: Case -> String
+showCase :: (Show x, Show y) => ([x], y) -> String
 showCase (a, b) = printf "%s:\n%s" (commas $ map show a) (indent $ show b)
 
 data Call = Call Identifier [Expr] deriving Eq
@@ -362,3 +368,26 @@ indentedParenList [] = "()"
 indentedParenList [x] = "(" ++ x ++ ")"
 indentedParenList l =
   "(\n" ++ (indent $ intercalate ",\n" l) ++ "\n)"
+
+type GenCase = ([Expr], GenItem)
+
+data GenItem
+  = GenBlock (Maybe Identifier) [GenItem]
+  | GenCase  Expr [GenCase] (Maybe GenItem)
+  | GenFor   (Identifier, Expr) Expr (Identifier, Expr) Identifier [GenItem]
+  | GenIf    Expr GenItem GenItem
+  | GenNull
+  | GenModuleItem ModuleItem
+  deriving Eq
+
+instance Show GenItem where
+  showList i _ = unlines' $ map show i
+  show (GenBlock Nothing  i)  = printf "begin\n%s\nend"          (indent $ unlines' $ map show i)
+  show (GenBlock (Just x) i)  = printf "begin : %s\n%s\nend" x (indent $ unlines' $ map show i)
+  show (GenCase e c Nothing ) = printf "case (%s)\n%s\nendcase"                 (show e) (indent $ unlines' $ map showCase c)
+  show (GenCase e c (Just d)) = printf "case (%s)\n%s\n\tdefault:\n%s\nendcase" (show e) (indent $ unlines' $ map showCase c) (indent $ indent $ show d)
+  show (GenIf e a GenNull)    = printf "if (%s)\n%s"           (show e) (indent $ show a)
+  show (GenIf e a b      )    = printf "if (%s)\n%s\nelse\n%s" (show e) (indent $ show a) (indent $ show b)
+  show (GenFor (x1, e1) c (x2, e2) x is) = printf "for (%s = %s; %s; %s = %s) %s" x1 (show e1) (show c) x2 (show e2) (show $ GenBlock (Just x) is)
+  show GenNull = ";"
+  show (GenModuleItem item) = show item

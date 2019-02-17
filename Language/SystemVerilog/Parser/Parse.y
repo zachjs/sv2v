@@ -27,9 +27,12 @@ import Language.SystemVerilog.Parser.Tokens
 "end"              { Token KW_end        _ _ }
 "endcase"          { Token KW_endcase    _ _ }
 "endfunction"      { Token KW_endfunction _ _ }
+"endgenerate"      { Token KW_endgenerate _ _ }
 "endmodule"        { Token KW_endmodule  _ _ }
 "function"         { Token KW_function   _ _ }
 "for"              { Token KW_for        _ _ }
+"generate"         { Token KW_generate   _ _ }
+"genvar"           { Token KW_genvar     _ _ }
 "if"               { Token KW_if         _ _ }
 "initial"          { Token KW_initial    _ _ }
 "inout"            { Token KW_inout      _ _ }
@@ -224,6 +227,8 @@ ModuleItem :: { [ModuleItem] }
   | "always" opt(EventControl) Stmt                      { [Always $2 $3] }
   | Identifier ParameterBindings Identifier Bindings ";" { [Instance $1 $2 $3 $4] }
   | "function" opt(RangeOrType) Identifier FunctionItems Stmt "endfunction" { [Function $2 $3 $4 $5] }
+  | "genvar" Identifiers ";"                             { map Genvar $2 }
+  | "generate" GenItems "endgenerate"                    { [Generate $2] }
 
 FunctionItems :: { [(Bool, BlockItemDeclaration)] }
   : "(" FunctionPortList ";" BlockItemDeclarations { (map ((,) True) $2) ++ (map ((,) False) $4) }
@@ -331,8 +336,7 @@ Stmt :: { Stmt }
   | "for" "(" Identifier "=" Expr ";" Expr ";" Identifier "=" Expr ")" Stmt { For ($3, $5) $7 ($9, $11) $13 }
   | LHS "=" Expr ";"                                 { BlockingAssignment $1 $3 }
   | LHS "<=" Expr ";"                                { NonBlockingAssignment $1 $3 }
-  -- | Call ";"                                         { StmtCall $1 }
-  | "case"  "(" Expr ")" Cases  CaseDefault "endcase"  { Case  $3 $5 $6 }
+  | "case" "(" Expr ")" Cases opt(CaseDefault) "endcase" { Case $3 $5 $6 }
 
 BlockItemDeclarations :: { [BlockItemDeclaration] }
   : BlockItemDeclaration                       { $1 }
@@ -351,15 +355,14 @@ BlockVariableType :: { (Identifier, [Range]) }
   | Identifier Dimensions { ($1, $2) }
 
 Cases :: { [Case] }
-:              { [] }
-| Cases Case   { $1 ++ [$2] }
+  : {- empty -}  { [] }
+  | Cases Case   { $1 ++ [$2] }
 
 Case :: { Case }
-: Exprs ":" Stmt  { ($1, $3) }
+  : Exprs ":" Stmt { ($1, $3) }
 
-CaseDefault  :: { Maybe Stmt }
-:                     { Nothing }
-| "default" ":" Stmt  { Just $3 }
+CaseDefault :: { Stmt }
+  : "default" opt(":") Stmt { $3 }
 
 Number :: { String }
   : number    { tokenString $1 }
@@ -424,6 +427,34 @@ Expr :: { Expr }
 | "~^" Expr %prec RedOps      { UniOp RedXnor $2 }
 | "^~" Expr %prec RedOps      { UniOp RedXnor $2 }
 
+GenItemOrNull :: { GenItem }
+  : GenItem { $1 }
+  | ";"     { GenNull }
+
+GenItems :: { [GenItem] }
+  : {- empty -}      { [] }
+  | GenItems GenItem { $1 ++ [$2] }
+
+GenItem :: { GenItem }
+  : "if" "(" Expr ")" GenItemOrNull "else" GenItemOrNull { GenIf $3 $5 $7      }
+  | "if" "(" Expr ")" GenItemOrNull %prec NoElse         { GenIf $3 $5 GenNull }
+  | "begin"                GenItems "end"                { GenBlock Nothing   $2 }
+  | "begin" ":" Identifier GenItems "end"                { GenBlock (Just $3) $4 }
+  | "case" "(" Expr ")" GenCases opt(GenCaseDefault) "endcase" { GenCase $3 $5 $6 }
+  | "for" "(" Identifier "=" Expr ";" Expr ";" Identifier "=" Expr ")" "begin" ":" Identifier GenItems "end" { GenFor ($3, $5) $7 ($9, $11) $15 $16 }
+  -- TODO: We should restrict it to the module items that are actually allowed.
+  | ModuleItem { genItemsToGenItem $ map GenModuleItem $1 }
+
+GenCases :: { [GenCase] }
+  : {- empty -}      { [] }
+  | GenCases GenCase { $1 ++ [$2] }
+
+GenCase :: { GenCase }
+  : Exprs ":" GenItemOrNull { ($1, $3) }
+
+GenCaseDefault :: { GenItem }
+  : "default" opt(":") GenItemOrNull { $3 }
+
 
 {
 parseError :: [Token] -> a
@@ -464,6 +495,15 @@ stmtsToStmt :: [Stmt] -> Stmt
 stmtsToStmt [] = error "stmtsToStmt given empty list!"
 stmtsToStmt [s] = s
 stmtsToStmt ss = Block Nothing ss
+
+moduleItemsToSingleGenItem :: [ModuleItem] -> GenItem
+moduleItemsToSingleGenItem [x] = GenModuleItem x
+moduleItemsToSingleGenItem other = error $ "multiple module items in a generate block where only one was allowed" ++ show other
+
+genItemsToGenItem :: [GenItem] -> GenItem
+genItemsToGenItem [] = error "genItemsToGenItem given empty list!"
+genItemsToGenItem [x] = x
+genItemsToGenItem xs = GenBlock Nothing xs
 
 }
 

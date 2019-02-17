@@ -67,8 +67,11 @@ tokens :-
   "endcase"          { tok KW_endcase    }
   "endmodule"        { tok KW_endmodule  }
   "endfunction"      { tok KW_endfunction}
+  "endgenerate"      { tok KW_endgenerate}
   "function"         { tok KW_function   }
   "for"              { tok KW_for        }
+  "generate"         { tok KW_generate   }
+  "genvar"           { tok KW_genvar     }
   "if"               { tok KW_if         }
   "initial"          { tok KW_initial    }
   "inout"            { tok KW_inout      }
