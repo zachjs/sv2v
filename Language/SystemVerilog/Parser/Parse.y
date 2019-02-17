@@ -225,10 +225,16 @@ ModuleItem :: { [ModuleItem] }
   | IntegerDeclaration                                   { map MIIntegerV   $1 }
   | "assign" LHS "=" Expr ";"                            { [Assign $2 $4] }
   | "always" opt(EventControl) Stmt                      { [Always $2 $3] }
-  | Identifier ParameterBindings Identifier Bindings ";" { [Instance $1 $2 $3 $4] }
+  | Identifier ParameterBindings ModuleInstantiations ";" { map (uncurry $ Instance $1 $2) $3 }
   | "function" opt(RangeOrType) Identifier FunctionItems Stmt "endfunction" { [Function $2 $3 $4 $5] }
   | "genvar" Identifiers ";"                             { map Genvar $2 }
   | "generate" GenItems "endgenerate"                    { [Generate $2] }
+
+ModuleInstantiations :: { [(Identifier, [PortBinding])] }
+  : ModuleInstantiation                          { [$1] }
+  | ModuleInstantiations "," ModuleInstantiation { $1 ++ [$3] }
+ModuleInstantiation :: { (Identifier, [PortBinding]) }
+  : Identifier "(" Bindings ")"  { ($1, $3) }
 
 FunctionItems :: { [(Bool, BlockItemDeclaration)] }
   : "(" FunctionPortList ";" BlockItemDeclarations { (map ((,) True) $2) ++ (map ((,) False) $4) }
@@ -307,20 +313,19 @@ Sense1 :: { Sense }
 | "negedge" LHS { SenseNegedge $2 }
 
 Bindings :: { [(Identifier, Maybe Expr)] }
-: "(" Bindings1 ")" { $2 }
-
-Bindings1 :: { [(Identifier, Maybe Expr)] }
-:               Binding  { [$1] }
-| Bindings1 "," Binding  { $1 ++ [$3] }
-
+  : {- empty -}      { [] }
+  | BindingsNonEmpty { $1 }
+BindingsNonEmpty :: { [(Identifier, Maybe Expr)] }
+  : Binding                      { [$1] }
+  | Binding "," BindingsNonEmpty { $1 : $3}
 Binding :: { (Identifier, Maybe Expr) }
-: "." Identifier "(" MaybeExpr ")" { ($2, $4) }
-| "." Identifier                   { ($2, Just $ Ident $2) }
-| Expr                             { ("", Just $1) }
+  : "." Identifier "(" MaybeExpr ")" { ($2, $4) }
+  | "." Identifier                   { ($2, Just $ Ident $2) }
+  | Expr                             { ("", Just $1) }
 
 ParameterBindings :: { [(Identifier, Maybe Expr)] }
-  : {- empty -}  { [] }
-  | "#" Bindings { $2 }
+  : {- empty -}                  { [] }
+  | "#" "(" BindingsNonEmpty ")" { $3 }
 
 Stmts :: { [Stmt] }
   : {- empty -} { [] }
