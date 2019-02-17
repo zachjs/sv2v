@@ -228,6 +228,7 @@ ModuleItem :: { [ModuleItem] }
 
 FunctionItems :: { [(Bool, BlockItemDeclaration)] }
   : "(" FunctionPortList ";" BlockItemDeclarations { (map ((,) True) $2) ++ (map ((,) False) $4) }
+  | "(" FunctionPortList ";"                       { (map ((,) True) $2) }
   | ";" FunctionItemDeclarations                   { $2 }
 FunctionPortList :: { [BlockItemDeclaration] }
   : FunctionInputDeclaration(")")                  { $1 }
@@ -339,10 +340,10 @@ BlockItemDeclarations :: { [BlockItemDeclaration] }
   | BlockItemDeclarations BlockItemDeclaration { $1 ++ $2 }
 
 BlockItemDeclaration :: { [BlockItemDeclaration] }
-  : "reg" opt(Range) BlockVariableIdentifiers { map (uncurry $ BIDReg $2) $3 }
-  | ParameterDeclaration                      { map BIDParameter  $1 }
-  | LocalparamDeclaration                     { map BIDLocalparam $1 }
-  | IntegerDeclaration                        { map BIDIntegerV   $1 }
+  : "reg" opt(Range) BlockVariableIdentifiers ";" { map (uncurry $ BIDReg $2) $3 }
+  | ParameterDeclaration                          { map BIDParameter  $1 }
+  | LocalparamDeclaration                         { map BIDLocalparam $1 }
+  | IntegerDeclaration                            { map BIDIntegerV   $1 }
 BlockVariableIdentifiers :: { [(Identifier, [Range])] }
   : BlockVariableType                              { [$1] }
   | BlockVariableIdentifiers "," BlockVariableType { $1 ++ [$3] }
