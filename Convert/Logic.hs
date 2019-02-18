@@ -19,14 +19,15 @@ import Language.SystemVerilog.AST
 
 type RegIdents = Set.Set String
 
-convert :: [Module] -> [Module]
-convert modules = map convertModule modules
+convert :: AST -> AST
+convert descriptions = map convertDescription descriptions
 
-convertModule :: Module -> Module
-convertModule (Module name ports items) =
+convertDescription :: Description -> Description
+convertDescription (Module name ports items) =
     Module name ports $ map (convertModuleItem idents) items
     where
         idents = Set.unions $ map getRegIdents items
+convertDescription other = other
 
 getStmtLHSs :: Stmt -> [LHS]
 getStmtLHSs (Block _ stmts) = concat $ map getStmtLHSs stmts

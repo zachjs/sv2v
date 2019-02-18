@@ -10,7 +10,7 @@ import Convert.Template.ModuleItem (moduleItemConverter)
 
 import Language.SystemVerilog.AST
 
-convert :: [Module] -> [Module]
+convert :: AST -> AST
 convert = moduleItemConverter convertModuleItem
 
 -- Conversions:

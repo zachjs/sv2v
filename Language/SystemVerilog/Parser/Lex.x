@@ -82,6 +82,7 @@ tokens :-
   "parameter"        { tok KW_parameter  }
   "posedge"          { tok KW_posedge    }
   "reg"              { tok KW_reg        }
+  "typedef"          { tok KW_typedef    }
   "wire"             { tok KW_wire       }
 
   @simpleIdentifier  { tok Id_simple  }

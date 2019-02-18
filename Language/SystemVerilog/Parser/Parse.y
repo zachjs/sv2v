@@ -1,5 +1,5 @@
 {
-module Language.SystemVerilog.Parser.Parse (modules) where
+module Language.SystemVerilog.Parser.Parse (descriptions) where
 
 import Data.Bits
 import Data.List
@@ -9,7 +9,7 @@ import Language.SystemVerilog.AST
 import Language.SystemVerilog.Parser.Tokens
 }
 
-%name modules
+%name descriptions
 %tokentype { Token }
 %error { parseError }
 
@@ -50,6 +50,7 @@ import Language.SystemVerilog.Parser.Tokens
 "parameter"        { Token KW_parameter  _ _ }
 "posedge"          { Token KW_posedge    _ _ }
 "reg"              { Token KW_reg        _ _ }
+"typedef"          { Token KW_typedef    _ _ }
 "wire"             { Token KW_wire       _ _ }
 
 simpleIdentifier   { Token Id_simple     _ _ }
@@ -164,14 +165,27 @@ opt(p) :: { Maybe a }
   : p { Just $1 }
   |   { Nothing }
 
-Modules :: { [Module] }
+Descriptions :: { [Description] }
   : {- empty -}    { [] }
-  | Modules Module { $1 ++ [$2] }
+  | Descriptions Description { $1 ++ [$2] }
 
-Module :: { Module }
-  : "module" Identifier Params           ";" ModuleItems "endmodule" opt(";") { Module $2 [] ($3 ++ $5) }
-  | "module" Identifier Params PortNames ";" ModuleItems "endmodule" opt(";") { Module $2 $4 ($3 ++ $6) }
-  | "module" Identifier Params PortDecls ";" ModuleItems "endmodule" opt(";") { Module $2 (getPortNames $4) ($3 ++ $4 ++ $6) }
+Description :: { Description }
+  : Module  opt(";") { $1 }
+  | Typedef opt(";") { $1 }
+
+Typedef :: { Description }
+  : "typedef" Type Identifier ";" { Typedef $2 $3 }
+
+Type :: { Type }
+  : "wire"     opt(Range) { Wire     $2 }
+  | "reg"      opt(Range) { Reg      $2 }
+  | "logic"    opt(Range) { Logic    $2 }
+  | Identifier opt(Range) { Alias $1 $2 }
+
+Module :: { Description }
+  : "module" Identifier Params           ";" ModuleItems "endmodule" { Module $2 [] ($3 ++ $5) }
+  | "module" Identifier Params PortNames ";" ModuleItems "endmodule" { Module $2 $4 ($3 ++ $6) }
+  | "module" Identifier Params PortDecls ";" ModuleItems "endmodule" { Module $2 (getPortNames $4) ($3 ++ $4 ++ $6) }
 
 Params :: { [ModuleItem] }
   : {- empty -}        { [] }
@@ -224,14 +238,17 @@ ModuleItems :: { [ModuleItem] }
 
 ModuleItem :: { [ModuleItem] }
   : PortDecl(";")                                        { $1 }
-  | "reg"    opt(Range) VariableIdentifiers ";"          { map (uncurry $ LocalNet $ Reg   $2) $3 }
-  | "wire"   opt(Range) VariableIdentifiers ";"          { map (uncurry $ LocalNet $ Wire  $2) $3 }
-  | "logic"  opt(Range) VariableIdentifiers ";"          { map (uncurry $ LocalNet $ Logic $2) $3 }
+  -- TODO: Allowing Ranges on aliases creates conflicts
+  | Identifier         VariableIdentifiers ";"           { map (uncurry $ LocalNet (Alias $1 Nothing)) $2 }
+  | "wire"  opt(Range) VariableIdentifiers ";"           { map (uncurry $ LocalNet $ Wire  $2) $3 }
+  | "reg"   opt(Range) VariableIdentifiers ";"           { map (uncurry $ LocalNet $ Reg   $2) $3 }
+  | "logic" opt(Range) VariableIdentifiers ";"           { map (uncurry $ LocalNet $ Logic $2) $3 }
   | ParameterDeclaration                                 { map MIParameter  $1 }
   | LocalparamDeclaration                                { map MILocalparam $1 }
   | IntegerDeclaration                                   { map MIIntegerV   $1 }
   | "assign" LHS "=" Expr ";"                            { [Assign $2 $4] }
   | AlwaysKW Stmt                                        { [AlwaysC $1 $2] }
+  | Identifier                   ModuleInstantiations ";" { map (uncurry $ Instance $1 []) $2 }
   | Identifier ParameterBindings ModuleInstantiations ";" { map (uncurry $ Instance $1 $2) $3 }
   | "function" opt(RangeOrType) Identifier FunctionItems Stmt "endfunction" { [Function $2 $3 $4 $5] }
   | "genvar" Identifiers ";"                             { map Genvar $2 }
@@ -337,8 +354,7 @@ Binding :: { (Identifier, Maybe Expr) }
   | Expr                             { ("", Just $1) }
 
 ParameterBindings :: { [(Identifier, Maybe Expr)] }
-  : {- empty -}                  { [] }
-  | "#" "(" BindingsNonEmpty ")" { $3 }
+  : "#" "(" BindingsNonEmpty ")" { $3 }
 
 Stmts :: { [Stmt] }
   : {- empty -} { [] }

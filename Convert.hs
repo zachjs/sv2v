@@ -10,22 +10,24 @@ import Language.SystemVerilog.AST
 
 import qualified Convert.AlwaysKW
 import qualified Convert.Logic
+import qualified Convert.Typedef
 
-type Phase = [Module] -> [Module]
+type Phase = AST -> AST
 
 phases :: [Phase]
 phases =
     [ Convert.AlwaysKW.convert
     , Convert.Logic.convert
+    , Convert.Typedef.convert
     ]
 
 run :: Phase
 run = foldr (.) id phases
 
 convert :: Phase
-convert modules =
-    let modules' = run modules
+convert descriptions =
+    let descriptions' = run descriptions
     in
-        if modules == modules'
-            then modules
-            else convert modules'
+        if descriptions == descriptions'
+            then descriptions
+            else convert descriptions'

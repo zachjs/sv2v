@@ -62,6 +62,7 @@ executable sv2v
     Convert
     Convert.AlwaysKW
     Convert.Logic
+    Convert.Typedef
     Convert.Template.ModuleItem
   ghc-options:
     -O3

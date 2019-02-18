@@ -10,8 +10,8 @@ import Language.SystemVerilog.Parser.Preprocess
 import Language.SystemVerilog.Parser.Tokens
 
 -- | Parses a file given a table of predefined macros, the file name, and the file contents.
-parseFile :: [(String, String)] -> FilePath -> String -> [Module]
-parseFile env file content = modules tokens
+parseFile :: [(String, String)] -> FilePath -> String -> AST
+parseFile env file content = descriptions tokens
   where
   tokens = map relocate $ alexScanTokens $ preprocess env file content
   relocate :: Token -> Token

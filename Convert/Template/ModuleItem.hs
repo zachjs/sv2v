@@ -13,15 +13,16 @@ import Language.SystemVerilog.AST
 
 type Converter = ModuleItem -> ModuleItem
 
-moduleItemConverter :: Converter -> ([Module] -> [Module])
+moduleItemConverter :: Converter -> (AST -> AST)
 moduleItemConverter f = convert f
 
-convert :: Converter -> [Module] -> [Module]
-convert f modules = map (convertModule f) modules
+convert :: Converter -> AST -> AST
+convert f modules = map (convertDescription f) modules
 
-convertModule :: Converter -> Module -> Module
-convertModule f (Module name ports items) =
+convertDescription :: Converter -> Description -> Description
+convertDescription f (Module name ports items) =
     Module name ports $ map (convertModuleItem f) items
+convertDescription _ (Typedef a b) = Typedef a b
 
 convertModuleItem :: Converter -> ModuleItem -> ModuleItem
 convertModuleItem f (Generate items) = f $ Generate $ map (convertGenItem f) items

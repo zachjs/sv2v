@@ -1,6 +1,6 @@
 module Language.SystemVerilog.AST
   ( Identifier
-  , Module     (..)
+  , Description(..)
   , ModuleItem (..)
   , Direction  (..)
   , Type       (..)
@@ -16,6 +16,7 @@ module Language.SystemVerilog.AST
   , IntegerV   (..)
   , GenItem    (..)
   , AlwaysKW (..)
+  , AST
   , PortBinding
   , Case
   , Range
@@ -38,12 +39,15 @@ type Identifier = String
 -- basing invariant checks. I want to avoid making a full type-checker though,
 -- as we should only be given valid SystemVerilog input files.
 
-data Module
+type AST = [Description]
+
+data Description
   = Module Identifier [Identifier] [ModuleItem]
+  | Typedef Type Identifier
   deriving Eq
 
-instance Show Module where
-  showList modules _ = intercalate "\n" $ map show modules
+instance Show Description where
+  showList descriptions _ = intercalate "\n" $ map show descriptions
   show (Module name ports items) = unlines
     [ "module " ++ name ++ portsStr ++ ";"
     , indent $ unlines' $ map show items
@@ -53,6 +57,7 @@ instance Show Module where
         if null ports
           then ""
           else indentedParenList ports
+  show (Typedef t x) = printf "typedef %s %s;" (show t) x
 
 data Direction
   = Input
@@ -69,12 +74,14 @@ data Type
   = Reg   (Maybe Range)
   | Wire  (Maybe Range)
   | Logic (Maybe Range)
+  | Alias String (Maybe Range)
   deriving Eq
 
 instance Show Type where
   show (Reg   r) = "reg "   ++ (showRange r)
   show (Wire  r) = "wire "  ++ (showRange r)
   show (Logic r) = "logic " ++ (showRange r)
+  show (Alias t r) = t ++ " " ++ (showRange r)
 
 data ModuleItem
   = Comment    String
