@@ -57,7 +57,10 @@ $decimalDigit = [0-9]
 
 tokens :-
 
-  "always"           { tok KW_always     }
+  "always"           { tok KW_always       }
+  "always_comb"      { tok KW_always_comb  }
+  "always_ff"        { tok KW_always_ff    }
+  "always_latch"     { tok KW_always_latch }
   "assign"           { tok KW_assign     }
   "begin"            { tok KW_begin      }
   "case"             { tok KW_case       }

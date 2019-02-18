@@ -72,12 +72,13 @@ getStmtLHSs (BlockingAssignment    lhs _) = [lhs]
 getStmtLHSs (NonBlockingAssignment lhs _) = [lhs]
 getStmtLHSs (For _ _ _ stmt) = getStmtLHSs stmt
 getStmtLHSs (If _ s1 s2) = (getStmtLHSs s1) ++ (getStmtLHSs s2)
+getStmtLHSs (Timing _ s) = getStmtLHSs s
 getStmtLHSs (Null) = []
 
 getTypeInfoModuleItem :: ModulePorts -> ModuleItem -> TypeInfo
 getTypeInfoModuleItem _ (Assign lhs _) =
     Map.fromList $ zip (getLHSIdentifiers lhs) (repeat onlyAsWire)
-getTypeInfoModuleItem _ (Always _ stmt) =
+getTypeInfoModuleItem _ (AlwaysC _ stmt) =
     Map.fromList $ zip idents (repeat onlyAsReg)
     where
         lhss = getStmtLHSs stmt

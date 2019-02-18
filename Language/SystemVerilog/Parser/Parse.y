@@ -17,7 +17,10 @@ import Language.SystemVerilog.Parser.Tokens
 
 %token
 
-"always"           { Token KW_always     _ _ }
+"always"           { Token KW_always       _ _ }
+"always_comb"      { Token KW_always_comb  _ _ }
+"always_ff"        { Token KW_always_ff    _ _ }
+"always_latch"     { Token KW_always_latch _ _ }
 "assign"           { Token KW_assign     _ _ }
 "begin"            { Token KW_begin      _ _ }
 "case"             { Token KW_case       _ _ }
@@ -228,11 +231,17 @@ ModuleItem :: { [ModuleItem] }
   | LocalparamDeclaration                                { map MILocalparam $1 }
   | IntegerDeclaration                                   { map MIIntegerV   $1 }
   | "assign" LHS "=" Expr ";"                            { [Assign $2 $4] }
-  | "always" opt(EventControl) Stmt                      { [Always $2 $3] }
+  | AlwaysKW Stmt                                        { [AlwaysC $1 $2] }
   | Identifier ParameterBindings ModuleInstantiations ";" { map (uncurry $ Instance $1 $2) $3 }
   | "function" opt(RangeOrType) Identifier FunctionItems Stmt "endfunction" { [Function $2 $3 $4 $5] }
   | "genvar" Identifiers ";"                             { map Genvar $2 }
   | "generate" GenItems "endgenerate"                    { [Generate $2] }
+
+AlwaysKW :: { AlwaysKW }
+  : "always"       { Always      }
+  | "always_comb"  { AlwaysComb  }
+  | "always_ff"    { AlwaysFF    }
+  | "always_latch" { AlwaysLatch }
 
 ModuleInstantiations :: { [(Identifier, [PortBinding])] }
   : ModuleInstantiation                          { [$1] }
@@ -346,6 +355,7 @@ Stmt :: { Stmt }
   | LHS "=" Expr ";"                                 { BlockingAssignment $1 $3 }
   | LHS "<=" Expr ";"                                { NonBlockingAssignment $1 $3 }
   | "case" "(" Expr ")" Cases opt(CaseDefault) "endcase" { Case $3 $5 $6 }
+  | EventControl Stmt                                { Timing $1 $2 }
 
 BlockItemDeclarations :: { [BlockItemDeclaration] }
   : BlockItemDeclaration                       { $1 }

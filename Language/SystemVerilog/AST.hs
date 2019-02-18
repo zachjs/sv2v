@@ -15,6 +15,7 @@ module Language.SystemVerilog.AST
   , Localparam (..)
   , IntegerV   (..)
   , GenItem    (..)
+  , AlwaysKW (..)
   , PortBinding
   , Case
   , Range
@@ -82,13 +83,26 @@ data ModuleItem
   | MIIntegerV   IntegerV
   | PortDecl   Direction (Maybe Range) Identifier
   | LocalNet   Type Identifier RangesOrAssignment
-  | Always     (Maybe Sense) Stmt
+  | AlwaysC    AlwaysKW Stmt
   | Assign     LHS Expr
   | Instance   Identifier [PortBinding] Identifier [PortBinding]
   | Function   (Maybe FuncRet) Identifier [(Bool, BlockItemDeclaration)] Stmt
   | Genvar     Identifier
   | Generate   [GenItem]
   deriving Eq
+
+data AlwaysKW
+  = Always
+  | AlwaysComb
+  | AlwaysFF
+  | AlwaysLatch
+  deriving Eq
+
+instance Show AlwaysKW where
+  show Always      = "always"
+  show AlwaysComb  = "always_comb"
+  show AlwaysFF    = "always_ff"
+  show AlwaysLatch = "always_latch"
 
 -- "function inputs and outputs are inferred to be of type reg if no internal
 -- data types for the ports are declared"
@@ -115,8 +129,7 @@ instance Show ModuleItem where
     MIIntegerV   nest -> show nest
     PortDecl   d r x -> printf "%s %s%s;" (show d) (showRange r) x
     LocalNet   t x v -> printf "%s%s%s;" (show t) x (showRangesOrAssignment v)
-    Always     Nothing  b -> printf "always\n%s" $ indent $ show b
-    Always     (Just a) b -> printf "always @(%s)\n%s" (show a) $ indent $ show b
+    AlwaysC    k b   -> printf "%s %s" (show k) (show b)
     Assign     a b   -> printf "assign %s = %s;" (show a) (show b)
     Instance   m params i ports
       | null params -> printf "%s %s %s;"     m                                  i (showPorts show ports)
@@ -290,6 +303,7 @@ data Stmt
   | NonBlockingAssignment LHS Expr
   | For                   (Identifier, Expr) Expr (Identifier, Expr) Stmt
   | If                    Expr Stmt Stmt
+  | Timing                Sense Stmt
   | Null
   deriving Eq
 
@@ -306,6 +320,7 @@ instance Show Stmt where
   show (For                   (a, b) c (d, e) f) = printf "for (%s = %s; %s; %s = %s)\n%s" a (show b) (show c) d (show e) $ indent $ show f
   show (If                    a b Null         ) = printf "if (%s)\n%s"           (show a) (indent $ show b)
   show (If                    a b c            ) = printf "if (%s)\n%s\nelse\n%s" (show a) (indent $ show b) (indent $ show c)
+  show (Timing                t s              ) = printf "@(%s) %s" (show t) (show s)
   show (Null                                   ) = ";"
 
 data BlockItemDeclaration
