@@ -148,7 +148,7 @@ string             { Token Lit_string    _ _ }
 %left  "&" "~&"
 %left  "==" "!=" "===" "!=="
 %left  "<" "<=" ">" ">="
-%left  "<<" ">>"
+%left  "<<" ">>" "<<<" ">>>"
 %left  "+" "-"
 %left  "*" "/" "%"
 %left  UPlus UMinus "!" "~" RedOps
@@ -420,6 +420,8 @@ Expr :: { Expr }
 | Expr "*"  Expr              { BinOp Mul $1 $3 }
 | Expr "/"  Expr              { BinOp Div $1 $3 }
 | Expr "%"  Expr              { BinOp Mod $1 $3 }
+| Expr "<<<" Expr             { BinOp ShiftAL $1 $3 }
+| Expr ">>>" Expr             { BinOp ShiftAR $1 $3 }
 | "!" Expr                    { UniOp Not $2 }
 | "~" Expr                    { UniOp BWNot $2 }
 | "+" Expr %prec UPlus        { UniOp UAdd $2 }

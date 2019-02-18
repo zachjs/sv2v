@@ -228,6 +228,8 @@ data BinOp
   | Le
   | Gt
   | Ge
+  | ShiftAL
+  | ShiftAR
   deriving Eq
 
 instance Show BinOp where
@@ -250,6 +252,8 @@ instance Show BinOp where
     Le     -> "<="
     Gt     -> ">"
     Ge     -> ">="
+    ShiftAL -> "<<<"
+    ShiftAR -> ">>>"
 
 instance Show Expr where
   show x = case x of
