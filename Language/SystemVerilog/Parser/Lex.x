@@ -1,11 +1,7 @@
 {
-{-# OPTIONS_GHC -w #-}
-module Language.SystemVerilog.Parser.Lex
-  ( alexScanTokens
-  ) where
+module Language.SystemVerilog.Parser.Lex (alexScanTokens) where
 
 import Language.SystemVerilog.Parser.Tokens
-
 }
 
 %wrapper "posn"
@@ -39,9 +35,6 @@ $decimalDigit = [0-9]
 @octalNumber  = @size? @octalBase  @octalValue
 @hexNumber    = @size? @hexBase    @hexValue
 
--- $exp  = [eE]
--- $sign = [\+\-]
--- @realNumber = unsignedNumber "." unsignedNumber | unsignedNumber ( "." unsignedNumber)? exp sign? unsignedNumber
 @number = @decimalNumber | @octalNumber | @binaryNumber | @hexNumber
 
 -- Strings
@@ -193,5 +186,3 @@ tokens :-
 tok :: TokenName -> AlexPosn -> String -> Token
 tok t (AlexPn _ l c) s = Token t s $ Position "" l c
 }
-
-
