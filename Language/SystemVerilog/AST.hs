@@ -65,13 +65,15 @@ instance Show Direction where
   show Inout  = "inout"
 
 data Type
-  = Reg  (Maybe Range)
-  | Wire (Maybe Range)
+  = Reg   (Maybe Range)
+  | Wire  (Maybe Range)
+  | Logic (Maybe Range)
   deriving Eq
 
 instance Show Type where
-  show (Reg  r) = "reg " ++ (showRange r)
-  show (Wire r) = "wire " ++ (showRange r)
+  show (Reg   r) = "reg "   ++ (showRange r)
+  show (Wire  r) = "wire "  ++ (showRange r)
+  show (Logic r) = "logic " ++ (showRange r)
 
 data ModuleItem
   = Comment    String

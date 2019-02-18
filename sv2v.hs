@@ -10,12 +10,14 @@ import System.Environment
 
 import Language.SystemVerilog.Parser
 
+import Convert (convert)
+
 main :: IO ()
 main = do
     [filePath] <- getArgs
     content <- readFile filePath
     let ast = parseFile [] filePath content
-    let res = Right ast
+    let res = Right (convert ast)
     case res of
         Left  _ -> do
             --hPrint stderr err

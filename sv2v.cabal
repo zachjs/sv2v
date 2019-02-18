@@ -49,7 +49,8 @@ executable sv2v
     happy >= 1 && < 2
   build-depends:
     array,
-    base
+    base,
+    containers
   other-modules:
     Language.SystemVerilog
     Language.SystemVerilog.AST
@@ -58,6 +59,7 @@ executable sv2v
     Language.SystemVerilog.Parser.Parse
     Language.SystemVerilog.Parser.Preprocess
     Language.SystemVerilog.Parser.Tokens
+    Convert
   ghc-options:
     -O3
     -threaded

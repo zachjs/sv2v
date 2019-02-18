@@ -39,6 +39,7 @@ import Language.SystemVerilog.Parser.Tokens
 "input"            { Token KW_input      _ _ }
 "integer"          { Token KW_integer    _ _ }
 "localparam"       { Token KW_localparam _ _ }
+"logic"            { Token KW_logic      _ _ }
 "module"           { Token KW_module     _ _ }
 "negedge"          { Token KW_negedge    _ _ }
 "or"               { Token KW_or         _ _ }
@@ -201,10 +202,12 @@ PortDeclsFollow :: { [ModuleItem] }
 PortDecl(delim) :: { [ModuleItem] }
   : "inout"  opt(NetType) opt(Range) Identifiers             delim { portDeclToModuleItems Inout  $2 $3 (zip $4 (repeat Nothing)) }
   | "input"  opt(NetType) opt(Range) Identifiers             delim { portDeclToModuleItems Input  $2 $3 (zip $4 (repeat Nothing)) }
-  | "output" opt(NetType) opt(Range) Identifiers             delim { portDeclToModuleItems Output $2 $3 (zip $4 (repeat Nothing)) }
-  | "output" "reg"        opt(Range) VariablePortIdentifiers delim { portDeclToModuleItems Output (Just Reg) $3 $4 }
-NetType
-  : "wire" { Wire }
+  | "output" "wire"       opt(Range) Identifiers             delim { portDeclToModuleItems Output (Just Wire ) $3 (zip $4 (repeat Nothing)) }
+  | "output" "reg"        opt(Range) VariablePortIdentifiers delim { portDeclToModuleItems Output (Just Reg  ) $3 $4 }
+  | "output" "logic"      opt(Range) VariablePortIdentifiers delim { portDeclToModuleItems Output (Just Logic) $3 $4 }
+NetType :: { Maybe Range -> Type }
+  : "wire"  { Wire }
+  | "logic" { Logic }
 VariablePortIdentifiers :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifier                             { [$1] }
   | VariablePortIdentifiers "," VariablePortIdentifier { $1 ++ [$3] }
@@ -218,8 +221,9 @@ ModuleItems :: { [ModuleItem] }
 
 ModuleItem :: { [ModuleItem] }
   : PortDecl(";")                                        { $1 }
-  | "reg"    opt(Range) VariableIdentifiers ";"          { map (uncurry $ LocalNet $ Reg  $2) $3 }
-  | "wire"   opt(Range) VariableIdentifiers ";"          { map (uncurry $ LocalNet $ Wire $2) $3 }
+  | "reg"    opt(Range) VariableIdentifiers ";"          { map (uncurry $ LocalNet $ Reg   $2) $3 }
+  | "wire"   opt(Range) VariableIdentifiers ";"          { map (uncurry $ LocalNet $ Wire  $2) $3 }
+  | "logic"  opt(Range) VariableIdentifiers ";"          { map (uncurry $ LocalNet $ Logic $2) $3 }
   | ParameterDeclaration                                 { map MIParameter  $1 }
   | LocalparamDeclaration                                { map MILocalparam $1 }
   | IntegerDeclaration                                   { map MIIntegerV   $1 }

@@ -78,6 +78,7 @@ tokens :-
   "input"            { tok KW_input      }
   "integer"          { tok KW_integer    }
   "localparam"       { tok KW_localparam }
+  "logic"            { tok KW_logic      }
   "module"           { tok KW_module     }
   "negedge"          { tok KW_negedge    }
   "or"               { tok KW_or         }
