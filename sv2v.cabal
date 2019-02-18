@@ -60,6 +60,9 @@ executable sv2v
     Language.SystemVerilog.Parser.Preprocess
     Language.SystemVerilog.Parser.Tokens
     Convert
+    Convert.AlwaysKW
+    Convert.Logic
+    Convert.Template.ModuleItem
   ghc-options:
     -O3
     -threaded
