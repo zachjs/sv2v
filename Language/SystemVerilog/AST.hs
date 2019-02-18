@@ -10,7 +10,6 @@ module Language.SystemVerilog.AST
   , UniOp      (..)
   , BinOp      (..)
   , Sense      (..)
-  , Call       (..)
   , BlockItemDeclaration (..)
   , Parameter  (..)
   , Localparam (..)
@@ -22,7 +21,6 @@ module Language.SystemVerilog.AST
   , GenCase
   ) where
 
-import Data.Bits
 import Data.List
 import Data.Maybe
 import Text.Printf
@@ -66,7 +64,6 @@ instance Show Direction where
   show Output = "output"
   show Inout  = "inout"
 
--- TODO: Support for arrays (multi-dimensional, too!)
 data Type
   = Reg  (Maybe Range)
   | Wire (Maybe Range)
@@ -177,7 +174,7 @@ data Expr
   | IdentBit   Identifier Expr
   | Repeat     Expr [Expr]
   | Concat     [Expr]
-  | ExprCall   Call
+  | Call       Identifier [Expr]
   | UniOp      UniOp Expr
   | BinOp      BinOp Expr Expr
   | Mux        Expr Expr Expr
@@ -265,25 +262,11 @@ instance Show Expr where
     IdentRange a (b, c) -> printf "%s[%s:%s]" a (show b) (show c)
     Repeat     a b      -> printf "{%s {%s}}" (show a) (commas $ map show b)
     Concat     a        -> printf "{%s}" (commas $ map show a)
-    ExprCall   a        -> show a
+    Call       a b      -> printf "%s(%s)" a (commas $ map show b)
     UniOp      a b      -> printf "(%s %s)" (show a) (show b)
     BinOp      a b c    -> printf "(%s %s %s)" (show b) (show a) (show c)
     Mux        a b c    -> printf "(%s ? %s : %s)" (show a) (show b) (show c)
     Bit        a b      -> printf "(%s [%d])" (show a) b
-
-instance Bits Expr where
-  (.&.) = BinOp BWAnd
-  (.|.) = BinOp BWOr
-  xor   = BinOp BWXor
-  complement = UniOp BWNot
-  isSigned _ = False
-  shift        = error "Not supported: shift"
-  rotate       = error "Not supported: rotate"
-  bitSize      = error "Not supported: bitSize"
-  bitSizeMaybe = error "Not supported: bitSizeMaybe"
-  testBit      = error "Not supported: testBit"
-  bit          = error "Not supported: bit"
-  popCount     = error "Not supported: popCount"
 
 data LHS
   = LHS       Identifier
@@ -323,10 +306,6 @@ instance Show Stmt where
   show (If                    a b c            ) = printf "if (%s)\n%s\nelse\n%s" (show a) (indent $ show b) (indent $ show c)
   show (Null                                   ) = ";"
 
-  -- It's not obvious to me how this can be done in a top level
-  --show (StmtCall              a                ) = printf "%s;" (show a)
-  -- | StmtCall              Call
-
 data BlockItemDeclaration
   = BIDReg        (Maybe Range) Identifier [Range]
   | BIDParameter  Parameter
@@ -344,11 +323,6 @@ type Case = ([Expr], Stmt)
 
 showCase :: (Show x, Show y) => ([x], y) -> String
 showCase (a, b) = printf "%s:\n%s" (commas $ map show a) (indent $ show b)
-
-data Call = Call Identifier [Expr] deriving Eq
-
-instance Show Call where
-  show (Call a b) = printf "%s(%s)" a (commas $ map show b)
 
 data Sense
   = Sense        LHS

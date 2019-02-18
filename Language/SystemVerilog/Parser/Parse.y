@@ -375,13 +375,9 @@ Number :: { String }
 String :: { String }
 : string    { toString $1 }
 
-Call :: { Call }
-: Identifier "(" CallArgs ")"  { Call $1 $3 }
-
 CallArgs :: { [Expr] }
-CallArgs
-:              Expr  { [$1] }
-| CallArgs "," Expr  { $1 ++ [$3] }
+  :              Expr  { [$1] }
+  | CallArgs "," Expr  { $1 ++ [$3] }
 
 MaybeExpr :: { Maybe Expr }
 :         { Nothing }
@@ -395,7 +391,7 @@ Expr :: { Expr }
 : "(" Expr ")"                { $2 }
 | String                      { String $1 }
 | Number                      { Number $1 }
-| Call                        { ExprCall $1 }
+| Identifier "(" CallArgs ")" { Call $1 $3 }
 | Identifier                  { Ident      $1    }
 | Identifier Range            { IdentRange $1 $2 }
 | Identifier "[" Expr "]"     { IdentBit   $1 $3 }
