@@ -260,11 +260,12 @@ AlwaysKW :: { AlwaysKW }
   | "always_ff"    { AlwaysFF    }
   | "always_latch" { AlwaysLatch }
 
-ModuleInstantiations :: { [(Identifier, [PortBinding])] }
+ModuleInstantiations :: { [(Identifier, Maybe [PortBinding])] }
   : ModuleInstantiation                          { [$1] }
   | ModuleInstantiations "," ModuleInstantiation { $1 ++ [$3] }
-ModuleInstantiation :: { (Identifier, [PortBinding]) }
-  : Identifier "(" Bindings ")"  { ($1, $3) }
+ModuleInstantiation :: { (Identifier, Maybe [PortBinding]) }
+  : Identifier "(" Bindings ")" { ($1, Just $3) }
+  | Identifier "(" ".*"     ")" { ($1, Nothing) }
 
 FunctionItems :: { [(Bool, BlockItemDeclaration)] }
   : "(" FunctionPortList ";" BlockItemDeclarations { (map ((,) True) $2) ++ (map ((,) False) $4) }

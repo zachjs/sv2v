@@ -92,7 +92,7 @@ data ModuleItem
   | LocalNet   Type Identifier RangesOrAssignment
   | AlwaysC    AlwaysKW Stmt
   | Assign     LHS Expr
-  | Instance   Identifier [PortBinding] Identifier [PortBinding]
+  | Instance   Identifier [PortBinding] Identifier (Maybe [PortBinding]) -- `Nothing` represents `.*`
   | Function   (Maybe FuncRet) Identifier [(Bool, BlockItemDeclaration)] Stmt
   | Genvar     Identifier
   | Generate   [GenItem]
@@ -139,14 +139,17 @@ instance Show ModuleItem where
     AlwaysC    k b   -> printf "%s %s" (show k) (show b)
     Assign     a b   -> printf "assign %s = %s;" (show a) (show b)
     Instance   m params i ports
-      | null params -> printf "%s %s %s;"     m                                  i (showPorts show ports)
-      | otherwise   -> printf "%s #%s %s %s;" m (showPorts show params) i (showPorts show ports)
+      | null params -> printf "%s %s%s;"     m                    i (showMaybePorts ports)
+      | otherwise   -> printf "%s #%s %s%s;" m (showPorts params) i (showMaybePorts ports)
     Function   t x i b -> printf "function %s%s;\n%s\n%s\nendfunction" (showFuncRet t) x (indent $ unlines' $ map showFunctionItem i) (indent $ show b)
     Genvar     x -> printf "genvar %s;" x
     Generate   b -> printf "generate\n%s\nendgenerate" (indent $ unlines' $ map show b)
     where
-    showPorts :: (Expr -> String) -> [(Identifier, Maybe Expr)] -> String
-    showPorts s ports = indentedParenList [ if i == "" then show (fromJust arg) else printf ".%s(%s)" i (if isJust arg then s $ fromJust arg else "") | (i, arg) <- ports ]
+    showMaybePorts :: Maybe [(Identifier, Maybe Expr)] -> String
+    showMaybePorts Nothing = "(.*)"
+    showMaybePorts (Just ports) = showPorts ports
+    showPorts :: [(Identifier, Maybe Expr)] -> String
+    showPorts ports = indentedParenList [ if i == "" then show (fromJust arg) else printf ".%s(%s)" i (if isJust arg then show $ fromJust arg else "") | (i, arg) <- ports ]
     showFunctionItem :: (Bool, BlockItemDeclaration) -> String
     showFunctionItem (b, item) = prefix ++ (show item)
       where prefix = if b then "input " else ""

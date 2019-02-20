@@ -11,6 +11,7 @@ import Language.SystemVerilog.AST
 import qualified Convert.AlwaysKW
 import qualified Convert.Logic
 import qualified Convert.Typedef
+import qualified Convert.StarPort
 
 type Phase = AST -> AST
 
@@ -19,6 +20,7 @@ phases =
     [ Convert.AlwaysKW.convert
     , Convert.Logic.convert
     , Convert.Typedef.convert
+    , Convert.StarPort.convert
     ]
 
 run :: Phase
