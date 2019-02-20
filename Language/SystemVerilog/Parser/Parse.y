@@ -177,10 +177,10 @@ Typedef :: { Description }
   : "typedef" Type Identifier ";" { Typedef $2 $3 }
 
 Type :: { Type }
-  : "wire"     opt(Range) { Wire     $2 }
-  | "reg"      opt(Range) { Reg      $2 }
-  | "logic"    opt(Range) { Logic    $2 }
-  | Identifier opt(Range) { Alias $1 $2 }
+  : "wire"     Dimensions { Wire     $2 }
+  | "reg"      Dimensions { Reg      $2 }
+  | "logic"    Dimensions { Logic    $2 }
+  | Identifier Dimensions { Alias $1 $2 }
 
 Module :: { Description }
   : "module" Identifier Params           ";" ModuleItems "endmodule" { Module $2 [] ($3 ++ $5) }
@@ -217,12 +217,12 @@ PortDeclsFollow :: { [ModuleItem] }
   | PortDecl(",") PortDeclsFollow { $1 ++ $2 }
 
 PortDecl(delim) :: { [ModuleItem] }
-  : "inout"  opt(NetType) opt(Range) Identifiers             delim { portDeclToModuleItems Inout  $2 $3 (zip $4 (repeat Nothing)) }
-  | "input"  opt(NetType) opt(Range) Identifiers             delim { portDeclToModuleItems Input  $2 $3 (zip $4 (repeat Nothing)) }
-  | "output" "wire"       opt(Range) Identifiers             delim { portDeclToModuleItems Output (Just Wire ) $3 (zip $4 (repeat Nothing)) }
-  | "output" "reg"        opt(Range) VariablePortIdentifiers delim { portDeclToModuleItems Output (Just Reg  ) $3 $4 }
-  | "output" "logic"      opt(Range) VariablePortIdentifiers delim { portDeclToModuleItems Output (Just Logic) $3 $4 }
-NetType :: { Maybe Range -> Type }
+  : "inout"  opt(NetType) Dimensions Identifiers             delim { portDeclToModuleItems Inout  $2 $3 (zip $4 (repeat Nothing)) }
+  | "input"  opt(NetType) Dimensions Identifiers             delim { portDeclToModuleItems Input  $2 $3 (zip $4 (repeat Nothing)) }
+  | "output" "wire"       Dimensions Identifiers             delim { portDeclToModuleItems Output (Just Wire ) $3 (zip $4 (repeat Nothing)) }
+  | "output" "reg"        Dimensions VariablePortIdentifiers delim { portDeclToModuleItems Output (Just Reg  ) $3 $4 }
+  | "output" "logic"      Dimensions VariablePortIdentifiers delim { portDeclToModuleItems Output (Just Logic) $3 $4 }
+NetType :: { [Range] -> Type }
   : "wire"  { Wire }
   | "logic" { Logic }
 VariablePortIdentifiers :: { [(Identifier, Maybe Expr)] }
@@ -239,10 +239,10 @@ ModuleItems :: { [ModuleItem] }
 ModuleItem :: { [ModuleItem] }
   : PortDecl(";")                                        { $1 }
   -- TODO: Allowing Ranges on aliases creates conflicts
-  | Identifier         VariableIdentifiers ";"           { map (uncurry $ LocalNet (Alias $1 Nothing)) $2 }
-  | "wire"  opt(Range) VariableIdentifiers ";"           { map (uncurry $ LocalNet $ Wire  $2) $3 }
-  | "reg"   opt(Range) VariableIdentifiers ";"           { map (uncurry $ LocalNet $ Reg   $2) $3 }
-  | "logic" opt(Range) VariableIdentifiers ";"           { map (uncurry $ LocalNet $ Logic $2) $3 }
+  | Identifier         VariableIdentifiers ";"           { map (uncurry $ LocalNet (Alias $1 [])) $2 }
+  | "wire"  Dimensions VariableIdentifiers ";"           { map (uncurry $ LocalNet $ Wire  $2) $3 }
+  | "reg"   Dimensions VariableIdentifiers ";"           { map (uncurry $ LocalNet $ Reg   $2) $3 }
+  | "logic" Dimensions VariableIdentifiers ";"           { map (uncurry $ LocalNet $ Logic $2) $3 }
   | ParameterDeclaration                                 { map MIParameter  $1 }
   | LocalparamDeclaration                                { map MILocalparam $1 }
   | IntegerDeclaration                                   { map MIIntegerV   $1 }
@@ -307,13 +307,16 @@ VariableIdentifiers :: { [(Identifier, Either [Range] (Maybe Expr))] }
   : VariableType                         { [$1] }
   | VariableIdentifiers "," VariableType { $1 ++ [$3] }
 VariableType :: { (Identifier, Either [Range] (Maybe Expr)) }
-  : Identifier            { ($1, Right $ Nothing) }
-  | Identifier "=" Expr   { ($1, Right $ Just $3) }
-  | Identifier Dimensions { ($1, Left $2) }
+  : Identifier                    { ($1, Right $ Nothing) }
+  | Identifier "=" Expr           { ($1, Right $ Just $3) }
+  | Identifier DimensionsNonEmpty { ($1, Left $2) }
 
 Dimensions :: { [Range] }
-  : Range            { [$1] }
-  | Dimensions Range { $1 ++ [$2] }
+  : {- empty -}        { [] }
+  | DimensionsNonEmpty { $1 }
+DimensionsNonEmpty :: { [Range] }
+  : Range                    { [$1] }
+  | DimensionsNonEmpty Range { $1 ++ [$2] }
 
 DeclAsgns :: { [(Identifier, Expr)] }
   : DeclAsgn               { [$1] }
@@ -387,8 +390,7 @@ BlockVariableIdentifiers :: { [(Identifier, [Range])] }
   : BlockVariableType                              { [$1] }
   | BlockVariableIdentifiers "," BlockVariableType { $1 ++ [$3] }
 BlockVariableType :: { (Identifier, [Range]) }
-  : Identifier            { ($1, []) }
-  | Identifier Dimensions { ($1, $2) }
+  : Identifier Dimensions { ($1, $2) }
 
 Cases :: { [Case] }
   : {- empty -}  { [] }
@@ -501,21 +503,21 @@ toString = tail . init . tokenString
 
 portDeclToModuleItems
   :: Direction
-  -> (Maybe ((Maybe Range) -> Type))
-  -> Maybe Range
+  -> (Maybe ([Range] -> Type))
+  -> [Range]
   -> [(Identifier, Maybe Expr)]
   -> [ModuleItem]
-portDeclToModuleItems dir Nothing mr l =
-  map (PortDecl dir mr) $ map toIdentifier $ l
+portDeclToModuleItems dir Nothing rs l =
+  map (PortDecl dir rs) $ map toIdentifier $ l
   where
     toIdentifier (x, Just  _) = error "ParseError: Incomplete port decl cannot have initialization"
     toIdentifier (x, Nothing) = x
-portDeclToModuleItems dir (Just tf) mr l =
+portDeclToModuleItems dir (Just tf) rs l =
   concat $ map toItems l
   where
     toItems (x, e) =
-      [ PortDecl dir mr x
-      , LocalNet (tf mr) x (Right e) ]
+      [ PortDecl dir rs x
+      , LocalNet (tf rs) x (Right e) ]
 
 getPortNames :: [ModuleItem] -> [Identifier]
 getPortNames items =

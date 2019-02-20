@@ -35,20 +35,15 @@ convertDescription types (Module name ports items) =
 convertDescription _ other = other
 
 resolveType :: Types -> Type -> Type
-resolveType _ (Reg   mr) = Reg   mr
-resolveType _ (Wire  mr) = Wire  mr
-resolveType _ (Logic mr) = Logic mr
-resolveType types (Alias st mr1) =
+resolveType _ (Reg   rs) = Reg   rs
+resolveType _ (Wire  rs) = Wire  rs
+resolveType _ (Logic rs) = Logic rs
+resolveType types (Alias st rs1) =
     case resolveType types $ types Map.! st of
-        (Reg   mr2) -> Reg   $ combineRanges mr1 mr2
-        (Wire  mr2) -> Wire  $ combineRanges mr1 mr2
-        (Logic mr2) -> Logic $ combineRanges mr1 mr2
+        (Reg   rs2) -> Reg   $ rs2 ++ rs1
+        (Wire  rs2) -> Wire  $ rs2 ++ rs1
+        (Logic rs2) -> Logic $ rs2 ++ rs1
         (Alias _ _) -> error $ "resolveType invariant failed on " ++ st
-    where
-        combineRanges :: Maybe Range -> Maybe Range -> Maybe Range
-        combineRanges Nothing other = other
-        combineRanges other Nothing = other
-        combineRanges _ _ = error $ "alias " ++ st ++ " leads to 2-D vectorized type"
 
 convertModuleItem :: Types -> ModuleItem -> ModuleItem
 convertModuleItem types (LocalNet t ident val) =

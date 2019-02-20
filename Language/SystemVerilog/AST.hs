@@ -71,24 +71,24 @@ instance Show Direction where
   show Inout  = "inout"
 
 data Type
-  = Reg   (Maybe Range)
-  | Wire  (Maybe Range)
-  | Logic (Maybe Range)
-  | Alias String (Maybe Range)
+  = Reg   [Range]
+  | Wire  [Range]
+  | Logic [Range]
+  | Alias String [Range]
   deriving Eq
 
 instance Show Type where
-  show (Reg   r) = "reg "   ++ (showRange r)
-  show (Wire  r) = "wire "  ++ (showRange r)
-  show (Logic r) = "logic " ++ (showRange r)
-  show (Alias t r) = t ++ " " ++ (showRange r)
+  show (Reg     r) = "reg "   ++ (showRanges r)
+  show (Wire    r) = "wire "  ++ (showRanges r)
+  show (Logic   r) = "logic " ++ (showRanges r)
+  show (Alias t r) = t ++ " " ++ (showRanges r)
 
 data ModuleItem
   = Comment    String
   | MIParameter  Parameter
   | MILocalparam Localparam
   | MIIntegerV   IntegerV
-  | PortDecl   Direction (Maybe Range) Identifier
+  | PortDecl   Direction [Range] Identifier
   | LocalNet   Type Identifier RangesOrAssignment
   | AlwaysC    AlwaysKW Stmt
   | Assign     LHS Expr
@@ -134,7 +134,7 @@ instance Show ModuleItem where
     MIParameter  nest -> show nest
     MILocalparam nest -> show nest
     MIIntegerV   nest -> show nest
-    PortDecl   d r x -> printf "%s %s%s;" (show d) (showRange r) x
+    PortDecl   d r x -> printf "%s %s%s;" (show d) (showRanges r) x
     LocalNet   t x v -> printf "%s%s%s;" (show t) x (showRangesOrAssignment v)
     AlwaysC    k b   -> printf "%s %s" (show k) (show b)
     Assign     a b   -> printf "assign %s = %s;" (show a) (show b)
@@ -334,6 +334,8 @@ instance Show Stmt where
   show (Null                                   ) = ";"
 
 data BlockItemDeclaration
+  -- TODO: Maybe BIDReg should use [Range] for the first arg as well, but it's
+  -- really not clear to me what useful purpose this would have.
   = BIDReg        (Maybe Range) Identifier [Range]
   | BIDParameter  Parameter
   | BIDLocalparam Localparam
