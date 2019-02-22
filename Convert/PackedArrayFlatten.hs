@@ -40,12 +40,13 @@ convert = map convertDescription
 
 convertDescription :: Description -> Description
 convertDescription (Module name ports items) =
-    Module name ports $ items' ++ unflatteners
+    -- Insert the new items right after the LocalNet for the item to preserve
+    -- declaration order, which some toolchains care about.
+    Module name ports $ concat $ map addUnflattener items'
     where
         toFlatten = mapMaybe getExtraDims items
         dimMap = Map.fromList toFlatten
         items' = map (convertModuleItem dimMap) items
-        unflatteners = concat $ map (unflattener outputs) toFlatten
         outputs = Set.fromList $ mapMaybe getOutput items
         getOutput :: ModuleItem -> Maybe Identifier
         getOutput (PortDecl Output _ ident) = Just ident
@@ -57,27 +58,44 @@ convertDescription (Module name ports items) =
                 else Nothing
             where (tf, rs) = typeDims t
         getExtraDims _ = Nothing
+        addUnflattener :: ModuleItem -> [ModuleItem]
+        addUnflattener (LocalNet t ident val) =
+            LocalNet t ident val :
+            case Map.lookup ident dimMap of
+                Nothing -> []
+                Just desc -> unflattener outputs (ident, desc)
+        addUnflattener other = [other]
 convertDescription other = other
 
+simplify :: Expr -> Expr
+simplify (BinOp op e1 e2) =
+    case (op, e1', e2') of
+        (Add, Number "0", e) -> e
+        (Add, e, Number "0") -> e
+        (Sub, e, Number "0") -> e
+        (Add, BinOp Sub e (Number "1"), Number "1") -> e
+        (Add, e, BinOp Sub (Number "0") (Number "1")) -> BinOp Sub e (Number "1")
+        _ -> BinOp op e1' e2'
+    where
+        e1' = simplify e1
+        e2' = simplify e2
+simplify other = other
+
 unflattener :: Set.Set Identifier -> (Identifier, (Type, Range)) -> [ModuleItem]
-unflattener outputs (arr, (t, (a, b))) =
+unflattener outputs (arr, (t, (majorHi, majorLo))) =
     [ Comment $ "sv2v packed-array-flatten unflattener for " ++ arr
-    , LocalNet t arrUnflat (Left [(a, b)])
+    , LocalNet t arrUnflat (Left [(majorHi, majorLo)])
     , Generate
         [ GenModuleItem $ Genvar index
         , GenModuleItem $ MIIntegerV $ IntegerV (arrUnflat ++ "_repeater_index") (Right Nothing)
-        , localparam hi a
-        , localparam lo b
-        , localparam size
-            (BinOp Add (BinOp Sub bigHi bigLo) (Number "1"))
         , GenFor
-            (index, Ident lo)
-            (BinOp Le (Ident index) (Ident hi))
+            (index, majorLo)
+            (BinOp Le (Ident index) majorHi)
             (index, BinOp Add (Ident index) (Number "1"))
             (prefix "unflatten")
             [ localparam startBit
-                (BinOp Add (Ident lo)
-                    (BinOp Mul (Ident index) (Ident size)))
+                (simplify $ BinOp Add majorLo
+                    (BinOp Mul (Ident index) size))
             , GenModuleItem $ (uncurry Assign) $
                 if Set.notMember arr outputs
                     then (LHSBit arrUnflat $ Ident index, IdentRange arr origRange)
@@ -86,17 +104,15 @@ unflattener outputs (arr, (t, (a, b))) =
         ]
     ]
     where
-        startBit = prefix "__START_BIT"
-        size = prefix "__SIZE"
+        startBit = prefix "_tmp_start"
         arrUnflat = prefix arr
-        index = prefix "__index"
-        hi = prefix "__hi"
-        lo = prefix "__lo"
-        (bigHi, bigLo) = head $ snd $ typeDims t
+        index = prefix "_tmp_index"
+        (minorHi, minorLo) = head $ snd $ typeDims t
+        size = simplify $ BinOp Add (BinOp Sub minorHi minorLo) (Number "1")
         localparam :: Identifier -> Expr -> GenItem
         localparam x v = GenModuleItem $ MILocalparam $ Localparam Nothing x v
         origRange = ( (BinOp Add (Ident startBit)
-                        (BinOp Sub (Ident size) (Number "1")))
+                        (BinOp Sub size (Number "1")))
                     , Ident startBit )
 
 typeDims :: Type -> ([Range] -> Type, [Range])
@@ -106,7 +122,7 @@ typeDims (Logic   r) = (Logic  , r)
 typeDims (Alias t r) = (Alias t, r)
 
 prefix :: Identifier -> Identifier
-prefix ident = "__sv2v_PAF_" ++ ident
+prefix ident = "_sv2v_" ++ ident
 
 rewriteRangesOrAssignment :: DimMap -> RangesOrAssignment -> RangesOrAssignment
 rewriteRangesOrAssignment dimMap (Right (Just e)) =
@@ -164,7 +180,7 @@ flattenRanges rs =
         size1 = BinOp Add (BinOp Sub s1 e1) (Number "1")
         size2 = BinOp Add (BinOp Sub s2 e2) (Number "1")
         upper = BinOp Add (BinOp Mul size1 size2) (BinOp Sub e1 (Number "1"))
-        r' = (upper, e1)
+        r' = (simplify upper, e1)
         rs' = (tail $ tail rs) ++ [r']
 
 rewriteLHS :: DimMap -> LHS -> LHS
