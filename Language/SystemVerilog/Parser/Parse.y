@@ -219,6 +219,7 @@ PortDeclsFollow :: { [ModuleItem] }
 PortDecl(delim) :: { [ModuleItem] }
   : "inout"  opt(NetType) Dimensions Identifiers             delim { portDeclToModuleItems Inout  $2 $3 (zip $4 (repeat Nothing)) }
   | "input"  opt(NetType) Dimensions Identifiers             delim { portDeclToModuleItems Input  $2 $3 (zip $4 (repeat Nothing)) }
+  | "output"              Dimensions Identifiers             delim { portDeclToModuleItems Output Nothing      $2 (zip $3 (repeat Nothing)) }
   | "output" "wire"       Dimensions Identifiers             delim { portDeclToModuleItems Output (Just Wire ) $3 (zip $4 (repeat Nothing)) }
   | "output" "reg"        Dimensions VariablePortIdentifiers delim { portDeclToModuleItems Output (Just Reg  ) $3 $4 }
   | "output" "logic"      Dimensions VariablePortIdentifiers delim { portDeclToModuleItems Output (Just Logic) $3 $4 }
@@ -300,6 +301,7 @@ RangeOrType :: { Either Range () }
 EventControl :: { Sense }
   : "@" "(" Sense ")" { $3 }
   | "@" "(" "*"   ")" { SenseStar }
+  | "@" "(*)"         { SenseStar }
   | "@" "*"           { SenseStar }
   | "@*"              { SenseStar }
 

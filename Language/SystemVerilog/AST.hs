@@ -79,10 +79,10 @@ data Type
   deriving Eq
 
 instance Show Type where
-  show (Reg     r) = "reg "   ++ (showRanges r)
-  show (Wire    r) = "wire "  ++ (showRanges r)
-  show (Logic   r) = "logic " ++ (showRanges r)
-  show (Alias t r) = t ++ " " ++ (showRanges r)
+  show (Reg     r) = "reg"   ++ (showRanges r)
+  show (Wire    r) = "wire"  ++ (showRanges r)
+  show (Logic   r) = "logic" ++ (showRanges r)
+  show (Alias t r) = t ++ (showRanges r)
 
 data ModuleItem
   = Comment    String
@@ -135,8 +135,8 @@ instance Show ModuleItem where
     MIParameter  nest -> show nest
     MILocalparam nest -> show nest
     MIIntegerV   nest -> show nest
-    PortDecl   d r x -> printf "%s %s%s;" (show d) (showRanges r) x
-    LocalNet   t x v -> printf "%s%s%s;" (show t) x (showRangesOrAssignment v)
+    PortDecl   d r x -> printf "%s%s %s;" (show d) (showRanges r) x
+    LocalNet   t x v -> printf "%s %s%s;" (show t) x (showRangesOrAssignment v)
     AlwaysC    k b   -> printf "%s %s" (show k) (show b)
     Assign     a b   -> printf "assign %s = %s;" (show a) (show b)
     Instance   m params i ports
@@ -173,8 +173,9 @@ showAssignment Nothing = ""
 showAssignment (Just val) = " = " ++ show val
 
 showRanges :: [Range] -> String
-showRanges = concat . (map rangeToString)
-  where rangeToString d = (showRange $ Just d) ++ "\b"
+showRanges [] = ""
+showRanges l = " " ++ (concat $ map rangeToString l)
+  where rangeToString d = init $ showRange $ Just d
 
 showRange :: Maybe Range -> String
 showRange Nothing = ""
