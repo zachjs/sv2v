@@ -13,6 +13,7 @@
 
 module Convert.Logic (convert) where
 
+import Data.Maybe (fromJust)
 import qualified Data.Set as Set
 
 import Language.SystemVerilog.AST
@@ -59,4 +60,22 @@ convertModuleItem idents (LocalNet (Logic mr) ident val) =
     LocalNet (t mr) ident val
     where
         t = if Set.member ident idents then Reg else Wire
+convertModuleItem idents (Generate items) = Generate $ map (convertGenItem $ convertModuleItem idents) items
 convertModuleItem _ other = other
+
+convertGenItem :: (ModuleItem -> ModuleItem) -> GenItem -> GenItem
+convertGenItem f item = convertGenItem' item
+    where
+        convertGenItem' :: GenItem -> GenItem
+        convertGenItem' (GenBlock x items) = GenBlock x $ map convertGenItem' items
+        convertGenItem' (GenFor a b c d items) = GenFor a b c d $ map convertGenItem' items
+        convertGenItem' (GenIf e i1 i2) = GenIf e (convertGenItem' i1) (convertGenItem' i2)
+        convertGenItem' (GenNull) = GenNull
+        convertGenItem' (GenModuleItem moduleItem) = GenModuleItem $ f moduleItem
+        convertGenItem' (GenCase e cases def) = GenCase e cases' def'
+            where
+                cases' = zip (map fst cases) (map (convertGenItem' . snd) cases)
+                def' = if def == Nothing
+                    then Nothing
+                    else Just $ convertGenItem' $ fromJust def
+

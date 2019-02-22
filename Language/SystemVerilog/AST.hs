@@ -21,6 +21,7 @@ module Language.SystemVerilog.AST
   , Case
   , Range
   , GenCase
+  , RangesOrAssignment
   ) where
 
 import Data.List
@@ -322,7 +323,7 @@ commas = intercalate ", "
 
 instance Show Stmt where
   show (Block                 Nothing       b  ) = printf "begin\n%s\nend" $ indent $ unlines' $ map show b
-  show (Block                 (Just (a, i)) b  ) = printf "begin : %s\n%s%s\nend" a $ indent $ unlines' $ (map show i ++ map show b)
+  show (Block                 (Just (a, i)) b  ) = printf "begin : %s\n%s\nend" a $ indent $ unlines' $ (map show i ++ map show b)
   show (Case                  a b Nothing      ) = printf "case (%s)\n%s\nendcase"                 (show a) (indent $ unlines' $ map showCase b)
   show (Case                  a b (Just c)     ) = printf "case (%s)\n%s\n\tdefault:\n%s\nendcase" (show a) (indent $ unlines' $ map showCase b) (indent $ indent $ show c)
   show (BlockingAssignment    a b              ) = printf "%s = %s;" (show a) (show b)
@@ -335,7 +336,7 @@ instance Show Stmt where
 
 data BlockItemDeclaration
   -- TODO: Maybe BIDReg should use [Range] for the first arg as well, but it's
-  -- really not clear to me what useful purpose this would have.
+  -- really not clear to me what *useful* purpose this would have.
   = BIDReg        (Maybe Range) Identifier [Range]
   | BIDParameter  Parameter
   | BIDLocalparam Localparam
