@@ -194,7 +194,7 @@ rewriteStmt dimMap orig = rs orig
     where
         rs :: Stmt -> Stmt
         rs (Block decls stmts) = Block decls (map rs stmts)
-        rs (Case e cases def) = Case e' cases' def'
+        rs (Case kw e cases def) = Case kw e' cases' def'
             where
                 re :: Expr -> Expr
                 re = rewriteExpr dimMap

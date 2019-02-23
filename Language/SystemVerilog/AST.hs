@@ -15,7 +15,8 @@ module Language.SystemVerilog.AST
   , Localparam (..)
   , IntegerV   (..)
   , GenItem    (..)
-  , AlwaysKW (..)
+  , AlwaysKW   (..)
+  , CaseKW     (..)
   , AST
   , PortBinding
   , Case
@@ -308,9 +309,20 @@ instance Show LHS where
   show (LHSRange   a (b, c)) = printf "%s[%s:%s]" a (show b) (show c)
   show (LHSConcat  a       ) = printf "{%s}" (commas $ map show a)
 
+data CaseKW
+  = CaseN
+  | CaseZ
+  | CaseX
+  deriving Eq
+
+instance Show CaseKW where
+  show CaseN = "case"
+  show CaseZ = "casez"
+  show CaseX = "casex"
+
 data Stmt
   = Block                 (Maybe (Identifier, [BlockItemDeclaration])) [Stmt]
-  | Case                  Expr [Case] (Maybe Stmt)
+  | Case                  CaseKW Expr [Case] (Maybe Stmt)
   | BlockingAssignment    LHS Expr
   | NonBlockingAssignment LHS Expr
   | For                   (Identifier, Expr) Expr (Identifier, Expr) Stmt
@@ -325,8 +337,8 @@ commas = intercalate ", "
 instance Show Stmt where
   show (Block                 Nothing       b  ) = printf "begin\n%s\nend" $ indent $ unlines' $ map show b
   show (Block                 (Just (a, i)) b  ) = printf "begin : %s\n%s\nend" a $ indent $ unlines' $ (map show i ++ map show b)
-  show (Case                  a b Nothing      ) = printf "case (%s)\n%s\nendcase"                 (show a) (indent $ unlines' $ map showCase b)
-  show (Case                  a b (Just c)     ) = printf "case (%s)\n%s\n\tdefault:\n%s\nendcase" (show a) (indent $ unlines' $ map showCase b) (indent $ indent $ show c)
+  show (Case                  kw a b Nothing   ) = printf "%s (%s)\n%s\nendcase"                 (show kw) (show a) (indent $ unlines' $ map showCase b)
+  show (Case                  kw a b (Just c)  ) = printf "%s (%s)\n%s\n\tdefault:\n%s\nendcase" (show kw) (show a) (indent $ unlines' $ map showCase b) (indent $ indent $ show c)
   show (BlockingAssignment    a b              ) = printf "%s = %s;" (show a) (show b)
   show (NonBlockingAssignment a b              ) = printf "%s <= %s;" (show a) (show b)
   show (For                   (a, b) c (d, e) f) = printf "for (%s = %s; %s; %s = %s)\n%s" a (show b) (show c) d (show e) $ indent $ show f

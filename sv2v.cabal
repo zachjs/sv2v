@@ -61,11 +61,13 @@ executable sv2v
     Language.SystemVerilog.Parser.Tokens
     Convert
     Convert.AlwaysKW
+    Convert.CaseKW
     Convert.Logic
     Convert.PackedArrayFlatten
     Convert.StarPort
     Convert.Typedef
     Convert.Template.ModuleItem
+    Convert.Template.Stmt
   ghc-options:
     -O3
     -threaded

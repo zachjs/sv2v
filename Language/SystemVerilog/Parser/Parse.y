@@ -24,6 +24,7 @@ import Language.SystemVerilog.Parser.Tokens
 "assign"           { Token KW_assign     _ _ }
 "begin"            { Token KW_begin      _ _ }
 "case"             { Token KW_case       _ _ }
+"casex"            { Token KW_casex      _ _ }
 "casez"            { Token KW_casez      _ _ }
 "default"          { Token KW_default    _ _ }
 "else"             { Token KW_else       _ _ }
@@ -51,6 +52,7 @@ import Language.SystemVerilog.Parser.Tokens
 "posedge"          { Token KW_posedge    _ _ }
 "reg"              { Token KW_reg        _ _ }
 "typedef"          { Token KW_typedef    _ _ }
+"unique"           { Token KW_unique     _ _ }
 "wire"             { Token KW_wire       _ _ }
 
 simpleIdentifier   { Token Id_simple     _ _ }
@@ -376,7 +378,7 @@ Stmt :: { Stmt }
   | "for" "(" Identifier "=" Expr ";" Expr ";" Identifier "=" Expr ")" Stmt { For ($3, $5) $7 ($9, $11) $13 }
   | LHS "=" Expr ";"                                 { BlockingAssignment $1 $3 }
   | LHS "<=" Expr ";"                                { NonBlockingAssignment $1 $3 }
-  | "case" "(" Expr ")" Cases opt(CaseDefault) "endcase" { Case $3 $5 $6 }
+  | CaseKW "(" Expr ")" Cases opt(CaseDefault) "endcase" { Case $1 $3 $5 $6 }
   | EventControl Stmt                                { Timing $1 $2 }
 
 BlockItemDeclarations :: { [BlockItemDeclaration] }
@@ -393,6 +395,13 @@ BlockVariableIdentifiers :: { [(Identifier, [Range])] }
   | BlockVariableIdentifiers "," BlockVariableType { $1 ++ [$3] }
 BlockVariableType :: { (Identifier, [Range]) }
   : Identifier Dimensions { ($1, $2) }
+
+CaseKW :: { CaseKW }
+  -- We just drop the unique keyword, for now. In the future, we should add it
+  -- to the AST and add a conversion phase for removing it.
+  : opt("unique") "case"  { CaseN }
+  | opt("unique") "casex" { CaseX }
+  | opt("unique") "casez" { CaseZ }
 
 Cases :: { [Case] }
   : {- empty -}  { [] }

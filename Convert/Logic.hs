@@ -32,8 +32,8 @@ convertDescription other = other
 
 getStmtLHSs :: Stmt -> [LHS]
 getStmtLHSs (Block _ stmts) = concat $ map getStmtLHSs stmts
-getStmtLHSs (Case e cases (Just stmt)) = (getStmtLHSs stmt) ++ (getStmtLHSs $ Case e cases Nothing)
-getStmtLHSs (Case _ cases Nothing) = concat $ map getStmtLHSs $ map snd cases
+getStmtLHSs (Case kw e cases (Just stmt)) = (getStmtLHSs stmt) ++ (getStmtLHSs $ Case kw e cases Nothing)
+getStmtLHSs (Case _  _ cases Nothing) = concat $ map getStmtLHSs $ map snd cases
 getStmtLHSs (BlockingAssignment    lhs _) = [lhs]
 getStmtLHSs (NonBlockingAssignment lhs _) = [lhs]
 getStmtLHSs (For _ _ _ stmt) = getStmtLHSs stmt

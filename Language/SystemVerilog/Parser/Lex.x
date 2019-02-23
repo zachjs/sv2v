@@ -10,16 +10,18 @@ import Language.SystemVerilog.Parser.Tokens
 
 $nonZeroDecimalDigit = [1-9]
 $decimalDigit = [0-9]
-@binaryDigit  = [0-1]
-@octalDigit   = [0-7]
-@hexDigit     = [0-9a-fA-F]
+@xDigit       = [xX]
+@zDigit       = [zZ\?]
+@binaryDigit  = @xDigit | @zDigit | [0-1]
+@octalDigit   = @xDigit | @zDigit | [0-7]
+@hexDigit     = @xDigit | @zDigit | [0-9a-fA-F]
 
 @decimalBase = "'" [dD]
 @binaryBase  = "'" [bB]
 @octalBase   = "'" [oO]
 @hexBase     = "'" [hH]
 
-@binaryValue         = @binaryDigit ("_" | @binaryDigit)*
+@binaryValue = @binaryDigit ("_" | @binaryDigit)*
 @octalValue  = @octalDigit  ("_" | @octalDigit)*
 @hexValue    = @hexDigit    ("_" | @hexDigit)*
 
@@ -57,6 +59,8 @@ tokens :-
   "assign"           { tok KW_assign     }
   "begin"            { tok KW_begin      }
   "case"             { tok KW_case       }
+  "casex"            { tok KW_casex      }
+  "casez"            { tok KW_casez      }
   "default"          { tok KW_default    }
   "else"             { tok KW_else       }
   "end"              { tok KW_end        }
@@ -83,6 +87,7 @@ tokens :-
   "posedge"          { tok KW_posedge    }
   "reg"              { tok KW_reg        }
   "typedef"          { tok KW_typedef    }
+  "unique"           { tok KW_unique     }
   "wire"             { tok KW_wire       }
 
   @simpleIdentifier  { tok Id_simple  }
