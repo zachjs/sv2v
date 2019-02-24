@@ -10,19 +10,15 @@ module Language.SystemVerilog.AST
   , UniOp      (..)
   , BinOp      (..)
   , Sense      (..)
-  , BlockItemDeclaration (..)
-  , Parameter  (..)
-  , Localparam (..)
-  , IntegerV   (..)
   , GenItem    (..)
   , AlwaysKW   (..)
   , CaseKW     (..)
+  , Decl       (..)
   , AST
   , PortBinding
   , Case
   , Range
   , GenCase
-  , RangesOrAssignment
   ) where
 
 import Data.List
@@ -65,48 +61,63 @@ data Direction
   = Input
   | Output
   | Inout
+  | Local
   deriving Eq
 
 instance Show Direction where
   show Input  = "input"
   show Output = "output"
   show Inout  = "inout"
+  show Local  = ""
 
 data Type
-  = Reg   [Range]
-  | Wire  [Range]
-  | Logic [Range]
-  | Alias String [Range]
+  = Reg              [Range]
+  | Wire             [Range]
+  | Logic            [Range]
+  | Alias Identifier [Range]
+  | Implicit         [Range]
+  | IntegerT
   | Enum (Maybe Type) [(Identifier, Maybe Expr)] [Range]
   deriving Eq
 
 instance Show Type where
-  show (Reg     r) = "reg"   ++ (showRanges r)
-  show (Wire    r) = "wire"  ++ (showRanges r)
-  show (Logic   r) = "logic" ++ (showRanges r)
-  show (Alias t r) = t ++ (showRanges r)
+  show (Reg      r) = "reg"   ++ (showRanges r)
+  show (Wire     r) = "wire"  ++ (showRanges r)
+  show (Logic    r) = "logic" ++ (showRanges r)
+  show (Alias t  r) = t       ++ (showRanges r)
+  show (Implicit r) =            (showRanges r)
+  show (IntegerT  ) = "integer"
   show (Enum mt vals r) = printf "enum %s{%s}%s" tStr (commas $ map showVal vals) (showRanges r)
     where
-      tStr = case mt of
-        Nothing -> ""
-        Just t -> (show t) ++ " "
+      tStr = maybe "" showPad mt
       showVal :: (Identifier, Maybe Expr) -> String
       showVal (x, e) = x ++ (showAssignment e)
 
+data Decl
+  = Parameter            Type Identifier Expr
+  | Localparam           Type Identifier Expr
+  | Variable   Direction Type Identifier [Range] (Maybe Expr)
+  deriving Eq
+
+instance Show Decl where
+  showList l _ = unlines' $ map show l
+  show (Parameter  t x e) = printf  "parameter %s%s = %s;" (showPad t) x (show e)
+  show (Localparam t x e) = printf "localparam %s%s = %s;" (showPad t) x (show e)
+  show (Variable d t x a me) = printf "%s%s %s%s%s;" (showPad d) (show t) x (showRanges a) (showAssignment me)
+
 data ModuleItem
   = Comment    String
-  | MIParameter  Parameter
-  | MILocalparam Localparam
-  | MIIntegerV   IntegerV
-  | PortDecl   Direction [Range] Identifier
-  | LocalNet   Type Identifier RangesOrAssignment
+  | MIDecl     Decl
   | AlwaysC    AlwaysKW Stmt
   | Assign     LHS Expr
   | Instance   Identifier [PortBinding] Identifier (Maybe [PortBinding]) -- `Nothing` represents `.*`
-  | Function   (Maybe FuncRet) Identifier [(Bool, BlockItemDeclaration)] Stmt
+  | Function   Type Identifier [Decl] Stmt
   | Genvar     Identifier
   | Generate   [GenItem]
   deriving Eq
+
+-- "function inputs and outputs are inferred to be of type reg if no internal
+-- data types for the ports are declared"
 
 data AlwaysKW
   = Always
@@ -121,61 +132,29 @@ instance Show AlwaysKW where
   show AlwaysFF    = "always_ff"
   show AlwaysLatch = "always_latch"
 
--- "function inputs and outputs are inferred to be of type reg if no internal
--- data types for the ports are declared"
-
 type PortBinding = (Identifier, Maybe Expr)
-
-data Parameter  = Parameter  (Maybe Range) Identifier Expr deriving Eq
-instance Show Parameter where
-    show (Parameter  r n e) = printf "parameter %s%s = %s;"  (showRange r) n (show e)
-
-data Localparam = Localparam (Maybe Range) Identifier Expr deriving Eq
-instance Show Localparam where
-    show (Localparam r n e) = printf "localparam %s%s = %s;" (showRange r) n (show e)
-
-data IntegerV   = IntegerV   Identifier RangesOrAssignment deriving Eq
-instance Show IntegerV where
-    show (IntegerV   x v  ) = printf "integer %s%s;" x (showRangesOrAssignment v)
 
 instance Show ModuleItem where
   show thing = case thing of
     Comment    c     -> "// " ++ c
-    MIParameter  nest -> show nest
-    MILocalparam nest -> show nest
-    MIIntegerV   nest -> show nest
-    PortDecl   d r x -> printf "%s%s %s;" (show d) (showRanges r) x
-    LocalNet   t x v -> printf "%s %s%s;" (show t) x (showRangesOrAssignment v)
+    MIDecl     nest  -> show nest
     AlwaysC    k b   -> printf "%s %s" (show k) (show b)
     Assign     a b   -> printf "assign %s = %s;" (show a) (show b)
     Instance   m params i ports
       | null params -> printf "%s %s%s;"     m                    i (showMaybePorts ports)
       | otherwise   -> printf "%s #%s %s%s;" m (showPorts params) i (showMaybePorts ports)
-    Function   t x i b -> printf "function %s%s;\n%s\n%s\nendfunction" (showFuncRet t) x (indent $ unlines' $ map showFunctionItem i) (indent $ show b)
+    Function   t x i b -> printf "function %s%s;\n%s\n%s\nendfunction" (showPad t) x (indent $ show i) (indent $ show b)
     Genvar     x -> printf "genvar %s;" x
     Generate   b -> printf "generate\n%s\nendgenerate" (indent $ unlines' $ map show b)
     where
-    showMaybePorts :: Maybe [(Identifier, Maybe Expr)] -> String
-    showMaybePorts Nothing = "(.*)"
-    showMaybePorts (Just ports) = showPorts ports
-    showPorts :: [(Identifier, Maybe Expr)] -> String
-    showPorts ports = indentedParenList [ if i == "" then show (fromJust arg) else printf ".%s(%s)" i (if isJust arg then show $ fromJust arg else "") | (i, arg) <- ports ]
-    showFunctionItem :: (Bool, BlockItemDeclaration) -> String
-    showFunctionItem (b, item) = prefix ++ (show item)
-      where prefix = if b then "input " else ""
-
-type FuncRet = Either Range ()
-
-showFuncRet :: Maybe FuncRet -> String
-showFuncRet Nothing = ""
-showFuncRet (Just (Left r)) = showRange $ Just r
-showFuncRet (Just (Right ())) = "integer "
-
-type RangesOrAssignment = Either [Range] (Maybe Expr)
-
-showRangesOrAssignment :: Either [Range] (Maybe Expr) -> String
-showRangesOrAssignment (Left ranges) = showRanges ranges
-showRangesOrAssignment (Right val) = showAssignment val
+    showMaybePorts = maybe "(.*)" showPorts
+    showPorts :: [PortBinding] -> String
+    showPorts ports = indentedParenList $ map showPort ports
+    showPort :: PortBinding -> String
+    showPort (i, arg) =
+      if i == ""
+        then show (fromJust arg)
+        else printf ".%s(%s)" i (if isJust arg then show $ fromJust arg else "")
 
 showAssignment :: Maybe Expr -> String
 showAssignment Nothing = ""
@@ -189,6 +168,13 @@ showRanges l = " " ++ (concat $ map rangeToString l)
 showRange :: Maybe Range -> String
 showRange Nothing = ""
 showRange (Just (h, l)) = printf "[%s:%s] " (show h) (show l)
+
+showPad :: Show t => t -> String
+showPad x =
+    if str == ""
+      then ""
+      else str ++ " "
+    where str = show x
 
 indent :: String -> String
 indent a = '\t' : f a
@@ -331,13 +317,13 @@ instance Show CaseKW where
   show CaseX = "casex"
 
 data Stmt
-  = Block                 (Maybe (Identifier, [BlockItemDeclaration])) [Stmt]
-  | Case                  CaseKW Expr [Case] (Maybe Stmt)
-  | BlockingAssignment    LHS Expr
-  | NonBlockingAssignment LHS Expr
-  | For                   (Identifier, Expr) Expr (Identifier, Expr) Stmt
-  | If                    Expr Stmt Stmt
-  | Timing                Sense Stmt
+  = Block   (Maybe (Identifier, [Decl])) [Stmt]
+  | Case    CaseKW Expr [Case] (Maybe Stmt)
+  | For     (Identifier, Expr) Expr (Identifier, Expr) Stmt
+  | AsgnBlk LHS Expr
+  | Asgn    LHS Expr
+  | If      Expr Stmt Stmt
+  | Timing  Sense Stmt
   | Null
   deriving Eq
 
@@ -345,32 +331,27 @@ commas :: [String] -> String
 commas = intercalate ", "
 
 instance Show Stmt where
-  show (Block                 Nothing       b  ) = printf "begin\n%s\nend" $ indent $ unlines' $ map show b
-  show (Block                 (Just (a, i)) b  ) = printf "begin : %s\n%s\nend" a $ indent $ unlines' $ (map show i ++ map show b)
-  show (Case                  kw a b Nothing   ) = printf "%s (%s)\n%s\nendcase"                 (show kw) (show a) (indent $ unlines' $ map showCase b)
-  show (Case                  kw a b (Just c)  ) = printf "%s (%s)\n%s\n\tdefault:\n%s\nendcase" (show kw) (show a) (indent $ unlines' $ map showCase b) (indent $ indent $ show c)
-  show (BlockingAssignment    a b              ) = printf "%s = %s;" (show a) (show b)
-  show (NonBlockingAssignment a b              ) = printf "%s <= %s;" (show a) (show b)
-  show (For                   (a, b) c (d, e) f) = printf "for (%s = %s; %s; %s = %s)\n%s" a (show b) (show c) d (show e) $ indent $ show f
-  show (If                    a b Null         ) = printf "if (%s)\n%s"           (show a) (indent $ show b)
-  show (If                    a b c            ) = printf "if (%s)\n%s\nelse\n%s" (show a) (indent $ show b) (indent $ show c)
-  show (Timing                t s              ) = printf "@(%s) %s" (show t) (show s)
-  show (Null                                   ) = ";"
-
-data BlockItemDeclaration
-  -- TODO: Maybe BIDReg should use [Range] for the first arg as well, but it's
-  -- really not clear to me what *useful* purpose this would have.
-  = BIDReg        (Maybe Range) Identifier [Range]
-  | BIDParameter  Parameter
-  | BIDLocalparam Localparam
-  | BIDIntegerV   IntegerV
-  deriving Eq
-
-instance Show BlockItemDeclaration where
-  show (BIDReg     mr x rs) = printf "reg %s%s%s;" (showRange mr) x (showRanges rs)
-  show (BIDParameter  nest) = show nest
-  show (BIDLocalparam nest) = show nest
-  show (BIDIntegerV   nest) = show nest
+  show (Block header stmts) =
+    printf "begin%s\n%s\nend" extra (block stmts)
+    where
+      block :: Show t => [t] -> String
+      block = indent . unlines' . map show
+      extra = case header of
+        Nothing -> ""
+        Just (x, i) -> printf " : %s\n%s" x (block i)
+  show (Case  kw e cs def) =
+    printf "%s (%s)\n%s%s\nendcase" (show kw) (show e) (indent $ unlines' $ map showCase cs) defStr
+    where
+    defStr = case def of
+      Nothing -> ""
+      Just c -> printf "\n\tdefault:\n%s" (indent $ indent $ show c)
+  show (For (a,b) c (d,e) f) = printf "for (%s = %s; %s; %s = %s)\n%s" a (show b) (show c) d (show e) $ indent $ show f
+  show (AsgnBlk v e) = printf "%s = %s;"  (show v) (show e)
+  show (Asgn    v e) = printf "%s <= %s;" (show v) (show e)
+  show (If a b Null) = printf "if (%s)\n%s"           (show a) (indent $ show b)
+  show (If a b c   ) = printf "if (%s)\n%s\nelse\n%s" (show a) (indent $ show b) (indent $ show c)
+  show (Timing t s ) = printf "@(%s) %s" (show t) (show s)
+  show (Null       ) = ";"
 
 type Case = ([Expr], Stmt)
 
@@ -413,7 +394,7 @@ data GenItem
 
 instance Show GenItem where
   showList i _ = unlines' $ map show i
-  show (GenBlock Nothing  i)  = printf "begin\n%s\nend"          (indent $ unlines' $ map show i)
+  show (GenBlock Nothing  i)  = printf "begin\n%s\nend"        (indent $ unlines' $ map show i)
   show (GenBlock (Just x) i)  = printf "begin : %s\n%s\nend" x (indent $ unlines' $ map show i)
   show (GenCase e c Nothing ) = printf "case (%s)\n%s\nendcase"                 (show e) (indent $ unlines' $ map showCase c)
   show (GenCase e c (Just d)) = printf "case (%s)\n%s\n\tdefault:\n%s\nendcase" (show e) (indent $ unlines' $ map showCase c) (indent $ indent $ show d)

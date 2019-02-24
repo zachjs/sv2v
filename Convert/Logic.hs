@@ -34,8 +34,8 @@ getStmtLHSs :: Stmt -> [LHS]
 getStmtLHSs (Block _ stmts) = concat $ map getStmtLHSs stmts
 getStmtLHSs (Case kw e cases (Just stmt)) = (getStmtLHSs stmt) ++ (getStmtLHSs $ Case kw e cases Nothing)
 getStmtLHSs (Case _  _ cases Nothing) = concat $ map getStmtLHSs $ map snd cases
-getStmtLHSs (BlockingAssignment    lhs _) = [lhs]
-getStmtLHSs (NonBlockingAssignment lhs _) = [lhs]
+getStmtLHSs (AsgnBlk lhs _) = [lhs]
+getStmtLHSs (Asgn    lhs _) = [lhs]
 getStmtLHSs (For _ _ _ stmt) = getStmtLHSs stmt
 getStmtLHSs (If _ s1 s2) = (getStmtLHSs s1) ++ (getStmtLHSs s2)
 getStmtLHSs (Timing _ s) = getStmtLHSs s
@@ -56,8 +56,8 @@ getRegIdents (AlwaysC _ stmt) =
 getRegIdents _ = Set.empty
 
 convertModuleItem :: RegIdents -> ModuleItem -> ModuleItem
-convertModuleItem idents (LocalNet (Logic mr) ident val) =
-    LocalNet (t mr) ident val
+convertModuleItem idents (MIDecl (Variable dir (Logic mr) ident a me)) =
+    MIDecl $ Variable dir (t mr) ident a me
     where
         t = if Set.member ident idents then Reg else Wire
 convertModuleItem idents (Generate items) = Generate $ map (convertGenItem $ convertModuleItem idents) items

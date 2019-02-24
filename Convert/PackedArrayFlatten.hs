@@ -40,7 +40,7 @@ convert = map convertDescription
 
 convertDescription :: Description -> Description
 convertDescription (Module name ports items) =
-    -- Insert the new items right after the LocalNet for the item to preserve
+    -- Insert the new items right after the Variable for the item to preserve
     -- declaration order, which some toolchains care about.
     Module name ports $ concat $ map addUnflattener items'
     where
@@ -49,18 +49,18 @@ convertDescription (Module name ports items) =
         items' = map (convertModuleItem dimMap) items
         outputs = Set.fromList $ mapMaybe getOutput items
         getOutput :: ModuleItem -> Maybe Identifier
-        getOutput (PortDecl Output _ ident) = Just ident
+        getOutput (MIDecl (Variable Output _ ident _ _)) = Just ident
         getOutput _ = Nothing
         getExtraDims :: ModuleItem -> Maybe (Identifier, (Type, Range))
-        getExtraDims (LocalNet t ident _) =
+        getExtraDims (MIDecl (Variable _ t ident _ _)) =
             if length rs > 1
                 then Just (ident, (tf $ tail rs, head rs))
                 else Nothing
             where (tf, rs) = typeDims t
         getExtraDims _ = Nothing
         addUnflattener :: ModuleItem -> [ModuleItem]
-        addUnflattener (LocalNet t ident val) =
-            LocalNet t ident val :
+        addUnflattener (orig @ (MIDecl (Variable _ _ ident _ _))) =
+            orig :
             case Map.lookup ident dimMap of
                 Nothing -> []
                 Just desc -> unflattener outputs (ident, desc)
@@ -84,10 +84,10 @@ simplify other = other
 unflattener :: Set.Set Identifier -> (Identifier, (Type, Range)) -> [ModuleItem]
 unflattener outputs (arr, (t, (majorHi, majorLo))) =
     [ Comment $ "sv2v packed-array-flatten unflattener for " ++ arr
-    , LocalNet t arrUnflat (Left [(majorHi, majorLo)])
+    , MIDecl $ Variable Local t arrUnflat [(majorHi, majorLo)] Nothing
     , Generate
         [ GenModuleItem $ Genvar index
-        , GenModuleItem $ MIIntegerV $ IntegerV (arrUnflat ++ "_repeater_index") (Right Nothing)
+        , GenModuleItem $ MIDecl $ Variable Local IntegerT (arrUnflat ++ "_repeater_index") [] Nothing
         , GenFor
             (index, majorLo)
             (BinOp Le (Ident index) majorHi)
@@ -110,7 +110,7 @@ unflattener outputs (arr, (t, (majorHi, majorLo))) =
         (minorHi, minorLo) = head $ snd $ typeDims t
         size = simplify $ BinOp Add (BinOp Sub minorHi minorLo) (Number "1")
         localparam :: Identifier -> Expr -> GenItem
-        localparam x v = GenModuleItem $ MILocalparam $ Localparam Nothing x v
+        localparam x v = GenModuleItem $ MIDecl $ Localparam (Implicit []) x v
         origRange = ( (BinOp Add (Ident startBit)
                         (BinOp Sub size (Number "1")))
                     , Ident startBit )
@@ -120,15 +120,12 @@ typeDims (Reg      r) = (Reg     , r)
 typeDims (Wire     r) = (Wire    , r)
 typeDims (Logic    r) = (Logic   , r)
 typeDims (Alias  t r) = (Alias  t, r)
+typeDims (Implicit r) = (Implicit, r)
+typeDims (IntegerT  ) = (error "ranges cannot be applied to IntegerT", [])
 typeDims (Enum t v r) = (Enum t v, r)
 
 prefix :: Identifier -> Identifier
 prefix ident = "_sv2v_" ++ ident
-
-rewriteRangesOrAssignment :: DimMap -> RangesOrAssignment -> RangesOrAssignment
-rewriteRangesOrAssignment dimMap (Right (Just e)) =
-    Right $ Just $ rewriteExpr dimMap e
-rewriteRangesOrAssignment _ other = other
 
 rewriteRange :: DimMap -> Range -> Range
 rewriteRange dimMap (a, b) = (r a, r b)
@@ -208,8 +205,8 @@ rewriteStmt dimMap orig = rs orig
                     case def of
                         Nothing -> Nothing
                         Just stmt -> Just $ rs stmt
-        rs (BlockingAssignment    lhs expr) = convertAssignment BlockingAssignment    lhs expr
-        rs (NonBlockingAssignment lhs expr) = convertAssignment NonBlockingAssignment lhs expr
+        rs (AsgnBlk lhs expr) = convertAssignment AsgnBlk lhs expr
+        rs (Asgn    lhs expr) = convertAssignment Asgn    lhs expr
         rs (For (x1, e1) cc (x2, e2) stmt) = For (x1, e1') cc' (x2, e2') (rs stmt)
             where
                 e1' = rewriteExpr dimMap e1
@@ -236,18 +233,15 @@ rewriteStmt dimMap orig = rs orig
             constructor (rewriteLHS dimMap lhs) (rewriteExpr dimMap expr)
 
 convertModuleItem :: DimMap -> ModuleItem -> ModuleItem
-convertModuleItem dimMap (LocalNet t x val) =
+convertModuleItem dimMap (MIDecl (Variable d t x a me)) =
     if Map.member x dimMap
-        then LocalNet t' x val'
-        else LocalNet t x val'
+        then MIDecl $ Variable d t' x a' me'
+        else MIDecl $ Variable d t  x a' me'
     where
         (tf, rs) = typeDims t
         t' = tf $ flattenRanges rs
-        val' = rewriteRangesOrAssignment dimMap val
-convertModuleItem dimMap (PortDecl dir rs x) =
-    if Map.member x dimMap
-        then PortDecl dir (flattenRanges rs) x
-        else PortDecl dir rs x
+        a' = map (rewriteRange dimMap) a
+        me' = maybe Nothing (Just . rewriteExpr dimMap) me
 convertModuleItem dimMap (Generate items) =
     Generate $ map (convertGenItem dimMap) items
 convertModuleItem dimMap (Assign lhs expr) =
@@ -264,11 +258,9 @@ convertModuleItem dimMap (Instance m params x (Just l)) =
         convertPortBinding :: PortBinding -> PortBinding
         convertPortBinding (p, Nothing) = (p, Nothing)
         convertPortBinding (p, Just  e) = (p, Just $ rewriteExpr dimMap e)
-convertModuleItem _ (Comment      x) = Comment      x
-convertModuleItem _ (Genvar       x) = Genvar       x
-convertModuleItem _ (MIParameter  x) = MIParameter  x
-convertModuleItem _ (MILocalparam x) = MILocalparam x
-convertModuleItem _ (MIIntegerV   x) = MIIntegerV   x
+convertModuleItem _ (Comment x) = Comment x
+convertModuleItem _ (Genvar  x) = Genvar  x
+convertModuleItem _ (MIDecl  x) = MIDecl  x
 
 convertGenItem :: DimMap -> GenItem -> GenItem
 convertGenItem dimMap item = convertGenItem' item

@@ -32,11 +32,9 @@ convertStmt f = f . convertStmt'
             Case kw expr cases' def'
             where
                 cases' = map (\(exprs, stmt) -> (exprs, cs stmt)) cases
-                def' = case def of
-                    Nothing -> Nothing
-                    Just stmt -> Just (cs stmt)
-        convertStmt' (BlockingAssignment    lhs expr) = BlockingAssignment    lhs expr
-        convertStmt' (NonBlockingAssignment lhs expr) = NonBlockingAssignment lhs expr
+                def' = maybe Nothing (Just . cs) def
+        convertStmt' (AsgnBlk lhs expr) = AsgnBlk lhs expr
+        convertStmt' (Asgn    lhs expr) = Asgn    lhs expr
         convertStmt' (For a b c stmt) = For a b c (cs stmt)
         convertStmt' (If e s1 s2) = If e (cs s1) (cs s2)
         convertStmt' (Timing sense stmt) = Timing sense (cs stmt)

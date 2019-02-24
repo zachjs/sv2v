@@ -1,10 +1,9 @@
 {
 module Language.SystemVerilog.Parser.Parse (descriptions) where
 
-import Data.Bits
 import Data.List
-
 import Data.Maybe
+
 import Language.SystemVerilog.AST
 import Language.SystemVerilog.Parser.Tokens
 }
@@ -200,7 +199,7 @@ ParamDecls :: { [ModuleItem] }
   : ParamDecl(")")            { $1 }
   | ParamDecl(",") ParamDecls { $1 ++ $2 }
 ParamDecl(delim) :: { [ModuleItem] }
-  : "parameter" opt(Range) DeclAsgns delim { map (MIParameter . (uncurry $ Parameter $2)) $3 }
+  : "parameter" ParamType DeclAsgns delim { map (MIDecl . (uncurry $ Parameter $2)) $3 }
 
 Identifier :: { Identifier }
   : simpleIdentifier  { tokenString $1 }
@@ -223,15 +222,16 @@ PortDeclsFollow :: { [ModuleItem] }
   | PortDecl(",") PortDeclsFollow { $1 ++ $2 }
 
 PortDecl(delim) :: { [ModuleItem] }
-  : "inout"  opt(NetType) Dimensions Identifiers             delim { portDeclToModuleItems Inout  $2 $3 (zip $4 (repeat Nothing)) }
-  | "input"  opt(NetType) Dimensions Identifiers             delim { portDeclToModuleItems Input  $2 $3 (zip $4 (repeat Nothing)) }
-  | "output"              Dimensions Identifiers             delim { portDeclToModuleItems Output Nothing      $2 (zip $3 (repeat Nothing)) }
-  | "output" "wire"       Dimensions Identifiers             delim { portDeclToModuleItems Output (Just Wire ) $3 (zip $4 (repeat Nothing)) }
-  | "output" "reg"        Dimensions VariablePortIdentifiers delim { portDeclToModuleItems Output (Just Reg  ) $3 $4 }
-  | "output" "logic"      Dimensions VariablePortIdentifiers delim { portDeclToModuleItems Output (Just Logic) $3 $4 }
+  : "inout"  NetType Dimensions Identifiers             delim { portDeclToModuleItems Inout  ($2       $3) (zip $4 (repeat Nothing)) }
+  | "input"  NetType Dimensions Identifiers             delim { portDeclToModuleItems Input  ($2       $3) (zip $4 (repeat Nothing)) }
+  | "output"         Dimensions Identifiers             delim { portDeclToModuleItems Output (Implicit $2) (zip $3 (repeat Nothing)) }
+  | "output" "wire"  Dimensions Identifiers             delim { portDeclToModuleItems Output (Wire     $3) (zip $4 (repeat Nothing)) }
+  | "output" "reg"   Dimensions VariablePortIdentifiers delim { portDeclToModuleItems Output (Reg      $3) $4 }
+  | "output" "logic" Dimensions VariablePortIdentifiers delim { portDeclToModuleItems Output (Logic    $3) $4 }
 NetType :: { [Range] -> Type }
-  : "wire"  { Wire }
-  | "logic" { Logic }
+  : "wire"      { Wire }
+  | "logic"     { Logic }
+  | {- empty -} { Implicit }
 VariablePortIdentifiers :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifier                             { [$1] }
   | VariablePortIdentifiers "," VariablePortIdentifier { $1 ++ [$3] }
@@ -245,18 +245,15 @@ ModuleItems :: { [ModuleItem] }
 
 ModuleItem :: { [ModuleItem] }
   : PortDecl(";")                                        { $1 }
-  -- TODO: Allowing Ranges on aliases creates conflicts
-  | Identifier                    VariableIdentifiers ";" { map (uncurry $ LocalNet (Alias $1 [])) $2 }
-  | Identifier DimensionsNonEmpty VariableIdentifiers ";" { map (uncurry $ LocalNet (Alias $1 $2)) $3 }
-  | TypeNonAlias                  VariableIdentifiers ";" { map (uncurry $ LocalNet $1) $2 }
-  | ParameterDeclaration                                 { map MIParameter  $1 }
-  | LocalparamDeclaration                                { map MILocalparam $1 }
-  | IntegerDeclaration                                   { map MIIntegerV   $1 }
+  | Identifier                    VariableIdentifiers ";" { map (\(x, a, e) -> MIDecl $ Variable Local (Alias $1 []) x a e) $2 }
+  | Identifier DimensionsNonEmpty VariableIdentifiers ";" { map (\(x, a, e) -> MIDecl $ Variable Local (Alias $1 $2) x a e) $3 }
+  | TypeNonAlias                  VariableIdentifiers ";" { map (\(x, a, e) -> MIDecl $ Variable Local $1            x a e) $2 }
+  | Declaration                                          { map MIDecl $1 }
   | "assign" LHS "=" Expr ";"                            { [Assign $2 $4] }
   | AlwaysKW Stmt                                        { [AlwaysC $1 $2] }
   | Identifier                   ModuleInstantiations ";" { map (uncurry $ Instance $1 []) $2 }
   | Identifier ParameterBindings ModuleInstantiations ";" { map (uncurry $ Instance $1 $2) $3 }
-  | "function" opt(RangeOrType) Identifier FunctionItems Stmt "endfunction" { [Function $2 $3 $4 $5] }
+  | "function" ParamType Identifier FunctionItems Stmt "endfunction" { [Function $2 $3 $4 $5] }
   | "genvar" Identifiers ";"                             { map Genvar $2 }
   | "generate" GenItems "endgenerate"                    { [Generate $2] }
 
@@ -273,35 +270,32 @@ ModuleInstantiation :: { (Identifier, Maybe [PortBinding]) }
   : Identifier "(" Bindings ")" { ($1, Just $3) }
   | Identifier "(" ".*"     ")" { ($1, Nothing) }
 
-FunctionItems :: { [(Bool, BlockItemDeclaration)] }
-  : "(" FunctionPortList ";" BlockItemDeclarations { (map ((,) True) $2) ++ (map ((,) False) $4) }
-  | "(" FunctionPortList ";"                       { (map ((,) True) $2) }
+FunctionItems :: { [Decl] }
+  : "(" FunctionPortList ";" BlockItemDeclarations { $2 ++ $4 }
+  | "(" FunctionPortList ";"                       { $2 }
   | ";" FunctionItemDeclarations                   { $2 }
-FunctionPortList :: { [BlockItemDeclaration] }
+FunctionPortList :: { [Decl] }
   : FunctionInputDeclaration(")")                  { $1 }
   | FunctionInputDeclaration(",") FunctionPortList { $1 ++ $2 }
-FunctionItemDeclarations :: { [(Bool, BlockItemDeclaration)] }
+FunctionItemDeclarations :: { [Decl] }
   : FunctionItemDeclaration                          { $1 }
   | FunctionItemDeclarations FunctionItemDeclaration { $1 ++ $2 }
-FunctionItemDeclaration :: { [(Bool, BlockItemDeclaration)] }
-  : BlockItemDeclaration          { map ((,) False) $1 }
-  | FunctionInputDeclaration(";") { map ((,) True ) $1 }
-FunctionInputDeclaration(delim) :: { [BlockItemDeclaration] }
-  : "input" opt("reg") opt(Range) Identifiers delim { map (\x -> BIDReg $3 x []) $4 }
-  | "input" "integer"             Identifiers delim { map (\x -> BIDIntegerV $ IntegerV x $ Left []) $3 }
+FunctionItemDeclaration :: { [Decl] }
+  : BlockItemDeclaration          { $1 }
+  | FunctionInputDeclaration(";") { $1 }
+FunctionInputDeclaration(delim) :: { [Decl] }
+  : "input"           Dimensions Identifiers delim { map (\x -> Variable Input (Implicit $2) x [] Nothing) $3 }
+  | "input" "reg"     Dimensions Identifiers delim { map (\x -> Variable Input (Reg $3)      x [] Nothing) $4 }
+  | "input" "integer"            Identifiers delim { map (\x -> Variable Input IntegerT      x [] Nothing) $3 }
 
-ParameterDeclaration :: { [Parameter] }
-  : "parameter"  opt(Range) DeclAsgns ";" { map (uncurry $ Parameter  $2) $3 }
+Declaration :: { [Decl] }
+  : "parameter"  ParamType DeclAsgns ";" { map (uncurry $ Parameter  $2) $3 }
+  | "localparam" ParamType DeclAsgns ";" { map (uncurry $ Localparam $2) $3 }
+  | "integer" VariableIdentifiers    ";" { map (\(x, a, e) -> Variable Local IntegerT x a e) $2 }
 
-LocalparamDeclaration :: { [Localparam] }
-  : "localparam" opt(Range) DeclAsgns ";" { map (uncurry $ Localparam $2) $3 }
-
-IntegerDeclaration :: { [IntegerV] }
-  : "integer" VariableIdentifiers ";" { map (uncurry IntegerV) $2 }
-
-RangeOrType :: { Either Range () }
-  : Range     { Left $1 }
-  | "integer" { Right () }
+ParamType :: { Type }
+  : Dimensions { Implicit $1 }
+  | "integer"  { IntegerT }
 
 EventControl :: { Sense }
   : "@" "(" Sense ")" { $3 }
@@ -310,13 +304,12 @@ EventControl :: { Sense }
   | "@" "*"           { SenseStar }
   | "@*"              { SenseStar }
 
-VariableIdentifiers :: { [(Identifier, Either [Range] (Maybe Expr))] }
+VariableIdentifiers :: { [(Identifier, [Range], Maybe Expr)] }
   : VariableType                         { [$1] }
   | VariableIdentifiers "," VariableType { $1 ++ [$3] }
-VariableType :: { (Identifier, Either [Range] (Maybe Expr)) }
-  : Identifier                    { ($1, Right $ Nothing) }
-  | Identifier "=" Expr           { ($1, Right $ Just $3) }
-  | Identifier DimensionsNonEmpty { ($1, Left $2) }
+VariableType :: { (Identifier, [Range], Maybe Expr) }
+  : Identifier Dimensions          { ($1, $2, Nothing) }
+  | Identifier Dimensions "=" Expr { ($1, $2, Just $4) }
 
 Dimensions :: { [Range] }
   : {- empty -}        { [] }
@@ -360,7 +353,7 @@ BindingsNonEmpty :: { [(Identifier, Maybe Expr)] }
   : Binding                      { [$1] }
   | Binding "," BindingsNonEmpty { $1 : $3}
 Binding :: { (Identifier, Maybe Expr) }
-  : "." Identifier "(" MaybeExpr ")" { ($2, $4) }
+  : "." Identifier "(" opt(Expr) ")" { ($2, $4) }
   | "." Identifier                   { ($2, Just $ Ident $2) }
   | Expr                             { ("", Just $1) }
 
@@ -379,20 +372,18 @@ Stmt :: { Stmt }
   | "if" "(" Expr ")" Stmt "else" Stmt               { If $3 $5 $7        }
   | "if" "(" Expr ")" Stmt %prec NoElse              { If $3 $5 Null      }
   | "for" "(" Identifier "=" Expr ";" Expr ";" Identifier "=" Expr ")" Stmt { For ($3, $5) $7 ($9, $11) $13 }
-  | LHS "=" Expr ";"                                 { BlockingAssignment $1 $3 }
-  | LHS "<=" Expr ";"                                { NonBlockingAssignment $1 $3 }
+  | LHS "=" Expr ";"                                 { AsgnBlk $1 $3 }
+  | LHS "<=" Expr ";"                                { Asgn    $1 $3 }
   | CaseKW "(" Expr ")" Cases opt(CaseDefault) "endcase" { Case $1 $3 $5 $6 }
   | EventControl Stmt                                { Timing $1 $2 }
 
-BlockItemDeclarations :: { [BlockItemDeclaration] }
+BlockItemDeclarations :: { [Decl] }
   : BlockItemDeclaration                       { $1 }
   | BlockItemDeclarations BlockItemDeclaration { $1 ++ $2 }
 
-BlockItemDeclaration :: { [BlockItemDeclaration] }
-  : "reg" opt(Range) BlockVariableIdentifiers ";" { map (uncurry $ BIDReg $2) $3 }
-  | ParameterDeclaration                          { map BIDParameter  $1 }
-  | LocalparamDeclaration                         { map BIDLocalparam $1 }
-  | IntegerDeclaration                            { map BIDIntegerV   $1 }
+BlockItemDeclaration :: { [Decl] }
+  : "reg" Dimensions BlockVariableIdentifiers ";" { map (\(x, rs) -> Variable Local (Reg $2) x rs Nothing) $3 }
+  | Declaration                                   { $1 }
 BlockVariableIdentifiers :: { [(Identifier, [Range])] }
   : BlockVariableType                              { [$1] }
   | BlockVariableIdentifiers "," BlockVariableType { $1 ++ [$3] }
@@ -420,15 +411,11 @@ Number :: { String }
   : number    { tokenString $1 }
 
 String :: { String }
-: string    { toString $1 }
+  : string { tail $ init $ tokenString $1 }
 
 CallArgs :: { [Expr] }
   :              Expr  { [$1] }
   | CallArgs "," Expr  { $1 ++ [$3] }
-
-MaybeExpr :: { Maybe Expr }
-:         { Nothing }
-| Expr    { Just $1 }
 
 Exprs :: { [Expr] }
 :           Expr  { [$1] }
@@ -513,43 +500,18 @@ parseError a = case a of
   []              -> error "Parse error: no tokens left to parse."
   Token t s p : _ -> error $ "Parse error: unexpected token '" ++ s ++ "' (" ++ show t ++ ") at " ++ show p ++ "."
 
-toString :: Token -> String
-toString = tail . init . tokenString
-
-portDeclToModuleItems
-  :: Direction
-  -> (Maybe ([Range] -> Type))
-  -> [Range]
-  -> [(Identifier, Maybe Expr)]
-  -> [ModuleItem]
-portDeclToModuleItems dir Nothing rs l =
-  map (PortDecl dir rs) $ map toIdentifier $ l
-  where
-    toIdentifier (x, Just  _) = error "ParseError: Incomplete port decl cannot have initialization"
-    toIdentifier (x, Nothing) = x
-portDeclToModuleItems dir (Just tf) rs l =
-  concat $ map toItems l
-  where
-    toItems (x, e) =
-      [ PortDecl dir rs x
-      , LocalNet (tf rs) x (Right e) ]
+portDeclToModuleItems :: Direction -> Type -> [PortBinding] -> [ModuleItem]
+portDeclToModuleItems dir t l =
+  map (\(x, me) -> MIDecl $ Variable dir t x [] me) l
 
 getPortNames :: [ModuleItem] -> [Identifier]
 getPortNames items =
   mapMaybe getPortName items
   where
     getPortName :: ModuleItem -> Maybe Identifier
-    getPortName (PortDecl _ _ ident) = Just ident
+    getPortName (MIDecl (Variable Local _ _     _ _)) = Nothing
+    getPortName (MIDecl (Variable _     _ ident _ _)) = Just ident
     getPortName _ = Nothing
-
-stmtsToStmt :: [Stmt] -> Stmt
-stmtsToStmt [] = error "stmtsToStmt given empty list!"
-stmtsToStmt [s] = s
-stmtsToStmt ss = Block Nothing ss
-
-moduleItemsToSingleGenItem :: [ModuleItem] -> GenItem
-moduleItemsToSingleGenItem [x] = GenModuleItem x
-moduleItemsToSingleGenItem other = error $ "multiple module items in a generate block where only one was allowed" ++ show other
 
 genItemsToGenItem :: [GenItem] -> GenItem
 genItemsToGenItem [] = error "genItemsToGenItem given empty list!"
