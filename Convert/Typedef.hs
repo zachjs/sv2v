@@ -7,6 +7,8 @@
 -- TODO: Right now we only support typedefs for module data items. Function
 -- parameters, block items, etc., probably support typedefs, too.
 
+-- TODO FIXME XXX: `Cast` contains a type, which we'll need to resolve/convert?
+
 module Convert.Typedef (convert) where
 
 import Data.Maybe
@@ -38,12 +40,15 @@ resolveType :: Types -> Type -> Type
 resolveType _ (Reg   rs) = Reg   rs
 resolveType _ (Wire  rs) = Wire  rs
 resolveType _ (Logic rs) = Logic rs
+resolveType _ (Enum Nothing vals rs) = Enum Nothing vals rs
+resolveType types (Enum (Just t) vals rs) = Enum (Just $ resolveType types t) vals rs
 resolveType types (Alias st rs1) =
     case resolveType types $ types Map.! st of
-        (Reg   rs2) -> Reg   $ rs2 ++ rs1
-        (Wire  rs2) -> Wire  $ rs2 ++ rs1
-        (Logic rs2) -> Logic $ rs2 ++ rs1
-        (Alias _ _) -> error $ "resolveType invariant failed on " ++ st
+        (Reg      rs2) -> Reg      $ rs2 ++ rs1
+        (Wire     rs2) -> Wire     $ rs2 ++ rs1
+        (Logic    rs2) -> Logic    $ rs2 ++ rs1
+        (Enum t v rs2) -> Enum t v $ rs2 ++ rs1
+        (Alias    _ _) -> error $ "resolveType invariant failed on " ++ st
 
 convertModuleItem :: Types -> ModuleItem -> ModuleItem
 convertModuleItem types (LocalNet t ident val) =

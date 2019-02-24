@@ -68,6 +68,7 @@ tokens :-
   "endmodule"        { tok KW_endmodule  }
   "endfunction"      { tok KW_endfunction}
   "endgenerate"      { tok KW_endgenerate}
+  "enum"             { tok KW_enum       }
   "function"         { tok KW_function   }
   "for"              { tok KW_for        }
   "generate"         { tok KW_generate   }

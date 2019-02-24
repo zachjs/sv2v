@@ -33,6 +33,7 @@ import Language.SystemVerilog.Parser.Tokens
 "endfunction"      { Token KW_endfunction _ _ }
 "endgenerate"      { Token KW_endgenerate _ _ }
 "endmodule"        { Token KW_endmodule  _ _ }
+"enum"             { Token KW_enum       _ _ }
 "function"         { Token KW_function   _ _ }
 "for"              { Token KW_for        _ _ }
 "generate"         { Token KW_generate   _ _ }
@@ -178,10 +179,13 @@ Description :: { Description }
 Typedef :: { Description }
   : "typedef" Type Identifier ";" { Typedef $2 $3 }
 
+TypeNonAlias :: { Type }
+  : "wire"  Dimensions { Wire  $2 }
+  | "reg"   Dimensions { Reg   $2 }
+  | "logic" Dimensions { Logic $2 }
+  | "enum" opt(Type) "{" VariablePortIdentifiers "}" Dimensions { Enum $2 $4 $6 }
 Type :: { Type }
-  : "wire"     Dimensions { Wire     $2 }
-  | "reg"      Dimensions { Reg      $2 }
-  | "logic"    Dimensions { Logic    $2 }
+  : TypeNonAlias          { $1 }
   | Identifier Dimensions { Alias $1 $2 }
 
 Module :: { Description }
@@ -242,10 +246,9 @@ ModuleItems :: { [ModuleItem] }
 ModuleItem :: { [ModuleItem] }
   : PortDecl(";")                                        { $1 }
   -- TODO: Allowing Ranges on aliases creates conflicts
-  | Identifier         VariableIdentifiers ";"           { map (uncurry $ LocalNet (Alias $1 [])) $2 }
-  | "wire"  Dimensions VariableIdentifiers ";"           { map (uncurry $ LocalNet $ Wire  $2) $3 }
-  | "reg"   Dimensions VariableIdentifiers ";"           { map (uncurry $ LocalNet $ Reg   $2) $3 }
-  | "logic" Dimensions VariableIdentifiers ";"           { map (uncurry $ LocalNet $ Logic $2) $3 }
+  | Identifier                    VariableIdentifiers ";" { map (uncurry $ LocalNet (Alias $1 [])) $2 }
+  | Identifier DimensionsNonEmpty VariableIdentifiers ";" { map (uncurry $ LocalNet (Alias $1 $2)) $3 }
+  | TypeNonAlias                  VariableIdentifiers ";" { map (uncurry $ LocalNet $1) $2 }
   | ParameterDeclaration                                 { map MIParameter  $1 }
   | LocalparamDeclaration                                { map MILocalparam $1 }
   | IntegerDeclaration                                   { map MIIntegerV   $1 }
@@ -473,6 +476,7 @@ Expr :: { Expr }
 | "^"  Expr %prec RedOps      { UniOp RedXor  $2 }
 | "~^" Expr %prec RedOps      { UniOp RedXnor $2 }
 | "^~" Expr %prec RedOps      { UniOp RedXnor $2 }
+| Type "'" "(" Expr ")"       { Cast $1 $4 }
 
 GenItemOrNull :: { GenItem }
   : GenItem { $1 }

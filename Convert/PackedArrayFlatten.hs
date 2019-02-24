@@ -116,10 +116,11 @@ unflattener outputs (arr, (t, (majorHi, majorLo))) =
                     , Ident startBit )
 
 typeDims :: Type -> ([Range] -> Type, [Range])
-typeDims (Reg     r) = (Reg    , r)
-typeDims (Wire    r) = (Wire   , r)
-typeDims (Logic   r) = (Logic  , r)
-typeDims (Alias t r) = (Alias t, r)
+typeDims (Reg      r) = (Reg     , r)
+typeDims (Wire     r) = (Wire    , r)
+typeDims (Logic    r) = (Logic   , r)
+typeDims (Alias  t r) = (Alias  t, r)
+typeDims (Enum t v r) = (Enum t v, r)
 
 prefix :: Identifier -> Identifier
 prefix ident = "_sv2v_" ++ ident
@@ -168,6 +169,7 @@ rewriteExpr dimMap = rewriteExpr'
         rewriteExpr' (BinOp      o e1 e2) = BinOp o (re e1) (re e2)
         rewriteExpr' (Mux        e1 e2 e3) = Mux (re e1) (re e2) (re e3)
         rewriteExpr' (Bit        e n) = Bit (re e) n
+        rewriteExpr' (Cast       t e) = Cast t (re e)
 
 flattenRanges :: [Range] -> [Range]
 flattenRanges rs =

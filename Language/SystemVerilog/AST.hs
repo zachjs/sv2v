@@ -77,6 +77,7 @@ data Type
   | Wire  [Range]
   | Logic [Range]
   | Alias String [Range]
+  | Enum (Maybe Type) [(Identifier, Maybe Expr)] [Range]
   deriving Eq
 
 instance Show Type where
@@ -84,6 +85,13 @@ instance Show Type where
   show (Wire    r) = "wire"  ++ (showRanges r)
   show (Logic   r) = "logic" ++ (showRanges r)
   show (Alias t r) = t ++ (showRanges r)
+  show (Enum mt vals r) = printf "enum %s{%s}%s" tStr (commas $ map showVal vals) (showRanges r)
+    where
+      tStr = case mt of
+        Nothing -> ""
+        Just t -> (show t) ++ " "
+      showVal :: (Identifier, Maybe Expr) -> String
+      showVal (x, e) = x ++ (showAssignment e)
 
 data ModuleItem
   = Comment    String
@@ -207,6 +215,7 @@ data Expr
   | BinOp      BinOp Expr Expr
   | Mux        Expr Expr Expr
   | Bit        Expr Int
+  | Cast       Type Expr
   deriving Eq
 
 data UniOp
@@ -295,6 +304,7 @@ instance Show Expr where
     BinOp      a b c    -> printf "(%s %s %s)" (show b) (show a) (show c)
     Mux        a b c    -> printf "(%s ? %s : %s)" (show a) (show b) (show c)
     Bit        a b      -> printf "(%s [%d])" (show a) b
+    Cast       a b      -> printf "%s'(%s)" (show a) (show b)
 
 data LHS
   = LHS       Identifier
