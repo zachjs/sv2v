@@ -348,15 +348,19 @@ instance Show Stmt where
   show (For (a,b) c (d,e) f) = printf "for (%s = %s; %s; %s = %s)\n%s" a (show b) (show c) d (show e) $ indent $ show f
   show (AsgnBlk v e) = printf "%s = %s;"  (show v) (show e)
   show (Asgn    v e) = printf "%s <= %s;" (show v) (show e)
-  show (If a b Null) = printf "if (%s)\n%s"           (show a) (indent $ show b)
-  show (If a b c   ) = printf "if (%s)\n%s\nelse\n%s" (show a) (indent $ show b) (indent $ show c)
-  show (Timing t s ) = printf "@(%s) %s" (show t) (show s)
+  show (If a b Null) = printf "if (%s)\n%s"         (show a) (show b)
+  show (If a b c   ) = printf "if (%s) %s\nelse %s" (show a) (show b) (show c)
+  show (Timing t s ) = printf "@(%s)%s" (show t) rest
+    where
+      rest = case s of
+        Block _ _ -> " " ++   (show s)
+        _ -> "\n" ++ (indent $ show s)
   show (Null       ) = ";"
 
 type Case = ([Expr], Stmt)
 
 showCase :: (Show x, Show y) => ([x], y) -> String
-showCase (a, b) = printf "%s:\n%s" (commas $ map show a) (indent $ show b)
+showCase (a, b) = printf "%s: %s" (commas $ map show a) (show b)
 
 data Sense
   = Sense        LHS
@@ -398,8 +402,8 @@ instance Show GenItem where
   show (GenBlock (Just x) i)  = printf "begin : %s\n%s\nend" x (indent $ unlines' $ map show i)
   show (GenCase e c Nothing ) = printf "case (%s)\n%s\nendcase"                 (show e) (indent $ unlines' $ map showCase c)
   show (GenCase e c (Just d)) = printf "case (%s)\n%s\n\tdefault:\n%s\nendcase" (show e) (indent $ unlines' $ map showCase c) (indent $ indent $ show d)
-  show (GenIf e a GenNull)    = printf "if (%s)\n%s"           (show e) (indent $ show a)
-  show (GenIf e a b      )    = printf "if (%s)\n%s\nelse\n%s" (show e) (indent $ show a) (indent $ show b)
+  show (GenIf e a GenNull)    = printf "if (%s) %s"          (show e) (show a)
+  show (GenIf e a b      )    = printf "if (%s) %s\nelse %s" (show e) (show a) (show b)
   show (GenFor (x1, e1) c (x2, e2) x is) = printf "for (%s = %s; %s; %s = %s) %s" x1 (show e1) (show c) x2 (show e2) (show $ GenBlock (Just x) is)
   show GenNull = ";"
   show (GenModuleItem item) = show item
