@@ -50,7 +50,8 @@ executable sv2v
   build-depends:
     array,
     base,
-    containers
+    containers,
+    mtl
   other-modules:
     Language.SystemVerilog
     Language.SystemVerilog.AST
@@ -66,8 +67,7 @@ executable sv2v
     Convert.PackedArrayFlatten
     Convert.StarPort
     Convert.Typedef
-    Convert.Template.ModuleItem
-    Convert.Template.Stmt
+    Convert.Traverse
   ghc-options:
     -O3
     -threaded

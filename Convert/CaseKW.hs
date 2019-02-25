@@ -11,17 +11,15 @@
 
 module Convert.CaseKW (convert) where
 
-import Convert.Template.Stmt (stmtConverter)
-
+import Convert.Traverse
 import Language.SystemVerilog.AST
 
 convert :: AST -> AST
-convert = stmtConverter convertStmt
+convert = traverseDescriptions (traverseModuleItems (traverseStmts convertStmt))
 
 -- Conversions:
 -- `casez` -> `case` with wildcards (?, z) expanded
 -- `casex` -> `case` with wildcards (?, z, x) expanded
-
 -- to be either 0 or 1
 
 wildcards :: CaseKW -> [Char]

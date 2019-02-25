@@ -6,20 +6,19 @@
 
 module Convert.AlwaysKW (convert) where
 
-import Convert.Template.ModuleItem (moduleItemConverter)
-
+import Convert.Traverse
 import Language.SystemVerilog.AST
 
 convert :: AST -> AST
-convert = moduleItemConverter convertModuleItem
+convert = traverseDescriptions $ traverseModuleItems replaceAlwaysKW
 
 -- Conversions:
 -- `always_comb` -> `always @*`
 -- `always_ff` -> `always`
 
-convertModuleItem :: ModuleItem -> ModuleItem
-convertModuleItem (AlwaysC AlwaysComb stmt) =
+replaceAlwaysKW :: ModuleItem -> ModuleItem
+replaceAlwaysKW (AlwaysC AlwaysComb stmt) =
     AlwaysC Always $ Timing SenseStar stmt
-convertModuleItem (AlwaysC AlwaysFF stmt) =
+replaceAlwaysKW (AlwaysC AlwaysFF stmt) =
     AlwaysC Always stmt
-convertModuleItem other = other
+replaceAlwaysKW other = other
