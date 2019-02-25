@@ -17,7 +17,6 @@ module Convert.Traverse
 ) where
 
 import Control.Monad.State
-import Data.Maybe
 import Language.SystemVerilog.AST
 
 type MapperM s t = t -> (State s) t
@@ -33,6 +32,10 @@ traverseDescriptionsM mapper descriptions =
 
 traverseDescriptions :: Mapper Description -> Mapper AST
 traverseDescriptions = unmonad traverseDescriptionsM
+
+maybeDo :: Monad m => (a -> m b) -> Maybe a -> m (Maybe b)
+maybeDo _ Nothing = return Nothing
+maybeDo fun (Just val) = fun val >>= return . Just
 
 traverseModuleItemsM :: MapperM s ModuleItem -> MapperM s Description
 traverseModuleItemsM mapper (Module name ports items) =
@@ -56,9 +59,7 @@ traverseModuleItemsM mapper (Module name ports items) =
         genItemMapper (GenCase e cases def) = do
             caseItems <- mapM (genItemMapper . snd) cases
             let cases' = zip (map fst cases) caseItems
-            def' <- if def == Nothing
-                    then return Nothing
-                    else genItemMapper (fromJust def) >>= \x -> return $ Just x
+            def' <- maybeDo genItemMapper def
             return $ GenCase e cases' def'
 traverseModuleItemsM _ orig = return orig
 
@@ -78,9 +79,7 @@ traverseStmtsM mapper = moduleItemMapper
         cs (Case kw expr cases def) = do
             caseStmts <- mapM fullMapper $ map snd cases
             let cases' = zip (map fst cases) caseStmts
-            def' <- if def == Nothing
-                    then return Nothing
-                    else fullMapper (fromJust def) >>= \x -> return $ Just x
+            def' <- maybeDo fullMapper def
             return $ Case kw expr cases' def'
         cs (AsgnBlk lhs expr) = return $ AsgnBlk lhs expr
         cs (Asgn    lhs expr) = return $ Asgn    lhs expr

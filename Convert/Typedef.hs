@@ -84,12 +84,11 @@ convertStmt types = rs
         rs :: Stmt -> Stmt
         rs (Block header stmts) =
             Block header' (map rs stmts)
-            where header' = maybe Nothing (\(x, decls) -> Just (x, map rd decls)) header
+            where header' = fmap (\(x, decls) -> (x, map rd decls)) header
         rs (Case kw e cases def) = Case kw (re e)
-            (map convertCase cases) def'
+            (map convertCase cases) (fmap rs def)
             where
                 convertCase (exprs, stmt) = (map re exprs, rs stmt)
-                def' = maybe Nothing (Just . rs) def
         rs (AsgnBlk lhs expr) = AsgnBlk lhs (re expr)
         rs (Asgn    lhs expr) = Asgn    lhs (re expr)
         rs (For (x1, e1) e (x2, e2) stmt) =

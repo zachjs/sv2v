@@ -201,10 +201,7 @@ rewriteStmt dimMap orig = rs orig
                 rc (exprs, stmt) = (map re exprs, rs stmt)
                 e' = re e
                 cases' = map rc cases
-                def' =
-                    case def of
-                        Nothing -> Nothing
-                        Just stmt -> Just $ rs stmt
+                def' = fmap rs def
         rs (AsgnBlk lhs expr) = convertAssignment AsgnBlk lhs expr
         rs (Asgn    lhs expr) = convertAssignment Asgn    lhs expr
         rs (For (x1, e1) cc (x2, e2) stmt) = For (x1, e1') cc' (x2, e2') (rs stmt)
@@ -241,7 +238,7 @@ convertModuleItem dimMap (MIDecl (Variable d t x a me)) =
         (tf, rs) = typeDims t
         t' = tf $ flattenRanges rs
         a' = map (rewriteRange dimMap) a
-        me' = maybe Nothing (Just . rewriteExpr dimMap) me
+        me' = fmap (rewriteExpr dimMap) me
 convertModuleItem dimMap (Generate items) =
     Generate $ map (convertGenItem dimMap) items
 convertModuleItem dimMap (Assign lhs expr) =
@@ -250,10 +247,8 @@ convertModuleItem dimMap (AlwaysC kw stmt) =
     AlwaysC kw (rewriteStmt dimMap stmt)
 convertModuleItem dimMap (Function ret f decls stmt) =
     Function ret f decls (rewriteStmt dimMap stmt)
-convertModuleItem _ (Instance m params x Nothing) =
-    Instance m params x Nothing
-convertModuleItem dimMap (Instance m params x (Just l)) =
-    Instance m params x $ Just $ map convertPortBinding l
+convertModuleItem dimMap (Instance m params x ml) =
+    Instance m params x $ fmap (map convertPortBinding) ml
     where
         convertPortBinding :: PortBinding -> PortBinding
         convertPortBinding (p, Nothing) = (p, Nothing)
@@ -276,6 +271,4 @@ convertGenItem dimMap item = convertGenItem' item
         convertGenItem' (GenCase e cases def) = GenCase e cases' def'
             where
                 cases' = zip (map fst cases) (map (convertGenItem' . snd) cases)
-                def' = if def == Nothing
-                    then Nothing
-                    else Just $ convertGenItem' $ fromJust def
+                def' = fmap convertGenItem' def

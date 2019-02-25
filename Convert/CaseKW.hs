@@ -33,10 +33,10 @@ possibilities = ['0', '1']
 explodeBy :: [Char] -> String -> [String]
 explodeBy _ "" = [""]
 explodeBy wilds (x : xs) =
-    if elem x wilds
-        then concat $ map (\c -> map (c :) prev) possibilities
-        else map (x :) prev
-    where prev = explodeBy wilds xs
+    [(:)] <*> chars <*> prev
+    where
+        chars = if elem x wilds then possibilities else [x]
+        prev = explodeBy wilds xs
 
 expandExpr :: [Char] -> Expr -> [Expr]
 expandExpr wilds (Number s) = map Number $ explodeBy wilds s

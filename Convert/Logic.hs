@@ -13,7 +13,6 @@
 
 module Convert.Logic (convert) where
 
-import Data.Maybe (fromJust)
 import qualified Data.Set as Set
 
 import Language.SystemVerilog.AST
@@ -75,7 +74,4 @@ convertGenItem f item = convertGenItem' item
         convertGenItem' (GenCase e cases def) = GenCase e cases' def'
             where
                 cases' = zip (map fst cases) (map (convertGenItem' . snd) cases)
-                def' = if def == Nothing
-                    then Nothing
-                    else Just $ convertGenItem' $ fromJust def
-
+                def' = fmap convertGenItem' def
