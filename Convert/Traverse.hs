@@ -8,36 +8,51 @@ module Convert.Traverse
 ( MapperM
 , Mapper
 , unmonad
+, collectify
 , traverseDescriptionsM
 , traverseDescriptions
+, collectDescriptionsM
 , traverseModuleItemsM
 , traverseModuleItems
+, collectModuleItemsM
 , traverseStmtsM
 , traverseStmts
+, collectStmtsM
+, traverseStmtLHSsM
+, traverseStmtLHSs
+, collectStmtLHSsM
 ) where
 
 import Control.Monad.State
 import Language.SystemVerilog.AST
 
-type MapperM s t = t -> (State s) t
+type MapperM m t = t -> m t
 type Mapper t = t -> t
+type CollectorM m t = t -> m ()
 
-unmonad :: (MapperM () a -> MapperM () b) -> Mapper a -> Mapper b
+unmonad :: (MapperM (State ()) a -> MapperM (State ()) b) -> Mapper a -> Mapper b
 unmonad traverser mapper thing =
     evalState (traverser (return . mapper) thing) ()
 
-traverseDescriptionsM :: MapperM s Description -> MapperM s AST
+collectify :: Monad m => (MapperM m a -> MapperM m b) -> CollectorM m a -> CollectorM m b
+collectify traverser collector thing =
+    traverser mapper thing >>= \_ -> return ()
+    where mapper x = collector x >>= \() -> return x
+
+traverseDescriptionsM :: Monad m => MapperM m Description -> MapperM m AST
 traverseDescriptionsM mapper descriptions =
     mapM mapper descriptions
 
 traverseDescriptions :: Mapper Description -> Mapper AST
 traverseDescriptions = unmonad traverseDescriptionsM
+collectDescriptionsM :: Monad m => CollectorM m Description -> CollectorM m AST
+collectDescriptionsM = collectify traverseDescriptionsM
 
 maybeDo :: Monad m => (a -> m b) -> Maybe a -> m (Maybe b)
 maybeDo _ Nothing = return Nothing
 maybeDo fun (Just val) = fun val >>= return . Just
 
-traverseModuleItemsM :: MapperM s ModuleItem -> MapperM s Description
+traverseModuleItemsM :: Monad m => MapperM m ModuleItem -> MapperM m Description
 traverseModuleItemsM mapper (Module name ports items) =
     mapM fullMapper items >>= return . Module name ports
     where
@@ -65,8 +80,10 @@ traverseModuleItemsM _ orig = return orig
 
 traverseModuleItems :: Mapper ModuleItem -> Mapper Description
 traverseModuleItems = unmonad traverseModuleItemsM
+collectModuleItemsM :: Monad m => CollectorM m ModuleItem -> CollectorM m Description
+collectModuleItemsM = collectify traverseModuleItemsM
 
-traverseStmtsM :: MapperM s Stmt -> MapperM s ModuleItem
+traverseStmtsM :: Monad m => MapperM m Stmt -> MapperM m ModuleItem
 traverseStmtsM mapper = moduleItemMapper
     where
         moduleItemMapper (AlwaysC kw stmt) =
@@ -74,6 +91,19 @@ traverseStmtsM mapper = moduleItemMapper
         moduleItemMapper (Function ret name decls stmt) =
             fullMapper stmt >>= return . Function ret name decls
         moduleItemMapper other = return $ other
+        fullMapper = traverseNestedStmtsM mapper
+
+traverseStmts :: Mapper Stmt -> Mapper ModuleItem
+traverseStmts = unmonad traverseStmtsM
+collectStmtsM :: Monad m => CollectorM m Stmt -> CollectorM m ModuleItem
+collectStmtsM = collectify traverseStmtsM
+
+-- private utility for turning a thing which maps over a single lever of
+-- statements into one that maps over the nested statements first, then the
+-- higher levels up
+traverseNestedStmtsM :: Monad m => MapperM m Stmt -> MapperM m Stmt
+traverseNestedStmtsM mapper = fullMapper
+    where
         fullMapper stmt = mapper stmt >>= cs
         cs (Block decls stmts) = mapM fullMapper stmts >>= return . Block decls
         cs (Case kw expr cases def) = do
@@ -91,5 +121,14 @@ traverseStmtsM mapper = moduleItemMapper
         cs (Timing sense stmt) = fullMapper stmt >>= return . Timing sense
         cs (Null) = return Null
 
-traverseStmts :: Mapper Stmt -> Mapper ModuleItem
-traverseStmts = unmonad traverseStmtsM
+traverseStmtLHSsM :: Monad m => MapperM m LHS -> MapperM m Stmt
+traverseStmtLHSsM mapper = traverseNestedStmtsM stmtMapper
+    where
+        stmtMapper (AsgnBlk lhs expr) = mapper lhs >>= \lhs' -> return $ AsgnBlk lhs' expr
+        stmtMapper (Asgn    lhs expr) = mapper lhs >>= \lhs' -> return $ Asgn    lhs' expr
+        stmtMapper other = return other
+
+traverseStmtLHSs :: Mapper LHS -> Mapper Stmt
+traverseStmtLHSs = unmonad traverseStmtLHSsM
+collectStmtLHSsM :: Monad m => CollectorM m LHS -> CollectorM m Stmt
+collectStmtLHSsM = collectify traverseStmtLHSsM

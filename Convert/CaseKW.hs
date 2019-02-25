@@ -6,7 +6,7 @@
  - Note that this conversion does not completely replicate the behavior of
  - `casex` and `casez` in cases where that case expression itself (rather than
  - just the case item patterns) contains wildcard values. This is apparently
- - rarely ever intentially done.
+ - rarely ever intentionally done.
  -}
 
 module Convert.CaseKW (convert) where
@@ -33,16 +33,15 @@ possibilities = ['0', '1']
 explodeBy :: [Char] -> String -> [String]
 explodeBy _ "" = [""]
 explodeBy wilds (x : xs) =
-    [(:)] <*> chars <*> prev
-    where
-        chars = if elem x wilds then possibilities else [x]
-        prev = explodeBy wilds xs
+    (map (:) chars) <*> (explodeBy wilds xs)
+    where chars = if elem x wilds then possibilities else [x]
 
 expandExpr :: [Char] -> Expr -> [Expr]
 expandExpr wilds (Number s) = map Number $ explodeBy wilds s
 expandExpr [] other = [other]
 -- TODO: Hopefully they only give us constant expressions...
-expandExpr _ other = error $ "CaseKW conversione encountered case that was not a number, which is dubious..." ++ (show other)
+-- TODO: We could be given a constant identifier...
+expandExpr _ other = error $ "CaseKW conversion encountered case that was not a number, which is dubious..." ++ (show other)
 
 -- Note that we don't have to convert the statements within the cases, as the
 -- conversion template takes care of that for us.

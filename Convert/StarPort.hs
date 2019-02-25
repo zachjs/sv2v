@@ -6,7 +6,7 @@
 
 module Convert.StarPort (convert) where
 
-import Data.Maybe (mapMaybe)
+import Control.Monad.Writer
 import qualified Data.Map.Strict as Map
 
 import Convert.Traverse
@@ -16,10 +16,10 @@ convert :: AST -> AST
 convert descriptions =
     traverseDescriptions (traverseModuleItems mapInstance) descriptions
     where
-        modulePorts = Map.fromList $ mapMaybe getPorts descriptions
-        getPorts :: Description -> Maybe (Identifier, [Identifier])
-        getPorts (Module name ports _) = Just (name, ports)
-        getPorts _ = Nothing
+        modulePorts = execWriter $ collectDescriptionsM getPorts descriptions
+        getPorts :: Description -> Writer (Map.Map Identifier [Identifier]) ()
+        getPorts (Module name ports _) = tell $ Map.singleton name ports
+        getPorts _ = return ()
 
         mapInstance :: ModuleItem -> ModuleItem
         mapInstance (Instance m p x Nothing) =
