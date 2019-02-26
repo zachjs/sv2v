@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
@@ -6,18 +7,18 @@
 
 import System.IO
 import System.Exit
-import System.Environment
 
-import Language.SystemVerilog.Parser
-
+import Args (readArgs, target, file)
 import Convert (convert)
+import Language.SystemVerilog.Parser
 
 main :: IO ()
 main = do
-    [filePath] <- getArgs
+    args <- readArgs
+    let filePath = file args
     content <- readFile filePath
     let ast = parseFile [] filePath content
-    let res = Right (convert ast)
+    let res = Right (convert (target args) ast)
     case res of
         Left  _ -> do
             --hPrint stderr err

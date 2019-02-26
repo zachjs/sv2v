@@ -7,6 +7,7 @@
 module Convert (convert) where
 
 import Language.SystemVerilog.AST
+import qualified Args as Args
 
 import qualified Convert.AlwaysKW
 import qualified Convert.CaseKW
@@ -18,24 +19,29 @@ import qualified Convert.StarPort
 
 type Phase = AST -> AST
 
-phases :: [Phase]
-phases =
+phases :: Args.Target -> [Phase]
+phases Args.YOSYS =
+    [ Convert.Typedef.convert
+    , Convert.PackedArrayFlatten.convert
+    , Convert.StarPort.convert
+    ]
+phases Args.VTR =
+    (phases Args.YOSYS) ++
     [ Convert.AlwaysKW.convert
     , Convert.CaseKW.convert
     , Convert.Logic.convert
-    , Convert.Typedef.convert
-    , Convert.PackedArrayFlatten.convert
     , Convert.SplitPortDecl.convert
-    , Convert.StarPort.convert
     ]
 
-run :: Phase
-run = foldr (.) id phases
+run :: Args.Target -> Phase
+run target = foldr (.) id $ phases target
 
-convert :: Phase
-convert descriptions =
-    let descriptions' = run descriptions
-    in
-        if descriptions == descriptions'
-            then descriptions
-            else convert descriptions'
+convert :: Args.Target -> Phase
+convert target = convert'
+    where
+        convert' :: Phase
+        convert' descriptions =
+            if descriptions == descriptions'
+                then descriptions
+                else convert' descriptions'
+            where descriptions' = run target descriptions

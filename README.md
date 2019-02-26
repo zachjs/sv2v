@@ -1,13 +1,15 @@
 # sv2v: SystemVerilog to Verilog
 
 sv2v is a tool for converting synthesizable SystemVerilog into Verilog that is
-synthesizable by tools with more limited feature sets. This project was
-originally created for converting SystemVerilog into the [limited subset of
-Verilog] supported by [VTR]. However, sv2v is intended to be configurable and
-extensible so that it can be used with new and different toolchains and as
-Verilog keyword support evolves.
+synthesizable by tools with more limited feature sets. This project is primarily
+focused on converting SystemVerilog into the subset of Verilog supported by
+[Yosys]. However, sv2v also has support for targeting the [limited subset of
+Verilog] supported by [VTR]. In the long term, we hope for sv2v to be more
+configurable and extensible so that it can be used with new and different
+toolchains and as Verilog support evolves.
 
-[limited subset of Verilog]: https://vtr-verilog-to-routing.readthedocs.io/en/latest/odin/index.html#verilog-hdl-file-keyword-support
+[Yosys]: http://www.clifford.at/yosys/
+[limited subset of Verilog]: https://docs.verilogtorouting.org/en/latest/odin/#verilog-synthesizable-keyword-support
 [VTR]: https://github.com/verilog-to-routing/vtr-verilog-to-routing
 
 
@@ -36,8 +38,23 @@ This creates the executable at `./bin/sv2v`
 
 ## Usage
 
-The interface for this tool has not yet been finalized. Currently, running
-`bin/sv2v path/to/file.sv` will output the converted file to `stdout`.
+The interface for this tool has not yet been finalized. Currently, running `sv2v
+path/to/file.sv` will output the converted file to `stdout`.
+
+```
+sv2v [OPTIONS] [FILE]
+
+Common flags:
+  -t --target=TARGET    target sythesizer (yosys, vtr; defaults to yosys)
+  -? --help             Display help message
+```
+
+
+## VTR Support
+
+sv2v can target VTR by specifying `--target=vtr` on the command line. Note that
+VTR does not support `generate` blocks, and this tool is not capable of
+converting those at this time.
 
 
 ## SystemVerilog Parser/AST

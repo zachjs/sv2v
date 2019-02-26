@@ -50,9 +50,11 @@ executable sv2v
   build-depends:
     array,
     base,
+    cmdargs,
     containers,
     mtl
   other-modules:
+    Args
     Language.SystemVerilog
     Language.SystemVerilog.AST
     Language.SystemVerilog.Parser
