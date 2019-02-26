@@ -115,15 +115,6 @@ unflattener outputs (arr, (t, (majorHi, majorLo))) =
                         (BinOp Sub size (Number "1")))
                     , Ident startBit )
 
-typeDims :: Type -> ([Range] -> Type, [Range])
-typeDims (Reg      r) = (Reg     , r)
-typeDims (Wire     r) = (Wire    , r)
-typeDims (Logic    r) = (Logic   , r)
-typeDims (Alias  t r) = (Alias  t, r)
-typeDims (Implicit r) = (Implicit, r)
-typeDims (IntegerT  ) = (error "ranges cannot be applied to IntegerT", [])
-typeDims (Enum t v r) = (Enum t v, r)
-
 prefix :: Identifier -> Identifier
 prefix ident = "_sv2v_" ++ ident
 

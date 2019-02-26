@@ -13,6 +13,7 @@ import qualified Convert.CaseKW
 import qualified Convert.Logic
 import qualified Convert.Typedef
 import qualified Convert.PackedArrayFlatten
+import qualified Convert.SplitPortDecl
 import qualified Convert.StarPort
 
 type Phase = AST -> AST
@@ -24,6 +25,7 @@ phases =
     , Convert.Logic.convert
     , Convert.Typedef.convert
     , Convert.PackedArrayFlatten.convert
+    , Convert.SplitPortDecl.convert
     , Convert.StarPort.convert
     ]
 
