@@ -29,7 +29,7 @@ convert = traverseDescriptions convertDescription
 convertDescription :: Description -> Description
 convertDescription description =
     hoistPortDecls $
-    traverseModuleItems (flattenModuleItem info . convertModuleItem dimMap') description
+    traverseModuleItems (flattenModuleItem info . rewriteModuleItem dimMap') description
     where
         info = execState
             (collectModuleItemsM collectDecl description)
@@ -152,53 +152,6 @@ simplify other = other
 prefix :: Identifier -> Identifier
 prefix ident = "_sv2v_" ++ ident
 
-
--- TODO FIXME XXX: There is a huge opportunity here to simplify the code after
--- this point in the module. Each of these mappings have a bit of their own
--- quirks. They cover all LHSs, expressions, and statements, at every level.
-
-
-rewriteRange :: DimMap -> Range -> Range
-rewriteRange dimMap (a, b) = (r a, r b)
-    where r = rewriteExpr dimMap
-
-rewriteIdentifier :: DimMap -> Identifier -> Identifier
-rewriteIdentifier dimMap x =
-    if Map.member x dimMap
-        then prefix x
-        else x
-
-rewriteExpr :: DimMap -> Expr -> Expr
-rewriteExpr dimMap = rewriteExpr'
-    where
-        ri :: Identifier -> Identifier
-        ri = rewriteIdentifier dimMap
-        re = rewriteExpr'
-        rewriteExpr' :: Expr -> Expr
-        rewriteExpr' (String     s) = String    s
-        rewriteExpr' (Number     s) = Number    s
-        rewriteExpr' (ConstBool  b) = ConstBool b
-        rewriteExpr' (Ident      i  ) = Ident      (ri i)
-        rewriteExpr' (IdentRange i (r @ (s, e))) =
-            case Map.lookup i dimMap of
-                Nothing -> IdentRange (ri i) (rewriteRange dimMap r)
-                Just (t, _) ->
-                    IdentRange i (simplify s', simplify e')
-                    where
-                        (a, b) = head $ snd $ typeDims t
-                        size = BinOp Add (BinOp Sub a b) (Number "1")
-                        s' = BinOp Sub (BinOp Mul size (BinOp Add s (Number "1"))) (Number "1")
-                        e' = BinOp Mul size e
-        rewriteExpr' (IdentBit   i e) = IdentBit   (ri i) (re e)
-        rewriteExpr' (Repeat     e l) = Repeat (re e) (map re l)
-        rewriteExpr' (Concat     l  ) = Concat (map re l)
-        rewriteExpr' (Call       f l) = Call f (map re l)
-        rewriteExpr' (UniOp      o e) = UniOp o (re e)
-        rewriteExpr' (BinOp      o e1 e2) = BinOp o (re e1) (re e2)
-        rewriteExpr' (Mux        e1 e2 e3) = Mux (re e1) (re e2) (re e3)
-        rewriteExpr' (Bit        e n) = Bit (re e) n
-        rewriteExpr' (Cast       t e) = Cast t (re e)
-
 -- combines (flattens) the bottom two ranges in the given list of ranges
 flattenRanges :: [Range] -> [Range]
 flattenRanges rs =
@@ -214,40 +167,37 @@ flattenRanges rs =
         r' = (simplify upper, e1)
         rs' = (tail $ tail rs) ++ [r']
 
-rewriteLHS :: DimMap -> LHS -> LHS
-rewriteLHS dimMap (LHS      x  ) = LHS      (rewriteIdentifier dimMap x)
-rewriteLHS dimMap (LHSBit   x e) = LHSBit   (rewriteIdentifier dimMap x) (rewriteExpr  dimMap e)
-rewriteLHS dimMap (LHSRange x r) = LHSRange (rewriteIdentifier dimMap x) (rewriteRange dimMap r)
-rewriteLHS dimMap (LHSConcat ls) = LHSConcat $ map (rewriteLHS dimMap) ls
-
-rewriteStmt :: DimMap -> Stmt -> Stmt
-rewriteStmt dimMap orig = rs orig
+rewriteModuleItem :: DimMap -> ModuleItem -> ModuleItem
+rewriteModuleItem dimMap =
+    traverseStmts rewriteStmt .
+    traverseExprs rewriteExpr
     where
-        rs :: Stmt -> Stmt
-        rs (Block decls stmts) = Block decls (map rs stmts)
-        rs (Case kw e cases def) = Case kw e' cases' def'
-            where
-                re :: Expr -> Expr
-                re = rewriteExpr dimMap
-                rc :: Case -> Case
-                rc (exprs, stmt) = (map re exprs, rs stmt)
-                e' = re e
-                cases' = map rc cases
-                def' = fmap rs def
-        rs (AsgnBlk lhs expr) = convertAssignment AsgnBlk lhs expr
-        rs (Asgn    lhs expr) = convertAssignment Asgn    lhs expr
-        rs (For (x1, e1) cc (x2, e2) stmt) = For (x1, e1') cc' (x2, e2') (rs stmt)
-            where
-                e1' = rewriteExpr dimMap e1
-                e2' = rewriteExpr dimMap e2
-                cc' = rewriteExpr dimMap cc
-        rs (If cc s1 s2) = If (rewriteExpr dimMap cc) (rs s1) (rs s2)
-        rs (Timing sense stmt) = Timing sense (rs stmt)
-        rs (Null) = Null
+        rewriteIdent :: Identifier -> Identifier
+        rewriteIdent x = if Map.member x dimMap then prefix x else x
+
+        rewriteExpr :: Expr -> Expr
+        rewriteExpr (Ident      i)   = Ident    (rewriteIdent i)
+        rewriteExpr (IdentBit   i e) = IdentBit (rewriteIdent i) e
+        rewriteExpr (IdentRange i (r @ (s, e))) =
+            case Map.lookup i dimMap of
+                Nothing -> IdentRange (rewriteIdent i) r
+                Just (t, _) ->
+                    IdentRange i (simplify s', simplify e')
+                    where
+                        (a, b) = head $ snd $ typeDims t
+                        size = BinOp Add (BinOp Sub a b) (Number "1")
+                        s' = BinOp Sub (BinOp Mul size (BinOp Add s (Number "1"))) (Number "1")
+                        e' = BinOp Mul size e
+        rewriteExpr other = other
+
+        rewriteStmt :: Stmt -> Stmt
+        rewriteStmt (AsgnBlk lhs expr) = convertAssignment AsgnBlk lhs expr
+        rewriteStmt (Asgn    lhs expr) = convertAssignment Asgn    lhs expr
+        rewriteStmt other = other
         convertAssignment :: (LHS -> Expr -> Stmt) -> LHS -> Expr -> Stmt
         convertAssignment constructor (lhs @ (LHS ident)) (expr @ (Repeat _ exprs)) =
             case Map.lookup ident dimMap of
-                Nothing -> constructor (rewriteLHS dimMap lhs) (rewriteExpr dimMap expr)
+                Nothing -> constructor lhs expr
                 Just (_, (a, b)) ->
                     For inir chkr incr assign
                     where
@@ -259,27 +209,4 @@ rewriteStmt dimMap orig = rs orig
                         chkr = BinOp Le (Ident index) a
                         incr = (index, BinOp Add (Ident index) (Number "1"))
         convertAssignment constructor lhs expr =
-            constructor (rewriteLHS dimMap lhs) (rewriteExpr dimMap expr)
-
-convertModuleItem :: DimMap -> ModuleItem -> ModuleItem
-convertModuleItem dimMap (MIDecl (Variable d t x a me)) =
-    MIDecl $ Variable d t  x a' me'
-    where
-        a' = map (rewriteRange dimMap) a
-        me' = fmap (rewriteExpr dimMap) me
-convertModuleItem dimMap (Assign lhs expr) =
-    Assign (rewriteLHS dimMap lhs) (rewriteExpr dimMap expr)
-convertModuleItem dimMap (AlwaysC kw stmt) =
-    AlwaysC kw (rewriteStmt dimMap stmt)
-convertModuleItem dimMap (Function ret f decls stmt) =
-    Function ret f decls (rewriteStmt dimMap stmt)
-convertModuleItem dimMap (Instance m params x ml) =
-    Instance m params x $ fmap (map convertPortBinding) ml
-    where
-        convertPortBinding :: PortBinding -> PortBinding
-        convertPortBinding (p, Nothing) = (p, Nothing)
-        convertPortBinding (p, Just  e) = (p, Just $ rewriteExpr dimMap e)
-convertModuleItem _ (Comment  x) = Comment  x
-convertModuleItem _ (Genvar   x) = Genvar   x
-convertModuleItem _ (MIDecl   x) = MIDecl   x
-convertModuleItem _ (Generate x) = Generate x
+            constructor lhs expr

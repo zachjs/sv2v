@@ -21,8 +21,12 @@ module Convert.Traverse
 , traverseStmtLHSsM
 , traverseStmtLHSs
 , collectStmtLHSsM
+, traverseExprsM
+, traverseExprs
+, collectExprsM
 ) where
 
+import Data.Maybe (fromJust)
 import Control.Monad.State
 import Language.SystemVerilog.AST
 
@@ -135,3 +139,123 @@ traverseStmtLHSs :: Mapper LHS -> Mapper Stmt
 traverseStmtLHSs = unmonad traverseStmtLHSsM
 collectStmtLHSsM :: Monad m => CollectorM m LHS -> CollectorM m Stmt
 collectStmtLHSsM = collectify traverseStmtLHSsM
+
+traverseNestedExprsM :: Monad m => MapperM m Expr -> MapperM m Expr
+traverseNestedExprsM mapper = exprMapper
+    where
+        exprMapper e = mapper e >>= em
+        em (String     s) = return $ String    s
+        em (Number     s) = return $ Number    s
+        em (ConstBool  b) = return $ ConstBool b
+        em (Ident      i) = return $ Ident     i
+        em (IdentRange i (e1, e2)) = do
+            e1' <- exprMapper e1
+            e2' <- exprMapper e2
+            return $ IdentRange i (e1', e2')
+        em (IdentBit   i e) =
+            exprMapper e >>= return . IdentBit i
+        em (Repeat     e l) = do
+            e' <- exprMapper e
+            l' <- mapM exprMapper l
+            return $ Repeat e' l'
+        em (Concat     l) =
+            mapM exprMapper l >>= return . Concat
+        em (Call       f l) =
+            mapM exprMapper l >>= return . Call f
+        em (UniOp      o e) =
+            exprMapper e >>= return . UniOp o
+        em (BinOp      o e1 e2) = do
+            e1' <- exprMapper e1
+            e2' <- exprMapper e2
+            return $ BinOp o e1' e2'
+        em (Mux        e1 e2 e3) = do
+            e1' <- exprMapper e1
+            e2' <- exprMapper e2
+            e3' <- exprMapper e3
+            return $ Mux e1' e2' e3'
+        em (Bit        e n) =
+            exprMapper e >>= \e' -> return $ Bit e' n
+        em (Cast       t e) =
+            exprMapper e >>= return . Cast t
+
+
+traverseExprsM :: Monad m => MapperM m Expr -> MapperM m ModuleItem
+traverseExprsM mapper = moduleItemMapper
+    where
+
+    rangeMapper (a, b) = do
+        a' <- exprMapper a
+        b' <- exprMapper b
+        return (a', b')
+
+    maybeExprMapper Nothing = return Nothing
+    maybeExprMapper (Just e) =
+        exprMapper e >>= return . Just
+
+    declMapper (Parameter  t x e) =
+        exprMapper e >>= return . Parameter  t x
+    declMapper (Localparam t x e) =
+        exprMapper e >>= return . Localparam t x
+    declMapper (Variable d t x a me) = do
+        a' <- mapM rangeMapper a
+        me' <- maybeExprMapper me
+        return $ Variable d t x a' me'
+
+    exprMapper = traverseNestedExprsM mapper
+
+    caseMapper (exprs, stmt) = do
+        exprs' <- mapM exprMapper exprs
+        return (exprs', stmt)
+    stmtMapper = traverseNestedStmtsM flatStmtMapper
+    flatStmtMapper (Block header stmts) = do
+        if header == Nothing
+            then return $ Block Nothing stmts
+            else do
+                let Just (name, decls) = header
+                decls' <- mapM declMapper decls
+                return $ Block (Just (name, decls')) stmts
+    flatStmtMapper (Case kw e cases def) = do
+        e' <- exprMapper e
+        cases' <- mapM caseMapper cases
+        return $ Case kw e' cases' def
+    flatStmtMapper (AsgnBlk lhs expr) =
+        exprMapper expr >>= return . AsgnBlk lhs
+    flatStmtMapper (Asgn    lhs expr) =
+        exprMapper expr >>= return . Asgn    lhs
+    flatStmtMapper (For (x1, e1) cc (x2, e2) stmt) = do
+        e1' <- exprMapper e1
+        e2' <- exprMapper e2
+        cc' <- exprMapper cc
+        return $ For (x1, e1') cc' (x2, e2') stmt
+    flatStmtMapper (If cc s1 s2) =
+        exprMapper cc >>= \cc' -> return $ If cc' s1 s2
+    flatStmtMapper (Timing sense stmt) = return $ Timing sense stmt
+    flatStmtMapper (Null) = return Null
+
+    portBindingMapper (p, me) =
+        maybeExprMapper me >>= \me' -> return (p, me')
+
+    moduleItemMapper (MIDecl decl) =
+        declMapper decl >>= return . MIDecl
+    moduleItemMapper (Assign lhs expr) =
+        exprMapper expr >>= return . Assign lhs
+    moduleItemMapper (AlwaysC kw stmt) =
+        stmtMapper stmt >>= return . AlwaysC kw
+    moduleItemMapper (Function ret f decls stmt) = do
+        decls' <- mapM declMapper decls
+        stmt' <- stmtMapper stmt
+        return $ Function ret f decls' stmt'
+    moduleItemMapper (Instance m params x ml) = do
+        if ml == Nothing
+            then return $ Instance m params x Nothing
+            else do
+                l <- mapM portBindingMapper (fromJust ml)
+                return $ Instance m params x (Just l)
+    moduleItemMapper (Comment  x) = return $ Comment  x
+    moduleItemMapper (Genvar   x) = return $ Genvar   x
+    moduleItemMapper (Generate x) = return $ Generate x
+
+traverseExprs :: Mapper Expr -> Mapper ModuleItem
+traverseExprs = unmonad traverseExprsM
+collectExprsM :: Monad m => CollectorM m Expr -> CollectorM m ModuleItem
+collectExprsM = collectify traverseExprsM
