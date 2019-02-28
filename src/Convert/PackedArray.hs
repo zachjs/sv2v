@@ -6,9 +6,12 @@
  - This removes one dimension per identifier at a time. This works fine because
  - the conversions are repeatedly applied.
  -
+ - TODO FIXME XXX: The Parser/AST don't yet support indexing into an identifier
+ - twice, or indexing into an identifier, and then selecting a range.
+ -
  - TODO: This assumes that the first range index is the upper bound. We could
- - probably get arround this with some cleverness in the generate block. I don't
- - think it's urgent to have support for "backwards" ragnes.
+ - probably get around this with some cleverness in the generate block. I don't
+ - think it's urgent to have support for "backwards" ranges.
  -}
 
 module Convert.PackedArray (convert) where
@@ -40,7 +43,7 @@ convertDescription description =
 collectDecl :: ModuleItem -> State (DimMap, DirMap) ()
 collectDecl (MIDecl (Variable dir t ident _ _)) = do
     let (tf, rs) = typeDims t
-    if length rs > 1
+    if not (typeIsImplicit t) && length rs > 1
         then modify $ \(m, r) -> (Map.insert ident (tf $ tail rs, head rs) m, r)
         else return ()
     if dir /= Local
@@ -93,9 +96,6 @@ flattenModuleItem (dimMap, dirMap) (orig @ (MIDecl (Variable dir t ident a me)))
         flipGen = Map.lookup ident dirMap == Just Input
         genItems = unflattener flipGen ident (dimMap Map.! ident)
         newDecl = MIDecl $ Variable dir t' ident a me
-        typeIsImplicit :: Type -> Bool
-        typeIsImplicit (Implicit _) = True
-        typeIsImplicit _ = False
 flattenModuleItem _ other = other
 
 -- produces a generate block for creating a local unflattened copy of the given
@@ -131,6 +131,10 @@ unflattener shouldFlip arr (t, (majorHi, majorLo)) =
         origRange = ( (BinOp Add (Ident startBit)
                         (BinOp Sub size (Number "1")))
                     , Ident startBit )
+
+typeIsImplicit :: Type -> Bool
+typeIsImplicit (Implicit _) = True
+typeIsImplicit _ = False
 
 -- basic expression simplfication utility to help us generate nicer code in the
 -- common case of ranges like `[FOO-1:0]`
@@ -190,6 +194,12 @@ rewriteModuleItem dimMap =
                         e' = BinOp Mul size e
         rewriteExpr other = other
 
+        rewriteLHS :: LHS -> LHS
+        rewriteLHS (LHS      x  ) = LHS      (rewriteIdent x)
+        rewriteLHS (LHSBit   x e) = LHSBit   (rewriteIdent x) e
+        rewriteLHS (LHSRange x r) = LHSRange (rewriteIdent x) r
+        rewriteLHS (LHSConcat ls) = LHSConcat $ map rewriteLHS ls
+
         rewriteStmt :: Stmt -> Stmt
         rewriteStmt (AsgnBlk lhs expr) = convertAssignment AsgnBlk lhs expr
         rewriteStmt (Asgn    lhs expr) = convertAssignment Asgn    lhs expr
@@ -197,7 +207,7 @@ rewriteModuleItem dimMap =
         convertAssignment :: (LHS -> Expr -> Stmt) -> LHS -> Expr -> Stmt
         convertAssignment constructor (lhs @ (LHS ident)) (expr @ (Repeat _ exprs)) =
             case Map.lookup ident dimMap of
-                Nothing -> constructor lhs expr
+                Nothing -> constructor (rewriteLHS lhs) expr
                 Just (_, (a, b)) ->
                     For inir chkr incr assign
                     where
@@ -209,4 +219,4 @@ rewriteModuleItem dimMap =
                         chkr = BinOp Le (Ident index) a
                         incr = (index, BinOp Add (Ident index) (Number "1"))
         convertAssignment constructor lhs expr =
-            constructor lhs expr
+            constructor (rewriteLHS lhs) expr
