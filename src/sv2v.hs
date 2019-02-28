@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
@@ -8,21 +7,19 @@
 import System.IO
 import System.Exit
 
-import Args (readArgs, target, file)
+import Job (readJob, file, target)
 import Convert (convert)
 import Language.SystemVerilog.Parser
 
 main :: IO ()
 main = do
-    args <- readArgs
-    let filePath = file args
+    job <- readJob
+    -- parse the input file
+    let filePath = file job
     content <- readFile filePath
     let ast = parseFile [] filePath content
-    let res = Right (convert (target args) ast)
-    case res of
-        Left  _ -> do
-            --hPrint stderr err
-            exitFailure
-        Right str -> do
-            hPrint stdout str
-            exitSuccess
+    -- convert the file
+    let ast' = convert (target job) ast
+    -- print the converted file out
+    hPrint stdout ast'
+    exitSuccess

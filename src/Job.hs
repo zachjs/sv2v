@@ -5,7 +5,7 @@
  - Command line arguments.
  -}
 
-module Args where
+module Job where
 
 import System.Console.CmdArgs
 
@@ -28,5 +28,5 @@ defaultJob = Job
     &= details [ "sv2v converts SystemVerilog to Verilog."
                , "More info: https://github.com/zachjs/sv2v" ]
 
-readArgs :: IO Job
-readArgs = cmdArgs defaultJob
+readJob :: IO Job
+readJob = cmdArgs defaultJob

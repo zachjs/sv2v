@@ -48,7 +48,7 @@ executable sv2v
     Convert.Typedef
     Convert.Traverse
     -- sv2v CLI modules
-    Args
+    Job
   ghc-options:
     -O3
     -threaded
