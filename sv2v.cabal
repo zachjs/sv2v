@@ -1,49 +1,24 @@
-name:    sv2v
+name: sv2v
 version: 0.0.1
-
-category: Language, Hardware, Embedded
-
 synopsis: SystemVerilog to Verilog conversion
-
 description:
-  A tool for coverting SystemVerilog to Verilog. Also exposes a limited
-  SystemVerilog parser and AST. Forked from the Verilog parser found at
-  https://github.com/tomahawkins/verilog
+  A tool for coverting SystemVerilog to Verilog. Originally forked from the
+  Verilog parser found at https://github.com/tomahawkins/verilog
+category: Language, Hardware, Embedded, Development
 
-author:     Zachary Snow <zach@zachjs.com>, Tom Hawkins <tomahawkins@gmail.com>
+author: Zachary Snow <zach@zachjs.com>, Tom Hawkins <tomahawkins@gmail.com>
 maintainer: Zachary Snow <zach@zachjs.com>
-
-license:      BSD3
+license: BSD3
 license-file: LICENSE
-
 homepage: https://github.com/zachjs/sv2v
 
-build-type:    Simple
-cabal-version: >= 1.10
-
-library
-  default-language: Haskell2010
-  build-tools:
-    alex  >= 3 && < 4,
-    happy >= 1 && < 2
-  build-depends:
-    base       >= 4.8.2.0   && < 5.0,
-    array      >= 0.5.1.0   && < 0.6
-
-  exposed-modules:
-    Language.SystemVerilog
-    Language.SystemVerilog.AST
-    Language.SystemVerilog.Parser
-    Language.SystemVerilog.Parser.Lex
-    Language.SystemVerilog.Parser.Parse
-    Language.SystemVerilog.Parser.Preprocess
-    Language.SystemVerilog.Parser.Tokens
-
-  ghc-options: -W
+build-type: Simple
+cabal-version: >= 1.12
 
 executable sv2v
   default-language: Haskell2010
   main-is: sv2v.hs
+  hs-source-dirs: src
   build-tools:
     alex  >= 3 && < 4,
     happy >= 1 && < 2
@@ -54,7 +29,7 @@ executable sv2v
     containers,
     mtl
   other-modules:
-    Args
+    -- SystemVerilog modules
     Language.SystemVerilog
     Language.SystemVerilog.AST
     Language.SystemVerilog.Parser
@@ -62,6 +37,7 @@ executable sv2v
     Language.SystemVerilog.Parser.Parse
     Language.SystemVerilog.Parser.Preprocess
     Language.SystemVerilog.Parser.Tokens
+    -- Conversion modules
     Convert
     Convert.AlwaysKW
     Convert.CaseKW
@@ -71,6 +47,8 @@ executable sv2v
     Convert.StarPort
     Convert.Typedef
     Convert.Traverse
+    -- sv2v CLI modules
+    Args
   ghc-options:
     -O3
     -threaded
