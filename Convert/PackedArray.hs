@@ -3,70 +3,137 @@
  -
  - Conversion for flattening multi-dimensional packed arrays
  -
- - To simplify the code, this only removes one dimension per identifier at a
- - time. Because the conversions are repeatedly applied until convergence, this
- - will eventually remove all the extra packed dimensions.
+ - This removes one dimension per identifier at a time. This works fine because
+ - the conversions are repeatedly applied.
  -
- - TODO FIXME XXX: We don't actually have support for more than 2 dimensions
- - right now. I don't think the parser can even handle that. This isn't
- - something that should be too common, so maybe we can hold off on that for
- - now.
- -
- - TODO FIXME XXX: This does not yet identify and flatten candidates that are
- - themselves contained inside of generate blocks.
- -
- - TODO FIXME XXX: This actually assumes that the first range index is the upper
- - bound. We could get arround this with a generate block.
+ - TODO: This assumes that the first range index is the upper bound. We could
+ - probably get arround this with some cleverness in the generate block. I don't
+ - think it's urgent to have support for "backwards" ragnes.
  -}
 
-module Convert.PackedArrayFlatten (convert) where
+module Convert.PackedArray (convert) where
 
--- Note that, for now, only wire/reg/logic/alias can have multiple packed
--- dimensions. This means all such transformations are for module items, though
--- we must of course change uses of these items in non-constant expressions,
--- which we, unfortunately, do not distinguish from constant expressions in the
--- AST.
-
-import Data.Maybe
+import Control.Monad.State
+import Data.List (partition)
 import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
 
+import Convert.Traverse
 import Language.SystemVerilog.AST
 
+type DirMap = Map.Map Identifier Direction
 type DimMap = Map.Map Identifier (Type, Range)
 
 convert :: AST -> AST
-convert = map convertDescription
+convert = traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription (Module name ports items) =
-    -- Insert the new items right after the Variable for the item to preserve
-    -- declaration order, which some toolchains care about.
-    Module name ports $ concat $ map addUnflattener items'
+convertDescription description =
+    hoistPortDecls $
+    traverseModuleItems (flattenModuleItem info . convertModuleItem dimMap') description
     where
-        toFlatten = mapMaybe getExtraDims items
-        dimMap = Map.fromList toFlatten
-        items' = map (convertModuleItem dimMap) items
-        outputs = Set.fromList $ mapMaybe getOutput items
-        getOutput :: ModuleItem -> Maybe Identifier
-        getOutput (MIDecl (Variable Output _ ident _ _)) = Just ident
-        getOutput _ = Nothing
-        getExtraDims :: ModuleItem -> Maybe (Identifier, (Type, Range))
-        getExtraDims (MIDecl (Variable _ t ident _ _)) =
-            if length rs > 1
-                then Just (ident, (tf $ tail rs, head rs))
-                else Nothing
-            where (tf, rs) = typeDims t
-        getExtraDims _ = Nothing
-        addUnflattener :: ModuleItem -> [ModuleItem]
-        addUnflattener (orig @ (MIDecl (Variable _ _ ident _ _))) =
-            orig :
-            case Map.lookup ident dimMap of
-                Nothing -> []
-                Just desc -> unflattener outputs (ident, desc)
-        addUnflattener other = [other]
-convertDescription other = other
+        info = execState
+            (collectModuleItemsM collectDecl description)
+            (Map.empty, Map.empty)
+        dimMap' = Map.restrictKeys (fst info) (Map.keysSet $ snd info)
 
+-- collects port direction and packed-array dimension info into the state
+collectDecl :: ModuleItem -> State (DimMap, DirMap) ()
+collectDecl (MIDecl (Variable dir t ident _ _)) = do
+    let (tf, rs) = typeDims t
+    if length rs > 1
+        then modify $ \(m, r) -> (Map.insert ident (tf $ tail rs, head rs) m, r)
+        else return ()
+    if dir /= Local
+        then modify $ \(m, r) -> (m, Map.insert ident dir r)
+        else return ()
+collectDecl _ = return ()
+
+-- VCS doesn't like port declarations inside of `generate` blocks, so we hoist
+-- them out with this function. This obviously isn't ideal, but it's a
+-- relatively straightforward transformation, and testing in VCS is important.
+hoistPortDecls :: Description -> Description
+hoistPortDecls (Module name ports items) =
+    Module name ports (concat $ map explode items)
+    where
+        explode :: ModuleItem -> [ModuleItem]
+        explode (Generate genItems) =
+            portDecls ++ [Generate rest]
+            where
+                (wrappedPortDecls, rest) = partition isPortDecl genItems
+                portDecls = map (\(GenModuleItem item) -> item) wrappedPortDecls
+                isPortDecl :: GenItem -> Bool
+                isPortDecl (GenModuleItem (MIDecl (Variable dir _ _ _ _))) =
+                    dir /= Local
+                isPortDecl _ = False
+        explode other = [other]
+hoistPortDecls other = other
+
+-- rewrite a module item if it contains a declaration to flatten
+flattenModuleItem :: (DimMap, DirMap) -> ModuleItem -> ModuleItem
+flattenModuleItem (dimMap, dirMap) (orig @ (MIDecl (Variable dir t ident a me))) =
+    -- if it doesn't need any mapping
+    if Map.notMember ident dimMap then
+        -- Skip!
+        orig
+    -- if it's not a port
+    else if Map.notMember ident dirMap then
+        -- move the packed dimension to the unpacked side
+        MIDecl $ Variable dir (tf $ tail rs) ident (a ++ [head rs]) me
+    -- if it is a port, but it's not the typed declaration
+    else if typeIsImplicit t then
+        -- flatten the ranges
+        newDecl -- see below
+    -- if it is a port, and it is the typed declaration of that por
+    else
+        -- do the fancy flatten-unflatten mapping
+        Generate $ (GenModuleItem newDecl) : genItems
+    where
+        (tf, rs) = typeDims t
+        t' = tf $ flattenRanges rs
+        flipGen = Map.lookup ident dirMap == Just Input
+        genItems = unflattener flipGen ident (dimMap Map.! ident)
+        newDecl = MIDecl $ Variable dir t' ident a me
+        typeIsImplicit :: Type -> Bool
+        typeIsImplicit (Implicit _) = True
+        typeIsImplicit _ = False
+flattenModuleItem _ other = other
+
+-- produces a generate block for creating a local unflattened copy of the given
+-- port-exposed flattened array
+unflattener :: Bool -> Identifier -> (Type, Range) -> [GenItem]
+unflattener shouldFlip arr (t, (majorHi, majorLo)) =
+        [ GenModuleItem $ Comment $ "sv2v packed-array-flatten unflattener for " ++ arr
+        , GenModuleItem $ MIDecl $ Variable Local t arrUnflat [(majorHi, majorLo)] Nothing
+        , GenModuleItem $ Genvar index
+        , GenModuleItem $ MIDecl $ Variable Local IntegerT (arrUnflat ++ "_repeater_index") [] Nothing
+        , GenFor
+            (index, majorLo)
+            (BinOp Le (Ident index) majorHi)
+            (index, BinOp Add (Ident index) (Number "1"))
+            (prefix "unflatten")
+            [ localparam startBit
+                (simplify $ BinOp Add majorLo
+                    (BinOp Mul (Ident index) size))
+            , GenModuleItem $ (uncurry Assign) $
+                if shouldFlip
+                    then (LHSBit arrUnflat $ Ident index, IdentRange arr origRange)
+                    else (LHSRange arr origRange, IdentBit arrUnflat $ Ident index)
+            ]
+        ]
+    where
+        startBit = prefix "_tmp_start"
+        arrUnflat = prefix arr
+        index = prefix "_tmp_index"
+        (minorHi, minorLo) = head $ snd $ typeDims t
+        size = simplify $ BinOp Add (BinOp Sub minorHi minorLo) (Number "1")
+        localparam :: Identifier -> Expr -> GenItem
+        localparam x v = GenModuleItem $ MIDecl $ Localparam (Implicit []) x v
+        origRange = ( (BinOp Add (Ident startBit)
+                        (BinOp Sub size (Number "1")))
+                    , Ident startBit )
+
+-- basic expression simplfication utility to help us generate nicer code in the
+-- common case of ranges like `[FOO-1:0]`
 simplify :: Expr -> Expr
 simplify (BinOp op e1 e2) =
     case (op, e1', e2') of
@@ -81,42 +148,15 @@ simplify (BinOp op e1 e2) =
         e2' = simplify e2
 simplify other = other
 
-unflattener :: Set.Set Identifier -> (Identifier, (Type, Range)) -> [ModuleItem]
-unflattener outputs (arr, (t, (majorHi, majorLo))) =
-    [ Comment $ "sv2v packed-array-flatten unflattener for " ++ arr
-    , MIDecl $ Variable Local t arrUnflat [(majorHi, majorLo)] Nothing
-    , Generate
-        [ GenModuleItem $ Genvar index
-        , GenModuleItem $ MIDecl $ Variable Local IntegerT (arrUnflat ++ "_repeater_index") [] Nothing
-        , GenFor
-            (index, majorLo)
-            (BinOp Le (Ident index) majorHi)
-            (index, BinOp Add (Ident index) (Number "1"))
-            (prefix "unflatten")
-            [ localparam startBit
-                (simplify $ BinOp Add majorLo
-                    (BinOp Mul (Ident index) size))
-            , GenModuleItem $ (uncurry Assign) $
-                if Set.notMember arr outputs
-                    then (LHSBit arrUnflat $ Ident index, IdentRange arr origRange)
-                    else (LHSRange arr origRange, IdentBit arrUnflat $ Ident index)
-            ]
-        ]
-    ]
-    where
-        startBit = prefix "_tmp_start"
-        arrUnflat = prefix arr
-        index = prefix "_tmp_index"
-        (minorHi, minorLo) = head $ snd $ typeDims t
-        size = simplify $ BinOp Add (BinOp Sub minorHi minorLo) (Number "1")
-        localparam :: Identifier -> Expr -> GenItem
-        localparam x v = GenModuleItem $ MIDecl $ Localparam (Implicit []) x v
-        origRange = ( (BinOp Add (Ident startBit)
-                        (BinOp Sub size (Number "1")))
-                    , Ident startBit )
-
+-- prefix a string with a namespace of sorts
 prefix :: Identifier -> Identifier
 prefix ident = "_sv2v_" ++ ident
+
+
+-- TODO FIXME XXX: There is a huge opportunity here to simplify the code after
+-- this point in the module. Each of these mappings have a bit of their own
+-- quirks. They cover all LHSs, expressions, and statements, at every level.
+
 
 rewriteRange :: DimMap -> Range -> Range
 rewriteRange dimMap (a, b) = (r a, r b)
@@ -143,7 +183,7 @@ rewriteExpr dimMap = rewriteExpr'
             case Map.lookup i dimMap of
                 Nothing -> IdentRange (ri i) (rewriteRange dimMap r)
                 Just (t, _) ->
-                    IdentRange i (s', e')
+                    IdentRange i (simplify s', simplify e')
                     where
                         (a, b) = head $ snd $ typeDims t
                         size = BinOp Add (BinOp Sub a b) (Number "1")
@@ -159,6 +199,7 @@ rewriteExpr dimMap = rewriteExpr'
         rewriteExpr' (Bit        e n) = Bit (re e) n
         rewriteExpr' (Cast       t e) = Cast t (re e)
 
+-- combines (flattens) the bottom two ranges in the given list of ranges
 flattenRanges :: [Range] -> [Range]
 flattenRanges rs =
     if length rs >= 2
@@ -222,16 +263,10 @@ rewriteStmt dimMap orig = rs orig
 
 convertModuleItem :: DimMap -> ModuleItem -> ModuleItem
 convertModuleItem dimMap (MIDecl (Variable d t x a me)) =
-    if Map.member x dimMap
-        then MIDecl $ Variable d t' x a' me'
-        else MIDecl $ Variable d t  x a' me'
+    MIDecl $ Variable d t  x a' me'
     where
-        (tf, rs) = typeDims t
-        t' = tf $ flattenRanges rs
         a' = map (rewriteRange dimMap) a
         me' = fmap (rewriteExpr dimMap) me
-convertModuleItem dimMap (Generate items) =
-    Generate $ map (convertGenItem dimMap) items
 convertModuleItem dimMap (Assign lhs expr) =
     Assign (rewriteLHS dimMap lhs) (rewriteExpr dimMap expr)
 convertModuleItem dimMap (AlwaysC kw stmt) =
@@ -244,22 +279,7 @@ convertModuleItem dimMap (Instance m params x ml) =
         convertPortBinding :: PortBinding -> PortBinding
         convertPortBinding (p, Nothing) = (p, Nothing)
         convertPortBinding (p, Just  e) = (p, Just $ rewriteExpr dimMap e)
-convertModuleItem _ (Comment x) = Comment x
-convertModuleItem _ (Genvar  x) = Genvar  x
-convertModuleItem _ (MIDecl  x) = MIDecl  x
-
-convertGenItem :: DimMap -> GenItem -> GenItem
-convertGenItem dimMap item = convertGenItem' item
-    where
-        f :: ModuleItem -> ModuleItem
-        f = convertModuleItem dimMap
-        convertGenItem' :: GenItem -> GenItem
-        convertGenItem' (GenBlock x items) = GenBlock x $ map convertGenItem' items
-        convertGenItem' (GenFor a b c d items) = GenFor a b c d $ map convertGenItem' items
-        convertGenItem' (GenIf e i1 i2) = GenIf e (convertGenItem' i1) (convertGenItem' i2)
-        convertGenItem' (GenNull) = GenNull
-        convertGenItem' (GenModuleItem moduleItem) = GenModuleItem $ f moduleItem
-        convertGenItem' (GenCase e cases def) = GenCase e cases' def'
-            where
-                cases' = zip (map fst cases) (map (convertGenItem' . snd) cases)
-                def' = fmap convertGenItem' def
+convertModuleItem _ (Comment  x) = Comment  x
+convertModuleItem _ (Genvar   x) = Genvar   x
+convertModuleItem _ (MIDecl   x) = MIDecl   x
+convertModuleItem _ (Generate x) = Generate x

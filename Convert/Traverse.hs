@@ -69,8 +69,11 @@ traverseModuleItemsM mapper (Module name ports items) =
             i2' <- genItemMapper i2
             return $ GenIf e i1' i2'
         genItemMapper (GenNull) = return GenNull
-        genItemMapper (GenModuleItem moduleItem) =
-            fullMapper moduleItem >>= return . GenModuleItem
+        genItemMapper (GenModuleItem moduleItem) = do
+            moduleItem' <- fullMapper moduleItem
+            return $ case moduleItem' of
+                Generate subItems -> GenBlock Nothing subItems
+                _ -> GenModuleItem moduleItem'
         genItemMapper (GenCase e cases def) = do
             caseItems <- mapM (genItemMapper . snd) cases
             let cases' = zip (map fst cases) caseItems

@@ -66,7 +66,7 @@ executable sv2v
     Convert.AlwaysKW
     Convert.CaseKW
     Convert.Logic
-    Convert.PackedArrayFlatten
+    Convert.PackedArray
     Convert.SplitPortDecl
     Convert.StarPort
     Convert.Typedef

@@ -13,7 +13,7 @@ import qualified Convert.AlwaysKW
 import qualified Convert.CaseKW
 import qualified Convert.Logic
 import qualified Convert.Typedef
-import qualified Convert.PackedArrayFlatten
+import qualified Convert.PackedArray
 import qualified Convert.SplitPortDecl
 import qualified Convert.StarPort
 
@@ -22,7 +22,7 @@ type Phase = AST -> AST
 phases :: Args.Target -> [Phase]
 phases Args.YOSYS =
     [ Convert.Typedef.convert
-    , Convert.PackedArrayFlatten.convert
+    , Convert.PackedArray.convert
     , Convert.StarPort.convert
     ]
 phases Args.VTR =
