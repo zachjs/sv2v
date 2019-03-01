@@ -79,7 +79,7 @@ data Type
   | Implicit         [Range]
   | IntegerT
   | Enum (Maybe Type) [(Identifier, Maybe Expr)] [Range]
-  deriving Eq
+  deriving (Eq, Ord)
 
 instance Show Type where
   show (Reg      r) = "reg"   ++ (showRanges r)
@@ -212,7 +212,7 @@ data Expr
   | Mux        Expr Expr Expr
   | Bit        Expr Int
   | Cast       Type Expr
-  deriving Eq
+  deriving (Eq, Ord)
 
 data UniOp
   = Not
@@ -225,7 +225,7 @@ data UniOp
   | RedNor
   | RedXor
   | RedXnor
-  deriving Eq
+  deriving (Eq, Ord)
 
 instance Show UniOp where
   show Not     = "!"
@@ -260,7 +260,7 @@ data BinOp
   | Ge
   | ShiftAL
   | ShiftAR
-  deriving Eq
+  deriving (Eq, Ord)
 
 instance Show BinOp where
   show a = case a of

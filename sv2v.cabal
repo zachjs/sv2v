@@ -41,6 +41,7 @@ executable sv2v
     Convert
     Convert.AlwaysKW
     Convert.CaseKW
+    Convert.Enum
     Convert.Logic
     Convert.PackedArray
     Convert.SplitPortDecl

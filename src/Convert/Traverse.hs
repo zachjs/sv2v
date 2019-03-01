@@ -30,6 +30,9 @@ module Convert.Traverse
 , traverseDeclsM
 , traverseDecls
 , collectDeclsM
+, traverseTypesM
+, traverseTypes
+, collectTypesM
 ) where
 
 import Data.Maybe (fromJust)
@@ -300,3 +303,28 @@ traverseDecls :: Mapper Decl -> Mapper ModuleItem
 traverseDecls = unmonad traverseDeclsM
 collectDeclsM :: Monad m => CollectorM m Decl -> CollectorM m ModuleItem
 collectDeclsM = collectify traverseDeclsM
+
+traverseTypesM :: Monad m => MapperM m Type -> MapperM m ModuleItem
+traverseTypesM mapper item =
+    traverseDeclsM declMapper item >>= traverseExprsM exprMapper
+    where
+        exprMapper (Cast t e) = do
+            t' <- mapper t
+            -- TODO HACK: If the cast type is no longer "simple", we just drop
+            -- the case altogether. This probably doesn't work great in all
+            -- cases.
+            return $ if elem ' ' (show t')
+                then e
+                else Cast t' e
+        exprMapper other = return other
+        declMapper (Parameter  t x    e) =
+            mapper t >>= \t' -> return $ Parameter  t' x   e
+        declMapper (Localparam t x    e) =
+            mapper t >>= \t' -> return $ Localparam t' x   e
+        declMapper (Variable d t x a me) =
+            mapper t >>= \t' -> return $ Variable d t' x a me
+
+traverseTypes :: Mapper Type -> Mapper ModuleItem
+traverseTypes = unmonad traverseTypesM
+collectTypesM :: Monad m => CollectorM m Type -> CollectorM m ModuleItem
+collectTypesM = collectify traverseTypesM

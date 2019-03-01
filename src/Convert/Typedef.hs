@@ -32,19 +32,7 @@ isTypedef _ = False
 
 convertDescription :: Types -> Description -> Description
 convertDescription types description =
-    traverseModuleItems rewriteMI description
-    where
-        rt :: Type -> Type
-        rt = resolveType types
-        rewriteMI :: ModuleItem -> ModuleItem
-        rewriteMI = traverseDecls rewriteDecl . traverseExprs rewriteExpr
-        rewriteExpr :: Expr -> Expr
-        rewriteExpr (Cast t e) = Cast (rt t) e
-        rewriteExpr other = other
-        rewriteDecl :: Decl -> Decl
-        rewriteDecl (Parameter  t x    e) = Parameter  (rt t) x   e
-        rewriteDecl (Localparam t x    e) = Localparam (rt t) x   e
-        rewriteDecl (Variable d t x a me) = Variable d (rt t) x a me
+    traverseModuleItems (traverseTypes $ resolveType types) description
 
 resolveType :: Types -> Type -> Type
 resolveType _ (Reg      rs) = Reg      rs

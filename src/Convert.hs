@@ -11,6 +11,7 @@ import Job (Target(..))
 
 import qualified Convert.AlwaysKW
 import qualified Convert.CaseKW
+import qualified Convert.Enum
 import qualified Convert.Logic
 import qualified Convert.Typedef
 import qualified Convert.PackedArray
@@ -21,9 +22,10 @@ type Phase = AST -> AST
 
 phases :: Target -> [Phase]
 phases YOSYS =
-    [ Convert.Typedef.convert
+    [ Convert.Enum.convert
     , Convert.PackedArray.convert
     , Convert.StarPort.convert
+    , Convert.Typedef.convert
     ]
 phases VTR =
     (phases YOSYS) ++
