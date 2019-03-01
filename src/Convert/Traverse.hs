@@ -24,6 +24,9 @@ module Convert.Traverse
 , traverseExprsM
 , traverseExprs
 , collectExprsM
+, traverseLHSsM
+, traverseLHSs
+, collectLHSsM
 ) where
 
 import Data.Maybe (fromJust)
@@ -259,3 +262,17 @@ traverseExprs :: Mapper Expr -> Mapper ModuleItem
 traverseExprs = unmonad traverseExprsM
 collectExprsM :: Monad m => CollectorM m Expr -> CollectorM m ModuleItem
 collectExprsM = collectify traverseExprsM
+
+traverseLHSsM :: Monad m => MapperM m LHS -> MapperM m ModuleItem
+traverseLHSsM mapper item =
+    traverseStmtsM (traverseStmtLHSsM mapper) item >>= traverseModuleItemLHSsM
+    where
+        traverseModuleItemLHSsM (Assign lhs expr) = do
+            lhs' <- mapper lhs
+            return $ Assign lhs' expr
+        traverseModuleItemLHSsM other = return other
+
+traverseLHSs :: Mapper LHS -> Mapper ModuleItem
+traverseLHSs = unmonad traverseLHSsM
+collectLHSsM :: Monad m => CollectorM m LHS -> CollectorM m ModuleItem
+collectLHSsM = collectify traverseLHSsM

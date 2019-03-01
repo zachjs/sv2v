@@ -19,7 +19,7 @@ module Language.SystemVerilog.AST
   , Case
   , Range
   , GenCase
-  , typeDims
+  , typeRanges
   ) where
 
 import Data.List
@@ -94,14 +94,14 @@ instance Show Type where
       showVal :: (Identifier, Maybe Expr) -> String
       showVal (x, e) = x ++ (showAssignment e)
 
-typeDims :: Type -> ([Range] -> Type, [Range])
-typeDims (Reg      r) = (Reg     , r)
-typeDims (Wire     r) = (Wire    , r)
-typeDims (Logic    r) = (Logic   , r)
-typeDims (Alias  t r) = (Alias  t, r)
-typeDims (Implicit r) = (Implicit, r)
-typeDims (IntegerT  ) = (error "ranges cannot be applied to IntegerT", [])
-typeDims (Enum t v r) = (Enum t v, r)
+typeRanges :: Type -> ([Range] -> Type, [Range])
+typeRanges (Reg      r) = (Reg     , r)
+typeRanges (Wire     r) = (Wire    , r)
+typeRanges (Logic    r) = (Logic   , r)
+typeRanges (Alias  t r) = (Alias  t, r)
+typeRanges (Implicit r) = (Implicit, r)
+typeRanges (IntegerT  ) = (error "ranges cannot be applied to IntegerT", [])
+typeRanges (Enum t v r) = (Enum t v, r)
 
 data Decl
   = Parameter            Type Identifier Expr

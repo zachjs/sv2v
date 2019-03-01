@@ -24,5 +24,5 @@ splitPortDecl (orig @ (MIDecl (Variable _ (Implicit _) _ _ _))) = [orig]
 splitPortDecl (MIDecl (Variable d t x a me)) =
     [ MIDecl $ Variable d     (Implicit r) x a Nothing
     , MIDecl $ Variable Local t            x a me      ]
-    where (_, r) = typeDims t
+    where (_, r) = typeRanges t
 splitPortDecl other = [other]
