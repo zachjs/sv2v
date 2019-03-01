@@ -27,6 +27,9 @@ module Convert.Traverse
 , traverseLHSsM
 , traverseLHSs
 , collectLHSsM
+, traverseDeclsM
+, traverseDecls
+, collectDeclsM
 ) where
 
 import Data.Maybe (fromJust)
@@ -276,3 +279,24 @@ traverseLHSs :: Mapper LHS -> Mapper ModuleItem
 traverseLHSs = unmonad traverseLHSsM
 collectLHSsM :: Monad m => CollectorM m LHS -> CollectorM m ModuleItem
 collectLHSsM = collectify traverseLHSsM
+
+traverseDeclsM :: Monad m => MapperM m Decl -> MapperM m ModuleItem
+traverseDeclsM mapper item = do
+    item' <- miMapperA item
+    traverseStmtsM miMapperB item'
+    where
+        miMapperA (MIDecl decl) =
+            mapper decl >>= return . MIDecl
+        miMapperA (Function t x decls s) = do
+            decls' <- mapM mapper decls
+            return $ Function t x decls' s
+        miMapperA other = return other
+        miMapperB (Block (Just (name, decls)) stmts) = do
+            decls' <- mapM mapper decls
+            return $ Block (Just (name, decls')) stmts
+        miMapperB other = return other
+
+traverseDecls :: Mapper Decl -> Mapper ModuleItem
+traverseDecls = unmonad traverseDeclsM
+collectDeclsM :: Monad m => CollectorM m Decl -> CollectorM m ModuleItem
+collectDeclsM = collectify traverseDeclsM
