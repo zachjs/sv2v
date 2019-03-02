@@ -79,6 +79,7 @@ data Type
   | Implicit         [Range]
   | IntegerT
   | Enum (Maybe Type) [(Identifier, Maybe Expr)] [Range]
+  | Struct Bool [(Type, Identifier)] [Range]
   deriving (Eq, Ord)
 
 instance Show Type where
@@ -93,6 +94,11 @@ instance Show Type where
       tStr = maybe "" showPad mt
       showVal :: (Identifier, Maybe Expr) -> String
       showVal (x, e) = x ++ (showAssignment e)
+  show (Struct p items r) = printf "struct %s{\n%s\n}%s" packedStr itemsStr (showRanges r)
+    where
+      packedStr = if p then "packed " else ""
+      itemsStr = indent $ unlines' $ map showItem items
+      showItem (t, x) = printf "%s %s;" (show t) x
 
 typeRanges :: Type -> ([Range] -> Type, [Range])
 typeRanges (Reg      r) = (Reg     , r)
@@ -102,6 +108,7 @@ typeRanges (Alias  t r) = (Alias  t, r)
 typeRanges (Implicit r) = (Implicit, r)
 typeRanges (IntegerT  ) = (error "ranges cannot be applied to IntegerT", [])
 typeRanges (Enum t v r) = (Enum t v, r)
+typeRanges (Struct p l r) = (Struct p l, r)
 
 data Decl
   = Parameter            Type Identifier Expr
@@ -212,6 +219,8 @@ data Expr
   | Mux        Expr Expr Expr
   | Bit        Expr Int
   | Cast       Type Expr
+  | StructAccess Expr Identifier
+  | StructPattern [(Maybe Identifier, Expr)]
   deriving (Eq, Ord)
 
 data UniOp
@@ -301,6 +310,14 @@ instance Show Expr where
     Mux        a b c    -> printf "(%s ? %s : %s)" (show a) (show b) (show c)
     Bit        a b      -> printf "(%s [%d])" (show a) b
     Cast       a b      -> printf "%s'(%s)" (show a) (show b)
+    StructAccess e n    -> printf "%s.%s" (show e) n
+    StructPattern l     -> printf "'{\n%s\n}" (showPatternItems l)
+    where
+      showPatternItems :: [(Maybe Identifier, Expr)] -> String
+      showPatternItems l = indent $ intercalate ",\n" (map showPatternItem l)
+      showPatternItem :: (Maybe Identifier, Expr) -> String
+      showPatternItem (Nothing, e) = show e
+      showPatternItem (Just n , e) = printf "%s: %s" n (show e)
 
 data LHS
   = LHS       Identifier
@@ -354,7 +371,7 @@ instance Show Stmt where
     where
     defStr = case def of
       Nothing -> ""
-      Just c -> printf "\n\tdefault:\n%s" (indent $ indent $ show c)
+      Just c -> printf "\n\tdefault: %s" (show c)
   show (For (a,b) c (d,e) f) = printf "for (%s = %s; %s; %s = %s)\n%s" a (show b) (show c) d (show e) $ indent $ show f
   show (AsgnBlk v e) = printf "%s = %s;"  (show v) (show e)
   show (Asgn    v e) = printf "%s <= %s;" (show v) (show e)

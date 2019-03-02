@@ -48,9 +48,11 @@ import Language.SystemVerilog.Parser.Tokens
 "negedge"          { Token KW_negedge    _ _ }
 "or"               { Token KW_or         _ _ }
 "output"           { Token KW_output     _ _ }
+"packed"           { Token KW_packed     _ _ }
 "parameter"        { Token KW_parameter  _ _ }
 "posedge"          { Token KW_posedge    _ _ }
 "reg"              { Token KW_reg        _ _ }
+"struct"           { Token KW_struct     _ _ }
 "typedef"          { Token KW_typedef    _ _ }
 "unique"           { Token KW_unique     _ _ }
 "wire"             { Token KW_wire       _ _ }
@@ -159,6 +161,7 @@ string             { Token Lit_string    _ _ }
 %left  "+" "-"
 %left  "*" "/" "%"
 %left  UPlus UMinus "!" "~" RedOps
+%left  "."
 
 
 %%
@@ -182,10 +185,24 @@ TypeNonAlias :: { Type }
   : "wire"  Dimensions { Wire  $2 }
   | "reg"   Dimensions { Reg   $2 }
   | "logic" Dimensions { Logic $2 }
-  | "enum" opt(Type) "{" VariablePortIdentifiers "}" Dimensions { Enum $2 $4 $6 }
+  | "enum"   opt(Type) "{" EnumItems   "}" Dimensions { Enum   $2 $4 $6 }
+  | "struct" Packed    "{" StructItems "}" Dimensions { Struct $2 $4 $6 }
 Type :: { Type }
   : TypeNonAlias          { $1 }
   | Identifier Dimensions { Alias $1 $2 }
+
+EnumItems :: { [(Identifier, Maybe Expr)] }
+  : VariablePortIdentifiers { $1 }
+
+StructItems :: { [(Type, Identifier)] }
+  : StructItem             { [$1] }
+  | StructItems StructItem { $1 ++ [$2] }
+StructItem :: { (Type, Identifier) }
+  : Type Identifier ";" { ($1, $2) }
+
+Packed :: { Bool }
+  : "packed"    { True }
+  | {- empty -} { False }
 
 Module :: { Description }
   : "module" Identifier Params           ";" ModuleItems "endmodule" { Module $2 [] ($3 ++ $5) }
@@ -220,24 +237,27 @@ PortDeclsFollow :: { [ModuleItem] }
   : ")"                           { [] }
   | PortDecl(")")                 { $1 }
   | PortDecl(",") PortDeclsFollow { $1 ++ $2 }
-
 PortDecl(delim) :: { [ModuleItem] }
-  : "inout"  NetType Dimensions Identifiers             delim { portDeclToModuleItems Inout  ($2       $3) (zip $4 (repeat Nothing)) }
-  | "input"  NetType Dimensions Identifiers             delim { portDeclToModuleItems Input  ($2       $3) (zip $4 (repeat Nothing)) }
-  | "output"         Dimensions Identifiers             delim { portDeclToModuleItems Output (Implicit $2) (zip $3 (repeat Nothing)) }
-  | "output" "wire"  Dimensions Identifiers             delim { portDeclToModuleItems Output (Wire     $3) (zip $4 (repeat Nothing)) }
-  | "output" "reg"   Dimensions VariablePortIdentifiers delim { portDeclToModuleItems Output (Reg      $3) $4 }
-  | "output" "logic" Dimensions VariablePortIdentifiers delim { portDeclToModuleItems Output (Logic    $3) $4 }
-NetType :: { [Range] -> Type }
-  : "wire"      { Wire }
-  | "logic"     { Logic }
-  | {- empty -} { Implicit }
+  : Direction TypedVariablePortIdentifiers(delim) { portDeclToModuleItems $1 $2 }
+
 VariablePortIdentifiers :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifier                             { [$1] }
   | VariablePortIdentifiers "," VariablePortIdentifier { $1 ++ [$3] }
 VariablePortIdentifier :: { (Identifier, Maybe Expr) }
   : Identifier          { ($1, Nothing) }
   | Identifier "=" Expr { ($1, Just $3) }
+
+-- Note that this allows for things like `input reg` which are not valid.
+TypedVariablePortIdentifiers(delim) :: { (Type, [PortBinding]) }
+  : TypeNonAlias                  VariablePortIdentifiers delim { ($1,    $2) }
+  | Identifier DimensionsNonEmpty VariablePortIdentifiers delim { (Alias $1 $2, $3) }
+  | Identifier                    VariablePortIdentifiers delim { (Alias $1 [], $2) }
+  |            DimensionsNonEmpty VariablePortIdentifiers delim { (Implicit $1, $2) }
+  |                               VariablePortIdentifiers delim { (Implicit [], $1) }
+Direction :: { Direction }
+  : "inout"  { Inout  }
+  | "input"  { Input  }
+  | "output" { Output }
 
 ModuleItems :: { [ModuleItem] }
   : {- empty -}            { [] }
@@ -464,6 +484,19 @@ Expr :: { Expr }
 | "~^" Expr %prec RedOps      { UniOp RedXnor $2 }
 | "^~" Expr %prec RedOps      { UniOp RedXnor $2 }
 | Type "'" "(" Expr ")"       { Cast $1 $4 }
+| Expr "." Identifier         { StructAccess $1 $3 }
+| "'" "{" PatternItems "}"    { StructPattern $3 }
+
+PatternItems :: { [(Maybe Identifier, Expr)] }
+  : PatternNamedItems   { map (\(x,e) -> (Just x, e)) $1 }
+  | PatternUnnamedItems { zip (repeat Nothing) $1 }
+PatternNamedItems :: { [(Identifier, Expr)] }
+  : PatternNamedItem                       { [$1] }
+  | PatternNamedItems "," PatternNamedItem { $1 ++ [$3] }
+PatternNamedItem :: { (Identifier, Expr) }
+  : Identifier ":" Expr { ($1, $3) }
+PatternUnnamedItems :: { [Expr] }
+  : Exprs { $1 }
 
 GenItemOrNull :: { GenItem }
   : GenItem { $1 }
@@ -500,8 +533,8 @@ parseError a = case a of
   []              -> error "Parse error: no tokens left to parse."
   Token t s p : _ -> error $ "Parse error: unexpected token '" ++ s ++ "' (" ++ show t ++ ") at " ++ show p ++ "."
 
-portDeclToModuleItems :: Direction -> Type -> [PortBinding] -> [ModuleItem]
-portDeclToModuleItems dir t l =
+portDeclToModuleItems :: Direction -> (Type, [PortBinding]) -> [ModuleItem]
+portDeclToModuleItems dir (t, l) =
   map (\(x, me) -> MIDecl $ Variable dir t x [] me) l
 
 getPortNames :: [ModuleItem] -> [Identifier]

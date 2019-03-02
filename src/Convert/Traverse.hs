@@ -186,6 +186,12 @@ traverseNestedExprsM mapper = exprMapper
             exprMapper e >>= \e' -> return $ Bit e' n
         em (Cast       t e) =
             exprMapper e >>= return . Cast t
+        em (StructAccess e x) =
+            exprMapper e >>= \e' -> return $ StructAccess e' x
+        em (StructPattern l) = do
+            let names = map fst l
+            exprs <- mapM exprMapper $ map snd l
+            return $ StructPattern $ zip names exprs
 
 
 traverseExprsM :: Monad m => MapperM m Expr -> MapperM m ModuleItem

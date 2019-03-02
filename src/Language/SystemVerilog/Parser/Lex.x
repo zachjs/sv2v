@@ -84,9 +84,11 @@ tokens :-
   "negedge"          { tok KW_negedge    }
   "or"               { tok KW_or         }
   "output"           { tok KW_output     }
+  "packed"           { tok KW_packed     }
   "parameter"        { tok KW_parameter  }
   "posedge"          { tok KW_posedge    }
   "reg"              { tok KW_reg        }
+  "struct"           { tok KW_struct     }
   "typedef"          { tok KW_typedef    }
   "unique"           { tok KW_unique     }
   "wire"             { tok KW_wire       }
