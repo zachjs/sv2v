@@ -29,6 +29,7 @@
 
 module Convert.PackedArray (convert) where
 
+import Text.Read (readMaybe)
 import Control.Monad.State
 import Data.List (partition)
 import qualified Data.Set as Set
@@ -90,14 +91,13 @@ recordSeqUsage i = modify $ \s -> s { sSeqUses = Set.insert i $ sSeqUses s }
 recordIdxUsage :: Identifier -> State Info ()
 recordIdxUsage i = modify $ \s -> s { sIdxUses = Set.insert i $ sIdxUses s }
 collectExpr :: Expr -> State Info ()
-collectExpr (Ident        i   ) = recordSeqUsage i
 collectExpr (Range (Ident i) _) = recordSeqUsage i
 collectExpr (Bit   (Ident i) _) = recordIdxUsage i
 collectExpr _ = return ()
 collectLHS :: LHS -> State Info ()
-collectLHS (LHSIdent  i) = recordSeqUsage i
-collectLHS (LHSBit (LHSIdent i) _) = recordIdxUsage i
-collectLHS _ = return () -- the collect recurses for us
+collectLHS (LHSRange (LHSIdent i) _) = recordSeqUsage i
+collectLHS (LHSBit   (LHSIdent i) _) = recordIdxUsage i
+collectLHS _ = return ()
 
 -- VCS doesn't like port declarations inside of `generate` blocks, so we hoist
 -- them out with this function. This obviously isn't ideal, but it's a
@@ -195,6 +195,12 @@ simplify (BinOp op e1 e2) =
         (Sub, e, Number "0") -> e
         (Add, BinOp Sub e (Number "1"), Number "1") -> e
         (Add, e, BinOp Sub (Number "0") (Number "1")) -> BinOp Sub e (Number "1")
+        (_  , Number a, Number b) ->
+            case (op, readMaybe a :: Maybe Int, readMaybe b :: Maybe Int) of
+                (Add, Just x, Just y) -> Number $ show (x + y)
+                (Sub, Just x, Just y) -> Number $ show (x - y)
+                (Mul, Just x, Just y) -> Number $ show (x * y)
+                _ -> BinOp op e1' e2'
         _ -> BinOp op e1' e2'
     where
         e1' = simplify e1
@@ -240,7 +246,7 @@ rewriteModuleItem info =
         rewriteAsgnIdent = rewriteIdent True
 
         rewriteExpr :: Expr -> Expr
-        rewriteExpr (Ident i)= Ident (rewriteReadIdent i)
+        rewriteExpr (Ident i) = Ident i
         rewriteExpr (Bit   (Ident i) e) = Bit (Ident $ rewriteReadIdent i) e
         rewriteExpr (Range (Ident i) (r @ (s, e))) =
             if Map.member i typeDims
@@ -256,6 +262,8 @@ rewriteModuleItem info =
 
         rewriteLHS :: LHS -> LHS
         rewriteLHS (LHSIdent x  ) = LHSIdent (rewriteAsgnIdent x)
+        rewriteLHS (LHSBit (LHSBit (LHSIdent x) a) b) =
+            LHSBit (LHSBit (LHSIdent $ rewriteReadIdent x) a) b
         rewriteLHS (LHSBit   l e) = LHSBit   (rewriteLHS l) e
         rewriteLHS (LHSRange l r) = LHSRange (rewriteLHS l) r
         rewriteLHS (LHSDot   l x) = LHSDot   (rewriteLHS l) x
