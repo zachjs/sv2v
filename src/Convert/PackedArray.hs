@@ -90,9 +90,9 @@ recordSeqUsage i = modify $ \s -> s { sSeqUses = Set.insert i $ sSeqUses s }
 recordIdxUsage :: Identifier -> State Info ()
 recordIdxUsage i = modify $ \s -> s { sIdxUses = Set.insert i $ sIdxUses s }
 collectExpr :: Expr -> State Info ()
-collectExpr (Ident      i  ) = recordSeqUsage i
-collectExpr (IdentRange i _) = recordSeqUsage i
-collectExpr (IdentBit   i _) = recordIdxUsage i
+collectExpr (Ident        i   ) = recordSeqUsage i
+collectExpr (Range (Ident i) _) = recordSeqUsage i
+collectExpr (Bit   (Ident i) _) = recordIdxUsage i
 collectExpr _ = return ()
 collectLHS :: LHS -> State Info ()
 collectLHS (LHSIdent  i) = recordSeqUsage i
@@ -165,8 +165,8 @@ unflattener writeToFlatVariant arr (t, (majorHi, majorLo)) =
                     (BinOp Mul (Ident index) size))
             , GenModuleItem $ (uncurry Assign) $
                 if not writeToFlatVariant
-                    then (LHSBit (LHSIdent arrUnflat) $ Ident index, IdentRange arr origRange)
-                    else (LHSRange (LHSIdent arr) origRange, IdentBit arrUnflat $ Ident index)
+                    then (LHSBit (LHSIdent arrUnflat) $ Ident index, Range (Ident arr) origRange)
+                    else (LHSRange (LHSIdent arr) origRange, Bit (Ident arrUnflat) (Ident index))
             ]
         ]
     where
@@ -240,12 +240,12 @@ rewriteModuleItem info =
         rewriteAsgnIdent = rewriteIdent True
 
         rewriteExpr :: Expr -> Expr
-        rewriteExpr (Ident      i)   = Ident    (rewriteReadIdent i)
-        rewriteExpr (IdentBit   i e) = IdentBit (rewriteReadIdent i) e
-        rewriteExpr (IdentRange i (r @ (s, e))) =
+        rewriteExpr (Ident i)= Ident (rewriteReadIdent i)
+        rewriteExpr (Bit   (Ident i) e) = Bit (Ident $ rewriteReadIdent i) e
+        rewriteExpr (Range (Ident i) (r @ (s, e))) =
             if Map.member i typeDims
-                then IdentRange i r'
-                else IdentRange i r
+                then Range (Ident i) r'
+                else Range (Ident i) r
             where
                 (a, b) = head $ snd $ typeRanges $ fst $ typeDims Map.! i
                 size = BinOp Add (BinOp Sub a b) (Number "1")

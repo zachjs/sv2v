@@ -240,18 +240,17 @@ data Expr
   | Number     String
   | ConstBool  Bool
   | Ident      Identifier
-  | IdentRange Identifier Range
-  | IdentBit   Identifier Expr
+  | Range      Expr Range
+  | Bit        Expr Expr
   | Repeat     Expr [Expr]
   | Concat     [Expr]
   | Call       Identifier [Expr]
   | UniOp      UniOp Expr
   | BinOp      BinOp Expr Expr
   | Mux        Expr Expr Expr
-  | Bit        Expr Int
   | Cast       Type Expr
-  | StructAccess Expr Identifier
-  | StructPattern [(Maybe Identifier, Expr)]
+  | Access     Expr Identifier
+  | Pattern    [(Maybe Identifier, Expr)]
   deriving (Eq, Ord)
 
 data UniOp
@@ -331,18 +330,17 @@ instance Show Expr where
     Number     a        -> a
     ConstBool  a        -> printf "1'b%s" (if a then "1" else "0")
     Ident      a        -> a
-    IdentBit   a b      -> printf "%s[%s]"    a (show b)
-    IdentRange a (b, c) -> printf "%s[%s:%s]" a (show b) (show c)
+    Bit        a b      -> printf "%s[%s]"    (show a) (show b)
+    Range      a (b, c) -> printf "%s[%s:%s]" (show a) (show b) (show c)
     Repeat     a b      -> printf "{%s {%s}}" (show a) (commas $ map show b)
     Concat     a        -> printf "{%s}" (commas $ map show a)
     Call       a b      -> printf "%s(%s)" a (commas $ map show b)
     UniOp      a b      -> printf "(%s %s)" (show a) (show b)
     BinOp      a b c    -> printf "(%s %s %s)" (show b) (show a) (show c)
     Mux        a b c    -> printf "(%s ? %s : %s)" (show a) (show b) (show c)
-    Bit        a b      -> printf "(%s [%d])" (show a) b
     Cast       a b      -> printf "%s'(%s)" (show a) (show b)
-    StructAccess e n    -> printf "%s.%s" (show e) n
-    StructPattern l     -> printf "'{\n%s\n}" (showPatternItems l)
+    Access     e n      -> printf "%s.%s" (show e) n
+    Pattern    l        -> printf "'{\n%s\n}" (showPatternItems l)
     where
       showPatternItems :: [(Maybe Identifier, Expr)] -> String
       showPatternItems l = indent $ intercalate ",\n" (map showPatternItem l)

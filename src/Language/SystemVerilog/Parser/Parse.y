@@ -168,7 +168,7 @@ string             { Token Lit_string    _ _ }
 %left  "+" "-"
 %left  "*" "/" "%"
 %left  UPlus UMinus "!" "~" RedOps
-%left  "."
+%left  "(" ")" "[" "]" "."
 
 
 %%
@@ -459,8 +459,8 @@ Expr :: { Expr }
 | Number                      { Number $1 }
 | Identifier "(" CallArgs ")" { Call $1 $3 }
 | Identifier                  { Ident      $1    }
-| Identifier Range            { IdentRange $1 $2 }
-| Identifier "[" Expr "]"     { IdentBit   $1 $3 }
+| Expr Range                  { Range $1 $2 }
+| Expr "[" Expr "]"           { Bit   $1 $3 }
 | "{" Expr "{" Exprs "}" "}"  { Repeat $2 $4 }
 | "{" Exprs "}"               { Concat $2 }
 | Expr "?" Expr ":" Expr      { Mux $1 $3 $5 }
@@ -495,9 +495,10 @@ Expr :: { Expr }
 | "^"  Expr %prec RedOps      { UniOp RedXor  $2 }
 | "~^" Expr %prec RedOps      { UniOp RedXnor $2 }
 | "^~" Expr %prec RedOps      { UniOp RedXnor $2 }
-| Type "'" "(" Expr ")"       { Cast $1 $4 }
-| Expr "." Identifier         { StructAccess $1 $3 }
-| "'" "{" PatternItems "}"    { StructPattern $3 }
+| PartialType "'" "(" Expr ")" { Cast ($1       []) $4 }
+| Identifier  "'" "(" Expr ")" { Cast (Alias $1 []) $4 }
+| Expr "." Identifier         { Access $1 $3 }
+| "'" "{" PatternItems "}"    { Pattern $3 }
 
 PatternItems :: { [(Maybe Identifier, Expr)] }
   : PatternNamedItems   { map (\(x,e) -> (Just x, e)) $1 }

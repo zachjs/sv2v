@@ -160,12 +160,15 @@ traverseNestedExprsM mapper = exprMapper
         em (Number     s) = return $ Number    s
         em (ConstBool  b) = return $ ConstBool b
         em (Ident      i) = return $ Ident     i
-        em (IdentRange i (e1, e2)) = do
+        em (Range e (e1, e2)) = do
+            e' <- exprMapper e
             e1' <- exprMapper e1
             e2' <- exprMapper e2
-            return $ IdentRange i (e1', e2')
-        em (IdentBit   i e) =
-            exprMapper e >>= return . IdentBit i
+            return $ Range e' (e1', e2')
+        em (Bit   e1 e2) = do
+            e1' <- exprMapper e1
+            e2' <- exprMapper e2
+            return $ Bit e1' e2'
         em (Repeat     e l) = do
             e' <- exprMapper e
             l' <- mapM exprMapper l
@@ -185,16 +188,14 @@ traverseNestedExprsM mapper = exprMapper
             e2' <- exprMapper e2
             e3' <- exprMapper e3
             return $ Mux e1' e2' e3'
-        em (Bit        e n) =
-            exprMapper e >>= \e' -> return $ Bit e' n
         em (Cast       t e) =
             exprMapper e >>= return . Cast t
-        em (StructAccess e x) =
-            exprMapper e >>= \e' -> return $ StructAccess e' x
-        em (StructPattern l) = do
+        em (Access e x) =
+            exprMapper e >>= \e' -> return $ Access e' x
+        em (Pattern l) = do
             let names = map fst l
             exprs <- mapM exprMapper $ map snd l
-            return $ StructPattern $ zip names exprs
+            return $ Pattern $ zip names exprs
 
 
 traverseExprsM :: Monad m => MapperM m Expr -> MapperM m ModuleItem
