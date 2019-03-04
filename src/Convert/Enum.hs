@@ -28,12 +28,12 @@ defaultType :: Type
 defaultType = Logic [(Number "31", Number "0")]
 
 convertDescription :: Description -> Description
-convertDescription (description @ (Module _ _ _)) =
-    Module name ports (enumItems ++ items)
+convertDescription (description @ (Part _ _ _ _)) =
+    Part kw name ports (enumItems ++ items)
     where
         enumPairs = concat $ map (uncurry enumVals) $ Set.toList enums
         enumItems = map (\(x, v) -> MIDecl $ Localparam (Implicit []) x v) enumPairs
-        (Module name ports items, enums) = runWriter $
+        (Part kw name ports items, enums) = runWriter $
             traverseModuleItemsM (traverseTypesM traverseType) description
         traverseType :: Type -> Writer Enums Type
         traverseType (Enum t v r) = do

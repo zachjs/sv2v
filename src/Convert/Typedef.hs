@@ -40,6 +40,7 @@ resolveType _ (Wire     rs) = Wire     rs
 resolveType _ (Logic    rs) = Logic    rs
 resolveType _ (Implicit rs) = Implicit rs
 resolveType _ (IntegerT   ) = IntegerT
+resolveType _ (InterfaceT x my rs) = InterfaceT x my rs
 resolveType _ (Enum Nothing vals rs) = Enum Nothing vals rs
 resolveType types (Enum (Just t) vals rs) = Enum (Just $ resolveType types t) vals rs
 resolveType types (Struct p items rs) = Struct p items' rs
@@ -47,12 +48,15 @@ resolveType types (Struct p items rs) = Struct p items' rs
         items' = map resolveItem items
         resolveItem (t, x) = (resolveType types t, x)
 resolveType types (Alias st rs1) =
-    case resolveType types $ types Map.! st of
+    if Map.notMember st types
+    then InterfaceT st Nothing rs1
+    else case resolveType types $ types Map.! st of
         (Reg      rs2) -> Reg      $ rs2 ++ rs1
         (Wire     rs2) -> Wire     $ rs2 ++ rs1
         (Logic    rs2) -> Logic    $ rs2 ++ rs1
         (Enum t v rs2) -> Enum t v $ rs2 ++ rs1
         (Struct p l rs2) -> Struct p l $ rs2 ++ rs1
+        (InterfaceT x my rs2) -> InterfaceT x my $ rs2 ++ rs1
         (Implicit rs2) -> Implicit $ rs2 ++ rs1
         (IntegerT    ) -> error $ "resolveType encountered packed `integer` on " ++ st
         (Alias    _ _) -> error $ "resolveType invariant failed on " ++ st

@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 module Language.SystemVerilog.AST
   ( Identifier
   , Description(..)
@@ -13,9 +14,11 @@ module Language.SystemVerilog.AST
   , GenItem    (..)
   , AlwaysKW   (..)
   , CaseKW     (..)
+  , PartKW     (..)
   , Decl       (..)
   , AST
   , PortBinding
+  , ModportDecl
   , Case
   , Range
   , GenCase
@@ -41,22 +44,31 @@ type Identifier = String
 type AST = [Description]
 
 data Description
-  = Module Identifier [Identifier] [ModuleItem]
+  = Part PartKW Identifier [Identifier] [ModuleItem]
   | Typedef Type Identifier
   deriving Eq
 
 instance Show Description where
   showList descriptions _ = intercalate "\n" $ map show descriptions
-  show (Module name ports items) = unlines
-    [ "module " ++ name ++ portsStr ++ ";"
+  show (Part kw name ports items) = unlines
+    [ (show kw) ++ " " ++ name ++ portsStr ++ ";"
     , indent $ unlines' $ map show items
-    , "endmodule" ]
+    , "end" ++ (show kw) ]
     where
       portsStr =
         if null ports
           then ""
           else indentedParenList ports
   show (Typedef t x) = printf "typedef %s %s;" (show t) x
+
+data PartKW
+  = Module
+  | Interface
+  deriving Eq
+
+instance Show PartKW where
+  show Module    = "module"
+  show Interface = "interface"
 
 data Direction
   = Input
@@ -80,6 +92,7 @@ data Type
   | IntegerT
   | Enum (Maybe Type) [(Identifier, Maybe Expr)] [Range]
   | Struct Bool [(Type, Identifier)] [Range]
+  | InterfaceT Identifier (Maybe Identifier) [Range]
   deriving (Eq, Ord)
 
 instance Show Type where
@@ -89,6 +102,8 @@ instance Show Type where
   show (Alias t  r) = t       ++ (showRanges r)
   show (Implicit r) =            (showRanges r)
   show (IntegerT  ) = "integer"
+  show (InterfaceT x my r) = x ++ yStr ++ (showRanges r)
+    where yStr = maybe "" ("."++) my
   show (Enum mt vals r) = printf "enum %s{%s}%s" tStr (commas $ map showVal vals) (showRanges r)
     where
       tStr = maybe "" showPad mt
@@ -100,6 +115,12 @@ instance Show Type where
       itemsStr = indent $ unlines' $ map showItem items
       showItem (t, x) = printf "%s %s;" (show t) x
 
+instance Show ([Range] -> Type) where
+    show tf = show (tf [])
+
+instance Eq ([Range] -> Type) where
+    (==) tf1 tf2 = (show $ tf1 []) == (show $ tf2 [])
+
 typeRanges :: Type -> ([Range] -> Type, [Range])
 typeRanges (Reg      r) = (Reg     , r)
 typeRanges (Wire     r) = (Wire    , r)
@@ -109,6 +130,7 @@ typeRanges (Implicit r) = (Implicit, r)
 typeRanges (IntegerT  ) = (error "ranges cannot be applied to IntegerT", [])
 typeRanges (Enum t v r) = (Enum t v, r)
 typeRanges (Struct p l r) = (Struct p l, r)
+typeRanges (InterfaceT x my r) = (InterfaceT x my, r)
 
 data Decl
   = Parameter            Type Identifier Expr
@@ -131,6 +153,7 @@ data ModuleItem
   | Function   Type Identifier [Decl] Stmt
   | Genvar     Identifier
   | Generate   [GenItem]
+  | Modport    Identifier [ModportDecl]
   deriving Eq
 
 -- "function inputs and outputs are inferred to be of type reg if no internal
@@ -150,6 +173,7 @@ instance Show AlwaysKW where
   show AlwaysLatch = "always_latch"
 
 type PortBinding = (Identifier, Maybe Expr)
+type ModportDecl = (Direction, Identifier, Maybe Expr)
 
 instance Show ModuleItem where
   show thing = case thing of
@@ -163,6 +187,7 @@ instance Show ModuleItem where
     Function   t x i b -> printf "function %s%s;\n%s\n%s\nendfunction" (showPad t) x (indent $ show i) (indent $ show b)
     Genvar     x -> printf "genvar %s;" x
     Generate   b -> printf "generate\n%s\nendgenerate" (indent $ unlines' $ map show b)
+    Modport    x l  -> printf "modport %s(\n%s\n);" x (indent $ intercalate ",\n" $ map showModportDecl l)
     where
     showMaybePorts = maybe "(.*)" showPorts
     showPorts :: [PortBinding] -> String
@@ -172,6 +197,11 @@ instance Show ModuleItem where
       if i == ""
         then show (fromJust arg)
         else printf ".%s(%s)" i (if isJust arg then show $ fromJust arg else "")
+    showModportDecl :: ModportDecl -> String
+    showModportDecl (dir, ident, me) =
+      if me == Just (Ident ident)
+        then printf "%s %s" (show dir) ident
+        else printf "%s .%s(%s)" (show dir) ident (maybe "" show me)
 
 showAssignment :: Maybe Expr -> String
 showAssignment Nothing = ""
@@ -323,6 +353,7 @@ data LHS
   = LHS       Identifier
   | LHSBit    Identifier Expr
   | LHSRange  Identifier Range
+  | LHSDot    LHS Identifier
   | LHSConcat [LHS]
   deriving Eq
 
@@ -331,6 +362,7 @@ instance Show LHS where
   show (LHSBit     a b     ) = printf "%s[%s]"    a (show b)
   show (LHSRange   a (b, c)) = printf "%s[%s:%s]" a (show b) (show c)
   show (LHSConcat  a       ) = printf "{%s}" (commas $ map show a)
+  show (LHSDot     a b     ) = printf "%s.%s" (show a) b
 
 data CaseKW
   = CaseN
@@ -375,7 +407,7 @@ instance Show Stmt where
   show (For (a,b) c (d,e) f) = printf "for (%s = %s; %s; %s = %s)\n%s" a (show b) (show c) d (show e) $ indent $ show f
   show (AsgnBlk v e) = printf "%s = %s;"  (show v) (show e)
   show (Asgn    v e) = printf "%s <= %s;" (show v) (show e)
-  show (If a b Null) = printf "if (%s)\n%s"         (show a) (show b)
+  show (If a b Null) = printf "if (%s) %s"         (show a) (show b)
   show (If a b c   ) = printf "if (%s) %s\nelse %s" (show a) (show b) (show c)
   show (Timing t s ) = printf "@(%s)%s" (show t) rest
     where

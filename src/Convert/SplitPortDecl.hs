@@ -14,8 +14,8 @@ convert :: AST -> AST
 convert = traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription (Module name ports items) =
-    Module name ports (concat $ map splitPortDecl items)
+convertDescription (Part kw name ports items) =
+    Part kw name ports (concat $ map splitPortDecl items)
 convertDescription other = other
 
 splitPortDecl :: ModuleItem -> [ModuleItem]

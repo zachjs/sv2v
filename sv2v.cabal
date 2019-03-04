@@ -35,6 +35,7 @@ executable sv2v
     Language.SystemVerilog.Parser
     Language.SystemVerilog.Parser.Lex
     Language.SystemVerilog.Parser.Parse
+    Language.SystemVerilog.Parser.ParseDecl
     Language.SystemVerilog.Parser.Preprocess
     Language.SystemVerilog.Parser.Tokens
     -- Conversion modules

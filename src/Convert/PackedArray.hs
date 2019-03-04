@@ -52,7 +52,7 @@ convert :: AST -> AST
 convert = traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription (description @ (Module _ ports _)) =
+convertDescription (description @ (Part _ _ ports _)) =
     hoistPortDecls $
     traverseModuleItems (flattenModuleItem info . rewriteModuleItem info) description
     where
@@ -99,13 +99,14 @@ collectLHS (LHS       i  ) = recordSeqUsage i
 collectLHS (LHSRange  i _) = recordSeqUsage i
 collectLHS (LHSBit    i _) = recordIdxUsage i
 collectLHS (LHSConcat lhss) = mapM collectLHS lhss >>= \_ -> return ()
+collectLHS (LHSDot  lhs _) = collectLHS lhs
 
 -- VCS doesn't like port declarations inside of `generate` blocks, so we hoist
 -- them out with this function. This obviously isn't ideal, but it's a
 -- relatively straightforward transformation, and testing in VCS is important.
 hoistPortDecls :: Description -> Description
-hoistPortDecls (Module name ports items) =
-    Module name ports (concat $ map explode items)
+hoistPortDecls (Part kw name ports items) =
+    Part kw name ports (concat $ map explode items)
     where
         explode :: ModuleItem -> [ModuleItem]
         explode (Generate genItems) =
@@ -260,6 +261,7 @@ rewriteModuleItem info =
         rewriteLHS (LHSBit   x e) = LHSBit   (rewriteAsgnIdent x) e
         rewriteLHS (LHSRange x r) = LHSRange (rewriteAsgnIdent x) r
         rewriteLHS (LHSConcat ls) = LHSConcat $ map rewriteLHS ls
+        rewriteLHS (LHSDot lhs x) = LHSDot (rewriteLHS lhs) x
 
         rewriteStmt :: Stmt -> Stmt
         rewriteStmt (AsgnBlk lhs expr) = convertAssignment AsgnBlk lhs expr

@@ -68,6 +68,7 @@ tokens :-
   "endmodule"        { tok KW_endmodule  }
   "endfunction"      { tok KW_endfunction}
   "endgenerate"      { tok KW_endgenerate}
+  "endinterface"     { tok KW_endinterface}
   "enum"             { tok KW_enum       }
   "function"         { tok KW_function   }
   "for"              { tok KW_for        }
@@ -77,10 +78,12 @@ tokens :-
   "initial"          { tok KW_initial    }
   "inout"            { tok KW_inout      }
   "input"            { tok KW_input      }
+  "interface"        { tok KW_interface  }
   "integer"          { tok KW_integer    }
   "localparam"       { tok KW_localparam }
   "logic"            { tok KW_logic      }
   "module"           { tok KW_module     }
+  "modport"          { tok KW_modport    }
   "negedge"          { tok KW_negedge    }
   "or"               { tok KW_or         }
   "output"           { tok KW_output     }

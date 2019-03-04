@@ -5,6 +5,7 @@ import Data.List
 import Data.Maybe
 
 import Language.SystemVerilog.AST
+import Language.SystemVerilog.Parser.ParseDecl
 import Language.SystemVerilog.Parser.Tokens
 }
 
@@ -31,6 +32,7 @@ import Language.SystemVerilog.Parser.Tokens
 "endcase"          { Token KW_endcase    _ _ }
 "endfunction"      { Token KW_endfunction _ _ }
 "endgenerate"      { Token KW_endgenerate _ _ }
+"endinterface"     { Token KW_endinterface _ _ }
 "endmodule"        { Token KW_endmodule  _ _ }
 "enum"             { Token KW_enum       _ _ }
 "function"         { Token KW_function   _ _ }
@@ -42,9 +44,11 @@ import Language.SystemVerilog.Parser.Tokens
 "inout"            { Token KW_inout      _ _ }
 "input"            { Token KW_input      _ _ }
 "integer"          { Token KW_integer    _ _ }
+"interface"        { Token KW_interface  _ _ }
 "localparam"       { Token KW_localparam _ _ }
 "logic"            { Token KW_logic      _ _ }
 "module"           { Token KW_module     _ _ }
+"modport"          { Token KW_modport    _ _ }
 "negedge"          { Token KW_negedge    _ _ }
 "or"               { Token KW_or         _ _ }
 "output"           { Token KW_output     _ _ }
@@ -175,21 +179,22 @@ Descriptions :: { [Description] }
   | Descriptions Description { $1 ++ [$2] }
 
 Description :: { Description }
-  : Module  opt(";") { $1 }
+  : Part    opt(";") { $1 }
   | Typedef opt(";") { $1 }
 
 Typedef :: { Description }
   : "typedef" Type Identifier ";" { Typedef $2 $3 }
 
-TypeNonAlias :: { Type }
-  : "wire"  Dimensions { Wire  $2 }
-  | "reg"   Dimensions { Reg   $2 }
-  | "logic" Dimensions { Logic $2 }
-  | "enum"   opt(Type) "{" EnumItems   "}" Dimensions { Enum   $2 $4 $6 }
-  | "struct" Packed    "{" StructItems "}" Dimensions { Struct $2 $4 $6 }
 Type :: { Type }
-  : TypeNonAlias          { $1 }
-  | Identifier Dimensions { Alias $1 $2 }
+  : PartialType Dimensions { $1 $2 }
+  | Identifier  Dimensions { Alias $1 $2 }
+PartialType :: { [Range] -> Type }
+  : "wire"                                  { Wire }
+  | "reg"                                   { Reg }
+  | "logic"                                 { Logic }
+  | "enum"   opt(Type) "{" EnumItems   "}"  { Enum   $2 $4 }
+  | "struct" Packed    "{" StructItems "}"  { Struct $2 $4 }
+  | "integer"                               { \[] -> IntegerT }
 
 EnumItems :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifiers { $1 }
@@ -204,10 +209,12 @@ Packed :: { Bool }
   : "packed"    { True }
   | {- empty -} { False }
 
-Module :: { Description }
-  : "module" Identifier Params           ";" ModuleItems "endmodule" { Module $2 [] ($3 ++ $5) }
-  | "module" Identifier Params PortNames ";" ModuleItems "endmodule" { Module $2 $4 ($3 ++ $6) }
-  | "module" Identifier Params PortDecls ";" ModuleItems "endmodule" { Module $2 (getPortNames $4) ($3 ++ $4 ++ $6) }
+Part :: { Description }
+  : "module"    Identifier Params PortDecls ";" ModuleItems "endmodule"    opt(Tag) { Part Module    $2 (fst $4) ($3 ++ (snd $4) ++ $6) }
+  | "interface" Identifier Params PortDecls ";" ModuleItems "endinterface" opt(Tag) { Part Interface $2 (fst $4) ($3 ++ (snd $4) ++ $6) }
+
+Tag :: { Identifier }
+  : ":" Identifier { $2 }
 
 Params :: { [ModuleItem] }
   : {- empty -}        { [] }
@@ -218,6 +225,29 @@ ParamDecls :: { [ModuleItem] }
 ParamDecl(delim) :: { [ModuleItem] }
   : "parameter" ParamType DeclAsgns delim { map (MIDecl . (uncurry $ Parameter $2)) $3 }
 
+PortDecls :: { ([Identifier], [ModuleItem]) }
+  : "(" DeclTokens(")") { parseDTsAsPortDecls $2 }
+  | {- empty -}         { ([], []) }
+
+ModportItems :: { [(Identifier, [ModportDecl])] }
+  : ModportItem                  { [$1] }
+  | ModportItems "," ModportItem { $1 ++ [$3] }
+ModportItem :: { (Identifier, [ModportDecl]) }
+  : Identifier "(" ModportPortsDeclarations { ($1, $3) }
+ModportPortsDeclarations :: { [ModportDecl] }
+  : ModportPortsDeclaration(")")                          { $1 }
+  | ModportPortsDeclaration(",") ModportPortsDeclarations { $1 ++ $2 }
+ModportPortsDeclaration(delim) :: { [ModportDecl] }
+  : ModportSimplePortsDeclaration(delim) { $1 }
+ModportSimplePortsDeclaration(delim) :: { [ModportDecl] }
+  : Direction ModportSimplePorts delim { map (\(a, b) -> ($1, a, b)) $2 }
+ModportSimplePorts :: { [(Identifier, Maybe Expr)] }
+  : ModportSimplePort                        { [$1] }
+  | ModportSimplePorts "," ModportSimplePort { $1 ++ [$3] }
+ModportSimplePort :: { (Identifier, Maybe Expr) }
+  : "." Identifier "(" opt(Expr) ")" { ($2, $4) }
+  | Identifier                       { ($1, Just $ Ident $1) }
+
 Identifier :: { Identifier }
   : simpleIdentifier  { tokenString $1 }
   | escapedIdentifier { tokenString $1 }
@@ -227,18 +257,21 @@ Identifiers :: { [Identifier] }
   :                 Identifier { [$1] }
   | Identifiers "," Identifier { $1 ++ [$3] }
 
-PortNames :: { [Identifier] }
-  : "(" Identifiers ")" { $2 }
-
--- abuses delimiter propogation hack to avoid conflicts
-PortDecls :: { [ModuleItem] }
-  : "(" PortDeclsFollow { $2 }
-PortDeclsFollow :: { [ModuleItem] }
-  : ")"                           { [] }
-  | PortDecl(")")                 { $1 }
-  | PortDecl(",") PortDeclsFollow { $1 ++ $2 }
-PortDecl(delim) :: { [ModuleItem] }
-  : Direction TypedVariablePortIdentifiers(delim) { portDeclToModuleItems $1 $2 }
+-- uses delimiter propagation hack to avoid conflicts
+DeclTokens(delim) :: { [DeclToken] }
+  : DeclToken               delim  { [$1] }
+  | DeclToken    DeclTokens(delim) { [$1] ++ $2 }
+  | "=" Expr "," DeclTokens(delim) { [DTAsgn $2, DTComma] ++ $4 }
+  | "=" Expr                delim  { [DTAsgn $2] }
+DeclToken :: { DeclToken }
+  : ","                       { DTComma }
+  | Range                     { DTRange    $1 }
+  | Identifier                { DTIdent    $1 }
+  | Direction                 { DTDir      $1 }
+  | ParameterBindings         { DTParams   $1 }
+  | ModuleInstantiation       { DTInstance $1 }
+  | PartialType               { DTType $1 }
+  | Identifier "." Identifier { DTType $ InterfaceT $1 (Just $3) }
 
 VariablePortIdentifiers :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifier                             { [$1] }
@@ -247,13 +280,6 @@ VariablePortIdentifier :: { (Identifier, Maybe Expr) }
   : Identifier          { ($1, Nothing) }
   | Identifier "=" Expr { ($1, Just $3) }
 
--- Note that this allows for things like `input reg` which are not valid.
-TypedVariablePortIdentifiers(delim) :: { (Type, [PortBinding]) }
-  : TypeNonAlias                  VariablePortIdentifiers delim { ($1,    $2) }
-  | Identifier DimensionsNonEmpty VariablePortIdentifiers delim { (Alias $1 $2, $3) }
-  | Identifier                    VariablePortIdentifiers delim { (Alias $1 [], $2) }
-  |            DimensionsNonEmpty VariablePortIdentifiers delim { (Implicit $1, $2) }
-  |                               VariablePortIdentifiers delim { (Implicit [], $1) }
 Direction :: { Direction }
   : "inout"  { Inout  }
   | "input"  { Input  }
@@ -264,18 +290,18 @@ ModuleItems :: { [ModuleItem] }
   | ModuleItems ModuleItem { $1 ++ $2 }
 
 ModuleItem :: { [ModuleItem] }
-  : PortDecl(";")                                        { $1 }
-  | Identifier                    VariableIdentifiers ";" { map (\(x, a, e) -> MIDecl $ Variable Local (Alias $1 []) x a e) $2 }
-  | Identifier DimensionsNonEmpty VariableIdentifiers ";" { map (\(x, a, e) -> MIDecl $ Variable Local (Alias $1 $2) x a e) $3 }
-  | TypeNonAlias                  VariableIdentifiers ";" { map (\(x, a, e) -> MIDecl $ Variable Local $1            x a e) $2 }
-  | Declaration                                          { map MIDecl $1 }
+  -- This item covers module instantiations and all declarations
+  : DeclTokens(";")  { parseDTsAsModuleItems $1 }
+  | "parameter"  ParamType DeclAsgns ";" { map MIDecl $ map (uncurry $ Parameter  $2) $3 }
+  | "localparam" ParamType DeclAsgns ";" { map MIDecl $ map (uncurry $ Localparam $2) $3 }
   | "assign" LHS "=" Expr ";"                            { [Assign $2 $4] }
   | AlwaysKW Stmt                                        { [AlwaysC $1 $2] }
-  | Identifier                   ModuleInstantiations ";" { map (uncurry $ Instance $1 []) $2 }
-  | Identifier ParameterBindings ModuleInstantiations ";" { map (uncurry $ Instance $1 $2) $3 }
-  | "function" ParamType Identifier FunctionItems Stmt "endfunction" { [Function $2 $3 $4 $5] }
+  | "function"                    Identifier FunctionItems Stmt "endfunction" opt(Tag) { [Function (Implicit []) $2 $3 $4] }
+  | "function" DimensionsNonEmpty Identifier FunctionItems Stmt "endfunction" opt(Tag) { [Function (Implicit $2) $3 $4 $5] }
+  | "function" Type               Identifier FunctionItems Stmt "endfunction" opt(Tag) { [Function $2 $3 $4 $5] }
   | "genvar" Identifiers ";"                             { map Genvar $2 }
   | "generate" GenItems "endgenerate"                    { [Generate $2] }
+  | "modport" ModportItems ";"                           { map (uncurry Modport) $2 }
 
 AlwaysKW :: { AlwaysKW }
   : "always"       { Always      }
@@ -283,35 +309,13 @@ AlwaysKW :: { AlwaysKW }
   | "always_ff"    { AlwaysFF    }
   | "always_latch" { AlwaysLatch }
 
-ModuleInstantiations :: { [(Identifier, Maybe [PortBinding])] }
-  : ModuleInstantiation                          { [$1] }
-  | ModuleInstantiations "," ModuleInstantiation { $1 ++ [$3] }
 ModuleInstantiation :: { (Identifier, Maybe [PortBinding]) }
   : Identifier "(" Bindings ")" { ($1, Just $3) }
   | Identifier "(" ".*"     ")" { ($1, Nothing) }
 
 FunctionItems :: { [Decl] }
-  : "(" FunctionPortList ";" BlockItemDeclarations { $2 ++ $4 }
-  | "(" FunctionPortList ";"                       { $2 }
-  | ";" FunctionItemDeclarations                   { $2 }
-FunctionPortList :: { [Decl] }
-  : FunctionInputDeclaration(")")                  { $1 }
-  | FunctionInputDeclaration(",") FunctionPortList { $1 ++ $2 }
-FunctionItemDeclarations :: { [Decl] }
-  : FunctionItemDeclaration                          { $1 }
-  | FunctionItemDeclarations FunctionItemDeclaration { $1 ++ $2 }
-FunctionItemDeclaration :: { [Decl] }
-  : BlockItemDeclaration          { $1 }
-  | FunctionInputDeclaration(";") { $1 }
-FunctionInputDeclaration(delim) :: { [Decl] }
-  : "input"           Dimensions Identifiers delim { map (\x -> Variable Input (Implicit $2) x [] Nothing) $3 }
-  | "input" "reg"     Dimensions Identifiers delim { map (\x -> Variable Input (Reg $3)      x [] Nothing) $4 }
-  | "input" "integer"            Identifiers delim { map (\x -> Variable Input IntegerT      x [] Nothing) $3 }
-
-Declaration :: { [Decl] }
-  : "parameter"  ParamType DeclAsgns ";" { map (uncurry $ Parameter  $2) $3 }
-  | "localparam" ParamType DeclAsgns ";" { map (uncurry $ Localparam $2) $3 }
-  | "integer" VariableIdentifiers    ";" { map (\(x, a, e) -> Variable Local IntegerT x a e) $2 }
+  : "(" DeclTokens(")") ";" BlockItemDeclarations { (parseDTsAsDecls $2) ++ $4 }
+  |                     ";" BlockItemDeclarations { $2 }
 
 ParamType :: { Type }
   : Dimensions { Implicit $1 }
@@ -352,6 +356,7 @@ LHS :: { LHS }
 | Identifier Range        { LHSRange  $1 $2 }
 | Identifier "[" Expr "]" { LHSBit    $1 $3 }
 | "{" LHSs "}"            { LHSConcat $2 }
+| LHS "." Identifier      { LHSDot    $1 $3 }
 
 LHSs :: { [LHS] }
 :          LHS  { [$1] }
@@ -387,7 +392,6 @@ Stmts :: { [Stmt] }
 Stmt :: { Stmt }
   : ";" { Null }
   | "begin"                                      Stmts "end" { Block Nothing         $2 }
-  | "begin" ":" Identifier                       Stmts "end" { Block (Just ($3, [])) $4 }
   | "begin" ":" Identifier BlockItemDeclarations Stmts "end" { Block (Just ($3, $4)) $5 }
   | "if" "(" Expr ")" Stmt "else" Stmt               { If $3 $5 $7        }
   | "if" "(" Expr ")" Stmt %prec NoElse              { If $3 $5 Null      }
@@ -398,12 +402,17 @@ Stmt :: { Stmt }
   | EventControl Stmt                                { Timing $1 $2 }
 
 BlockItemDeclarations :: { [Decl] }
-  : BlockItemDeclaration                       { $1 }
+  : {- empty -}                                { [] }
   | BlockItemDeclarations BlockItemDeclaration { $1 ++ $2 }
-
 BlockItemDeclaration :: { [Decl] }
   : "reg" Dimensions BlockVariableIdentifiers ";" { map (\(x, rs) -> Variable Local (Reg $2) x rs Nothing) $3 }
-  | Declaration                                   { $1 }
+  | "parameter"  ParamType DeclAsgns ";" { map (uncurry $ Parameter  $2) $3 }
+  | "localparam" ParamType DeclAsgns ";" { map (uncurry $ Localparam $2) $3 }
+  | "integer" VariableIdentifiers    ";" { map (\(x, a, e) -> Variable Local IntegerT x a e) $2 }
+  | "input"           Dimensions Identifiers ";" { map (\x -> Variable Input (Implicit $2) x [] Nothing) $3 }
+  | "input" "reg"     Dimensions Identifiers ";" { map (\x -> Variable Input (Reg $3)      x [] Nothing) $4 }
+  | "input" "integer"            Identifiers ";" { map (\x -> Variable Input IntegerT      x [] Nothing) $3 }
+
 BlockVariableIdentifiers :: { [(Identifier, [Range])] }
   : BlockVariableType                              { [$1] }
   | BlockVariableIdentifiers "," BlockVariableType { $1 ++ [$3] }
@@ -528,23 +537,11 @@ GenCaseDefault :: { GenItem }
 
 
 {
+
 parseError :: [Token] -> a
 parseError a = case a of
   []              -> error "Parse error: no tokens left to parse."
   Token t s p : _ -> error $ "Parse error: unexpected token '" ++ s ++ "' (" ++ show t ++ ") at " ++ show p ++ "."
-
-portDeclToModuleItems :: Direction -> (Type, [PortBinding]) -> [ModuleItem]
-portDeclToModuleItems dir (t, l) =
-  map (\(x, me) -> MIDecl $ Variable dir t x [] me) l
-
-getPortNames :: [ModuleItem] -> [Identifier]
-getPortNames items =
-  mapMaybe getPortName items
-  where
-    getPortName :: ModuleItem -> Maybe Identifier
-    getPortName (MIDecl (Variable Local _ _     _ _)) = Nothing
-    getPortName (MIDecl (Variable _     _ ident _ _)) = Just ident
-    getPortName _ = Nothing
 
 genItemsToGenItem :: [GenItem] -> GenItem
 genItemsToGenItem [] = error "genItemsToGenItem given empty list!"
@@ -552,4 +549,3 @@ genItemsToGenItem [x] = x
 genItemsToGenItem xs = GenBlock Nothing xs
 
 }
-

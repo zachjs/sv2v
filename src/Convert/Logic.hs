@@ -43,4 +43,5 @@ regIdents (AlwaysC _ stmt) = collectStmtLHSsM idents stmt
         idents (LHSBit    vx _) = tell $ Set.singleton vx
         idents (LHSRange  vx _) = tell $ Set.singleton vx
         idents (LHSConcat lhss) = mapM idents lhss >>= \_ -> return ()
+        idents (LHSDot   lhs _) = idents lhs
 regIdents _ = return ()

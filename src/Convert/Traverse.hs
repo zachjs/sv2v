@@ -66,8 +66,8 @@ maybeDo _ Nothing = return Nothing
 maybeDo fun (Just val) = fun val >>= return . Just
 
 traverseModuleItemsM :: Monad m => MapperM m ModuleItem -> MapperM m Description
-traverseModuleItemsM mapper (Module name ports items) =
-    mapM fullMapper items >>= return . Module name ports
+traverseModuleItemsM mapper (Part kw name ports items) =
+    mapM fullMapper items >>= return . Part kw name ports
     where
         fullMapper (Generate genItems) =
             mapM genItemMapper genItems >>= mapper . Generate
@@ -269,6 +269,7 @@ traverseExprsM mapper = moduleItemMapper
     moduleItemMapper (Comment  x) = return $ Comment  x
     moduleItemMapper (Genvar   x) = return $ Genvar   x
     moduleItemMapper (Generate x) = return $ Generate x
+    moduleItemMapper (Modport x l) = return $ Modport x l
 
 traverseExprs :: Mapper Expr -> Mapper ModuleItem
 traverseExprs = unmonad traverseExprsM
