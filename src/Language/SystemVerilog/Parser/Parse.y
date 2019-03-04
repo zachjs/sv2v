@@ -21,54 +21,54 @@ import Language.SystemVerilog.Parser.Tokens
 "always_comb"      { Token KW_always_comb  _ _ }
 "always_ff"        { Token KW_always_ff    _ _ }
 "always_latch"     { Token KW_always_latch _ _ }
-"assign"           { Token KW_assign     _ _ }
-"automatic"        { Token KW_automatic  _ _ }
-"begin"            { Token KW_begin      _ _ }
-"case"             { Token KW_case       _ _ }
-"casex"            { Token KW_casex      _ _ }
-"casez"            { Token KW_casez      _ _ }
-"default"          { Token KW_default    _ _ }
-"else"             { Token KW_else       _ _ }
-"end"              { Token KW_end        _ _ }
-"endcase"          { Token KW_endcase    _ _ }
-"endfunction"      { Token KW_endfunction _ _ }
-"endgenerate"      { Token KW_endgenerate _ _ }
+"assign"           { Token KW_assign       _ _ }
+"automatic"        { Token KW_automatic    _ _ }
+"begin"            { Token KW_begin        _ _ }
+"case"             { Token KW_case         _ _ }
+"casex"            { Token KW_casex        _ _ }
+"casez"            { Token KW_casez        _ _ }
+"default"          { Token KW_default      _ _ }
+"else"             { Token KW_else         _ _ }
+"end"              { Token KW_end          _ _ }
+"endcase"          { Token KW_endcase      _ _ }
+"endfunction"      { Token KW_endfunction  _ _ }
+"endgenerate"      { Token KW_endgenerate  _ _ }
 "endinterface"     { Token KW_endinterface _ _ }
-"endmodule"        { Token KW_endmodule  _ _ }
-"enum"             { Token KW_enum       _ _ }
-"function"         { Token KW_function   _ _ }
-"for"              { Token KW_for        _ _ }
-"generate"         { Token KW_generate   _ _ }
-"genvar"           { Token KW_genvar     _ _ }
-"if"               { Token KW_if         _ _ }
-"initial"          { Token KW_initial    _ _ }
-"inout"            { Token KW_inout      _ _ }
-"input"            { Token KW_input      _ _ }
-"integer"          { Token KW_integer    _ _ }
-"interface"        { Token KW_interface  _ _ }
-"localparam"       { Token KW_localparam _ _ }
-"logic"            { Token KW_logic      _ _ }
-"module"           { Token KW_module     _ _ }
-"modport"          { Token KW_modport    _ _ }
-"negedge"          { Token KW_negedge    _ _ }
-"or"               { Token KW_or         _ _ }
-"output"           { Token KW_output     _ _ }
-"packed"           { Token KW_packed     _ _ }
-"parameter"        { Token KW_parameter  _ _ }
-"posedge"          { Token KW_posedge    _ _ }
-"reg"              { Token KW_reg        _ _ }
-"return"           { Token KW_return     _ _ }
-"static"           { Token KW_static     _ _ }
-"struct"           { Token KW_struct     _ _ }
-"typedef"          { Token KW_typedef    _ _ }
-"unique"           { Token KW_unique     _ _ }
-"wire"             { Token KW_wire       _ _ }
+"endmodule"        { Token KW_endmodule    _ _ }
+"enum"             { Token KW_enum         _ _ }
+"function"         { Token KW_function     _ _ }
+"for"              { Token KW_for          _ _ }
+"generate"         { Token KW_generate     _ _ }
+"genvar"           { Token KW_genvar       _ _ }
+"if"               { Token KW_if           _ _ }
+"initial"          { Token KW_initial      _ _ }
+"inout"            { Token KW_inout        _ _ }
+"input"            { Token KW_input        _ _ }
+"integer"          { Token KW_integer      _ _ }
+"interface"        { Token KW_interface    _ _ }
+"localparam"       { Token KW_localparam   _ _ }
+"logic"            { Token KW_logic        _ _ }
+"module"           { Token KW_module       _ _ }
+"modport"          { Token KW_modport      _ _ }
+"negedge"          { Token KW_negedge      _ _ }
+"or"               { Token KW_or           _ _ }
+"output"           { Token KW_output       _ _ }
+"packed"           { Token KW_packed       _ _ }
+"parameter"        { Token KW_parameter    _ _ }
+"posedge"          { Token KW_posedge      _ _ }
+"reg"              { Token KW_reg          _ _ }
+"return"           { Token KW_return       _ _ }
+"static"           { Token KW_static       _ _ }
+"struct"           { Token KW_struct       _ _ }
+"typedef"          { Token KW_typedef      _ _ }
+"unique"           { Token KW_unique       _ _ }
+"wire"             { Token KW_wire         _ _ }
 
-simpleIdentifier   { Token Id_simple     _ _ }
-escapedIdentifier  { Token Id_escaped    _ _ }
-systemIdentifier   { Token Id_system     _ _ }
-number             { Token Lit_number    _ _ }
-string             { Token Lit_string    _ _ }
+simpleIdentifier   { Token Id_simple       _ _ }
+escapedIdentifier  { Token Id_escaped      _ _ }
+systemIdentifier   { Token Id_system       _ _ }
+number             { Token Lit_number      _ _ }
+string             { Token Lit_string      _ _ }
 
 "("                { Token Sym_paren_l _ _ }
 ")"                { Token Sym_paren_r _ _ }
@@ -138,8 +138,8 @@ string             { Token Lit_string    _ _ }
 "*>"               { Token Sym_aster_gt _ _ }
 "==="              { Token Sym_eq_eq_eq _ _ }
 "!=="              { Token Sym_bang_eq_eq _ _ }
-"=?="              { Token Sym_eq_question_eq _ _ }
-"!?="              { Token Sym_bang_question_eq _ _ }
+"==?"              { Token Sym_eq_eq_question _ _ }
+"!=?"              { Token Sym_bang_eq_question _ _ }
 ">>>"              { Token Sym_gt_gt_gt _ _ }
 "<<<"              { Token Sym_lt_lt_lt _ _ }
 "<<="              { Token Sym_lt_lt_eq _ _ }
@@ -154,6 +154,7 @@ string             { Token Lit_string    _ _ }
 "<<<="             { Token Sym_lt_lt_lt_eq _ _ }
 ">>>="             { Token Sym_gt_gt_gt_eq _ _ }
 
+-- operator precedences, from *lowest* to *highest*
 %nonassoc NoElse
 %nonassoc "else"
 %right "?" ":"
@@ -162,12 +163,13 @@ string             { Token Lit_string    _ _ }
 %left  "|" "~|"
 %left  "^" "^~"
 %left  "&" "~&"
-%left  "==" "!=" "===" "!=="
+%left  "==" "!=" "===" "!==" "==?" "!=?"
 %left  "<" "<=" ">" ">="
 %left  "<<" ">>" "<<<" ">>>"
 %left  "+" "-"
 %left  "*" "/" "%"
-%left  UPlus UMinus "!" "~" RedOps
+%left  "**"
+%right  UPlus UMinus "!" "~" RedOps "++" "--"
 %left  "(" ")" "[" "]" "."
 
 
@@ -280,7 +282,6 @@ DeclToken :: { DeclToken }
   | Identifier "." Identifier { DTType $ InterfaceT $1 (Just $3) }
   | "[" Expr "]"              { DTBit      $2 }
   | "{" LHSs "}"              { DTConcat   $2 }
-  -- | LHS "." Identifier      { LHSDot    $1 $3 }
 
 VariablePortIdentifiers :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifier                             { [$1] }
@@ -409,7 +410,7 @@ StmtNonAsgn :: { Stmt }
   | "if" "(" Expr ")" Stmt "else" Stmt         { If $3 $5 $7        }
   | "if" "(" Expr ")" Stmt %prec NoElse        { If $3 $5 Null      }
   | "for" "(" Identifier "=" Expr ";" Expr ";" Identifier "=" Expr ")" Stmt { For ($3, $5) $7 ($9, $11) $13 }
-  | CaseKW "(" Expr ")" Cases opt(CaseDefault) "endcase" { Case $1 $3 $5 $6 }
+  | Unique CaseKW "(" Expr ")" Cases opt(CaseDefault) "endcase" { Case $1 $2 $4 $6 $7 }
   | EventControl Stmt                          { Timing $1 $2 }
   | "return" Expr ";"                          { Return $2 }
 
@@ -422,12 +423,14 @@ DeclOrStmt :: { ([Decl], [Stmt]) }
   | "parameter"  ParamType DeclAsgns ";" { (map (uncurry $ Parameter  $2) $3, []) }
   | "localparam" ParamType DeclAsgns ";" { (map (uncurry $ Localparam $2) $3, []) }
 
+Unique :: { Bool }
+  : "unique"    { True  }
+  | {- empty -} { False }
+
 CaseKW :: { CaseKW }
-  -- We just drop the unique keyword, for now. In the future, we should add it
-  -- to the AST and add a conversion phase for removing it.
-  : opt("unique") "case"  { CaseN }
-  | opt("unique") "casex" { CaseX }
-  | opt("unique") "casez" { CaseZ }
+  : "case"  { CaseN }
+  | "casex" { CaseX }
+  | "casez" { CaseZ }
 
 Cases :: { [Case] }
   : {- empty -}  { [] }
@@ -482,8 +485,13 @@ Expr :: { Expr }
 | Expr "*"  Expr              { BinOp Mul $1 $3 }
 | Expr "/"  Expr              { BinOp Div $1 $3 }
 | Expr "%"  Expr              { BinOp Mod $1 $3 }
+| Expr "**" Expr              { BinOp Pow $1 $3 }
 | Expr "<<<" Expr             { BinOp ShiftAL $1 $3 }
 | Expr ">>>" Expr             { BinOp ShiftAR $1 $3 }
+| Expr "===" Expr             { BinOp TEq $1 $3 }
+| Expr "!==" Expr             { BinOp TNe $1 $3 }
+| Expr "==?" Expr             { BinOp WEq $1 $3 }
+| Expr "!=?" Expr             { BinOp WNe $1 $3 }
 | "!" Expr                    { UniOp Not $2 }
 | "~" Expr                    { UniOp BWNot $2 }
 | "+" Expr %prec UPlus        { UniOp UAdd $2 }
@@ -525,7 +533,7 @@ GenItem :: { GenItem }
   | "begin"                GenItems "end"                { GenBlock Nothing   $2 }
   | "begin" ":" Identifier GenItems "end"                { GenBlock (Just $3) $4 }
   | "case" "(" Expr ")" GenCases opt(GenCaseDefault) "endcase" { GenCase $3 $5 $6 }
-  | "for" "(" Identifier "=" Expr ";" Expr ";" Identifier "=" Expr ")" "begin" ":" Identifier GenItems "end" { GenFor ($3, $5) $7 ($9, $11) $15 $16 }
+  | "for" "(" Identifier "=" Expr ";" Expr ";" GenvarIteration ")" "begin" ":" Identifier GenItems "end" { GenFor ($3, $5) $7 $9 $13 $14 }
   -- TODO: We should restrict it to the module items that are actually allowed.
   | ModuleItem { genItemsToGenItem $ map GenModuleItem $1 }
 
@@ -539,6 +547,29 @@ GenCase :: { GenCase }
 GenCaseDefault :: { GenItem }
   : "default" opt(":") GenItemOrNull { $3 }
 
+GenvarIteration :: { (Identifier, AsgnOp, Expr) }
+  : Identifier AssignmentOperator Expr { ($1, $2, $3) }
+  | IncOrDecOperator Identifier { ($2, AsgnOp $1, Number "1") }
+  | Identifier IncOrDecOperator { ($1, AsgnOp $2, Number "1") }
+
+AssignmentOperator :: { AsgnOp }
+  : "="    { AsgnOpEq }
+  | "+="   { AsgnOp Add }
+  | "-="   { AsgnOp Sub }
+  | "*="   { AsgnOp Mul }
+  | "/="   { AsgnOp Div }
+  | "%="   { AsgnOp Mod }
+  | "&="   { AsgnOp BWAnd }
+  | "|="   { AsgnOp BWOr  }
+  | "^="   { AsgnOp BWXor }
+  | "<<="  { AsgnOp ShiftL }
+  | ">>="  { AsgnOp ShiftR }
+  | "<<<=" { AsgnOp ShiftAL }
+  | ">>>=" { AsgnOp ShiftAR }
+
+IncOrDecOperator :: { BinOp }
+  : "++" { Add }
+  | "--" { Sub }
 
 {
 

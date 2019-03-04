@@ -123,11 +123,11 @@ traverseNestedStmtsM mapper = fullMapper
     where
         fullMapper stmt = mapper stmt >>= cs
         cs (Block decls stmts) = mapM fullMapper stmts >>= return . Block decls
-        cs (Case kw expr cases def) = do
+        cs (Case u kw expr cases def) = do
             caseStmts <- mapM fullMapper $ map snd cases
             let cases' = zip (map fst cases) caseStmts
             def' <- maybeDo fullMapper def
-            return $ Case kw expr cases' def'
+            return $ Case u kw expr cases' def'
         cs (AsgnBlk lhs expr) = return $ AsgnBlk lhs expr
         cs (Asgn    lhs expr) = return $ Asgn    lhs expr
         cs (For a b c stmt) = fullMapper stmt >>= return . For a b c
@@ -233,10 +233,10 @@ traverseExprsM mapper = moduleItemMapper
                 let Just (name, decls) = header
                 decls' <- mapM declMapper decls
                 return $ Block (Just (name, decls')) stmts
-    flatStmtMapper (Case kw e cases def) = do
+    flatStmtMapper (Case u kw e cases def) = do
         e' <- exprMapper e
         cases' <- mapM caseMapper cases
-        return $ Case kw e' cases' def
+        return $ Case u kw e' cases' def
     flatStmtMapper (AsgnBlk lhs expr) =
         exprMapper expr >>= return . AsgnBlk lhs
     flatStmtMapper (Asgn    lhs expr) =

@@ -56,48 +56,48 @@ tokens :-
   "always_comb"      { tok KW_always_comb  }
   "always_ff"        { tok KW_always_ff    }
   "always_latch"     { tok KW_always_latch }
-  "assign"           { tok KW_assign     }
-  "automatic"        { tok KW_automatic  }
-  "begin"            { tok KW_begin      }
-  "case"             { tok KW_case       }
-  "casex"            { tok KW_casex      }
-  "casez"            { tok KW_casez      }
-  "default"          { tok KW_default    }
-  "else"             { tok KW_else       }
-  "end"              { tok KW_end        }
-  "endcase"          { tok KW_endcase    }
-  "endmodule"        { tok KW_endmodule  }
-  "endfunction"      { tok KW_endfunction}
-  "endgenerate"      { tok KW_endgenerate}
-  "endinterface"     { tok KW_endinterface}
-  "enum"             { tok KW_enum       }
-  "function"         { tok KW_function   }
-  "for"              { tok KW_for        }
-  "generate"         { tok KW_generate   }
-  "genvar"           { tok KW_genvar     }
-  "if"               { tok KW_if         }
-  "initial"          { tok KW_initial    }
-  "inout"            { tok KW_inout      }
-  "input"            { tok KW_input      }
-  "interface"        { tok KW_interface  }
-  "integer"          { tok KW_integer    }
-  "localparam"       { tok KW_localparam }
-  "logic"            { tok KW_logic      }
-  "module"           { tok KW_module     }
-  "modport"          { tok KW_modport    }
-  "negedge"          { tok KW_negedge    }
-  "or"               { tok KW_or         }
-  "output"           { tok KW_output     }
-  "packed"           { tok KW_packed     }
-  "parameter"        { tok KW_parameter  }
-  "posedge"          { tok KW_posedge    }
-  "reg"              { tok KW_reg        }
-  "return"           { tok KW_return     }
-  "static"           { tok KW_static     }
-  "struct"           { tok KW_struct     }
-  "typedef"          { tok KW_typedef    }
-  "unique"           { tok KW_unique     }
-  "wire"             { tok KW_wire       }
+  "assign"           { tok KW_assign       }
+  "automatic"        { tok KW_automatic    }
+  "begin"            { tok KW_begin        }
+  "case"             { tok KW_case         }
+  "casex"            { tok KW_casex        }
+  "casez"            { tok KW_casez        }
+  "default"          { tok KW_default      }
+  "else"             { tok KW_else         }
+  "end"              { tok KW_end          }
+  "endcase"          { tok KW_endcase      }
+  "endmodule"        { tok KW_endmodule    }
+  "endfunction"      { tok KW_endfunction  }
+  "endgenerate"      { tok KW_endgenerate  }
+  "endinterface"     { tok KW_endinterface }
+  "enum"             { tok KW_enum         }
+  "function"         { tok KW_function     }
+  "for"              { tok KW_for          }
+  "generate"         { tok KW_generate     }
+  "genvar"           { tok KW_genvar       }
+  "if"               { tok KW_if           }
+  "initial"          { tok KW_initial      }
+  "inout"            { tok KW_inout        }
+  "input"            { tok KW_input        }
+  "interface"        { tok KW_interface    }
+  "integer"          { tok KW_integer      }
+  "localparam"       { tok KW_localparam   }
+  "logic"            { tok KW_logic        }
+  "module"           { tok KW_module       }
+  "modport"          { tok KW_modport      }
+  "negedge"          { tok KW_negedge      }
+  "or"               { tok KW_or           }
+  "output"           { tok KW_output       }
+  "packed"           { tok KW_packed       }
+  "parameter"        { tok KW_parameter    }
+  "posedge"          { tok KW_posedge      }
+  "reg"              { tok KW_reg          }
+  "return"           { tok KW_return       }
+  "static"           { tok KW_static       }
+  "struct"           { tok KW_struct       }
+  "typedef"          { tok KW_typedef      }
+  "unique"           { tok KW_unique       }
+  "wire"             { tok KW_wire         }
 
   @simpleIdentifier  { tok Id_simple  }
   @escapedIdentifier { tok Id_escaped }
@@ -176,8 +176,8 @@ tokens :-
 
   "==="              { tok Sym_eq_eq_eq }
   "!=="              { tok Sym_bang_eq_eq }
-  "=?="              { tok Sym_eq_question_eq }
-  "!?="              { tok Sym_bang_question_eq }
+  "==?"              { tok Sym_eq_eq_question }
+  "!=?"              { tok Sym_bang_eq_question }
   ">>>"              { tok Sym_gt_gt_gt }
   "<<<"              { tok Sym_lt_lt_lt }
   "<<="              { tok Sym_lt_lt_eq }

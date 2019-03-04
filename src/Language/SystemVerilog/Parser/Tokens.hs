@@ -318,8 +318,8 @@ data TokenName
   | Sym_aster_gt
   | Sym_eq_eq_eq
   | Sym_bang_eq_eq
-  | Sym_eq_question_eq
-  | Sym_bang_question_eq
+  | Sym_eq_eq_question
+  | Sym_bang_eq_question
   | Sym_gt_gt_gt
   | Sym_lt_lt_lt
   | Sym_lt_lt_eq

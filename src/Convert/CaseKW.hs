@@ -46,8 +46,8 @@ expandExpr _ other = error $ "CaseKW conversion encountered case that was not a 
 -- Note that we don't have to convert the statements within the cases, as the
 -- conversion template takes care of that for us.
 convertStmt :: Stmt -> Stmt
-convertStmt (Case kw expr cases def) =
-    Case CaseN expr cases' def
+convertStmt (Case u kw expr cases def) =
+    Case u CaseN expr cases' def
     where
         wilds = wildcards kw
         cases' = map convertCase cases

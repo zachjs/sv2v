@@ -13,10 +13,11 @@ import qualified Convert.AlwaysKW
 import qualified Convert.CaseKW
 import qualified Convert.Enum
 import qualified Convert.Logic
-import qualified Convert.Typedef
 import qualified Convert.PackedArray
 import qualified Convert.SplitPortDecl
 import qualified Convert.StarPort
+import qualified Convert.Typedef
+import qualified Convert.Unique
 
 type Phase = AST -> AST
 
@@ -26,6 +27,7 @@ phases YOSYS =
     , Convert.PackedArray.convert
     , Convert.StarPort.convert
     , Convert.Typedef.convert
+    , Convert.Unique.convert
     ]
 phases VTR =
     (phases YOSYS) ++

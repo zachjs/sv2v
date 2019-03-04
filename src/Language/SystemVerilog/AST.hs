@@ -10,6 +10,7 @@ module Language.SystemVerilog.AST
   , Expr       (..)
   , UniOp      (..)
   , BinOp      (..)
+  , AsgnOp     (..)
   , Sense      (..)
   , GenItem    (..)
   , AlwaysKW   (..)
@@ -297,8 +298,13 @@ data BinOp
   | Le
   | Gt
   | Ge
+  | Pow
   | ShiftAL
   | ShiftAR
+  | TEq
+  | TNe
+  | WEq
+  | WNe
   deriving (Eq, Ord)
 
 instance Show BinOp where
@@ -321,8 +327,13 @@ instance Show BinOp where
     Le     -> "<="
     Gt     -> ">"
     Ge     -> ">="
+    Pow    -> "**"
     ShiftAL -> "<<<"
     ShiftAR -> ">>>"
+    TEq     -> "==="
+    TNe     -> "!=="
+    WEq     -> "==?"
+    WNe     -> "!=?"
 
 instance Show Expr where
   show x = case x of
@@ -347,6 +358,15 @@ instance Show Expr where
       showPatternItem :: (Maybe Identifier, Expr) -> String
       showPatternItem (Nothing, e) = show e
       showPatternItem (Just n , e) = printf "%s: %s" n (show e)
+
+data AsgnOp
+  = AsgnOpEq
+  | AsgnOp BinOp
+  deriving Eq
+
+instance Show AsgnOp where
+  show AsgnOpEq = "="
+  show (AsgnOp op) = (show op) ++ "="
 
 data LHS
   = LHSIdent  Identifier
@@ -376,7 +396,7 @@ instance Show CaseKW where
 
 data Stmt
   = Block   (Maybe (Identifier, [Decl])) [Stmt]
-  | Case    CaseKW Expr [Case] (Maybe Stmt)
+  | Case    Bool CaseKW Expr [Case] (Maybe Stmt)
   | For     (Identifier, Expr) Expr (Identifier, Expr) Stmt
   | AsgnBlk LHS Expr
   | Asgn    LHS Expr
@@ -398,12 +418,13 @@ instance Show Stmt where
       extra = case header of
         Nothing -> ""
         Just (x, i) -> printf " : %s\n%s" x (block i)
-  show (Case  kw e cs def) =
-    printf "%s (%s)\n%s%s\nendcase" (show kw) (show e) (indent $ unlines' $ map showCase cs) defStr
+  show (Case u kw e cs def) =
+    printf "%s%s (%s)\n%s%s\nendcase" uniqStr (show kw) (show e) (indent $ unlines' $ map showCase cs) defStr
     where
-    defStr = case def of
-      Nothing -> ""
-      Just c -> printf "\n\tdefault: %s" (show c)
+      uniqStr = if u then "unique " else ""
+      defStr = case def of
+        Nothing -> ""
+        Just c -> printf "\n\tdefault: %s" (show c)
   show (For (a,b) c (d,e) f) = printf "for (%s = %s; %s; %s = %s)\n%s" a (show b) (show c) d (show e) $ indent $ show f
   show (AsgnBlk v e) = printf "%s = %s;"  (show v) (show e)
   show (Asgn    v e) = printf "%s <= %s;" (show v) (show e)
@@ -450,7 +471,7 @@ type GenCase = ([Expr], GenItem)
 data GenItem
   = GenBlock (Maybe Identifier) [GenItem]
   | GenCase  Expr [GenCase] (Maybe GenItem)
-  | GenFor   (Identifier, Expr) Expr (Identifier, Expr) Identifier [GenItem]
+  | GenFor   (Identifier, Expr) Expr (Identifier, AsgnOp, Expr) Identifier [GenItem]
   | GenIf    Expr GenItem GenItem
   | GenNull
   | GenModuleItem ModuleItem
@@ -464,7 +485,7 @@ instance Show GenItem where
   show (GenCase e c (Just d)) = printf "case (%s)\n%s\n\tdefault:\n%s\nendcase" (show e) (indent $ unlines' $ map showCase c) (indent $ indent $ show d)
   show (GenIf e a GenNull)    = printf "if (%s) %s"          (show e) (show a)
   show (GenIf e a b      )    = printf "if (%s) %s\nelse %s" (show e) (show a) (show b)
-  show (GenFor (x1, e1) c (x2, e2) x is) = printf "for (%s = %s; %s; %s = %s) %s" x1 (show e1) (show c) x2 (show e2) (show $ GenBlock (Just x) is)
+  show (GenFor (x1, e1) c (x2, o2, e2) x is) = printf "for (%s = %s; %s; %s %s %s) %s" x1 (show e1) (show c) x2 (show o2) (show e2) (show $ GenBlock (Just x) is)
   show GenNull = ";"
   show (GenModuleItem item) = show item
 
