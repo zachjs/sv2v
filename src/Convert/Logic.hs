@@ -39,9 +39,6 @@ regIdents :: ModuleItem -> Writer RegIdents ()
 regIdents (AlwaysC _ stmt) = collectStmtLHSsM idents stmt
     where
         idents :: LHS -> Writer RegIdents ()
-        idents (LHS       vx  ) = tell $ Set.singleton vx
-        idents (LHSBit    vx _) = tell $ Set.singleton vx
-        idents (LHSRange  vx _) = tell $ Set.singleton vx
-        idents (LHSConcat lhss) = mapM idents lhss >>= \_ -> return ()
-        idents (LHSDot   lhs _) = idents lhs
+        idents (LHSIdent  vx  ) = tell $ Set.singleton vx
+        idents _ = return () -- the collector recurses for us
 regIdents _ = return ()

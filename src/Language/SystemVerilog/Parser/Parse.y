@@ -230,6 +230,7 @@ ParamDecl(delim) :: { [ModuleItem] }
 
 PortDecls :: { ([Identifier], [ModuleItem]) }
   : "(" DeclTokens(")") { parseDTsAsPortDecls $2 }
+  | "("            ")"  { ([], []) }
   | {- empty -}         { ([], []) }
 
 ModportItems :: { [(Identifier, [ModportDecl])] }
@@ -360,15 +361,15 @@ Range :: { Range }
   : "[" Expr ":" Expr "]"  { ($2, $4) }
 
 LHS :: { LHS }
-: Identifier              { LHS       $1    }
-| Identifier Range        { LHSRange  $1 $2 }
-| Identifier "[" Expr "]" { LHSBit    $1 $3 }
-| "{" LHSs "}"            { LHSConcat $2 }
-| LHS "." Identifier      { LHSDot    $1 $3 }
+  : Identifier         { LHSIdent  $1    }
+  | LHS Range          { LHSRange  $1 $2 }
+  | LHS "[" Expr "]"   { LHSBit    $1 $3 }
+  | LHS "." Identifier { LHSDot    $1 $3 }
+  | "{" LHSs "}"       { LHSConcat $2    }
 
 LHSs :: { [LHS] }
-:          LHS  { [$1] }
-| LHSs "," LHS  { $1 ++ [$3] }
+  : LHS           { [$1] }
+  | LHSs "," LHS  { $1 ++ [$3] }
 
 Sense :: { Sense }
 :            Sense1 { $1 }

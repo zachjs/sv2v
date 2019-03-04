@@ -95,11 +95,9 @@ collectExpr (IdentRange i _) = recordSeqUsage i
 collectExpr (IdentBit   i _) = recordIdxUsage i
 collectExpr _ = return ()
 collectLHS :: LHS -> State Info ()
-collectLHS (LHS       i  ) = recordSeqUsage i
-collectLHS (LHSRange  i _) = recordSeqUsage i
-collectLHS (LHSBit    i _) = recordIdxUsage i
-collectLHS (LHSConcat lhss) = mapM collectLHS lhss >>= \_ -> return ()
-collectLHS (LHSDot  lhs _) = collectLHS lhs
+collectLHS (LHSIdent  i) = recordSeqUsage i
+collectLHS (LHSBit (LHSIdent i) _) = recordIdxUsage i
+collectLHS _ = return () -- the collect recurses for us
 
 -- VCS doesn't like port declarations inside of `generate` blocks, so we hoist
 -- them out with this function. This obviously isn't ideal, but it's a
@@ -167,8 +165,8 @@ unflattener writeToFlatVariant arr (t, (majorHi, majorLo)) =
                     (BinOp Mul (Ident index) size))
             , GenModuleItem $ (uncurry Assign) $
                 if not writeToFlatVariant
-                    then (LHSBit arrUnflat $ Ident index, IdentRange arr origRange)
-                    else (LHSRange arr origRange, IdentBit arrUnflat $ Ident index)
+                    then (LHSBit (LHSIdent arrUnflat) $ Ident index, IdentRange arr origRange)
+                    else (LHSRange (LHSIdent arr) origRange, IdentBit arrUnflat $ Ident index)
             ]
         ]
     where
@@ -257,18 +255,18 @@ rewriteModuleItem info =
         rewriteExpr other = other
 
         rewriteLHS :: LHS -> LHS
-        rewriteLHS (LHS      x  ) = LHS      (rewriteAsgnIdent x)
-        rewriteLHS (LHSBit   x e) = LHSBit   (rewriteAsgnIdent x) e
-        rewriteLHS (LHSRange x r) = LHSRange (rewriteAsgnIdent x) r
+        rewriteLHS (LHSIdent x  ) = LHSIdent (rewriteAsgnIdent x)
+        rewriteLHS (LHSBit   l e) = LHSBit   (rewriteLHS l) e
+        rewriteLHS (LHSRange l r) = LHSRange (rewriteLHS l) r
+        rewriteLHS (LHSDot   l x) = LHSDot   (rewriteLHS l) x
         rewriteLHS (LHSConcat ls) = LHSConcat $ map rewriteLHS ls
-        rewriteLHS (LHSDot lhs x) = LHSDot (rewriteLHS lhs) x
 
         rewriteStmt :: Stmt -> Stmt
         rewriteStmt (AsgnBlk lhs expr) = convertAssignment AsgnBlk lhs expr
         rewriteStmt (Asgn    lhs expr) = convertAssignment Asgn    lhs expr
         rewriteStmt other = other
         convertAssignment :: (LHS -> Expr -> Stmt) -> LHS -> Expr -> Stmt
-        convertAssignment constructor (lhs @ (LHS ident)) (expr @ (Repeat _ exprs)) =
+        convertAssignment constructor (lhs @ (LHSIdent ident)) (expr @ (Repeat _ exprs)) =
             if Map.member ident typeDims
                 then For inir chkr incr assign
                 else constructor (rewriteLHS lhs) expr
@@ -276,7 +274,7 @@ rewriteModuleItem info =
                 (_, (a, b)) = typeDims Map.! ident
                 index = prefix $ ident ++ "_repeater_index"
                 assign = constructor
-                    (LHSBit (prefix ident) (Ident index))
+                    (LHSBit (LHSIdent $ prefix ident) (Ident index))
                     (Concat exprs)
                 inir = (index, b)
                 chkr = BinOp Le (Ident index) a

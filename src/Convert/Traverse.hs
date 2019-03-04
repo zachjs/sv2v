@@ -142,8 +142,9 @@ traverseNestedStmtsM mapper = fullMapper
 traverseStmtLHSsM :: Monad m => MapperM m LHS -> MapperM m Stmt
 traverseStmtLHSsM mapper = traverseNestedStmtsM stmtMapper
     where
-        stmtMapper (AsgnBlk lhs expr) = mapper lhs >>= \lhs' -> return $ AsgnBlk lhs' expr
-        stmtMapper (Asgn    lhs expr) = mapper lhs >>= \lhs' -> return $ Asgn    lhs' expr
+        fullMapper = traverseNestedLHSsM mapper
+        stmtMapper (AsgnBlk lhs expr) = fullMapper lhs >>= \lhs' -> return $ AsgnBlk lhs' expr
+        stmtMapper (Asgn    lhs expr) = fullMapper lhs >>= \lhs' -> return $ Asgn    lhs' expr
         stmtMapper other = return other
 
 traverseStmtLHSs :: Mapper LHS -> Mapper Stmt
@@ -285,7 +286,7 @@ traverseLHSsM mapper item =
     traverseStmtsM (traverseStmtLHSsM mapper) item >>= traverseModuleItemLHSsM
     where
         traverseModuleItemLHSsM (Assign lhs expr) = do
-            lhs' <- mapper lhs
+            lhs' <- traverseNestedLHSsM mapper lhs
             return $ Assign lhs' expr
         traverseModuleItemLHSsM other = return other
 
@@ -293,6 +294,16 @@ traverseLHSs :: Mapper LHS -> Mapper ModuleItem
 traverseLHSs = unmonad traverseLHSsM
 collectLHSsM :: Monad m => CollectorM m LHS -> CollectorM m ModuleItem
 collectLHSsM = collectify traverseLHSsM
+
+traverseNestedLHSsM :: Monad m => MapperM m LHS -> MapperM m LHS
+traverseNestedLHSsM mapper = fullMapper
+    where
+        fullMapper lhs = tl lhs >>= mapper
+        tl (LHSIdent  x   ) = return $ LHSIdent x
+        tl (LHSBit    l e ) = fullMapper l >>= \l' -> return $ LHSBit    l' e
+        tl (LHSRange  l r ) = fullMapper l >>= \l' -> return $ LHSRange  l' r
+        tl (LHSDot    l x ) = fullMapper l >>= \l' -> return $ LHSDot    l' x
+        tl (LHSConcat lhss) = mapM fullMapper lhss >>= return . LHSConcat
 
 traverseDeclsM :: Monad m => MapperM m Decl -> MapperM m ModuleItem
 traverseDeclsM mapper item = do

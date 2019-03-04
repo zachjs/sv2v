@@ -351,19 +351,19 @@ instance Show Expr where
       showPatternItem (Just n , e) = printf "%s: %s" n (show e)
 
 data LHS
-  = LHS       Identifier
-  | LHSBit    Identifier Expr
-  | LHSRange  Identifier Range
+  = LHSIdent  Identifier
+  | LHSBit    LHS Expr
+  | LHSRange  LHS Range
   | LHSDot    LHS Identifier
   | LHSConcat [LHS]
   deriving Eq
 
 instance Show LHS where
-  show (LHS        a       ) = a
-  show (LHSBit     a b     ) = printf "%s[%s]"    a (show b)
-  show (LHSRange   a (b, c)) = printf "%s[%s:%s]" a (show b) (show c)
-  show (LHSConcat  a       ) = printf "{%s}" (commas $ map show a)
-  show (LHSDot     a b     ) = printf "%s.%s" (show a) b
+  show (LHSIdent   x       ) = x
+  show (LHSBit     l e     ) = printf "%s[%s]"    (show l) (show e)
+  show (LHSRange   l (a, b)) = printf "%s[%s:%s]" (show l) (show a) (show b)
+  show (LHSDot     l x     ) = printf "%s.%s"     (show l) x
+  show (LHSConcat  lhss    ) = printf "{%s}" (commas $ map show lhss)
 
 data CaseKW
   = CaseN

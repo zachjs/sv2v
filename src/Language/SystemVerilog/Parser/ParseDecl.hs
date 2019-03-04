@@ -151,26 +151,23 @@ parseDTsAsDeclOrAsgn tokens =
             DTAsgn     e -> (AsgnBlk, e)
             DTAsgnNBlk e -> (Asgn   , e)
             _ -> error $ "invalid block item decl or stmt: " ++ (show tokens)
-        (lhs, []) = takeLHS $ init tokens
+        Just lhs = foldl takeLHSStep Nothing $ init tokens
         isAsgnToken :: DeclToken -> Bool
         isAsgnToken (DTBit    _) = True
         isAsgnToken (DTConcat _) = True
         isAsgnToken _ = False
 
--- TODO: It looks like our LHS type doesn't represent the full set of possible
--- LHSs, i.e., `foo[0][0]` isn't representable. When this is addressed, we'll
--- have to take another pass at this function. It will probably need to be
--- recursive.
-takeLHS :: [DeclToken] -> (LHS, [DeclToken])
-takeLHS (DTConcat lhss         : rest) = (LHSConcat lhss, rest)
-takeLHS (DTIdent x : DTBit   e : rest) = (LHSBit x e    , rest)
-takeLHS (DTIdent x : DTRange r : rest) = (LHSRange x r  , rest)
-takeLHS (DTIdent x             : rest) = (LHS x         , rest)
-takeLHS (DTType tf : rest) =
+takeLHSStep :: Maybe LHS -> DeclToken -> Maybe LHS
+takeLHSStep (Nothing  ) (DTConcat lhss) = Just $ LHSConcat lhss
+takeLHSStep (Nothing  ) (DTIdent  x   ) = Just $ LHSIdent x
+takeLHSStep (Just curr) (DTBit    e   ) = Just $ LHSBit   curr e
+takeLHSStep (Just curr) (DTRange  r   ) = Just $ LHSRange curr r
+takeLHSStep (Nothing  ) (DTType   tf  ) =
     case tf [] of
-        InterfaceT x (Just y) [] -> (LHSDot (LHS x) y, rest)
+        InterfaceT x (Just y) [] -> Just $ LHSDot (LHSIdent x) y
         _ -> error $ "unexpected type in assignment: " ++ (show tf)
-takeLHS tokens = error $ "missing LHS in assignment: " ++ (show tokens)
+takeLHSStep (maybeCurr) token =
+    error $ "unexpected token in LHS: " ++ show (maybeCurr, token)
 
 
 -- batches together seperate declaration lists
