@@ -22,6 +22,7 @@ import Language.SystemVerilog.Parser.Tokens
 "always_ff"        { Token KW_always_ff    _ _ }
 "always_latch"     { Token KW_always_latch _ _ }
 "assign"           { Token KW_assign     _ _ }
+"automatic"        { Token KW_automatic  _ _ }
 "begin"            { Token KW_begin      _ _ }
 "case"             { Token KW_case       _ _ }
 "casex"            { Token KW_casex      _ _ }
@@ -56,6 +57,8 @@ import Language.SystemVerilog.Parser.Tokens
 "parameter"        { Token KW_parameter  _ _ }
 "posedge"          { Token KW_posedge    _ _ }
 "reg"              { Token KW_reg        _ _ }
+"return"           { Token KW_return     _ _ }
+"static"           { Token KW_static     _ _ }
 "struct"           { Token KW_struct     _ _ }
 "typedef"          { Token KW_typedef    _ _ }
 "unique"           { Token KW_unique     _ _ }
@@ -259,10 +262,12 @@ Identifiers :: { [Identifier] }
 
 -- uses delimiter propagation hack to avoid conflicts
 DeclTokens(delim) :: { [DeclToken] }
-  : DeclToken               delim  { [$1] }
-  | DeclToken    DeclTokens(delim) { [$1] ++ $2 }
-  | "=" Expr "," DeclTokens(delim) { [DTAsgn $2, DTComma] ++ $4 }
-  | "=" Expr                delim  { [DTAsgn $2] }
+  : DeclToken                delim  { [$1] }
+  | DeclToken     DeclTokens(delim) { [$1] ++ $2 }
+  | "="  Expr "," DeclTokens(delim) { [DTAsgn     $2, DTComma] ++ $4 }
+  | "<=" Expr "," DeclTokens(delim) { [DTAsgnNBlk $2, DTComma] ++ $4 }
+  | "="  Expr                delim  { [DTAsgn     $2] }
+  | "<=" Expr                delim  { [DTAsgnNBlk $2] }
 DeclToken :: { DeclToken }
   : ","                       { DTComma }
   | Range                     { DTRange    $1 }
@@ -272,6 +277,9 @@ DeclToken :: { DeclToken }
   | ModuleInstantiation       { DTInstance $1 }
   | PartialType               { DTType $1 }
   | Identifier "." Identifier { DTType $ InterfaceT $1 (Just $3) }
+  | "[" Expr "]"              { DTBit      $2 }
+  | "{" LHSs "}"              { DTConcat   $2 }
+  -- | LHS "." Identifier      { LHSDot    $1 $3 }
 
 VariablePortIdentifiers :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifier                             { [$1] }
@@ -294,14 +302,17 @@ ModuleItem :: { [ModuleItem] }
   : DeclTokens(";")  { parseDTsAsModuleItems $1 }
   | "parameter"  ParamType DeclAsgns ";" { map MIDecl $ map (uncurry $ Parameter  $2) $3 }
   | "localparam" ParamType DeclAsgns ";" { map MIDecl $ map (uncurry $ Localparam $2) $3 }
-  | "assign" LHS "=" Expr ";"                            { [Assign $2 $4] }
-  | AlwaysKW Stmt                                        { [AlwaysC $1 $2] }
-  | "function"                    Identifier FunctionItems Stmt "endfunction" opt(Tag) { [Function (Implicit []) $2 $3 $4] }
-  | "function" DimensionsNonEmpty Identifier FunctionItems Stmt "endfunction" opt(Tag) { [Function (Implicit $2) $3 $4 $5] }
-  | "function" Type               Identifier FunctionItems Stmt "endfunction" opt(Tag) { [Function $2 $3 $4 $5] }
-  | "genvar" Identifiers ";"                             { map Genvar $2 }
-  | "generate" GenItems "endgenerate"                    { [Generate $2] }
-  | "modport" ModportItems ";"                           { map (uncurry Modport) $2 }
+  | "assign" LHS "=" Expr ";"            { [Assign $2 $4] }
+  | AlwaysKW Stmt                        { [AlwaysC $1 $2] }
+  | "genvar" Identifiers ";"             { map Genvar $2 }
+  | "generate" GenItems "endgenerate"    { [Generate $2] }
+  | "modport" ModportItems ";"           { map (uncurry Modport) $2 }
+  | "function" opt(Lifetime) FuncRetAndName FunctionItems DeclsAndStmts "endfunction" opt(Tag) { [Function $2 (fst $3) (snd $3) ($4 ++ fst $5) (snd $5)] }
+
+FuncRetAndName :: { (Type, Identifier) }
+  : {- empty -}        Identifier { (Implicit [], $1) }
+  | DimensionsNonEmpty Identifier { (Implicit $1, $2) }
+  | Type               Identifier { ($1         , $2) }
 
 AlwaysKW :: { AlwaysKW }
   : "always"       { Always      }
@@ -309,13 +320,17 @@ AlwaysKW :: { AlwaysKW }
   | "always_ff"    { AlwaysFF    }
   | "always_latch" { AlwaysLatch }
 
+Lifetime :: { Lifetime }
+  : "static"    { Static    }
+  | "automatic" { Automatic }
+
 ModuleInstantiation :: { (Identifier, Maybe [PortBinding]) }
   : Identifier "(" Bindings ")" { ($1, Just $3) }
   | Identifier "(" ".*"     ")" { ($1, Nothing) }
 
 FunctionItems :: { [Decl] }
-  : "(" DeclTokens(")") ";" BlockItemDeclarations { (parseDTsAsDecls $2) ++ $4 }
-  |                     ";" BlockItemDeclarations { $2 }
+  : "(" DeclTokens(")") ";" { map makeInput $ parseDTsAsDecls $2 }
+  |                     ";" { [] }
 
 ParamType :: { Type }
   : Dimensions { Implicit $1 }
@@ -327,13 +342,6 @@ EventControl :: { Sense }
   | "@" "(*)"         { SenseStar }
   | "@" "*"           { SenseStar }
   | "@*"              { SenseStar }
-
-VariableIdentifiers :: { [(Identifier, [Range], Maybe Expr)] }
-  : VariableType                         { [$1] }
-  | VariableIdentifiers "," VariableType { $1 ++ [$3] }
-VariableType :: { (Identifier, [Range], Maybe Expr) }
-  : Identifier Dimensions          { ($1, $2, Nothing) }
-  | Identifier Dimensions "=" Expr { ($1, $2, Just $4) }
 
 Dimensions :: { [Range] }
   : {- empty -}        { [] }
@@ -390,34 +398,28 @@ Stmts :: { [Stmt] }
   | Stmts Stmt  { $1 ++ [$2] }
 
 Stmt :: { Stmt }
+  : StmtNonAsgn       { $1 }
+  | LHS "="  Expr ";" { AsgnBlk $1 $3 }
+  | LHS "<=" Expr ";" { Asgn    $1 $3 }
+StmtNonAsgn :: { Stmt }
   : ";" { Null }
-  | "begin"                                      Stmts "end" { Block Nothing         $2 }
-  | "begin" ":" Identifier BlockItemDeclarations Stmts "end" { Block (Just ($3, $4)) $5 }
-  | "if" "(" Expr ")" Stmt "else" Stmt               { If $3 $5 $7        }
-  | "if" "(" Expr ")" Stmt %prec NoElse              { If $3 $5 Null      }
+  | "begin"                        Stmts "end" { Block Nothing             $2 }
+  | "begin" ":" Identifier DeclsAndStmts "end" { Block (Just ($3, fst $4)) (snd $4) }
+  | "if" "(" Expr ")" Stmt "else" Stmt         { If $3 $5 $7        }
+  | "if" "(" Expr ")" Stmt %prec NoElse        { If $3 $5 Null      }
   | "for" "(" Identifier "=" Expr ";" Expr ";" Identifier "=" Expr ")" Stmt { For ($3, $5) $7 ($9, $11) $13 }
-  | LHS "=" Expr ";"                                 { AsgnBlk $1 $3 }
-  | LHS "<=" Expr ";"                                { Asgn    $1 $3 }
   | CaseKW "(" Expr ")" Cases opt(CaseDefault) "endcase" { Case $1 $3 $5 $6 }
-  | EventControl Stmt                                { Timing $1 $2 }
+  | EventControl Stmt                          { Timing $1 $2 }
+  | "return" Expr ";"                          { Return $2 }
 
-BlockItemDeclarations :: { [Decl] }
-  : {- empty -}                                { [] }
-  | BlockItemDeclarations BlockItemDeclaration { $1 ++ $2 }
-BlockItemDeclaration :: { [Decl] }
-  : "reg" Dimensions BlockVariableIdentifiers ";" { map (\(x, rs) -> Variable Local (Reg $2) x rs Nothing) $3 }
-  | "parameter"  ParamType DeclAsgns ";" { map (uncurry $ Parameter  $2) $3 }
-  | "localparam" ParamType DeclAsgns ";" { map (uncurry $ Localparam $2) $3 }
-  | "integer" VariableIdentifiers    ";" { map (\(x, a, e) -> Variable Local IntegerT x a e) $2 }
-  | "input"           Dimensions Identifiers ";" { map (\x -> Variable Input (Implicit $2) x [] Nothing) $3 }
-  | "input" "reg"     Dimensions Identifiers ";" { map (\x -> Variable Input (Reg $3)      x [] Nothing) $4 }
-  | "input" "integer"            Identifiers ";" { map (\x -> Variable Input IntegerT      x [] Nothing) $3 }
-
-BlockVariableIdentifiers :: { [(Identifier, [Range])] }
-  : BlockVariableType                              { [$1] }
-  | BlockVariableIdentifiers "," BlockVariableType { $1 ++ [$3] }
-BlockVariableType :: { (Identifier, [Range]) }
-  : Identifier Dimensions { ($1, $2) }
+DeclsAndStmts :: { ([Decl], [Stmt]) }
+  : DeclOrStmt DeclsAndStmts { combineDeclsAndStmts $1 $2 }
+  | StmtNonAsgn Stmts        { ([], $1 : $2) }
+  | {- empty -}              { ([], []) }
+DeclOrStmt :: { ([Decl], [Stmt]) }
+  : DeclTokens(";") { parseDTsAsDeclOrAsgn $1 }
+  | "parameter"  ParamType DeclAsgns ";" { (map (uncurry $ Parameter  $2) $3, []) }
+  | "localparam" ParamType DeclAsgns ";" { (map (uncurry $ Localparam $2) $3, []) }
 
 CaseKW :: { CaseKW }
   -- We just drop the unique keyword, for now. In the future, we should add it
@@ -547,5 +549,12 @@ genItemsToGenItem :: [GenItem] -> GenItem
 genItemsToGenItem [] = error "genItemsToGenItem given empty list!"
 genItemsToGenItem [x] = x
 genItemsToGenItem xs = GenBlock Nothing xs
+
+combineDeclsAndStmts :: ([Decl], [Stmt]) -> ([Decl], [Stmt]) -> ([Decl], [Stmt])
+combineDeclsAndStmts (a1, b1) (a2, b2) = (a1 ++ a2, b1 ++ b2)
+
+makeInput :: Decl -> Decl
+makeInput (Variable _ t x a me) = Variable Input t x a me
+makeInput other = error $ "unexpected non-var decl: " ++ (show other)
 
 }

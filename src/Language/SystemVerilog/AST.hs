@@ -16,6 +16,7 @@ module Language.SystemVerilog.AST
   , CaseKW     (..)
   , PartKW     (..)
   , Decl       (..)
+  , Lifetime   (..)
   , AST
   , PortBinding
   , ModportDecl
@@ -150,7 +151,7 @@ data ModuleItem
   | AlwaysC    AlwaysKW Stmt
   | Assign     LHS Expr
   | Instance   Identifier [PortBinding] Identifier (Maybe [PortBinding]) -- `Nothing` represents `.*`
-  | Function   Type Identifier [Decl] Stmt
+  | Function   (Maybe Lifetime) Type Identifier [Decl] [Stmt]
   | Genvar     Identifier
   | Generate   [GenItem]
   | Modport    Identifier [ModportDecl]
@@ -184,7 +185,7 @@ instance Show ModuleItem where
     Instance   m params i ports
       | null params -> printf "%s %s%s;"     m                    i (showMaybePorts ports)
       | otherwise   -> printf "%s #%s %s%s;" m (showPorts params) i (showMaybePorts ports)
-    Function   t x i b -> printf "function %s%s;\n%s\n%s\nendfunction" (showPad t) x (indent $ show i) (indent $ show b)
+    Function   ml t x i b -> printf "function %s%s%s;\n%s\n%s\nendfunction" (showLifetime ml) (showPad t) x (indent $ show i) (indent $ unlines' $ map show b)
     Genvar     x -> printf "genvar %s;" x
     Generate   b -> printf "generate\n%s\nendgenerate" (indent $ unlines' $ map show b)
     Modport    x l  -> printf "modport %s(\n%s\n);" x (indent $ intercalate ",\n" $ map showModportDecl l)
@@ -383,6 +384,7 @@ data Stmt
   | Asgn    LHS Expr
   | If      Expr Stmt Stmt
   | Timing  Sense Stmt
+  | Return  Expr
   | Null
   deriving Eq
 
@@ -409,6 +411,7 @@ instance Show Stmt where
   show (Asgn    v e) = printf "%s <= %s;" (show v) (show e)
   show (If a b Null) = printf "if (%s) %s"         (show a) (show b)
   show (If a b c   ) = printf "if (%s) %s\nelse %s" (show a) (show b) (show c)
+  show (Return e   ) = printf "return %s;" (show e)
   show (Timing t s ) = printf "@(%s)%s" (show t) rest
     where
       rest = case s of
@@ -466,3 +469,16 @@ instance Show GenItem where
   show (GenFor (x1, e1) c (x2, e2) x is) = printf "for (%s = %s; %s; %s = %s) %s" x1 (show e1) (show c) x2 (show e2) (show $ GenBlock (Just x) is)
   show GenNull = ";"
   show (GenModuleItem item) = show item
+
+data Lifetime
+  = Static
+  | Automatic
+  deriving (Eq, Ord)
+
+instance Show Lifetime where
+  show Static    = "static"
+  show Automatic = "automatic"
+
+showLifetime :: Maybe Lifetime -> String
+showLifetime Nothing = ""
+showLifetime (Just l) = show l ++ " "

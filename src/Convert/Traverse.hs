@@ -104,8 +104,9 @@ traverseStmtsM mapper = moduleItemMapper
     where
         moduleItemMapper (AlwaysC kw stmt) =
             fullMapper stmt >>= return . AlwaysC kw
-        moduleItemMapper (Function ret name decls stmt) =
-            fullMapper stmt >>= return . Function ret name decls
+        moduleItemMapper (Function lifetime ret name decls stmts) = do
+            stmts' <- mapM fullMapper stmts
+            return $ Function lifetime ret name decls stmts'
         moduleItemMapper other = return $ other
         fullMapper = traverseNestedStmtsM mapper
 
@@ -135,6 +136,7 @@ traverseNestedStmtsM mapper = fullMapper
             s2' <- fullMapper s2
             return $ If e s1' s2'
         cs (Timing sense stmt) = fullMapper stmt >>= return . Timing sense
+        cs (Return expr) = return $ Return expr
         cs (Null) = return Null
 
 traverseStmtLHSsM :: Monad m => MapperM m LHS -> MapperM m Stmt
@@ -245,6 +247,8 @@ traverseExprsM mapper = moduleItemMapper
     flatStmtMapper (If cc s1 s2) =
         exprMapper cc >>= \cc' -> return $ If cc' s1 s2
     flatStmtMapper (Timing sense stmt) = return $ Timing sense stmt
+    flatStmtMapper (Return expr) =
+        exprMapper expr >>= return . Return
     flatStmtMapper (Null) = return Null
 
     portBindingMapper (p, me) =
@@ -256,10 +260,10 @@ traverseExprsM mapper = moduleItemMapper
         exprMapper expr >>= return . Assign lhs
     moduleItemMapper (AlwaysC kw stmt) =
         stmtMapper stmt >>= return . AlwaysC kw
-    moduleItemMapper (Function ret f decls stmt) = do
+    moduleItemMapper (Function lifetime ret f decls stmts) = do
         decls' <- mapM declMapper decls
-        stmt' <- stmtMapper stmt
-        return $ Function ret f decls' stmt'
+        stmts' <- mapM stmtMapper stmts
+        return $ Function lifetime ret f decls' stmts'
     moduleItemMapper (Instance m params x ml) = do
         if ml == Nothing
             then return $ Instance m params x Nothing
@@ -297,9 +301,9 @@ traverseDeclsM mapper item = do
     where
         miMapperA (MIDecl decl) =
             mapper decl >>= return . MIDecl
-        miMapperA (Function t x decls s) = do
+        miMapperA (Function l t x decls s) = do
             decls' <- mapM mapper decls
-            return $ Function t x decls' s
+            return $ Function l t x decls' s
         miMapperA other = return other
         miMapperB (Block (Just (name, decls)) stmts) = do
             decls' <- mapM mapper decls
@@ -313,7 +317,7 @@ collectDeclsM = collectify traverseDeclsM
 
 traverseTypesM :: Monad m => MapperM m Type -> MapperM m ModuleItem
 traverseTypesM mapper item =
-    traverseDeclsM declMapper item >>= traverseExprsM exprMapper
+    miMapper item >>= traverseDeclsM declMapper >>= traverseExprsM exprMapper
     where
         exprMapper (Cast t e) = do
             t' <- mapper t
@@ -330,6 +334,9 @@ traverseTypesM mapper item =
             mapper t >>= \t' -> return $ Localparam t' x   e
         declMapper (Variable d t x a me) =
             mapper t >>= \t' -> return $ Variable d t' x a me
+        miMapper (Function l t x d s) =
+            mapper t >>= \t' -> return $ Function l t' x d s
+        miMapper other = return other
 
 traverseTypes :: Mapper Type -> Mapper ModuleItem
 traverseTypes = unmonad traverseTypesM

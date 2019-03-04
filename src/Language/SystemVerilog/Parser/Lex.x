@@ -57,6 +57,7 @@ tokens :-
   "always_ff"        { tok KW_always_ff    }
   "always_latch"     { tok KW_always_latch }
   "assign"           { tok KW_assign     }
+  "automatic"        { tok KW_automatic  }
   "begin"            { tok KW_begin      }
   "case"             { tok KW_case       }
   "casex"            { tok KW_casex      }
@@ -91,6 +92,8 @@ tokens :-
   "parameter"        { tok KW_parameter  }
   "posedge"          { tok KW_posedge    }
   "reg"              { tok KW_reg        }
+  "return"           { tok KW_return     }
+  "static"           { tok KW_static     }
   "struct"           { tok KW_struct     }
   "typedef"          { tok KW_typedef    }
   "unique"           { tok KW_unique     }

@@ -35,6 +35,7 @@ module Language.SystemVerilog.Parser.ParseDecl
 , parseDTsAsModuleItems
 , parseDTsAsDecls
 , parseDTsAsDecl
+, parseDTsAsDeclOrAsgn
 ) where
 
 import Data.List (findIndices)
@@ -46,12 +47,15 @@ import Language.SystemVerilog.AST
 data DeclToken
     = DTComma
     | DTAsgn     Expr
+    | DTAsgnNBlk Expr
     | DTRange    Range
     | DTIdent    Identifier
     | DTDir      Direction
     | DTType     ([Range] -> Type)
     | DTParams   [PortBinding]
     | DTInstance (Identifier, Maybe [PortBinding])
+    | DTBit      Expr
+    | DTConcat   [LHS]
     deriving (Show, Eq)
 
 
@@ -136,6 +140,39 @@ parseDTsAsDecl tokens =
     where components = parseDTsAsComponents tokens
 
 
+-- [PUBLIC]: parser for single block item declarations of assign statetments
+parseDTsAsDeclOrAsgn :: [DeclToken] -> ([Decl], [Stmt])
+parseDTsAsDeclOrAsgn tokens =
+    if any isAsgnToken tokens || tripLookahead tokens
+        then ([], [constructor lhs expr])
+        else (parseDTsAsDecl tokens, [])
+    where
+        (constructor, expr) = case last tokens of
+            DTAsgn     e -> (AsgnBlk, e)
+            DTAsgnNBlk e -> (Asgn   , e)
+            _ -> error $ "invalid block item decl or stmt: " ++ (show tokens)
+        (lhs, []) = takeLHS $ init tokens
+        isAsgnToken :: DeclToken -> Bool
+        isAsgnToken (DTBit    _) = True
+        isAsgnToken (DTConcat _) = True
+        isAsgnToken _ = False
+
+-- TODO: It looks like our LHS type doesn't represent the full set of possible
+-- LHSs, i.e., `foo[0][0]` isn't representable. When this is addressed, we'll
+-- have to take another pass at this function. It will probably need to be
+-- recursive.
+takeLHS :: [DeclToken] -> (LHS, [DeclToken])
+takeLHS (DTConcat lhss         : rest) = (LHSConcat lhss, rest)
+takeLHS (DTIdent x : DTBit   e : rest) = (LHSBit x e    , rest)
+takeLHS (DTIdent x : DTRange r : rest) = (LHSRange x r  , rest)
+takeLHS (DTIdent x             : rest) = (LHS x         , rest)
+takeLHS (DTType tf : rest) =
+    case tf [] of
+        InterfaceT x (Just y) [] -> (LHSDot (LHS x) y, rest)
+        _ -> error $ "unexpected type in assignment: " ++ (show tf)
+takeLHS tokens = error $ "missing LHS in assignment: " ++ (show tokens)
+
+
 -- batches together seperate declaration lists
 type Triplet = (Identifier, [Range], Maybe Expr)
 type Component = (Direction, Type, [Triplet])
@@ -207,9 +244,14 @@ takeRanges (DTRange r : rest) = (r : rs, rest')
     where (rs, rest') = takeRanges rest
 takeRanges rest = ([], rest)
 
+-- TODO: entrypoints besides `parseDTsAsDeclOrAsgn` should disallow `DTAsgnNBlk`
+-- Note: matching DTAsgnNBlk too is a bit of a hack to allow for tripLookahead
+-- to work both for standard declarations and in `parseDTsAsDeclOrAsgn`, where
+-- we're checking for an assignment
 takeAsgn :: [DeclToken] -> (Maybe Expr, [DeclToken])
-takeAsgn (DTAsgn e : rest) = (Just e , rest)
-takeAsgn             rest  = (Nothing, rest)
+takeAsgn (DTAsgn     e : rest) = (Just e , rest)
+takeAsgn (DTAsgnNBlk e : rest) = (Just e , rest)
+takeAsgn                 rest  = (Nothing, rest)
 
 takeComma :: [DeclToken] -> (Bool, [DeclToken])
 takeComma [] = (False, [])
