@@ -33,6 +33,9 @@ module Convert.Traverse
 , traverseTypesM
 , traverseTypes
 , collectTypesM
+, traverseGenItemsM
+, traverseGenItems
+, collectGenItemsM
 ) where
 
 import Data.Maybe (fromJust)
@@ -70,28 +73,15 @@ traverseModuleItemsM mapper (Part kw name ports items) =
     mapM fullMapper items >>= return . Part kw name ports
     where
         fullMapper (Generate genItems) =
-            mapM genItemMapper genItems >>= mapper . Generate
+            mapM fullGenItemMapper genItems >>= mapper . Generate
         fullMapper other = mapper other
-        -- maps all ModuleItems within the given GenItem
-        genItemMapper (GenBlock x subItems) =
-            mapM genItemMapper subItems >>= return . GenBlock x
-        genItemMapper (GenFor a b c d subItems) =
-            mapM genItemMapper subItems >>= return . GenFor a b c d
-        genItemMapper (GenIf e i1 i2) = do
-            i1' <- genItemMapper i1
-            i2' <- genItemMapper i2
-            return $ GenIf e i1' i2'
-        genItemMapper (GenNull) = return GenNull
+        fullGenItemMapper = traverseNestedGenItemsM genItemMapper
         genItemMapper (GenModuleItem moduleItem) = do
             moduleItem' <- fullMapper moduleItem
             return $ case moduleItem' of
                 Generate subItems -> GenBlock Nothing subItems
                 _ -> GenModuleItem moduleItem'
-        genItemMapper (GenCase e cases def) = do
-            caseItems <- mapM (genItemMapper . snd) cases
-            let cases' = zip (map fst cases) caseItems
-            def' <- maybeDo genItemMapper def
-            return $ GenCase e cases' def'
+        genItemMapper other = return other
 traverseModuleItemsM _ orig = return orig
 
 traverseModuleItems :: Mapper ModuleItem -> Mapper Description
@@ -354,3 +344,39 @@ traverseTypes :: Mapper Type -> Mapper ModuleItem
 traverseTypes = unmonad traverseTypesM
 collectTypesM :: Monad m => CollectorM m Type -> CollectorM m ModuleItem
 collectTypesM = collectify traverseTypesM
+
+traverseGenItemsM :: Monad m => MapperM m GenItem -> MapperM m ModuleItem
+traverseGenItemsM mapper = moduleItemMapper
+    where
+        fullMapper = traverseNestedGenItemsM mapper
+        moduleItemMapper (Generate genItems) =
+            mapM fullMapper genItems >>= return . Generate
+        moduleItemMapper other = return other
+
+traverseGenItems :: Mapper GenItem -> Mapper ModuleItem
+traverseGenItems = unmonad traverseGenItemsM
+collectGenItemsM :: Monad m => CollectorM m GenItem -> CollectorM m ModuleItem
+collectGenItemsM = collectify traverseGenItemsM
+
+-- traverses all GenItems within a given GenItem, but doesn't inspect within
+-- GenModuleItems
+traverseNestedGenItemsM :: Monad m => MapperM m GenItem -> MapperM m GenItem
+traverseNestedGenItemsM mapper = fullMapper
+    where
+        fullMapper genItem = gim genItem >>= mapper
+        gim (GenBlock x subItems) =
+            mapM fullMapper subItems >>= return . GenBlock x
+        gim (GenFor a b c d subItems) =
+            mapM fullMapper subItems >>= return . GenFor a b c d
+        gim (GenIf e i1 i2) = do
+            i1' <- fullMapper i1
+            i2' <- fullMapper i2
+            return $ GenIf e i1' i2'
+        gim (GenCase e cases def) = do
+            caseItems <- mapM (fullMapper . snd) cases
+            let cases' = zip (map fst cases) caseItems
+            def' <- maybeDo fullMapper def
+            return $ GenCase e cases' def'
+        gim (GenModuleItem moduleItem) =
+            return $ GenModuleItem moduleItem
+        gim (GenNull) = return GenNull

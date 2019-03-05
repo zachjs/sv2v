@@ -10,6 +10,7 @@ import Language.SystemVerilog.AST
 import Job (Target(..))
 
 import qualified Convert.AlwaysKW
+import qualified Convert.AsgnOp
 import qualified Convert.CaseKW
 import qualified Convert.Enum
 import qualified Convert.Logic
@@ -23,7 +24,8 @@ type Phase = AST -> AST
 
 phases :: Target -> [Phase]
 phases YOSYS =
-    [ Convert.Enum.convert
+    [ Convert.AsgnOp.convert
+    , Convert.Enum.convert
     , Convert.PackedArray.convert
     , Convert.StarPort.convert
     , Convert.Typedef.convert
