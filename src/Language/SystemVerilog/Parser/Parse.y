@@ -28,6 +28,7 @@ import Language.SystemVerilog.Parser.Tokens
 "casex"            { Token KW_casex        _ _ }
 "casez"            { Token KW_casez        _ _ }
 "default"          { Token KW_default      _ _ }
+"do"               { Token KW_do           _ _ }
 "else"             { Token KW_else         _ _ }
 "end"              { Token KW_end          _ _ }
 "endcase"          { Token KW_endcase      _ _ }
@@ -36,8 +37,9 @@ import Language.SystemVerilog.Parser.Tokens
 "endinterface"     { Token KW_endinterface _ _ }
 "endmodule"        { Token KW_endmodule    _ _ }
 "enum"             { Token KW_enum         _ _ }
-"function"         { Token KW_function     _ _ }
 "for"              { Token KW_for          _ _ }
+"forever"          { Token KW_forever      _ _ }
+"function"         { Token KW_function     _ _ }
 "generate"         { Token KW_generate     _ _ }
 "genvar"           { Token KW_genvar       _ _ }
 "if"               { Token KW_if           _ _ }
@@ -48,8 +50,8 @@ import Language.SystemVerilog.Parser.Tokens
 "interface"        { Token KW_interface    _ _ }
 "localparam"       { Token KW_localparam   _ _ }
 "logic"            { Token KW_logic        _ _ }
-"module"           { Token KW_module       _ _ }
 "modport"          { Token KW_modport      _ _ }
+"module"           { Token KW_module       _ _ }
 "negedge"          { Token KW_negedge      _ _ }
 "or"               { Token KW_or           _ _ }
 "output"           { Token KW_output       _ _ }
@@ -57,11 +59,13 @@ import Language.SystemVerilog.Parser.Tokens
 "parameter"        { Token KW_parameter    _ _ }
 "posedge"          { Token KW_posedge      _ _ }
 "reg"              { Token KW_reg          _ _ }
+"repeat"           { Token KW_repeat       _ _ }
 "return"           { Token KW_return       _ _ }
 "static"           { Token KW_static       _ _ }
 "struct"           { Token KW_struct       _ _ }
 "typedef"          { Token KW_typedef      _ _ }
 "unique"           { Token KW_unique       _ _ }
+"while"            { Token KW_while        _ _ }
 "wire"             { Token KW_wire         _ _ }
 
 simpleIdentifier   { Token Id_simple       _ _ }
@@ -408,6 +412,10 @@ StmtNonAsgn :: { Stmt }
   | TimingControl Stmt                         { Timing $1 $2 }
   | "return" Expr ";"                          { Return $2 }
   | Identifier "(" CallArgs ")" ";"            { Subroutine $1 $3 }
+  | "while"  "(" Expr ")" Stmt                 { While   $3 $5 }
+  | "repeat" "(" Expr ")" Stmt                 { RepeatL $3 $5 }
+  | "do"      Stmt "while" "(" Expr ")" ";"    { DoWhile $5 $2 }
+  | "forever" Stmt                             { Forever $2 }
 
 DeclsAndStmts :: { ([Decl], [Stmt]) }
   : DeclOrStmt DeclsAndStmts { combineDeclsAndStmts $1 $2 }

@@ -400,6 +400,10 @@ data Stmt
   | For     (Identifier, Expr) Expr (Identifier, Expr) Stmt
   | AsgnBlk LHS Expr
   | Asgn    LHS Expr
+  | While   Expr Stmt
+  | RepeatL Expr Stmt
+  | DoWhile Expr Stmt
+  | Forever Stmt
   | If      Expr Stmt Stmt
   | Timing  Timing Stmt
   | Return  Expr
@@ -429,6 +433,10 @@ instance Show Stmt where
   show (For (a,b) c (d,e) f) = printf "for (%s = %s; %s; %s = %s)\n%s" a (show b) (show c) d (show e) $ indent $ show f
   show (AsgnBlk v e) = printf "%s = %s;"  (show v) (show e)
   show (Asgn    v e) = printf "%s <= %s;" (show v) (show e)
+  show (While   e s) = printf  "while (%s) %s" (show e) (show s)
+  show (RepeatL e s) = printf "repeat (%s) %s" (show e) (show s)
+  show (DoWhile e s) = printf "do %s while (%s);" (show s) (show e)
+  show (Forever s  ) = printf "forever %s" (show s)
   show (If a b Null) = printf "if (%s) %s"         (show a) (show b)
   show (If a b c   ) = printf "if (%s) %s\nelse %s" (show a) (show b) (show c)
   show (Return e   ) = printf "return %s;" (show e)

@@ -123,6 +123,10 @@ traverseNestedStmtsM mapper = fullMapper
         cs (AsgnBlk lhs expr) = return $ AsgnBlk lhs expr
         cs (Asgn    lhs expr) = return $ Asgn    lhs expr
         cs (For a b c stmt) = fullMapper stmt >>= return . For a b c
+        cs (While   e stmt) = fullMapper stmt >>= return . While   e
+        cs (RepeatL e stmt) = fullMapper stmt >>= return . RepeatL e
+        cs (DoWhile e stmt) = fullMapper stmt >>= return . DoWhile e
+        cs (Forever   stmt) = fullMapper stmt >>= return . Forever
         cs (If e s1 s2) = do
             s1' <- fullMapper s1
             s2' <- fullMapper s2
@@ -239,6 +243,13 @@ traverseExprsM mapper = moduleItemMapper
         e2' <- exprMapper e2
         cc' <- exprMapper cc
         return $ For (x1, e1') cc' (x2, e2') stmt
+    flatStmtMapper (While   e stmt) =
+        exprMapper e >>= \e' -> return $ While   e' stmt
+    flatStmtMapper (RepeatL e stmt) =
+        exprMapper e >>= \e' -> return $ RepeatL e' stmt
+    flatStmtMapper (DoWhile e stmt) =
+        exprMapper e >>= \e' -> return $ DoWhile e' stmt
+    flatStmtMapper (Forever   stmt) = return $ Forever stmt
     flatStmtMapper (If cc s1 s2) =
         exprMapper cc >>= \cc' -> return $ If cc' s1 s2
     flatStmtMapper (Timing event stmt) = return $ Timing event stmt

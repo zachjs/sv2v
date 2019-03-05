@@ -63,28 +63,30 @@ tokens :-
   "casex"            { tok KW_casex        }
   "casez"            { tok KW_casez        }
   "default"          { tok KW_default      }
+  "do"               { tok KW_do           }
   "else"             { tok KW_else         }
   "end"              { tok KW_end          }
   "endcase"          { tok KW_endcase      }
-  "endmodule"        { tok KW_endmodule    }
   "endfunction"      { tok KW_endfunction  }
   "endgenerate"      { tok KW_endgenerate  }
   "endinterface"     { tok KW_endinterface }
+  "endmodule"        { tok KW_endmodule    }
   "enum"             { tok KW_enum         }
-  "function"         { tok KW_function     }
   "for"              { tok KW_for          }
+  "forever"          { tok KW_forever      }
+  "function"         { tok KW_function     }
   "generate"         { tok KW_generate     }
   "genvar"           { tok KW_genvar       }
   "if"               { tok KW_if           }
   "initial"          { tok KW_initial      }
   "inout"            { tok KW_inout        }
   "input"            { tok KW_input        }
-  "interface"        { tok KW_interface    }
   "integer"          { tok KW_integer      }
+  "interface"        { tok KW_interface    }
   "localparam"       { tok KW_localparam   }
   "logic"            { tok KW_logic        }
-  "module"           { tok KW_module       }
   "modport"          { tok KW_modport      }
+  "module"           { tok KW_module       }
   "negedge"          { tok KW_negedge      }
   "or"               { tok KW_or           }
   "output"           { tok KW_output       }
@@ -92,11 +94,13 @@ tokens :-
   "parameter"        { tok KW_parameter    }
   "posedge"          { tok KW_posedge      }
   "reg"              { tok KW_reg          }
+  "repeat"           { tok KW_repeat       }
   "return"           { tok KW_return       }
   "static"           { tok KW_static       }
   "struct"           { tok KW_struct       }
   "typedef"          { tok KW_typedef      }
   "unique"           { tok KW_unique       }
+  "while"            { tok KW_while        }
   "wire"             { tok KW_wire         }
 
   @simpleIdentifier  { tok Id_simple  }
