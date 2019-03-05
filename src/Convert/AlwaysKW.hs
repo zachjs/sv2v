@@ -18,7 +18,7 @@ convert = traverseDescriptions $ traverseModuleItems replaceAlwaysKW
 
 replaceAlwaysKW :: ModuleItem -> ModuleItem
 replaceAlwaysKW (AlwaysC AlwaysComb stmt) =
-    AlwaysC Always $ Timing SenseStar stmt
+    AlwaysC Always $ Timing (Event SenseStar) stmt
 replaceAlwaysKW (AlwaysC AlwaysFF stmt) =
     AlwaysC Always stmt
 replaceAlwaysKW other = other

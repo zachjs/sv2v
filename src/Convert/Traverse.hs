@@ -97,6 +97,8 @@ traverseStmtsM mapper = moduleItemMapper
         moduleItemMapper (Function lifetime ret name decls stmts) = do
             stmts' <- mapM fullMapper stmts
             return $ Function lifetime ret name decls stmts'
+        moduleItemMapper (Initial stmt) =
+            fullMapper stmt >>= return . Initial
         moduleItemMapper other = return $ other
         fullMapper = traverseNestedStmtsM mapper
 
@@ -125,8 +127,9 @@ traverseNestedStmtsM mapper = fullMapper
             s1' <- fullMapper s1
             s2' <- fullMapper s2
             return $ If e s1' s2'
-        cs (Timing sense stmt) = fullMapper stmt >>= return . Timing sense
+        cs (Timing event stmt) = fullMapper stmt >>= return . Timing event
         cs (Return expr) = return $ Return expr
+        cs (Subroutine f exprs) = return $ Subroutine f exprs
         cs (Null) = return Null
 
 traverseStmtLHSsM :: Monad m => MapperM m LHS -> MapperM m Stmt
@@ -238,7 +241,9 @@ traverseExprsM mapper = moduleItemMapper
         return $ For (x1, e1') cc' (x2, e2') stmt
     flatStmtMapper (If cc s1 s2) =
         exprMapper cc >>= \cc' -> return $ If cc' s1 s2
-    flatStmtMapper (Timing sense stmt) = return $ Timing sense stmt
+    flatStmtMapper (Timing event stmt) = return $ Timing event stmt
+    flatStmtMapper (Subroutine f exprs) =
+        mapM exprMapper exprs >>= return . Subroutine f
     flatStmtMapper (Return expr) =
         exprMapper expr >>= return . Return
     flatStmtMapper (Null) = return Null
@@ -252,6 +257,8 @@ traverseExprsM mapper = moduleItemMapper
         exprMapper expr >>= return . Assign lhs
     moduleItemMapper (AlwaysC kw stmt) =
         stmtMapper stmt >>= return . AlwaysC kw
+    moduleItemMapper (Initial stmt) =
+        stmtMapper stmt >>= return . Initial
     moduleItemMapper (Function lifetime ret f decls stmts) = do
         decls' <- mapM declMapper decls
         stmts' <- mapM stmtMapper stmts

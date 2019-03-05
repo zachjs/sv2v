@@ -12,6 +12,7 @@ module Language.SystemVerilog.AST
   , BinOp      (..)
   , AsgnOp     (..)
   , Sense      (..)
+  , Timing     (..)
   , GenItem    (..)
   , AlwaysKW   (..)
   , CaseKW     (..)
@@ -156,10 +157,8 @@ data ModuleItem
   | Genvar     Identifier
   | Generate   [GenItem]
   | Modport    Identifier [ModportDecl]
+  | Initial    Stmt
   deriving Eq
-
--- "function inputs and outputs are inferred to be of type reg if no internal
--- data types for the ports are declared"
 
 data AlwaysKW
   = Always
@@ -189,7 +188,8 @@ instance Show ModuleItem where
     Function   ml t x i b -> printf "function %s%s%s;\n%s\n%s\nendfunction" (showLifetime ml) (showPad t) x (indent $ show i) (indent $ unlines' $ map show b)
     Genvar     x -> printf "genvar %s;" x
     Generate   b -> printf "generate\n%s\nendgenerate" (indent $ unlines' $ map show b)
-    Modport    x l  -> printf "modport %s(\n%s\n);" x (indent $ intercalate ",\n" $ map showModportDecl l)
+    Modport    x l   -> printf "modport %s(\n%s\n);" x (indent $ intercalate ",\n" $ map showModportDecl l)
+    Initial    s     -> printf "initial %s" (show s)
     where
     showMaybePorts = maybe "(.*)" showPorts
     showPorts :: [PortBinding] -> String
@@ -401,8 +401,9 @@ data Stmt
   | AsgnBlk LHS Expr
   | Asgn    LHS Expr
   | If      Expr Stmt Stmt
-  | Timing  Sense Stmt
+  | Timing  Timing Stmt
   | Return  Expr
+  | Subroutine Identifier [Expr]
   | Null
   deriving Eq
 
@@ -431,9 +432,11 @@ instance Show Stmt where
   show (If a b Null) = printf "if (%s) %s"         (show a) (show b)
   show (If a b c   ) = printf "if (%s) %s\nelse %s" (show a) (show b) (show c)
   show (Return e   ) = printf "return %s;" (show e)
-  show (Timing t s ) = printf "@(%s)%s" (show t) rest
+  show (Subroutine x a) = printf "%s(%s);" x (commas $ map show a)
+  show (Timing t s ) = printf "%s%s" (show t) rest
     where
       rest = case s of
+        Null -> ";"
         Block _ _ -> " " ++   (show s)
         _ -> "\n" ++ (indent $ show s)
   show (Null       ) = ";"
@@ -442,6 +445,17 @@ type Case = ([Expr], Stmt)
 
 showCase :: (Show x, Show y) => ([x], y) -> String
 showCase (a, b) = printf "%s: %s" (commas $ map show a) (show b)
+
+data Timing
+  = Event Sense
+  | Delay Expr
+  | Cycle Expr
+  deriving Eq
+
+instance Show Timing where
+  show (Event s) = printf  "@(%s)" (show s)
+  show (Delay e) = printf  "#(%s)" (show e)
+  show (Cycle e) = printf "##(%s)" (show e)
 
 data Sense
   = Sense        LHS

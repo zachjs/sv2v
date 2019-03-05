@@ -265,23 +265,31 @@ Identifiers :: { [Identifier] }
 
 -- uses delimiter propagation hack to avoid conflicts
 DeclTokens(delim) :: { [DeclToken] }
-  : DeclToken                delim  { [$1] }
-  | DeclToken     DeclTokens(delim) { [$1] ++ $2 }
-  | "="  Expr "," DeclTokens(delim) { [DTAsgn     $2, DTComma] ++ $4 }
-  | "<=" Expr "," DeclTokens(delim) { [DTAsgnNBlk $2, DTComma] ++ $4 }
-  | "="  Expr                delim  { [DTAsgn     $2] }
-  | "<=" Expr                delim  { [DTAsgnNBlk $2] }
+  : DeclToken               delim  { [$1] }
+  | DeclToken    DeclTokens(delim) { [$1] ++ $2 }
+  | "=" Expr "," DeclTokens(delim) { [DTAsgn $2, DTComma] ++ $4 }
+  | "=" Expr                delim  { [DTAsgn $2] }
 DeclToken :: { DeclToken }
+  : DeclOrStmtToken     { $1 }
+  | ParameterBindings   { DTParams   $1 }
+  | ModuleInstantiation { DTInstance $1 }
+
+DeclOrStmtTokens(delim) :: { [DeclToken] }
+  : DeclOrStmtToken                  delim  { [$1] }
+  | DeclOrStmtToken DeclOrStmtTokens(delim) { [$1] ++ $2 }
+  | "="  Expr ","   DeclOrStmtTokens(delim) { [DTAsgn     $2, DTComma] ++ $4 }
+  | "<=" Expr ","   DeclOrStmtTokens(delim) { [DTAsgnNBlk $2, DTComma] ++ $4 }
+  | "="  Expr                        delim  { [DTAsgn     $2] }
+  | "<=" Expr                        delim  { [DTAsgnNBlk $2] }
+DeclOrStmtToken :: { DeclToken }
   : ","                       { DTComma }
-  | Range                     { DTRange    $1 }
-  | Identifier                { DTIdent    $1 }
-  | Direction                 { DTDir      $1 }
-  | ParameterBindings         { DTParams   $1 }
-  | ModuleInstantiation       { DTInstance $1 }
-  | PartialType               { DTType $1 }
+  | Range                     { DTRange  $1 }
+  | Identifier                { DTIdent  $1 }
+  | Direction                 { DTDir    $1 }
+  | "[" Expr "]"              { DTBit    $2 }
+  | "{" LHSs "}"              { DTConcat $2 }
+  | PartialType               { DTType   $1 }
   | Identifier "." Identifier { DTType $ InterfaceT $1 (Just $3) }
-  | "[" Expr "]"              { DTBit      $2 }
-  | "{" LHSs "}"              { DTConcat   $2 }
 
 VariablePortIdentifiers :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifier                             { [$1] }
@@ -306,6 +314,7 @@ ModuleItem :: { [ModuleItem] }
   | "localparam" ParamType DeclAsgns ";" { map MIDecl $ map (uncurry $ Localparam $2) $3 }
   | "assign" LHS "=" Expr ";"            { [Assign $2 $4] }
   | AlwaysKW Stmt                        { [AlwaysC $1 $2] }
+  | "initial" Stmt                       { [Initial $2] }
   | "genvar" Identifiers ";"             { map Genvar $2 }
   | "generate" GenItems "endgenerate"    { [Generate $2] }
   | "modport" ModportItems ";"           { map (uncurry Modport) $2 }
@@ -338,13 +347,6 @@ ParamType :: { Type }
   : Dimensions { Implicit $1 }
   | "integer"  { IntegerT }
 
-EventControl :: { Sense }
-  : "@" "(" Sense ")" { $3 }
-  | "@" "(" "*"   ")" { SenseStar }
-  | "@" "(*)"         { SenseStar }
-  | "@" "*"           { SenseStar }
-  | "@*"              { SenseStar }
-
 Dimensions :: { [Range] }
   : {- empty -}        { [] }
   | DimensionsNonEmpty { $1 }
@@ -372,15 +374,6 @@ LHSs :: { [LHS] }
   : LHS           { [$1] }
   | LHSs "," LHS  { $1 ++ [$3] }
 
-Sense :: { Sense }
-:            Sense1 { $1 }
-| Sense "or" Sense1 { SenseOr $1 $3 }
-
-Sense1 :: { Sense }
-:           LHS { Sense        $1 }
-| "posedge" LHS { SensePosedge $2 }
-| "negedge" LHS { SenseNegedge $2 }
-
 Bindings :: { [(Identifier, Maybe Expr)] }
   : {- empty -}      { [] }
   | BindingsNonEmpty { $1 }
@@ -403,6 +396,7 @@ Stmt :: { Stmt }
   : StmtNonAsgn       { $1 }
   | LHS "="  Expr ";" { AsgnBlk $1 $3 }
   | LHS "<=" Expr ";" { Asgn    $1 $3 }
+  | Identifier    ";" { Subroutine $1 [] }
 StmtNonAsgn :: { Stmt }
   : ";" { Null }
   | "begin"                        Stmts "end" { Block Nothing             $2 }
@@ -411,17 +405,38 @@ StmtNonAsgn :: { Stmt }
   | "if" "(" Expr ")" Stmt %prec NoElse        { If $3 $5 Null      }
   | "for" "(" Identifier "=" Expr ";" Expr ";" Identifier "=" Expr ")" Stmt { For ($3, $5) $7 ($9, $11) $13 }
   | Unique CaseKW "(" Expr ")" Cases opt(CaseDefault) "endcase" { Case $1 $2 $4 $6 $7 }
-  | EventControl Stmt                          { Timing $1 $2 }
+  | TimingControl Stmt                         { Timing $1 $2 }
   | "return" Expr ";"                          { Return $2 }
+  | Identifier "(" CallArgs ")" ";"            { Subroutine $1 $3 }
 
 DeclsAndStmts :: { ([Decl], [Stmt]) }
   : DeclOrStmt DeclsAndStmts { combineDeclsAndStmts $1 $2 }
   | StmtNonAsgn Stmts        { ([], $1 : $2) }
   | {- empty -}              { ([], []) }
 DeclOrStmt :: { ([Decl], [Stmt]) }
-  : DeclTokens(";") { parseDTsAsDeclOrAsgn $1 }
+  : DeclOrStmtTokens(";") { parseDTsAsDeclOrAsgn $1 }
   | "parameter"  ParamType DeclAsgns ";" { (map (uncurry $ Parameter  $2) $3, []) }
   | "localparam" ParamType DeclAsgns ";" { (map (uncurry $ Localparam $2) $3, []) }
+
+TimingControl :: { Timing }
+  : DelayControl { $1 }
+  | CycleDelay   { $1 }
+  | EventControl { $1 }
+DelayControl :: { Timing }
+  : "#"  Expr { Delay $2 }
+CycleDelay :: { Timing }
+  : "##" Expr { Cycle $2 }
+EventControl :: { Timing }
+  : "@" "(" Senses ")" { Event $3 }
+  | "@" "(*)"          { Event SenseStar }
+  | "@*"               { Event SenseStar }
+Senses :: { Sense }
+  : Sense             { $1 }
+  | Senses "or" Sense { SenseOr $1 $3 }
+Sense :: { Sense }
+  :           LHS { Sense        $1 }
+  | "posedge" LHS { SensePosedge $2 }
+  | "negedge" LHS { SenseNegedge $2 }
 
 Unique :: { Bool }
   : "unique"    { True  }
@@ -449,8 +464,11 @@ String :: { String }
   : string { tail $ init $ tokenString $1 }
 
 CallArgs :: { [Expr] }
-  :              Expr  { [$1] }
-  | CallArgs "," Expr  { $1 ++ [$3] }
+  : {- empty -}      { [] }
+  | CallArgsNonEmpty { $1 }
+CallArgsNonEmpty :: { [Expr] }
+  : Expr                      { [$1] }
+  | CallArgsNonEmpty "," Expr { $1 ++ [$3] }
 
 Exprs :: { [Expr] }
 :           Expr  { [$1] }
