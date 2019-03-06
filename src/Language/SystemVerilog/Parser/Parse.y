@@ -322,7 +322,7 @@ ModuleItem :: { [ModuleItem] }
   | "genvar" Identifiers ";"             { map Genvar $2 }
   | "generate" GenItems "endgenerate"    { [Generate $2] }
   | "modport" ModportItems ";"           { map (uncurry Modport) $2 }
-  | "function" opt(Lifetime) FuncRetAndName FunctionItems DeclsAndStmts "endfunction" opt(Tag) { [Function $2 (fst $3) (snd $3) ($4 ++ fst $5) (snd $5)] }
+  | "function" opt(Lifetime) FuncRetAndName FunctionItems DeclsAndStmts "endfunction" opt(Tag) { [Function $2 (fst $3) (snd $3) (map defaultFuncInput $ $4 ++ fst $5) (snd $5)] }
 
 FuncRetAndName :: { (Type, Identifier) }
   : {- empty -}        Identifier { (Implicit [], $1) }
@@ -615,5 +615,10 @@ combineDeclsAndStmts (a1, b1) (a2, b2) = (a1 ++ a2, b1 ++ b2)
 makeInput :: Decl -> Decl
 makeInput (Variable _ t x a me) = Variable Input t x a me
 makeInput other = error $ "unexpected non-var decl: " ++ (show other)
+
+defaultFuncInput :: Decl -> Decl
+defaultFuncInput (Variable Input (Implicit rs) x a me) =
+  Variable Input (Logic rs) x a me
+defaultFuncInput other = other
 
 }
