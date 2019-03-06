@@ -36,6 +36,10 @@ module Convert.Traverse
 , traverseGenItemsM
 , traverseGenItems
 , collectGenItemsM
+, traverseAsgnsM
+, traverseAsgns
+, collectAsgnsM
+, traverseNestedStmts
 ) where
 
 import Data.Maybe (fromJust)
@@ -339,8 +343,25 @@ traverseTypesM :: Monad m => MapperM m Type -> MapperM m ModuleItem
 traverseTypesM mapper item =
     miMapper item >>= traverseDeclsM declMapper >>= traverseExprsM exprMapper
     where
+        fullMapper t = tm t >>= mapper
+        tm (Reg      r) = return $ Reg      r
+        tm (Wire     r) = return $ Wire     r
+        tm (Logic    r) = return $ Logic    r
+        tm (Alias x  r) = return $ Alias  x r
+        tm (Implicit r) = return $ Implicit r
+        tm (IntegerT  ) = return $ IntegerT
+        tm (InterfaceT x my r) = return $ InterfaceT x my r
+        tm (Enum Nothing vals r) =
+            return $ Enum Nothing vals r
+        tm (Enum (Just t) vals r) = do
+            t' <- fullMapper t
+            return $ Enum (Just t') vals r
+        tm (Struct p fields r) = do
+            types <- mapM fullMapper $ map fst fields
+            let idents = map snd fields
+            return $ Struct p (zip types idents) r
         exprMapper (Cast t e) = do
-            t' <- mapper t
+            t' <- fullMapper t
             -- TODO HACK: If the cast type is no longer "simple", we just drop
             -- the case altogether. This probably doesn't work great in all
             -- cases.
@@ -349,13 +370,13 @@ traverseTypesM mapper item =
                 else Cast t' e
         exprMapper other = return other
         declMapper (Parameter  t x    e) =
-            mapper t >>= \t' -> return $ Parameter  t' x   e
+            fullMapper t >>= \t' -> return $ Parameter  t' x   e
         declMapper (Localparam t x    e) =
-            mapper t >>= \t' -> return $ Localparam t' x   e
+            fullMapper t >>= \t' -> return $ Localparam t' x   e
         declMapper (Variable d t x a me) =
-            mapper t >>= \t' -> return $ Variable d t' x a me
+            fullMapper t >>= \t' -> return $ Variable d t' x a me
         miMapper (Function l t x d s) =
-            mapper t >>= \t' -> return $ Function l t' x d s
+            fullMapper t >>= \t' -> return $ Function l t' x d s
         miMapper other = return other
 
 traverseTypes :: Mapper Type -> Mapper ModuleItem
@@ -398,3 +419,30 @@ traverseNestedGenItemsM mapper = fullMapper
         gim (GenModuleItem moduleItem) =
             return $ GenModuleItem moduleItem
         gim (GenNull) = return GenNull
+
+traverseAsgnsM :: Monad m => MapperM m (LHS, Expr) -> MapperM m ModuleItem
+traverseAsgnsM mapper = moduleItemMapper
+    where
+        moduleItemMapper item = miMapperA item >>= miMapperB
+
+        miMapperA (Assign lhs expr) = do
+            (lhs', expr') <- mapper (lhs, expr)
+            return $ Assign lhs' expr'
+        miMapperA other = return other
+
+        miMapperB = traverseStmtsM stmtMapper
+        stmtMapper (AsgnBlk lhs expr) = do
+            (lhs', expr') <- mapper (lhs, expr)
+            return $ AsgnBlk lhs' expr'
+        stmtMapper (Asgn    lhs expr) = do
+            (lhs', expr') <- mapper (lhs, expr)
+            return $ Asgn    lhs' expr'
+        stmtMapper other = return other
+
+traverseAsgns :: Mapper (LHS, Expr) -> Mapper ModuleItem
+traverseAsgns = unmonad traverseAsgnsM
+collectAsgnsM :: Monad m => CollectorM m (LHS, Expr) -> CollectorM m ModuleItem
+collectAsgnsM = collectify traverseAsgnsM
+
+traverseNestedStmts :: Mapper Stmt -> Mapper Stmt
+traverseNestedStmts = unmonad traverseNestedStmtsM

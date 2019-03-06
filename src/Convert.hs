@@ -15,8 +15,10 @@ import qualified Convert.CaseKW
 import qualified Convert.Enum
 import qualified Convert.Logic
 import qualified Convert.PackedArray
+import qualified Convert.Return
 import qualified Convert.SplitPortDecl
 import qualified Convert.StarPort
+import qualified Convert.Struct
 import qualified Convert.Typedef
 import qualified Convert.Unique
 
@@ -28,6 +30,8 @@ phases YOSYS =
     , Convert.Enum.convert
     , Convert.PackedArray.convert
     , Convert.StarPort.convert
+    , Convert.Struct.convert
+    , Convert.Return.convert
     , Convert.Typedef.convert
     , Convert.Unique.convert
     ]

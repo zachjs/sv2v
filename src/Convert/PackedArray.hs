@@ -29,7 +29,6 @@
 
 module Convert.PackedArray (convert) where
 
-import Text.Read (readMaybe)
 import Control.Monad.State
 import Data.List (partition)
 import qualified Data.Set as Set
@@ -174,7 +173,7 @@ unflattener writeToFlatVariant arr (t, (majorHi, majorLo)) =
         arrUnflat = prefix arr
         index = prefix "_tmp_index"
         (minorHi, minorLo) = head $ snd $ typeRanges t
-        size = simplify $ BinOp Add (BinOp Sub minorHi minorLo) (Number "1")
+        size = rangeSize (minorHi, minorLo)
         localparam :: Identifier -> Expr -> GenItem
         localparam x v = GenModuleItem $ MIDecl $ Localparam (Implicit []) x v
         origRange = ( (BinOp Add (Ident startBit)
@@ -184,28 +183,6 @@ unflattener writeToFlatVariant arr (t, (majorHi, majorLo)) =
 typeIsImplicit :: Type -> Bool
 typeIsImplicit (Implicit _) = True
 typeIsImplicit _ = False
-
--- basic expression simplfication utility to help us generate nicer code in the
--- common case of ranges like `[FOO-1:0]`
-simplify :: Expr -> Expr
-simplify (BinOp op e1 e2) =
-    case (op, e1', e2') of
-        (Add, Number "0", e) -> e
-        (Add, e, Number "0") -> e
-        (Sub, e, Number "0") -> e
-        (Add, BinOp Sub e (Number "1"), Number "1") -> e
-        (Add, e, BinOp Sub (Number "0") (Number "1")) -> BinOp Sub e (Number "1")
-        (_  , Number a, Number b) ->
-            case (op, readMaybe a :: Maybe Int, readMaybe b :: Maybe Int) of
-                (Add, Just x, Just y) -> Number $ show (x + y)
-                (Sub, Just x, Just y) -> Number $ show (x - y)
-                (Mul, Just x, Just y) -> Number $ show (x * y)
-                _ -> BinOp op e1' e2'
-        _ -> BinOp op e1' e2'
-    where
-        e1' = simplify e1
-        e2' = simplify e2
-simplify other = other
 
 -- prefix a string with a namespace of sorts
 prefix :: Identifier -> Identifier
@@ -220,8 +197,8 @@ flattenRanges rs =
     where
         (s1, e1) = head rs
         (s2, e2) = head $ tail rs
-        size1 = BinOp Add (BinOp Sub s1 e1) (Number "1")
-        size2 = BinOp Add (BinOp Sub s2 e2) (Number "1")
+        size1 = rangeSize (s1, e1)
+        size2 = rangeSize (s2, e2)
         upper = BinOp Add (BinOp Mul size1 size2) (BinOp Sub e1 (Number "1"))
         r' = (simplify upper, e1)
         rs' = (tail $ tail rs) ++ [r']
@@ -254,7 +231,7 @@ rewriteModuleItem info =
                 else Range (Ident i) r
             where
                 (a, b) = head $ snd $ typeRanges $ fst $ typeDims Map.! i
-                size = BinOp Add (BinOp Sub a b) (Number "1")
+                size = rangeSize (a, b)
                 s' = BinOp Sub (BinOp Mul size (BinOp Add s (Number "1"))) (Number "1")
                 e' = BinOp Mul size e
                 r' = (simplify s', simplify e')

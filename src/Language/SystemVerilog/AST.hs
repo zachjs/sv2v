@@ -26,11 +26,14 @@ module Language.SystemVerilog.AST
   , Range
   , GenCase
   , typeRanges
+  , simplify
+  , rangeSize
   ) where
 
 import Data.List
 import Data.Maybe
 import Text.Printf
+import Text.Read (readMaybe)
 
 type Identifier = String
 
@@ -119,10 +122,13 @@ instance Show Type where
       showItem (t, x) = printf "%s %s;" (show t) x
 
 instance Show ([Range] -> Type) where
-    show tf = show (tf [])
+  show tf = show (tf [])
 
 instance Eq ([Range] -> Type) where
-    (==) tf1 tf2 = (show $ tf1 []) == (show $ tf2 [])
+  (==) tf1 tf2 = (tf1 []) == (tf2 [])
+
+instance Ord ([Range] -> Type) where
+  compare tf1 tf2 = compare (show tf1) (show tf2)
 
 typeRanges :: Type -> ([Range] -> Type, [Range])
 typeRanges (Reg      r) = (Reg     , r)
@@ -130,7 +136,7 @@ typeRanges (Wire     r) = (Wire    , r)
 typeRanges (Logic    r) = (Logic   , r)
 typeRanges (Alias  t r) = (Alias  t, r)
 typeRanges (Implicit r) = (Implicit, r)
-typeRanges (IntegerT  ) = (error "ranges cannot be applied to IntegerT", [])
+typeRanges (IntegerT  ) = (\[] -> IntegerT, [])
 typeRanges (Enum t v r) = (Enum t v, r)
 typeRanges (Struct p l r) = (Struct p l, r)
 typeRanges (InterfaceT x my r) = (InterfaceT x my, r)
@@ -523,3 +529,29 @@ instance Show Lifetime where
 showLifetime :: Maybe Lifetime -> String
 showLifetime Nothing = ""
 showLifetime (Just l) = show l ++ " "
+
+-- basic expression simplfication utility to help us generate nicer code in the
+-- common case of ranges like `[FOO-1:0]`
+simplify :: Expr -> Expr
+simplify (BinOp op e1 e2) =
+    case (op, e1', e2') of
+        (Add, Number "0", e) -> e
+        (Add, e, Number "0") -> e
+        (Sub, e, Number "0") -> e
+        (Add, BinOp Sub e (Number "1"), Number "1") -> e
+        (Add, e, BinOp Sub (Number "0") (Number "1")) -> BinOp Sub e (Number "1")
+        (_  , Number a, Number b) ->
+            case (op, readMaybe a :: Maybe Int, readMaybe b :: Maybe Int) of
+                (Add, Just x, Just y) -> Number $ show (x + y)
+                (Sub, Just x, Just y) -> Number $ show (x - y)
+                (Mul, Just x, Just y) -> Number $ show (x * y)
+                _ -> BinOp op e1' e2'
+        _ -> BinOp op e1' e2'
+    where
+        e1' = simplify e1
+        e2' = simplify e2
+simplify other = other
+
+rangeSize :: Range -> Expr
+rangeSize (s, e) =
+    simplify $ BinOp Add (BinOp Sub s e) (Number "1")
