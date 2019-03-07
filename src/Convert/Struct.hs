@@ -139,7 +139,7 @@ convertAsgn structs types (lhs, expr) =
                 rs' = r : tail rs
         convertLHS (LHSDot    l x ) =
             case t of
-                InterfaceT _ _ _ -> (Implicit [], l')
+                InterfaceT _ _ _ -> (Implicit [], LHSDot l' x)
                 Struct _ _ _ -> case Map.lookup structTf structs of
                     Nothing -> (fieldType, LHSDot l' x)
                     Just (structT, m) -> (tf [tr], LHSRange l' r)
