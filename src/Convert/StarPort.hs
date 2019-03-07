@@ -22,11 +22,18 @@ convert descriptions =
         getPorts _ = return ()
 
         mapInstance :: ModuleItem -> ModuleItem
-        mapInstance (Instance m p x Nothing) =
-            Instance m p x (Just portBindings)
+        mapInstance (Instance m p x bindings) =
+            Instance m p x $ concatMap expandBinding bindings
             where
-                ports = case Map.lookup m modulePorts of
-                    Nothing -> error $ "could not convert `.*` in instantiation of " ++ m
-                    Just l -> l
-                portBindings = map (\port -> (port, Just $ Ident port)) ports
+                alreadyBound :: [Identifier]
+                alreadyBound = map fst bindings
+                expandBinding :: PortBinding -> [PortBinding]
+                expandBinding ("*", Nothing) =
+                    case Map.lookup m modulePorts of
+                        Just l ->
+                            map (\port -> (port, Just $ Ident port)) $
+                            filter (\s -> not $ elem s alreadyBound) $ l
+                        -- if we can't find it, just skip :(
+                        Nothing -> [("*", Nothing)]
+                expandBinding other = [other]
         mapInstance other = other

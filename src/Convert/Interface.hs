@@ -73,12 +73,12 @@ convertDescription interfaces (Part Module name ports items) =
                 mapper = \(dir, port, Just expr) ->
                     Variable dir (lookupType interfaceItems expr)
                     (ident ++ "_" ++ port) [] Nothing
-        mapInterface (Instance part params ident (Just instancePorts)) =
+        mapInterface (Instance part params ident instancePorts) =
             case Map.lookup part interfaces of
                 Just interface ->
                     Generate $ map GenModuleItem $
                     inlineInterface interface (ident, expandedPorts)
-                Nothing -> Instance part params ident (Just expandedPorts)
+                Nothing -> Instance part params ident expandedPorts
             where expandedPorts = concatMap expandPortBinding instancePorts
         mapInterface other = other
 

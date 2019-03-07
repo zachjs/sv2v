@@ -45,7 +45,6 @@ module Convert.Traverse
 , traverseNestedStmts
 ) where
 
-import Data.Maybe (fromJust)
 import Control.Monad.State
 import Language.SystemVerilog.AST
 
@@ -302,12 +301,9 @@ traverseExprsM mapper = moduleItemMapper
         decls' <- mapM declMapper decls
         stmts' <- mapM stmtMapper stmts
         return $ MIPackageItem $ Task lifetime f decls' stmts'
-    moduleItemMapper (Instance m params x ml) = do
-        if ml == Nothing
-            then return $ Instance m params x Nothing
-            else do
-                l <- mapM portBindingMapper (fromJust ml)
-                return $ Instance m params x (Just l)
+    moduleItemMapper (Instance m params x l) = do
+        l' <- mapM portBindingMapper l
+        return $ Instance m params x l'
     moduleItemMapper (Modport x l) =
         mapM modportDeclMapper l >>= return . Modport x
     moduleItemMapper (Genvar   x) = return $ Genvar   x

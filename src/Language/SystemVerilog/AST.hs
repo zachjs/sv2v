@@ -177,7 +177,7 @@ data ModuleItem
   = MIDecl     Decl
   | AlwaysC    AlwaysKW Stmt
   | Assign     LHS Expr
-  | Instance   Identifier [PortBinding] Identifier (Maybe [PortBinding]) -- `Nothing` represents `.*`
+  | Instance   Identifier [PortBinding] Identifier [PortBinding]
   | Genvar     Identifier
   | Generate   [GenItem]
   | Modport    Identifier [ModportDecl]
@@ -207,18 +207,18 @@ instance Show ModuleItem where
     AlwaysC    k b   -> printf "%s %s" (show k) (show b)
     Assign     a b   -> printf "assign %s = %s;" (show a) (show b)
     Instance   m params i ports
-      | null params -> printf "%s %s%s;"     m                    i (showMaybePorts ports)
-      | otherwise   -> printf "%s #%s %s%s;" m (showPorts params) i (showMaybePorts ports)
+      | null params -> printf "%s %s%s;"     m                    i (showPorts ports)
+      | otherwise   -> printf "%s #%s %s%s;" m (showPorts params) i (showPorts ports)
     Genvar     x -> printf "genvar %s;" x
     Generate   b -> printf "generate\n%s\nendgenerate" (indent $ unlines' $ map show b)
     Modport    x l   -> printf "modport %s(\n%s\n);" x (indent $ intercalate ",\n" $ map showModportDecl l)
     Initial    s     -> printf "initial %s" (show s)
     MIPackageItem i  -> show i
     where
-    showMaybePorts = maybe "(.*)" showPorts
     showPorts :: [PortBinding] -> String
     showPorts ports = indentedParenList $ map showPort ports
     showPort :: PortBinding -> String
+    showPort ("*", Nothing) = ".*"
     showPort (i, arg) =
       if i == ""
         then show (fromJust arg)

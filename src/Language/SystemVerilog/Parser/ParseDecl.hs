@@ -53,7 +53,7 @@ data DeclToken
     | DTDir      Direction
     | DTType     ([Range] -> Type)
     | DTParams   [PortBinding]
-    | DTInstance (Identifier, Maybe [PortBinding])
+    | DTInstance (Identifier, [PortBinding])
     | DTBit      Expr
     | DTConcat   [LHS]
     deriving (Show, Eq)
