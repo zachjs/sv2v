@@ -19,9 +19,6 @@
  -    derive one from the other. The derivation direction is decided based on
  -    which version, if any, is exposed directly as a port.
  -
- - TODO FIXME XXX: The Parser/AST don't yet support indexing into an identifier
- - twice, or indexing into an identifier, and then selecting a range.
- -
  - TODO: This assumes that the first range index is the upper bound. We could
  - probably get around this with some cleverness in the generate block. I don't
  - think it's urgent to have support for "backwards" ranges.
@@ -210,23 +207,25 @@ rewriteModuleItem info =
     traverseStmts rewriteStmt .
     traverseExprs rewriteExpr
     where
-        Info typeDims portDirs idxUses seqUses = info
+        Info typeDims _ idxUses seqUses = info
         duoUses = Set.intersection idxUses seqUses
 
         rewriteIdent :: Bool -> Identifier -> Identifier
-        rewriteIdent isAsgn x =
-            if isDuod && (isOutputPort == isAsgn)
-                then prefix x
+        rewriteIdent isSeqUsage x =
+            if Set.member x duoUses
+                then
+                    -- if an array is used both ways, then the original name is
+                    -- the flattened version
+                    if isSeqUsage
+                        then x
+                        else prefix x
                 else x
-            where
-                isDuod = Set.member x duoUses
-                isOutputPort = Map.lookup x portDirs == Just Output
-        rewriteReadIdent = rewriteIdent False
-        rewriteAsgnIdent = rewriteIdent True
+        rewriteSeqIdent = rewriteIdent True
+        rewriteIdxIdent = rewriteIdent False
 
         rewriteExpr :: Expr -> Expr
-        rewriteExpr (Ident i) = Ident i
-        rewriteExpr (Bit   (Ident i) e) = Bit (Ident $ rewriteReadIdent i) e
+        rewriteExpr (Ident i) = Ident $ rewriteSeqIdent i
+        rewriteExpr (Bit   (Ident i) e) = Bit (Ident $ rewriteIdxIdent i) e
         rewriteExpr (Range (Ident i) (r @ (s, e))) =
             if Map.member i typeDims
                 then Range (Ident i) r'
@@ -240,9 +239,9 @@ rewriteModuleItem info =
         rewriteExpr other = other
 
         rewriteLHS :: LHS -> LHS
-        rewriteLHS (LHSIdent x  ) = LHSIdent (rewriteAsgnIdent x)
-        rewriteLHS (LHSBit (LHSBit (LHSIdent x) a) b) =
-            LHSBit (LHSBit (LHSIdent $ rewriteReadIdent x) a) b
+        rewriteLHS (LHSIdent x  ) = LHSIdent (rewriteSeqIdent x)
+        rewriteLHS (LHSBit (LHSIdent x) e) =
+            LHSBit (LHSIdent $ rewriteIdxIdent x) e
         rewriteLHS (LHSBit   l e) = LHSBit   (rewriteLHS l) e
         rewriteLHS (LHSRange l r) = LHSRange (rewriteLHS l) r
         rewriteLHS (LHSDot   l x) = LHSDot   (rewriteLHS l) x
