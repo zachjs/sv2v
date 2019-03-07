@@ -239,9 +239,15 @@ takeType (DTIdent tn : rest) = (Alias tn, rest)
 takeType               rest  = (Implicit, rest)
 
 takeRanges :: [DeclToken] -> ([Range], [DeclToken])
-takeRanges (DTRange r : rest) = (r : rs, rest')
-    where (rs, rest') = takeRanges rest
-takeRanges rest = ([], rest)
+takeRanges [] = ([], [])
+takeRanges (token : tokens) =
+    case token of
+        DTRange r -> (r         : rs, rest          )
+        DTBit   s -> (asRange s : rs, rest          )
+        _         -> ([]            , token : tokens)
+    where
+        (rs, rest) = takeRanges tokens
+        asRange s = (simplify $ BinOp Sub s (Number "1"), Number "0")
 
 -- TODO: entrypoints besides `parseDTsAsDeclOrAsgn` should disallow `DTAsgnNBlk`
 -- Note: matching DTAsgnNBlk too is a bit of a hack to allow for tripLookahead

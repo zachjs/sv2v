@@ -355,8 +355,11 @@ Dimensions :: { [Range] }
   : {- empty -}        { [] }
   | DimensionsNonEmpty { $1 }
 DimensionsNonEmpty :: { [Range] }
-  : Range                    { [$1] }
-  | DimensionsNonEmpty Range { $1 ++ [$2] }
+  : Dimension                    { [$1] }
+  | DimensionsNonEmpty Dimension { $1 ++ [$2] }
+Dimension :: { Range }
+  : Range        { $1 }
+  | "[" Expr "]" { (simplify $  BinOp Sub $2 (Number "1"), Number "0") }
 
 DeclAsgns :: { [(Identifier, Expr)] }
   : DeclAsgn               { [$1] }
