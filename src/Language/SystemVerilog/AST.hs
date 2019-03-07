@@ -419,7 +419,7 @@ instance Show CaseKW where
   show CaseX = "casex"
 
 data Stmt
-  = Block   (Maybe (Identifier, [Decl])) [Stmt]
+  = Block   (Maybe Identifier) [Decl] [Stmt]
   | Case    Bool CaseKW Expr [Case] (Maybe Stmt)
   | For     (Identifier, Expr) Expr (Identifier, Expr) Stmt
   | AsgnBlk LHS Expr
@@ -439,14 +439,12 @@ commas :: [String] -> String
 commas = intercalate ", "
 
 instance Show Stmt where
-  show (Block header stmts) =
-    printf "begin%s\n%s\nend" extra (block stmts)
+  show (Block name decls stmts) =
+    printf "begin%s\n%s\n%s\nend" header (block decls) (block stmts)
     where
+      header = maybe "" (" : " ++) name
       block :: Show t => [t] -> String
       block = indent . unlines' . map show
-      extra = case header of
-        Nothing -> ""
-        Just (x, i) -> printf " : %s\n%s" x (block i)
   show (Case u kw e cs def) =
     printf "%s%s (%s)\n%s%s\nendcase" uniqStr (show kw) (show e) (indent $ unlines' $ map showCase cs) defStr
     where
@@ -469,7 +467,7 @@ instance Show Stmt where
     where
       rest = case s of
         Null -> ";"
-        Block _ _ -> " " ++   (show s)
+        Block _ _ _ -> " " ++   (show s)
         _ -> "\n" ++ (indent $ show s)
   show (Null       ) = ";"
 

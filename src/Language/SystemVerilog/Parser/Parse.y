@@ -411,8 +411,8 @@ Stmt :: { Stmt }
   | Identifier    ";" { Subroutine $1 [] }
 StmtNonAsgn :: { Stmt }
   : ";" { Null }
-  | "begin"                        Stmts "end" { Block Nothing             $2 }
-  | "begin" ":" Identifier DeclsAndStmts "end" { Block (Just ($3, fst $4)) (snd $4) }
+  | "begin"                DeclsAndStmts "end" { Block Nothing   (fst $2) (snd $2) }
+  | "begin" ":" Identifier DeclsAndStmts "end" { Block (Just $3) (fst $4) (snd $4) }
   | "if" "(" Expr ")" Stmt "else" Stmt         { If $3 $5 $7        }
   | "if" "(" Expr ")" Stmt %prec NoElse        { If $3 $5 Null      }
   | "for" "(" Identifier "=" Expr ";" Expr ";" Identifier "=" Expr ")" Stmt { For ($3, $5) $7 ($9, $11) $13 }

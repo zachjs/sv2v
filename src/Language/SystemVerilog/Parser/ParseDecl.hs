@@ -155,8 +155,9 @@ parseDTsAsDeclOrAsgn tokens =
             _ -> error $ "invalid block item decl or stmt: " ++ (show tokens)
         Just lhs = foldl takeLHSStep Nothing $ init tokens
         isAsgnToken :: DeclToken -> Bool
-        isAsgnToken (DTBit    _) = True
-        isAsgnToken (DTConcat _) = True
+        isAsgnToken (DTBit      _) = True
+        isAsgnToken (DTConcat   _) = True
+        isAsgnToken (DTAsgnNBlk _) = True
         isAsgnToken _ = False
 
 takeLHSStep :: Maybe LHS -> DeclToken -> Maybe LHS
@@ -267,7 +268,7 @@ takeComma _ = error "take comma encountered neither comma nor end of tokens"
 
 takeIdent :: [DeclToken] -> (Identifier, [DeclToken])
 takeIdent (DTIdent x : rest) = (x, rest)
-takeIdent _ = error "takeIdent didn't find identifier"
+takeIdent tokens = error $ "takeIdent didn't find identifier: " ++ show tokens
 
 
 isIdent :: DeclToken -> Bool

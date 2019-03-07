@@ -130,7 +130,8 @@ traverseNestedStmtsM :: Monad m => MapperM m Stmt -> MapperM m Stmt
 traverseNestedStmtsM mapper = fullMapper
     where
         fullMapper stmt = mapper stmt >>= cs
-        cs (Block decls stmts) = mapM fullMapper stmts >>= return . Block decls
+        cs (Block name decls stmts) =
+            mapM fullMapper stmts >>= return . Block name decls
         cs (Case u kw expr cases def) = do
             caseStmts <- mapM fullMapper $ map snd cases
             let cases' = zip (map fst cases) caseStmts
@@ -250,13 +251,9 @@ traverseExprsM mapper = moduleItemMapper
         exprs' <- mapM exprMapper exprs
         return (exprs', stmt)
     stmtMapper = traverseNestedStmtsM flatStmtMapper
-    flatStmtMapper (Block header stmts) = do
-        if header == Nothing
-            then return $ Block Nothing stmts
-            else do
-                let Just (name, decls) = header
-                decls' <- mapM declMapper decls
-                return $ Block (Just (name, decls')) stmts
+    flatStmtMapper (Block name decls stmts) = do
+        decls' <- mapM declMapper decls
+        return $ Block name decls' stmts
     flatStmtMapper (Case u kw e cases def) = do
         e' <- exprMapper e
         cases' <- mapM caseMapper cases
@@ -368,9 +365,9 @@ traverseDeclsM mapper item = do
             decls' <- mapM mapper decls
             return $ MIPackageItem $ Task l x decls' s
         miMapperA other = return other
-        miMapperB (Block (Just (name, decls)) stmts) = do
+        miMapperB (Block name decls stmts) = do
             decls' <- mapM mapper decls
-            return $ Block (Just (name, decls')) stmts
+            return $ Block name decls' stmts
         miMapperB other = return other
 
 traverseDecls :: Mapper Decl -> Mapper ModuleItem
