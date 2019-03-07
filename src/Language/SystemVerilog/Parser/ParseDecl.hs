@@ -185,8 +185,6 @@ finalize (dir, typ, trips) =
 -- internal; entrypoint of the critical portion of our parser
 parseDTsAsComponents :: [DeclToken] -> [Component]
 parseDTsAsComponents [] = []
-parseDTsAsComponents [DTDir dir, DTIdent ident] =
-    [(dir, Implicit [], [(ident, [], Nothing)])]
 parseDTsAsComponents l0 =
     component : parseDTsAsComponents l4
     where
@@ -238,9 +236,11 @@ takeDir (DTDir dir : rest) = (dir  , rest)
 takeDir              rest  = (Local, rest)
 
 takeType :: [DeclToken] -> ([Range] -> Type, [DeclToken])
-takeType (DTType  tf : rest) = (tf      , rest)
-takeType (DTIdent tn : rest) = (Alias tn, rest)
-takeType               rest  = (Implicit, rest)
+takeType (DTType  tf           : rest) = (tf      ,                        rest)
+takeType (DTIdent tn : DTComma : rest) = (Implicit, DTIdent tn : DTComma : rest)
+takeType (DTIdent tn           : [  ]) = (Implicit, DTIdent tn           : [  ])
+takeType (DTIdent tn           : rest) = (Alias tn,                        rest)
+takeType                         rest  = (Implicit,                        rest)
 
 takeRanges :: [DeclToken] -> ([Range], [DeclToken])
 takeRanges [] = ([], [])
