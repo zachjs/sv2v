@@ -147,9 +147,20 @@ traverseStmtLHSsM :: Monad m => MapperM m LHS -> MapperM m Stmt
 traverseStmtLHSsM mapper = traverseNestedStmtsM stmtMapper
     where
         fullMapper = traverseNestedLHSsM mapper
+        stmtMapper (Timing (Event sense) stmt) = do
+            sense' <- senseMapper sense
+            return $ Timing (Event sense') stmt
         stmtMapper (AsgnBlk lhs expr) = fullMapper lhs >>= \lhs' -> return $ AsgnBlk lhs' expr
         stmtMapper (Asgn    lhs expr) = fullMapper lhs >>= \lhs' -> return $ Asgn    lhs' expr
         stmtMapper other = return other
+        senseMapper (Sense        lhs) = fullMapper lhs >>= return . Sense
+        senseMapper (SensePosedge lhs) = fullMapper lhs >>= return . SensePosedge
+        senseMapper (SenseNegedge lhs) = fullMapper lhs >>= return . SenseNegedge
+        senseMapper (SenseOr    s1 s2) = do
+            s1' <- senseMapper s1
+            s2' <- senseMapper s2
+            return $ SenseOr s1' s2'
+        senseMapper (SenseStar       ) = return SenseStar
 
 traverseStmtLHSs :: Mapper LHS -> Mapper Stmt
 traverseStmtLHSs = unmonad traverseStmtLHSsM

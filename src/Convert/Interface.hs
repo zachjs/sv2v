@@ -6,7 +6,7 @@
 
 module Convert.Interface (convert) where
 
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, mapMaybe)
 import Control.Monad.Writer
 import qualified Data.Map.Strict as Map
 
@@ -33,36 +33,54 @@ convert descriptions =
         isInterface (Part Interface _ _ _) = True
         isInterface _ = False
 
--- TODO FIXME XXX: We should probably extract out/flatten the needless generate
--- blocks we make during covnersion...
-
 convertDescription :: Interfaces -> Description -> Description
-convertDescription interfaces (orig @ (Part Module name _ _)) =
+convertDescription interfaces (Part Module name ports items) =
     Part Module name ports' items'
     where
-        Part Module _ ports items = traverseModuleItems mapInstance orig
-        ports' = ports
-        items' = items
+        items' =
+            map (traverseNestedModuleItems $ traverseExprs convertExpr) $
+            map (traverseNestedModuleItems $ traverseLHSs  convertLHS) $
+            map (traverseNestedModuleItems mapInterface) $
+            items
+        ports' = concatMap convertPort ports
 
         -- collect the interface type of all interface instances in this module
-        instances = execWriter $ collectModuleItemsM collectInstance orig
-        collectInstance :: ModuleItem -> Writer Instances ()
-        collectInstance (Instance part _ ident _) =
+        (instances, modports) = execWriter $ mapM
+            (collectNestedModuleItemsM collectInterface) items
+        collectInterface :: ModuleItem -> Writer (Instances, Modports)  ()
+        collectInterface (MIDecl (Variable Local t ident _ _)) =
+            case t of
+                InterfaceT interfaceName (Just modportName) [] ->
+                    tell (Map.empty, Map.singleton ident modportDecls)
+                    where modportDecls = lookupModport Nothing interfaceName modportName
+                _ -> return ()
+        collectInterface (Instance part _ ident _) =
             if Map.member part interfaces
-                then tell $ Map.singleton ident part
+                then tell (Map.singleton ident part, Map.empty)
                 else return ()
-        collectInstance _ = return ()
+        collectInterface _ = return ()
 
         -- TODO: We don't yet handle interfaces with parameter bindings.
-        mapInstance :: ModuleItem -> ModuleItem
-        mapInstance (Instance part params ident (Just instancePorts)) =
+        mapInterface :: ModuleItem -> ModuleItem
+        mapInterface (orig @ (MIDecl (Variable Local t ident _ _))) =
+            case Map.lookup ident modports of
+                Just modportDecls -> Generate $
+                    map (GenModuleItem . MIDecl . mapper) modportDecls
+                Nothing -> orig
+            where
+                InterfaceT interfaceName (Just _) [] = t
+                interfaceItems = snd $ interfaces Map.! interfaceName
+                mapper = \(dir, port, Just expr) ->
+                    Variable dir (lookupType interfaceItems expr)
+                    (ident ++ "_" ++ port) [] Nothing
+        mapInterface (Instance part params ident (Just instancePorts)) =
             case Map.lookup part interfaces of
                 Just interface ->
                     Generate $ map GenModuleItem $
                     inlineInterface interface (ident, expandedPorts)
                 Nothing -> Instance part params ident (Just expandedPorts)
             where expandedPorts = concatMap expandPortBinding instancePorts
-        mapInstance other = other
+        mapInterface other = other
 
         expandPortBinding :: PortBinding -> [PortBinding]
         expandPortBinding (origBinding @ (portName, Just (Access (Ident instanceName) modportName))) =
@@ -71,22 +89,41 @@ convertDescription interfaces (orig @ (Part Module name _ _)) =
                 Just interfaceName ->
                     map mapper modportDecls
                     where
-                        modportDecls = lookupModport instanceName interfaceName modportName
+                        modportDecls = lookupModport (Just instanceName) interfaceName modportName
                         mapper (_, x, me) = (portName ++ "_" ++ x, me)
         expandPortBinding other = [other]
 
-        lookupModport :: Identifier -> Identifier -> Identifier -> [ModportDecl]
+        lookupModport :: Maybe Identifier -> Identifier -> Identifier -> [ModportDecl]
         lookupModport instanceName interfaceName = (Map.!) modportMap
             where
+                prefix = maybe "" (++ "_") instanceName
                 interfaceItems =
-                    map (prefixModuleItems $ instanceName ++ "_") $
+                    map (prefixModuleItems prefix) $
                     snd $ interfaces Map.! interfaceName
                 modportMap = execWriter $
                     mapM (collectNestedModuleItemsM collectModport) $
                     interfaceItems
                 collectModport :: ModuleItem -> Writer Modports ()
-                collectModport (Modport x l) = tell $ Map.singleton x l
+                collectModport (Modport ident l) = tell $ Map.singleton ident l
                 collectModport _ = return ()
+
+        convertExpr :: Expr -> Expr
+        convertExpr (orig @ (Access (Ident x) y)) =
+            if Map.member x modports
+                then Ident (x ++ "_" ++ y)
+                else orig
+        convertExpr other = other
+        convertLHS :: LHS -> LHS
+        convertLHS (orig @ (LHSDot (LHSIdent x) y)) =
+            if Map.member x modports
+                then LHSIdent (x ++ "_" ++ y)
+                else orig
+        convertLHS other = other
+        convertPort :: Identifier -> [Identifier]
+        convertPort ident =
+            case Map.lookup ident modports of
+                Nothing -> [ident]
+                Just decls -> map (\(_, x, _) -> ident ++ "_" ++ x) decls
 
 convertDescription _ other = other
 
@@ -108,6 +145,18 @@ prefixModuleItems prefix =
         prefixLHS :: LHS -> LHS
         prefixLHS (LHSIdent x) = LHSIdent (prefix ++ x)
         prefixLHS other = other
+
+-- TODO: this is an incomplete attempt at looking up the type of an expression;
+-- there is definitely some overlap here with the Struct conversion
+lookupType :: [ModuleItem] -> Expr -> Type
+lookupType items (Ident ident) =
+    head $ mapMaybe findType items
+    where
+        findType :: ModuleItem -> Maybe Type
+        findType (MIDecl (Variable _ t x [] Nothing)) =
+            if x == ident then Just t else Nothing
+        findType _ = Nothing
+lookupType _ expr = error $ "lookupType on fancy expr: " ++ show expr
 
 -- convert an interface instantiation into a series of equivalent module items
 inlineInterface :: Interface -> (Identifier, [PortBinding]) -> [ModuleItem]

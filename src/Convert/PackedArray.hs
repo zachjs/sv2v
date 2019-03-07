@@ -107,7 +107,9 @@ hoistPortDecls (Part kw name ports items) =
     where
         explode :: ModuleItem -> [ModuleItem]
         explode (Generate genItems) =
-            portDecls ++ [Generate rest]
+            if null rest
+                then portDecls
+                else portDecls ++ [Generate rest]
             where
                 (wrappedPortDecls, rest) = partition isPortDecl genItems
                 portDecls = map (\(GenModuleItem item) -> item) wrappedPortDecls

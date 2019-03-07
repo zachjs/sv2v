@@ -149,7 +149,7 @@ convertAsgn structs types (lhs, expr) =
                             hi' = BinOp Add base $ BinOp Sub hi lo
                             lo' = base
                             tr = (simplify hi', simplify lo')
-                _ -> error $ "convertLHS encountered dot for bad type: " ++ show l
+                _ -> error $ "convertLHS encountered dot for bad type: " ++ show (t, l, x)
             where
                 (t, l') = convertLHS l
                 Struct p fields [] = t
