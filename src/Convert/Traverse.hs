@@ -380,14 +380,8 @@ traverseTypesM mapper item =
             types <- mapM fullMapper $ map fst fields
             let idents = map snd fields
             return $ Struct p (zip types idents) r
-        exprMapper (Cast t e) = do
-            t' <- fullMapper t
-            -- TODO HACK: If the cast type is no longer "simple", we just drop
-            -- the case altogether. This probably doesn't work great in all
-            -- cases.
-            return $ if elem ' ' (show t')
-                then e
-                else Cast t' e
+        exprMapper (Cast t e) =
+            fullMapper t >>= \t' -> return $ Cast t' e
         exprMapper other = return other
         declMapper (Parameter  t x    e) =
             fullMapper t >>= \t' -> return $ Parameter  t' x   e

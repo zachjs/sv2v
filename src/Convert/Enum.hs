@@ -33,8 +33,10 @@ convertDescription (description @ (Part _ _ _ _)) =
     where
         enumPairs = concat $ map (uncurry enumVals) $ Set.toList enums
         enumItems = map (\(x, v) -> MIDecl $ Localparam (Implicit []) x v) enumPairs
-        (Part kw name ports items, enums) = runWriter $
-            traverseModuleItemsM (traverseTypesM traverseType) description
+        (Part kw name ports items, enums) =
+            runWriter $ traverseModuleItemsM (traverseTypesM traverseType) $
+            traverseModuleItems (traverseExprs traverseExpr) $
+            description
         traverseType :: Type -> Writer Enums Type
         traverseType (Enum t v r) = do
             () <- tell $ Set.singleton (t, v)
@@ -42,6 +44,11 @@ convertDescription (description @ (Part _ _ _ _)) =
             let (tf, rs) = typeRanges baseType
             return $ tf (rs ++ r)
         traverseType other = return other
+        -- drop any enum type casts in favor of implicit conversion from the
+        -- converted type
+        traverseExpr :: Expr -> Expr
+        traverseExpr (Cast (Enum _ _ _) e) = e
+        traverseExpr other = other
 convertDescription other = other
 
 enumVals :: Maybe Type -> [(Identifier, Maybe Expr)] -> [(Identifier, Expr)]
