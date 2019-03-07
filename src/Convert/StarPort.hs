@@ -18,7 +18,7 @@ convert descriptions =
     where
         modulePorts = execWriter $ collectDescriptionsM getPorts descriptions
         getPorts :: Description -> Writer (Map.Map Identifier [Identifier]) ()
-        getPorts (Part Module name ports _) = tell $ Map.singleton name ports
+        getPorts (Part _ name ports _) = tell $ Map.singleton name ports
         getPorts _ = return ()
 
         mapInstance :: ModuleItem -> ModuleItem

@@ -45,6 +45,7 @@ executable sv2v
     Convert.CaseKW
     Convert.Enum
     Convert.FuncRet
+    Convert.Interface
     Convert.Logic
     Convert.PackedArray
     Convert.Return

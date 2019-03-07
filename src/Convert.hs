@@ -14,6 +14,7 @@ import qualified Convert.AsgnOp
 import qualified Convert.CaseKW
 import qualified Convert.Enum
 import qualified Convert.FuncRet
+import qualified Convert.Interface
 import qualified Convert.Logic
 import qualified Convert.PackedArray
 import qualified Convert.Return
@@ -28,6 +29,7 @@ type Phase = AST -> AST
 phases :: Target -> [Phase]
 phases YOSYS =
     [ Convert.AsgnOp.convert
+    , Convert.Interface.convert
     , Convert.FuncRet.convert
     , Convert.Enum.convert
     , Convert.PackedArray.convert

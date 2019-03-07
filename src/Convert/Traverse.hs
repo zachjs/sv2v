@@ -39,6 +39,9 @@ module Convert.Traverse
 , traverseAsgnsM
 , traverseAsgns
 , collectAsgnsM
+, traverseNestedModuleItemsM
+, traverseNestedModuleItems
+, collectNestedModuleItemsM
 , traverseNestedStmts
 ) where
 
@@ -284,10 +287,16 @@ traverseExprsM mapper = moduleItemMapper
             else do
                 l <- mapM portBindingMapper (fromJust ml)
                 return $ Instance m params x (Just l)
+    moduleItemMapper (Modport x l) =
+        mapM modportDeclMapper l >>= return . Modport x
     moduleItemMapper (Comment  x) = return $ Comment  x
     moduleItemMapper (Genvar   x) = return $ Genvar   x
     moduleItemMapper (Generate x) = return $ Generate x
-    moduleItemMapper (Modport x l) = return $ Modport x l
+
+    modportDeclMapper (dir, ident, Just e) = do
+        e' <- exprMapper e
+        return (dir, ident, Just e')
+    modportDeclMapper other = return other
 
 traverseExprs :: Mapper Expr -> Mapper ModuleItem
 traverseExprs = unmonad traverseExprsM
@@ -443,6 +452,17 @@ traverseAsgns :: Mapper (LHS, Expr) -> Mapper ModuleItem
 traverseAsgns = unmonad traverseAsgnsM
 collectAsgnsM :: Monad m => CollectorM m (LHS, Expr) -> CollectorM m ModuleItem
 collectAsgnsM = collectify traverseAsgnsM
+
+traverseNestedModuleItemsM :: Monad m => MapperM m ModuleItem -> MapperM m ModuleItem
+traverseNestedModuleItemsM mapper item = do
+    Part Module "DNE" [] [item'] <-
+        traverseModuleItemsM mapper (Part Module "DNE" [] [item])
+    return item'
+
+traverseNestedModuleItems :: Mapper ModuleItem -> Mapper ModuleItem
+traverseNestedModuleItems = unmonad traverseNestedModuleItemsM
+collectNestedModuleItemsM :: Monad m => CollectorM m ModuleItem -> CollectorM m ModuleItem
+collectNestedModuleItemsM = collectify traverseNestedModuleItemsM
 
 traverseNestedStmts :: Mapper Stmt -> Mapper Stmt
 traverseNestedStmts = unmonad traverseNestedStmtsM
