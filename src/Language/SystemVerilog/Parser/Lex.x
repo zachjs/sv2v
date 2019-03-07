@@ -71,6 +71,7 @@ tokens :-
   "endgenerate"      { tok KW_endgenerate  }
   "endinterface"     { tok KW_endinterface }
   "endmodule"        { tok KW_endmodule    }
+  "endtask"          { tok KW_endtask      }
   "enum"             { tok KW_enum         }
   "for"              { tok KW_for          }
   "forever"          { tok KW_forever      }
@@ -98,6 +99,7 @@ tokens :-
   "return"           { tok KW_return       }
   "static"           { tok KW_static       }
   "struct"           { tok KW_struct       }
+  "task"             { tok KW_task         }
   "typedef"          { tok KW_typedef      }
   "unique"           { tok KW_unique       }
   "while"            { tok KW_while        }

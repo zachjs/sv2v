@@ -183,6 +183,8 @@ finalize (dir, typ, trips) =
 -- internal; entrypoint of the critical portion of our parser
 parseDTsAsComponents :: [DeclToken] -> [Component]
 parseDTsAsComponents [] = []
+parseDTsAsComponents [DTDir dir, DTIdent ident] =
+    [(dir, Implicit [], [(ident, [], Nothing)])]
 parseDTsAsComponents l0 =
     component : parseDTsAsComponents l4
     where

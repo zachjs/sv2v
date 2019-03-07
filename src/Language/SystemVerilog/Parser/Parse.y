@@ -36,6 +36,7 @@ import Language.SystemVerilog.Parser.Tokens
 "endgenerate"      { Token KW_endgenerate  _ _ }
 "endinterface"     { Token KW_endinterface _ _ }
 "endmodule"        { Token KW_endmodule    _ _ }
+"endtask"          { Token KW_endtask      _ _ }
 "enum"             { Token KW_enum         _ _ }
 "for"              { Token KW_for          _ _ }
 "forever"          { Token KW_forever      _ _ }
@@ -63,6 +64,7 @@ import Language.SystemVerilog.Parser.Tokens
 "return"           { Token KW_return       _ _ }
 "static"           { Token KW_static       _ _ }
 "struct"           { Token KW_struct       _ _ }
+"task"             { Token KW_task         _ _ }
 "typedef"          { Token KW_typedef      _ _ }
 "unique"           { Token KW_unique       _ _ }
 "while"            { Token KW_while        _ _ }
@@ -324,7 +326,8 @@ ModuleItem :: { [ModuleItem] }
 
 PackageItem :: { PackageItem }
   : "typedef" Type Identifier ";" { Typedef $2 $3 }
-  | "function" opt(Lifetime) FuncRetAndName FunctionItems DeclsAndStmts "endfunction" opt(Tag) { Function $2 (fst $3) (snd $3) (map defaultFuncInput $ $4 ++ fst $5) (snd $5) }
+  | "function" opt(Lifetime) FuncRetAndName TFItems DeclsAndStmts "endfunction" opt(Tag) { Function $2 (fst $3) (snd $3) (map defaultFuncInput $ (map makeInput $4) ++ fst $5) (snd $5) }
+  | "task" opt(Lifetime) Identifier TFItems DeclsAndStmts "endtask" opt(Tag) { Task $2 $3 (map defaultFuncInput $ $4 ++ fst $5) (snd $5) }
 
 FuncRetAndName :: { (Type, Identifier) }
   : {- empty -}        Identifier { (Implicit [], $1) }
@@ -345,8 +348,8 @@ ModuleInstantiation :: { (Identifier, Maybe [PortBinding]) }
   : Identifier "(" Bindings ")" { ($1, Just $3) }
   | Identifier "(" ".*"     ")" { ($1, Nothing) }
 
-FunctionItems :: { [Decl] }
-  : "(" DeclTokens(")") ";" { map makeInput $ parseDTsAsDecls $2 }
+TFItems :: { [Decl] }
+  : "(" DeclTokens(")") ";" { parseDTsAsDecls $2 }
   |                     ";" { [] }
 
 ParamType :: { Type }

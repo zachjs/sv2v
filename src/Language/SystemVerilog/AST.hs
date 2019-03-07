@@ -53,6 +53,7 @@ type AST = [Description]
 data PackageItem
   = Typedef Type Identifier
   | Function (Maybe Lifetime) Type Identifier [Decl] [Stmt]
+  | Task     (Maybe Lifetime)      Identifier [Decl] [Stmt]
   | Comment String
   deriving Eq
 
@@ -61,6 +62,10 @@ instance Show PackageItem where
   show (Function ml t x i b) =
     printf "function %s%s%s;\n%s\n%s\nendfunction"
       (showLifetime ml) (showPad t) x (indent $ show i)
+      (indent $ unlines' $ map show b)
+  show (Task ml x i b) =
+    printf "task %s%s;\n%s\n%s\nendtask"
+      (showLifetime ml) x (indent $ show i)
       (indent $ unlines' $ map show b)
   show (Comment c) = "// " ++ c
 

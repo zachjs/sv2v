@@ -110,6 +110,9 @@ traverseStmtsM mapper = moduleItemMapper
         moduleItemMapper (MIPackageItem (Function lifetime ret name decls stmts)) = do
             stmts' <- mapM fullMapper stmts
             return $ MIPackageItem $ Function lifetime ret name decls stmts'
+        moduleItemMapper (MIPackageItem (Task lifetime name decls stmts)) = do
+            stmts' <- mapM fullMapper stmts
+            return $ MIPackageItem $ Task lifetime name decls stmts'
         moduleItemMapper (Initial stmt) =
             fullMapper stmt >>= return . Initial
         moduleItemMapper other = return $ other
@@ -298,6 +301,10 @@ traverseExprsM mapper = moduleItemMapper
         decls' <- mapM declMapper decls
         stmts' <- mapM stmtMapper stmts
         return $ MIPackageItem $ Function lifetime ret f decls' stmts'
+    moduleItemMapper (MIPackageItem (Task lifetime f decls stmts)) = do
+        decls' <- mapM declMapper decls
+        stmts' <- mapM stmtMapper stmts
+        return $ MIPackageItem $ Task lifetime f decls' stmts'
     moduleItemMapper (Instance m params x ml) = do
         if ml == Nothing
             then return $ Instance m params x Nothing
@@ -357,6 +364,9 @@ traverseDeclsM mapper item = do
         miMapperA (MIPackageItem (Function l t x decls s)) = do
             decls' <- mapM mapper decls
             return $ MIPackageItem $ Function l t x decls' s
+        miMapperA (MIPackageItem (Task l x decls s)) = do
+            decls' <- mapM mapper decls
+            return $ MIPackageItem $ Task l x decls' s
         miMapperA other = return other
         miMapperB (Block (Just (name, decls)) stmts) = do
             decls' <- mapM mapper decls
@@ -400,6 +410,8 @@ traverseTypesM mapper item =
             fullMapper t >>= \t' -> return $ Variable d t' x a me
         miMapper (MIPackageItem (Function l t x d s)) =
             fullMapper t >>= \t' -> return $ MIPackageItem $ Function l t' x d s
+        miMapper (MIPackageItem (other @ (Task _ _ _ _))) =
+            return $ MIPackageItem other
         miMapper other = return other
 
 traverseTypes :: Mapper Type -> Mapper ModuleItem
