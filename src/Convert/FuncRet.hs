@@ -13,6 +13,6 @@ convert :: AST -> AST
 convert = traverseDescriptions $ traverseModuleItems convertFunction
 
 convertFunction :: ModuleItem -> ModuleItem
-convertFunction (Function ml (Logic r) f decls stmts) =
-    Function ml (Implicit r) f decls stmts
+convertFunction (MIPackageItem (Function ml (Logic r) f decls stmts)) =
+    MIPackageItem $ Function ml (Implicit r) f decls stmts
 convertFunction other = other

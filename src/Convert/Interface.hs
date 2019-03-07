@@ -161,7 +161,7 @@ lookupType _ expr = error $ "lookupType on fancy expr: " ++ show expr
 -- convert an interface instantiation into a series of equivalent module items
 inlineInterface :: Interface -> (Identifier, [PortBinding]) -> [ModuleItem]
 inlineInterface (ports, items) (instanceName, instancePorts) =
-    (:) (Comment $ "expanded instance: " ++ instanceName) $
+    (:) (MIPackageItem $ Comment $ "expanded instance: " ++ instanceName) $
     (++) portBindings $
     map (traverseNestedModuleItems removeModport) $
     map (traverseNestedModuleItems removeMIDeclDir) $
@@ -186,5 +186,6 @@ inlineInterface (ports, items) (instanceName, instancePorts) =
             MIDecl $ Variable Local t x a me
         removeMIDeclDir other = other
         removeModport :: ModuleItem -> ModuleItem
-        removeModport (Modport x _) = Comment $ "removed modport " ++ x
+        removeModport (Modport x _) =
+            MIPackageItem $ Comment $ "removed modport " ++ x
         removeModport other = other

@@ -109,7 +109,7 @@ collectDecl (Localparam t x _) = tell $ Map.singleton x t
 
 -- write down the return type of a function
 collectFunction :: ModuleItem -> Writer Types ()
-collectFunction (Function _ t f _ _) = tell $ Map.singleton f t
+collectFunction (MIPackageItem (Function _ t f _ _)) = tell $ Map.singleton f t
 collectFunction _ = return ()
 
 

@@ -2,6 +2,7 @@
 module Language.SystemVerilog.AST
   ( Identifier
   , Description(..)
+  , PackageItem(..)
   , ModuleItem (..)
   , Direction  (..)
   , Type       (..)
@@ -49,9 +50,23 @@ type Identifier = String
 
 type AST = [Description]
 
+data PackageItem
+  = Typedef Type Identifier
+  | Function (Maybe Lifetime) Type Identifier [Decl] [Stmt]
+  | Comment String
+  deriving Eq
+
+instance Show PackageItem where
+  show (Typedef t x) = printf "typedef %s %s;" (show t) x
+  show (Function ml t x i b) =
+    printf "function %s%s%s;\n%s\n%s\nendfunction"
+      (showLifetime ml) (showPad t) x (indent $ show i)
+      (indent $ unlines' $ map show b)
+  show (Comment c) = "// " ++ c
+
 data Description
   = Part PartKW Identifier [Identifier] [ModuleItem]
-  | Typedef Type Identifier
+  | PackageItem PackageItem
   deriving Eq
 
 instance Show Description where
@@ -65,7 +80,7 @@ instance Show Description where
         if null ports
           then ""
           else indentedParenList ports
-  show (Typedef t x) = printf "typedef %s %s;" (show t) x
+  show (PackageItem i) = show i
 
 data PartKW
   = Module
@@ -154,16 +169,15 @@ instance Show Decl where
   show (Variable d t x a me) = printf "%s%s %s%s%s;" (showPad d) (show t) x (showRanges a) (showAssignment me)
 
 data ModuleItem
-  = Comment    String
-  | MIDecl     Decl
+  = MIDecl     Decl
   | AlwaysC    AlwaysKW Stmt
   | Assign     LHS Expr
   | Instance   Identifier [PortBinding] Identifier (Maybe [PortBinding]) -- `Nothing` represents `.*`
-  | Function   (Maybe Lifetime) Type Identifier [Decl] [Stmt]
   | Genvar     Identifier
   | Generate   [GenItem]
   | Modport    Identifier [ModportDecl]
   | Initial    Stmt
+  | MIPackageItem PackageItem
   deriving Eq
 
 data AlwaysKW
@@ -184,18 +198,17 @@ type ModportDecl = (Direction, Identifier, Maybe Expr)
 
 instance Show ModuleItem where
   show thing = case thing of
-    Comment    c     -> "// " ++ c
     MIDecl     nest  -> show nest
     AlwaysC    k b   -> printf "%s %s" (show k) (show b)
     Assign     a b   -> printf "assign %s = %s;" (show a) (show b)
     Instance   m params i ports
       | null params -> printf "%s %s%s;"     m                    i (showMaybePorts ports)
       | otherwise   -> printf "%s #%s %s%s;" m (showPorts params) i (showMaybePorts ports)
-    Function   ml t x i b -> printf "function %s%s%s;\n%s\n%s\nendfunction" (showLifetime ml) (showPad t) x (indent $ show i) (indent $ unlines' $ map show b)
     Genvar     x -> printf "genvar %s;" x
     Generate   b -> printf "generate\n%s\nendgenerate" (indent $ unlines' $ map show b)
     Modport    x l   -> printf "modport %s(\n%s\n);" x (indent $ intercalate ",\n" $ map showModportDecl l)
     Initial    s     -> printf "initial %s" (show s)
+    MIPackageItem i  -> show i
     where
     showMaybePorts = maybe "(.*)" showPorts
     showPorts :: [PortBinding] -> String

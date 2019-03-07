@@ -13,8 +13,9 @@ convert :: AST -> AST
 convert = traverseDescriptions $ traverseModuleItems convertFunction
 
 convertFunction :: ModuleItem -> ModuleItem
-convertFunction (Function ml t f decls stmts) =
-    Function ml t f decls (map (traverseNestedStmts convertStmt) stmts)
+convertFunction (MIPackageItem (Function ml t f decls stmts)) =
+    MIPackageItem $ Function ml t f decls $
+    map (traverseNestedStmts convertStmt) stmts
     where
         convertStmt :: Stmt -> Stmt
         convertStmt (Return e) = AsgnBlk (LHSIdent f) e

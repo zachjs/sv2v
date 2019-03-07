@@ -184,15 +184,13 @@ opt(p) :: { Maybe a }
   |   { Nothing }
 
 Descriptions :: { [Description] }
-  : {- empty -}    { [] }
+  : {- empty -}              { [] }
+  | Descriptions ";"         { $1 }
   | Descriptions Description { $1 ++ [$2] }
 
 Description :: { Description }
-  : Part    opt(";") { $1 }
-  | Typedef opt(";") { $1 }
-
-Typedef :: { Description }
-  : "typedef" Type Identifier ";" { Typedef $2 $3 }
+  : Part        { $1 }
+  | PackageItem { PackageItem $1 }
 
 Type :: { Type }
   : PartialType Dimensions { $1 $2 }
@@ -322,7 +320,11 @@ ModuleItem :: { [ModuleItem] }
   | "genvar" Identifiers ";"             { map Genvar $2 }
   | "generate" GenItems "endgenerate"    { [Generate $2] }
   | "modport" ModportItems ";"           { map (uncurry Modport) $2 }
-  | "function" opt(Lifetime) FuncRetAndName FunctionItems DeclsAndStmts "endfunction" opt(Tag) { [Function $2 (fst $3) (snd $3) (map defaultFuncInput $ $4 ++ fst $5) (snd $5)] }
+  | PackageItem                          { [MIPackageItem $1] }
+
+PackageItem :: { PackageItem }
+  : "typedef" Type Identifier ";" { Typedef $2 $3 }
+  | "function" opt(Lifetime) FuncRetAndName FunctionItems DeclsAndStmts "endfunction" opt(Tag) { Function $2 (fst $3) (snd $3) (map defaultFuncInput $ $4 ++ fst $5) (snd $5) }
 
 FuncRetAndName :: { (Type, Identifier) }
   : {- empty -}        Identifier { (Implicit [], $1) }

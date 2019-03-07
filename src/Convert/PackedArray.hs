@@ -149,7 +149,7 @@ flattenModuleItem _ other = other
 -- flattened, packed array
 unflattener :: Bool -> Identifier -> (Type, Range) -> [GenItem]
 unflattener writeToFlatVariant arr (t, (majorHi, majorLo)) =
-        [ GenModuleItem $ Comment $ "sv2v packed-array-flatten unflattener for " ++ arr
+        [ GenModuleItem $ MIPackageItem $ Comment $ "sv2v packed-array-flatten unflattener for " ++ arr
         , GenModuleItem $ MIDecl $ Variable Local t arrUnflat [(majorHi, majorLo)] Nothing
         , GenModuleItem $ Genvar index
         , GenModuleItem $ MIDecl $ Variable Local IntegerT (arrUnflat ++ "_repeater_index") [] Nothing

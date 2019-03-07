@@ -89,7 +89,13 @@ traverseModuleItemsM mapper (Part kw name ports items) =
                 Generate subItems -> GenBlock Nothing subItems
                 _ -> GenModuleItem moduleItem'
         genItemMapper other = return other
-traverseModuleItemsM _ orig = return orig
+traverseModuleItemsM mapper (PackageItem packageItem) = do
+    let item = MIPackageItem packageItem
+    Part Module "DNE" [] [item'] <-
+        traverseModuleItemsM mapper (Part Module "DNE" [] [item])
+    return $ case item' of
+        MIPackageItem packageItem' -> PackageItem packageItem'
+        other -> error $ "encountered bad package module item: " ++ show other
 
 traverseModuleItems :: Mapper ModuleItem -> Mapper Description
 traverseModuleItems = unmonad traverseModuleItemsM
@@ -101,9 +107,9 @@ traverseStmtsM mapper = moduleItemMapper
     where
         moduleItemMapper (AlwaysC kw stmt) =
             fullMapper stmt >>= return . AlwaysC kw
-        moduleItemMapper (Function lifetime ret name decls stmts) = do
+        moduleItemMapper (MIPackageItem (Function lifetime ret name decls stmts)) = do
             stmts' <- mapM fullMapper stmts
-            return $ Function lifetime ret name decls stmts'
+            return $ MIPackageItem $ Function lifetime ret name decls stmts'
         moduleItemMapper (Initial stmt) =
             fullMapper stmt >>= return . Initial
         moduleItemMapper other = return $ other
@@ -288,10 +294,10 @@ traverseExprsM mapper = moduleItemMapper
         stmtMapper stmt >>= return . AlwaysC kw
     moduleItemMapper (Initial stmt) =
         stmtMapper stmt >>= return . Initial
-    moduleItemMapper (Function lifetime ret f decls stmts) = do
+    moduleItemMapper (MIPackageItem (Function lifetime ret f decls stmts)) = do
         decls' <- mapM declMapper decls
         stmts' <- mapM stmtMapper stmts
-        return $ Function lifetime ret f decls' stmts'
+        return $ MIPackageItem $ Function lifetime ret f decls' stmts'
     moduleItemMapper (Instance m params x ml) = do
         if ml == Nothing
             then return $ Instance m params x Nothing
@@ -300,9 +306,12 @@ traverseExprsM mapper = moduleItemMapper
                 return $ Instance m params x (Just l)
     moduleItemMapper (Modport x l) =
         mapM modportDeclMapper l >>= return . Modport x
-    moduleItemMapper (Comment  x) = return $ Comment  x
     moduleItemMapper (Genvar   x) = return $ Genvar   x
     moduleItemMapper (Generate x) = return $ Generate x
+    moduleItemMapper (MIPackageItem (Typedef t x)) =
+        return $ MIPackageItem $ Typedef t x
+    moduleItemMapper (MIPackageItem (Comment c)) =
+        return $ MIPackageItem $ Comment c
 
     modportDeclMapper (dir, ident, Just e) = do
         e' <- exprMapper e
@@ -345,9 +354,9 @@ traverseDeclsM mapper item = do
     where
         miMapperA (MIDecl decl) =
             mapper decl >>= return . MIDecl
-        miMapperA (Function l t x decls s) = do
+        miMapperA (MIPackageItem (Function l t x decls s)) = do
             decls' <- mapM mapper decls
-            return $ Function l t x decls' s
+            return $ MIPackageItem $ Function l t x decls' s
         miMapperA other = return other
         miMapperB (Block (Just (name, decls)) stmts) = do
             decls' <- mapM mapper decls
@@ -389,8 +398,8 @@ traverseTypesM mapper item =
             fullMapper t >>= \t' -> return $ Localparam t' x   e
         declMapper (Variable d t x a me) =
             fullMapper t >>= \t' -> return $ Variable d t' x a me
-        miMapper (Function l t x d s) =
-            fullMapper t >>= \t' -> return $ Function l t' x d s
+        miMapper (MIPackageItem (Function l t x d s)) =
+            fullMapper t >>= \t' -> return $ MIPackageItem $ Function l t' x d s
         miMapper other = return other
 
 traverseTypes :: Mapper Type -> Mapper ModuleItem

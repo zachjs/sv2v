@@ -19,20 +19,34 @@ type Types = Map.Map Identifier Type
 
 convert :: AST -> AST
 convert descriptions =
-    filter (not . isTypedef) $ traverseDescriptions (convertDescription types) descriptions
+    traverseDescriptions removeTypedef $
+    traverseDescriptions (convertDescription types) $
+    descriptions
     where
         types = execWriter $ collectDescriptionsM getTypedef descriptions
         getTypedef :: Description -> Writer Types ()
-        getTypedef (Typedef a b) = tell $ Map.singleton b a
+        getTypedef (PackageItem (Typedef a b)) = tell $ Map.singleton b a
         getTypedef _ = return ()
-
-isTypedef :: Description -> Bool
-isTypedef (Typedef _ _) = True
-isTypedef _ = False
+        removeTypedef :: Description -> Description
+        removeTypedef (PackageItem (Typedef _ x)) =
+            PackageItem $ Comment $ "removed typedef: " ++ x
+        removeTypedef other = other
 
 convertDescription :: Types -> Description -> Description
-convertDescription types description =
-    traverseModuleItems (traverseTypes $ resolveType types) description
+convertDescription globalTypes description =
+    traverseModuleItems removeTypedef $
+    traverseModuleItems (traverseTypes $ resolveType types) $
+    description
+    where
+        types = Map.union globalTypes $
+            execWriter $ collectModuleItemsM getTypedef description
+        getTypedef :: ModuleItem -> Writer Types ()
+        getTypedef (MIPackageItem (Typedef a b)) = tell $ Map.singleton b a
+        getTypedef _ = return ()
+        removeTypedef :: ModuleItem -> ModuleItem
+        removeTypedef (MIPackageItem (Typedef _ x)) =
+            MIPackageItem $ Comment $ "removed typedef: " ++ x
+        removeTypedef other = other
 
 resolveType :: Types -> Type -> Type
 resolveType _ (Reg      rs) = Reg      rs
