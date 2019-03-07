@@ -248,8 +248,8 @@ rewriteModuleItem info =
         rewriteLHS (LHSConcat ls) = LHSConcat $ map rewriteLHS ls
 
         rewriteStmt :: Stmt -> Stmt
-        rewriteStmt (AsgnBlk lhs expr) = convertAssignment AsgnBlk lhs expr
-        rewriteStmt (Asgn    lhs expr) = convertAssignment Asgn    lhs expr
+        rewriteStmt (AsgnBlk op lhs expr) = convertAssignment (AsgnBlk op) lhs expr
+        rewriteStmt (Asgn       lhs expr) = convertAssignment Asgn         lhs expr
         rewriteStmt other = other
         convertAssignment :: (LHS -> Expr -> Stmt) -> LHS -> Expr -> Stmt
         convertAssignment constructor (lhs @ (LHSIdent ident)) (expr @ (Repeat _ exprs)) =

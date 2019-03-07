@@ -18,6 +18,6 @@ convertFunction (MIPackageItem (Function ml t f decls stmts)) =
     map (traverseNestedStmts convertStmt) stmts
     where
         convertStmt :: Stmt -> Stmt
-        convertStmt (Return e) = AsgnBlk (LHSIdent f) e
+        convertStmt (Return e) = AsgnBlk AsgnOpEq (LHSIdent f) e
         convertStmt other = other
 convertFunction other = other

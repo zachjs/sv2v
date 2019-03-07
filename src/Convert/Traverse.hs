@@ -137,8 +137,8 @@ traverseNestedStmtsM mapper = fullMapper
             let cases' = zip (map fst cases) caseStmts
             def' <- maybeDo fullMapper def
             return $ Case u kw expr cases' def'
-        cs (AsgnBlk lhs expr) = return $ AsgnBlk lhs expr
-        cs (Asgn    lhs expr) = return $ Asgn    lhs expr
+        cs (AsgnBlk op lhs expr) = return $ AsgnBlk op lhs expr
+        cs (Asgn       lhs expr) = return $ Asgn       lhs expr
         cs (For a b c stmt) = fullMapper stmt >>= return . For a b c
         cs (While   e stmt) = fullMapper stmt >>= return . While   e
         cs (RepeatL e stmt) = fullMapper stmt >>= return . RepeatL e
@@ -160,8 +160,8 @@ traverseStmtLHSsM mapper = traverseNestedStmtsM stmtMapper
         stmtMapper (Timing (Event sense) stmt) = do
             sense' <- senseMapper sense
             return $ Timing (Event sense') stmt
-        stmtMapper (AsgnBlk lhs expr) = fullMapper lhs >>= \lhs' -> return $ AsgnBlk lhs' expr
-        stmtMapper (Asgn    lhs expr) = fullMapper lhs >>= \lhs' -> return $ Asgn    lhs' expr
+        stmtMapper (AsgnBlk op lhs expr) = fullMapper lhs >>= \lhs' -> return $ AsgnBlk op lhs' expr
+        stmtMapper (Asgn       lhs expr) = fullMapper lhs >>= \lhs' -> return $ Asgn       lhs' expr
         stmtMapper other = return other
         senseMapper (Sense        lhs) = fullMapper lhs >>= return . Sense
         senseMapper (SensePosedge lhs) = fullMapper lhs >>= return . SensePosedge
@@ -258,10 +258,10 @@ traverseExprsM mapper = moduleItemMapper
         e' <- exprMapper e
         cases' <- mapM caseMapper cases
         return $ Case u kw e' cases' def
-    flatStmtMapper (AsgnBlk lhs expr) =
-        exprMapper expr >>= return . AsgnBlk lhs
-    flatStmtMapper (Asgn    lhs expr) =
-        exprMapper expr >>= return . Asgn    lhs
+    flatStmtMapper (AsgnBlk op lhs expr) =
+        exprMapper expr >>= return . AsgnBlk op lhs
+    flatStmtMapper (Asgn       lhs expr) =
+        exprMapper expr >>= return . Asgn       lhs
     flatStmtMapper (For (x1, e1) cc (x2, e2) stmt) = do
         e1' <- exprMapper e1
         e2' <- exprMapper e2
@@ -463,12 +463,12 @@ traverseAsgnsM mapper = moduleItemMapper
         miMapperA other = return other
 
         miMapperB = traverseStmtsM stmtMapper
-        stmtMapper (AsgnBlk lhs expr) = do
+        stmtMapper (AsgnBlk op lhs expr) = do
             (lhs', expr') <- mapper (lhs, expr)
-            return $ AsgnBlk lhs' expr'
-        stmtMapper (Asgn    lhs expr) = do
+            return $ AsgnBlk op lhs' expr'
+        stmtMapper (Asgn       lhs expr) = do
             (lhs', expr') <- mapper (lhs, expr)
-            return $ Asgn    lhs' expr'
+            return $ Asgn       lhs' expr'
         stmtMapper other = return other
 
 traverseAsgns :: Mapper (LHS, Expr) -> Mapper ModuleItem

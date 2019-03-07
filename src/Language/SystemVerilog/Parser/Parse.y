@@ -269,10 +269,10 @@ Identifiers :: { [Identifier] }
 
 -- uses delimiter propagation hack to avoid conflicts
 DeclTokens(delim) :: { [DeclToken] }
-  : DeclToken               delim  { [$1] }
-  | DeclToken    DeclTokens(delim) { [$1] ++ $2 }
-  | "=" Expr "," DeclTokens(delim) { [DTAsgn $2, DTComma] ++ $4 }
-  | "=" Expr                delim  { [DTAsgn $2] }
+  : DeclToken                  delim  { [$1] }
+  | DeclToken       DeclTokens(delim) { [$1] ++ $2 }
+  | AsgnOp Expr "," DeclTokens(delim) { [DTAsgn $1 $2, DTComma] ++ $4 }
+  | AsgnOp Expr                delim  { [DTAsgn $1 $2] }
 DeclToken :: { DeclToken }
   : DeclOrStmtToken     { $1 }
   | ParameterBindings   { DTParams   $1 }
@@ -281,10 +281,10 @@ DeclToken :: { DeclToken }
 DeclOrStmtTokens(delim) :: { [DeclToken] }
   : DeclOrStmtToken                  delim  { [$1] }
   | DeclOrStmtToken DeclOrStmtTokens(delim) { [$1] ++ $2 }
-  | "="  Expr ","   DeclOrStmtTokens(delim) { [DTAsgn     $2, DTComma] ++ $4 }
-  | "<=" Expr ","   DeclOrStmtTokens(delim) { [DTAsgnNBlk $2, DTComma] ++ $4 }
-  | "="  Expr                        delim  { [DTAsgn     $2] }
-  | "<=" Expr                        delim  { [DTAsgnNBlk $2] }
+  | AsgnOp Expr "," DeclOrStmtTokens(delim) { [DTAsgn $1  $2, DTComma] ++ $4 }
+  | "<="   Expr "," DeclOrStmtTokens(delim) { [DTAsgnNBlk $2, DTComma] ++ $4 }
+  | AsgnOp Expr                      delim  { [DTAsgn $1  $2] }
+  | "<="   Expr                      delim  { [DTAsgnNBlk $2] }
 DeclOrStmtToken :: { DeclToken }
   : ","                       { DTComma }
   | Range                     { DTRange  $1 }
@@ -405,10 +405,10 @@ Stmts :: { [Stmt] }
   | Stmts Stmt  { $1 ++ [$2] }
 
 Stmt :: { Stmt }
-  : StmtNonAsgn       { $1 }
-  | LHS "="  Expr ";" { AsgnBlk $1 $3 }
-  | LHS "<=" Expr ";" { Asgn    $1 $3 }
-  | Identifier    ";" { Subroutine $1 [] }
+  : StmtNonAsgn         { $1 }
+  | LHS AsgnOp Expr ";" { AsgnBlk $2 $1 $3 }
+  | LHS "<="   Expr ";" { Asgn       $1 $3 }
+  | Identifier      ";" { Subroutine $1 [] }
 StmtNonAsgn :: { Stmt }
   : ";" { Null }
   | "begin"                DeclsAndStmts "end" { Block Nothing   (fst $2) (snd $2) }
@@ -582,11 +582,11 @@ GenCaseDefault :: { GenItem }
   : "default" opt(":") GenItemOrNull { $3 }
 
 GenvarIteration :: { (Identifier, AsgnOp, Expr) }
-  : Identifier AssignmentOperator Expr { ($1, $2, $3) }
+  : Identifier AsgnOp Expr { ($1, $2, $3) }
   | IncOrDecOperator Identifier { ($2, AsgnOp $1, Number "1") }
   | Identifier IncOrDecOperator { ($1, AsgnOp $2, Number "1") }
 
-AssignmentOperator :: { AsgnOp }
+AsgnOp :: { AsgnOp }
   : "="    { AsgnOpEq }
   | "+="   { AsgnOp Add }
   | "-="   { AsgnOp Sub }

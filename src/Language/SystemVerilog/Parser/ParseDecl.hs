@@ -46,7 +46,7 @@ import Language.SystemVerilog.AST
 -- [PUBLIC]: combined (irregular) tokens for declarations
 data DeclToken
     = DTComma
-    | DTAsgn     Expr
+    | DTAsgn     AsgnOp Expr
     | DTAsgnNBlk Expr
     | DTRange    Range
     | DTIdent    Identifier
@@ -150,14 +150,15 @@ parseDTsAsDeclOrAsgn tokens =
         else (parseDTsAsDecl tokens, [])
     where
         (constructor, expr) = case last tokens of
-            DTAsgn     e -> (AsgnBlk, e)
-            DTAsgnNBlk e -> (Asgn   , e)
+            DTAsgn  op e -> (AsgnBlk op, e)
+            DTAsgnNBlk e -> (Asgn      , e)
             _ -> error $ "invalid block item decl or stmt: " ++ (show tokens)
         Just lhs = foldl takeLHSStep Nothing $ init tokens
         isAsgnToken :: DeclToken -> Bool
-        isAsgnToken (DTBit      _) = True
-        isAsgnToken (DTConcat   _) = True
-        isAsgnToken (DTAsgnNBlk _) = True
+        isAsgnToken (DTBit             _) = True
+        isAsgnToken (DTConcat          _) = True
+        isAsgnToken (DTAsgnNBlk        _) = True
+        isAsgnToken (DTAsgn (AsgnOp _) _) = True
         isAsgnToken _ = False
 
 takeLHSStep :: Maybe LHS -> DeclToken -> Maybe LHS
@@ -257,8 +258,8 @@ takeRanges (token : tokens) =
 -- to work both for standard declarations and in `parseDTsAsDeclOrAsgn`, where
 -- we're checking for an assignment
 takeAsgn :: [DeclToken] -> (Maybe Expr, [DeclToken])
-takeAsgn (DTAsgn     e : rest) = (Just e , rest)
-takeAsgn (DTAsgnNBlk e : rest) = (Just e , rest)
+takeAsgn (DTAsgn AsgnOpEq e : rest) = (Just e , rest)
+takeAsgn (DTAsgnNBlk      e : rest) = (Just e , rest)
 takeAsgn                 rest  = (Nothing, rest)
 
 takeComma :: [DeclToken] -> (Bool, [DeclToken])
