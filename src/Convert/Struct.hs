@@ -98,6 +98,7 @@ convertType structs t1 =
 
 -- write down the type a declarations
 collectDecl :: Decl -> Writer Types ()
+collectDecl (Variable _ (Implicit []) _ _ _) = return ()
 collectDecl (Variable _ t x a _) =
     -- We add the unpacked dimensions to the type so that our type traversal can
     -- correctly match-off the dimensions whenever we see a `Bit` or `Range`
@@ -186,9 +187,12 @@ convertAsgn structs types (lhs, expr) =
                 Nothing -> (Implicit [], Ident x)
                 Just t -> (t, Ident x)
         convertSubExpr (Access e x) =
-            if Map.notMember structTf structs
-                then (fieldType, Access e' x)
-                else (fieldType, Range  e' r)
+            case subExprType of
+                Struct _ _ _ ->
+                    if Map.notMember structTf structs
+                        then (fieldType, Access e' x)
+                        else (fieldType, Range  e' r)
+                _ -> (Implicit [], Access e' x)
             where
                 (subExprType, e') = convertSubExpr e
                 Struct p fields [] = subExprType
