@@ -59,10 +59,26 @@ data DeclToken
     deriving (Show, Eq)
 
 
+-- entrypoints besides `parseDTsAsDeclOrAsgn` use this to disallow `DTAsgnNBlk`
+-- and `DTAsgn` with a binary assignment operator because we don't expect to see
+-- those assignment oeprators in declarations
+forbidNonEqAsgn :: [DeclToken] -> a -> a
+forbidNonEqAsgn tokens =
+    if any isNonEqAsgn tokens
+        then error $ "decl tokens contain bad assignment operator: " ++ show tokens
+        else id
+    where
+        isNonEqAsgn :: DeclToken -> Bool
+        isNonEqAsgn (DTAsgnNBlk _) = True
+        isNonEqAsgn (DTAsgn (AsgnOp _) _) = True
+        isNonEqAsgn _ = False
+
+
 -- [PUBLIC]: parser for module port declarations, including interface ports
 -- Example: `input foo, bar, One inst`
 parseDTsAsPortDecls :: [DeclToken] -> ([Identifier], [ModuleItem])
 parseDTsAsPortDecls pieces =
+    forbidNonEqAsgn pieces $
     if isSimpleList
         then (simpleIdents, [])
         else (portNames declarations, map MIDecl declarations)
@@ -94,6 +110,7 @@ parseDTsAsPortDecls pieces =
 -- parameters) and module instantiations
 parseDTsAsModuleItems :: [DeclToken] -> [ModuleItem]
 parseDTsAsModuleItems tokens =
+    forbidNonEqAsgn tokens $
     if any isInstance tokens
         then parseDTsAsIntantiations tokens
         else map MIDecl $ parseDTsAsDecl tokens
@@ -127,6 +144,7 @@ parseDTsAsIntantiations tokens =
 -- [PUBLIC]: parser for generic, comma-separated declarations
 parseDTsAsDecls :: [DeclToken] -> [Decl]
 parseDTsAsDecls tokens =
+    forbidNonEqAsgn tokens $
     concat $ map finalize $ parseDTsAsComponents tokens
 
 
@@ -134,6 +152,7 @@ parseDTsAsDecls tokens =
 -- outside of a port list
 parseDTsAsDecl :: [DeclToken] -> [Decl]
 parseDTsAsDecl tokens =
+    forbidNonEqAsgn tokens $
     if length components /= 1
         then error $ "too many declarations: " ++ (show tokens)
         else finalize $ head components
@@ -253,10 +272,10 @@ takeRanges (token : tokens) =
         (rs, rest) = takeRanges tokens
         asRange s = (simplify $ BinOp Sub s (Number "1"), Number "0")
 
--- TODO: entrypoints besides `parseDTsAsDeclOrAsgn` should disallow `DTAsgnNBlk`
--- Note: matching DTAsgnNBlk too is a bit of a hack to allow for tripLookahead
--- to work both for standard declarations and in `parseDTsAsDeclOrAsgn`, where
--- we're checking for an assignment
+-- Matching DTAsgnNBlk here allows tripLookahead to work both for standard
+-- declarations and in `parseDTsAsDeclOrAsgn`, where we're checking for an
+-- assignment assignment statement. The other entry points disallow
+-- `DTAsgnNBlk`, so this doesn't liberalize the parser.
 takeAsgn :: [DeclToken] -> (Maybe Expr, [DeclToken])
 takeAsgn (DTAsgn AsgnOpEq e : rest) = (Just e , rest)
 takeAsgn (DTAsgnNBlk      e : rest) = (Just e , rest)
