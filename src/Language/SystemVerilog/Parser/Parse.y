@@ -449,6 +449,7 @@ EventControl :: { Timing }
 Senses :: { Sense }
   : Sense             { $1 }
   | Senses "or" Sense { SenseOr $1 $3 }
+  | Senses ","  Sense { SenseOr $1 $3 }
 Sense :: { Sense }
   :           LHS { Sense        $1 }
   | "posedge" LHS { SensePosedge $2 }
