@@ -7,18 +7,16 @@
 module Convert (convert) where
 
 import Language.SystemVerilog.AST
-import Job (Target(..))
+import qualified Job (Exclude(..))
 
 import qualified Convert.AlwaysKW
 import qualified Convert.AsgnOp
-import qualified Convert.CaseKW
 import qualified Convert.Enum
 import qualified Convert.FuncRet
 import qualified Convert.Interface
 import qualified Convert.Logic
 import qualified Convert.PackedArray
 import qualified Convert.Return
-import qualified Convert.SplitPortDecl
 import qualified Convert.StarPort
 import qualified Convert.Struct
 import qualified Convert.Typedef
@@ -26,10 +24,10 @@ import qualified Convert.Unique
 
 type Phase = AST -> AST
 
-phases :: Target -> [Phase]
-phases YOSYS =
+phases :: [Job.Exclude] -> [Phase]
+phases excludes =
+    extras ++
     [ Convert.AsgnOp.convert
-    , Convert.Interface.convert
     , Convert.FuncRet.convert
     , Convert.Enum.convert
     , Convert.PackedArray.convert
@@ -39,23 +37,27 @@ phases YOSYS =
     , Convert.Typedef.convert
     , Convert.Unique.convert
     ]
-phases VTR =
-    (phases YOSYS) ++
-    [ Convert.AlwaysKW.convert
-    , Convert.CaseKW.convert
-    , Convert.Logic.convert
-    , Convert.SplitPortDecl.convert
-    ]
+    where
+        availableExcludes =
+            [ (Job.Interface, Convert.Interface.convert)
+            , (Job.Logic    , Convert.Logic.convert)
+            , (Job.Always   , Convert.AlwaysKW.convert) ]
+        extras = map selectExclude availableExcludes
+        selectExclude :: (Job.Exclude, Phase) -> Phase
+        selectExclude (exclude, phase) =
+            if elem exclude excludes
+                then id
+                else phase
 
-run :: Target -> Phase
-run target = foldr (.) id $ phases target
+run :: [Job.Exclude] -> Phase
+run excludes = foldr (.) id $ phases excludes
 
-convert :: Target -> Phase
-convert target = convert'
+convert :: [Job.Exclude] -> Phase
+convert excludes = convert'
     where
         convert' :: Phase
         convert' descriptions =
             if descriptions == descriptions'
                 then descriptions
                 else convert' descriptions'
-            where descriptions' = run target descriptions
+            where descriptions' = run excludes descriptions

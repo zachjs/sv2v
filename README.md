@@ -1,24 +1,21 @@
 # sv2v: SystemVerilog to Verilog
 
-sv2v is a tool for converting synthesizable SystemVerilog into Verilog that is
-synthesizable by tools with more limited feature sets. This project is primarily
-focused on converting SystemVerilog into the subset of Verilog supported by
-[Yosys]. However, sv2v also has support for targeting the [limited subset of
-Verilog] supported by [VTR]. In the long term, we hope for sv2v to be more
-configurable and extensible so that it can be used with new and different
-toolchains and as Verilog support evolves.
+sv2v is a tool for converting [SystemVerilog] into [Verilog-2005], with an
+emphasis on supporting synthesizable SystemVerilog features. This project was
+originally developed to target [Yosys], and so allows for disabling the
+conversion of those [SystemVerilog features which Yosys supports].
 
+[SystemVerilog]: http://ecee.colorado.edu/~mathys/ecen2350/IntelSoftware/pdf/IEEE_Std1800-2017_8299595.pdf
+[Verilog-2005]: https://www.eg.bucknell.edu/~csci320/2016-fall/wp-content/uploads/2015/08/verilog-std-1364-2005.pdf
 [Yosys]: http://www.clifford.at/yosys/
-[limited subset of Verilog]: https://docs.verilogtorouting.org/en/latest/odin/#verilog-synthesizable-keyword-support
-[VTR]: https://github.com/verilog-to-routing/vtr-verilog-to-routing
+[SystemVerilog features which Yosys supports]: https://github.com/YosysHQ/yosys#supported-features-from-systemverilog
 
 
 ## Installation
 
 ### Pre-built binaries
 
-Given the infamy of Haskell's build system, we aim to release pre-built binaries
-and installation files. This has not been done yet.
+We plan on releasing pre-built binaries in the near future.
 
 ### Building from source
 
@@ -33,7 +30,8 @@ stack setup
 make
 ```
 
-This creates the executable at `./bin/sv2v`
+This creates the executable at `./bin/sv2v` You can install the binary by
+running `stack install`.
 
 
 ## Usage
@@ -45,16 +43,12 @@ path/to/file.sv` will output the converted file to `stdout`.
 sv2v [OPTIONS] [FILE]
 
 Common flags:
-  -t --target=TARGET    target sythesizer (yosys, vtr; defaults to yosys)
+  -e --exclude=CONV     conversion to exclude (always, interface, logic); can
+                        be specified multiple times
   -? --help             Display help message
+  -V --version          Print version information
+     --numeric-version  Print just the version number
 ```
-
-
-## VTR Support
-
-sv2v can target VTR by specifying `--target=vtr` on the command line. Note that
-VTR does not support `generate` blocks, and this tool is not capable of
-converting those at this time.
 
 
 ## SystemVerilog Parser/AST
@@ -65,7 +59,7 @@ strict, and the AST allows for the representation of syntactically (and
 semantically) invalid Verilog. The goal is to be more general in the
 representation to enable more standardized and straightforward conversion
 procedures. This could be extended into an independent and more fully-featured
-parer if there is significant interest.
+parser if there is significant interest.
 
 
 ## License

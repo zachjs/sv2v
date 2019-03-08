@@ -13,8 +13,11 @@ convert :: AST -> AST
 convert = traverseDescriptions $ traverseModuleItems convertFunction
 
 convertFunction :: ModuleItem -> ModuleItem
-convertFunction (MIPackageItem (Function ml (Reg r) f decls stmts)) =
-    MIPackageItem $ Function ml (Implicit r) f decls stmts
-convertFunction (MIPackageItem (Function ml (Logic r) f decls stmts)) =
-    MIPackageItem $ Function ml (Implicit r) f decls stmts
+convertFunction (MIPackageItem (Function ml t f decls stmts)) =
+    MIPackageItem $ Function ml t' f decls stmts
+    where
+        t' = case t of
+            Reg rs -> Implicit rs
+            Logic rs -> Implicit rs
+            _ -> t
 convertFunction other = other

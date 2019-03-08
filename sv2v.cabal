@@ -42,14 +42,12 @@ executable sv2v
     Convert
     Convert.AlwaysKW
     Convert.AsgnOp
-    Convert.CaseKW
     Convert.Enum
     Convert.FuncRet
     Convert.Interface
     Convert.Logic
     Convert.PackedArray
     Convert.Return
-    Convert.SplitPortDecl
     Convert.StarPort
     Convert.Struct
     Convert.Typedef

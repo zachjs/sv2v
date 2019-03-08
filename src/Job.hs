@@ -9,18 +9,23 @@ module Job where
 
 import System.Console.CmdArgs
 
-data Target = VTR | YOSYS
-    deriving (Show, Typeable, Data)
+data Exclude
+    = Always
+    | Interface
+    | Logic
+    deriving (Show, Typeable, Data, Eq)
 
 data Job = Job
-    { target :: Target
+    { exclude :: [Exclude]
     , file :: FilePath
     } deriving (Show, Typeable, Data)
 
 defaultJob :: Job
 defaultJob = Job
-    { target = YOSYS &= typ "TARGET"
-        &= help "target sythesizer (yosys, vtr; defaults to yosys)"
+    { exclude = [] &= typ "CONV"
+        &= help
+            ("conversion to exclude (always, interface, logic)"
+            ++ "; can be specified multiple times")
     , file = def &= args &= typFile
     }
     &= program "sv2v"
