@@ -269,7 +269,7 @@ data Expr
   | Bit        Expr Expr
   | Repeat     Expr [Expr]
   | Concat     [Expr]
-  | Call       Identifier [Expr]
+  | Call       Identifier [Maybe Expr]
   | UniOp      UniOp Expr
   | BinOp      BinOp Expr Expr
   | Mux        Expr Expr Expr
@@ -369,7 +369,7 @@ instance Show Expr where
     Range      a (b, c) -> printf "%s[%s:%s]" (show a) (show b) (show c)
     Repeat     a b      -> printf "{%s {%s}}" (show a) (commas $ map show b)
     Concat     a        -> printf "{%s}" (commas $ map show a)
-    Call       a b      -> printf "%s(%s)" a (commas $ map show b)
+    Call       a b      -> printf "%s(%s)" a (commas $ map (maybe "" show) b)
     UniOp      a b      -> printf "(%s %s)" (show a) (show b)
     BinOp      a b c    -> printf "(%s %s %s)" (show b) (show a) (show c)
     Mux        a b c    -> printf "(%s ? %s : %s)" (show a) (show b) (show c)
@@ -431,7 +431,7 @@ data Stmt
   | If      Expr Stmt Stmt
   | Timing  Timing Stmt
   | Return  Expr
-  | Subroutine Identifier [Expr]
+  | Subroutine Identifier [Maybe Expr]
   | Null
   deriving Eq
 
@@ -462,7 +462,7 @@ instance Show Stmt where
   show (If a b Null) = printf "if (%s) %s"         (show a) (show b)
   show (If a b c   ) = printf "if (%s) %s\nelse %s" (show a) (show b) (show c)
   show (Return e   ) = printf "return %s;" (show e)
-  show (Subroutine x a) = printf "%s(%s);" x (commas $ map show a)
+  show (Subroutine x a) = printf "%s(%s);" x (commas $ map (maybe "" show) a)
   show (Timing t s ) = printf "%s%s" (show t) rest
     where
       rest = case s of

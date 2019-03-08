@@ -180,6 +180,9 @@ traverseNestedExprsM :: Monad m => MapperM m Expr -> MapperM m Expr
 traverseNestedExprsM mapper = exprMapper
     where
         exprMapper e = mapper e >>= em
+        maybeExprMapper Nothing = return Nothing
+        maybeExprMapper (Just e) =
+            exprMapper e >>= return . Just
         em (String     s) = return $ String    s
         em (Number     s) = return $ Number    s
         em (ConstBool  b) = return $ ConstBool b
@@ -200,7 +203,7 @@ traverseNestedExprsM mapper = exprMapper
         em (Concat     l) =
             mapM exprMapper l >>= return . Concat
         em (Call       f l) =
-            mapM exprMapper l >>= return . Call f
+            mapM maybeExprMapper l >>= return . Call f
         em (UniOp      o e) =
             exprMapper e >>= return . UniOp o
         em (BinOp      o e1 e2) = do
@@ -277,7 +280,7 @@ traverseExprsM mapper = moduleItemMapper
         exprMapper cc >>= \cc' -> return $ If cc' s1 s2
     flatStmtMapper (Timing event stmt) = return $ Timing event stmt
     flatStmtMapper (Subroutine f exprs) =
-        mapM exprMapper exprs >>= return . Subroutine f
+        mapM maybeExprMapper exprs >>= return . Subroutine f
     flatStmtMapper (Return expr) =
         exprMapper expr >>= return . Return
     flatStmtMapper (Null) = return Null

@@ -479,12 +479,14 @@ Number :: { String }
 String :: { String }
   : string { tail $ init $ tokenString $1 }
 
-CallArgs :: { [Expr] }
-  : {- empty -}      { [] }
-  | CallArgsNonEmpty { $1 }
-CallArgsNonEmpty :: { [Expr] }
-  : Expr                      { [$1] }
-  | CallArgsNonEmpty "," Expr { $1 ++ [$3] }
+CallArgs :: { [Maybe Expr] }
+  : {- empty -}         { [] }
+  | Expr                { [Just $1] }
+  |      CallArgsFollow { (Nothing) : $1 }
+  | Expr CallArgsFollow { (Just $1) : $2 }
+CallArgsFollow :: { [Maybe Expr] }
+  : "," opt(Expr)                { [$2] }
+  | "," opt(Expr) CallArgsFollow { $2 : $3 }
 
 Exprs :: { [Expr] }
 :           Expr  { [$1] }
