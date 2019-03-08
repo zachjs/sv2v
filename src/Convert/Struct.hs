@@ -128,12 +128,16 @@ convertAsgn structs types (lhs, expr) =
                 Nothing -> (Implicit [], LHSIdent x)
                 Just t -> (t, LHSIdent x)
         convertLHS (LHSBit l e) =
-            (tf $ tail rs, LHSBit l' e)
+            if null rs
+                then (Implicit [], LHSBit l' e)
+                else (tf $ tail rs, LHSBit l' e)
             where
                 (t, l') = convertLHS l
                 (tf, rs) = typeRanges t
         convertLHS (LHSRange l r ) =
-            (tf rs', LHSRange l' r)
+            if null rs
+                then (Implicit [], LHSRange l' r)
+                else (tf rs', LHSRange l' r)
             where
                 (t, l') = convertLHS l
                 (tf, rs) = typeRanges t
@@ -150,6 +154,7 @@ convertAsgn structs types (lhs, expr) =
                             hi' = BinOp Add base $ BinOp Sub hi lo
                             lo' = base
                             tr = (simplify hi', simplify lo')
+                Implicit _ -> (Implicit [], LHSDot l' x)
                 _ -> error $ "convertLHS encountered dot for bad type: " ++ show (t, l, x)
             where
                 (t, l') = convertLHS l
