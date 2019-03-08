@@ -162,7 +162,7 @@ lookupType _ expr = error $ "lookupType on fancy expr: " ++ show expr
 inlineInterface :: Interface -> (Identifier, [PortBinding]) -> [ModuleItem]
 inlineInterface (ports, items) (instanceName, instancePorts) =
     (:) (MIPackageItem $ Comment $ "expanded instance: " ++ instanceName) $
-    (++) portBindings $
+    flip (++) portBindings $
     map (traverseNestedModuleItems removeModport) $
     map (traverseNestedModuleItems removeMIDeclDir) $
     map (prefixModuleItems prefix) $
