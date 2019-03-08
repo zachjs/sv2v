@@ -37,7 +37,14 @@ $decimalDigit = [0-9]
 @octalNumber  = @size? @octalBase  @octalValue
 @hexNumber    = @size? @hexBase    @hexValue
 
-@number = @decimalNumber | @octalNumber | @binaryNumber | @hexNumber
+@unbasedUnsizedLiteral = "'" ( 0 | 1 | x | X | z | Z )
+
+@number
+  = @decimalNumber
+  | @octalNumber
+  | @binaryNumber
+  | @hexNumber
+  | @unbasedUnsizedLiteral
 
 -- Strings
 
