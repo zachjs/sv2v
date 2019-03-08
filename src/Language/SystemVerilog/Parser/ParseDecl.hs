@@ -56,6 +56,7 @@ data DeclToken
     | DTInstance (Identifier, [PortBinding])
     | DTBit      Expr
     | DTConcat   [LHS]
+    | DTDot      Identifier
     deriving (Show, Eq)
 
 
@@ -185,10 +186,7 @@ takeLHSStep (Nothing  ) (DTConcat lhss) = Just $ LHSConcat lhss
 takeLHSStep (Nothing  ) (DTIdent  x   ) = Just $ LHSIdent x
 takeLHSStep (Just curr) (DTBit    e   ) = Just $ LHSBit   curr e
 takeLHSStep (Just curr) (DTRange  r   ) = Just $ LHSRange curr r
-takeLHSStep (Nothing  ) (DTType   tf  ) =
-    case tf [] of
-        InterfaceT x (Just y) [] -> Just $ LHSDot (LHSIdent x) y
-        _ -> error $ "unexpected type in assignment: " ++ (show tf)
+takeLHSStep (Just curr) (DTDot    x   ) = Just $ LHSDot curr x
 takeLHSStep (maybeCurr) token =
     error $ "unexpected token in LHS: " ++ show (maybeCurr, token)
 
@@ -255,6 +253,7 @@ takeDir (DTDir dir : rest) = (dir  , rest)
 takeDir              rest  = (Local, rest)
 
 takeType :: [DeclToken] -> ([Range] -> Type, [DeclToken])
+takeType (DTIdent a : DTDot b  : rest) = (InterfaceT a (Just b),           rest)
 takeType (DTType  tf           : rest) = (tf      ,                        rest)
 takeType (DTIdent tn : DTComma : rest) = (Implicit, DTIdent tn : DTComma : rest)
 takeType (DTIdent tn           : [  ]) = (Implicit, DTIdent tn           : [  ])

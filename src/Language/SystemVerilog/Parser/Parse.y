@@ -293,7 +293,7 @@ DeclOrStmtToken :: { DeclToken }
   | "[" Expr "]"              { DTBit    $2 }
   | "{" LHSs "}"              { DTConcat $2 }
   | PartialType               { DTType   $1 }
-  | Identifier "." Identifier { DTType $ InterfaceT $1 (Just $3) }
+  | "." Identifier            { DTDot    $2 }
 
 VariablePortIdentifiers :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifier                             { [$1] }
