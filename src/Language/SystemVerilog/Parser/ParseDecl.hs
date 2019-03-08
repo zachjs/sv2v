@@ -124,7 +124,7 @@ parseDTsAsModuleItems tokens =
 -- internal; parser for module instantiations
 parseDTsAsIntantiations :: [DeclToken] -> [ModuleItem]
 parseDTsAsIntantiations (DTIdent name : tokens) =
-    if not (all isInstance rest)
+    if not (all isInstanceOrComma rest)
         then error $ "instantiations mixed with other items: " ++ (show rest)
         else map (uncurry $ Instance name params) instances
     where
@@ -132,10 +132,13 @@ parseDTsAsIntantiations (DTIdent name : tokens) =
             case head tokens of
                 DTParams ps -> (ps, tail tokens)
                 _           -> ([],      tokens)
-        instances = map (\(DTInstance inst) -> inst) rest
-        isInstance :: DeclToken -> Bool
-        isInstance (DTInstance _) = True
-        isInstance _ = False
+        instances =
+            map (\(DTInstance inst) -> inst) $
+            filter (DTComma /=) $ rest
+        isInstanceOrComma :: DeclToken -> Bool
+        isInstanceOrComma (DTInstance _) = True
+        isInstanceOrComma DTComma = True
+        isInstanceOrComma _ = False
 parseDTsAsIntantiations tokens =
     error $
         "DeclTokens contain instantiations, but start with non-ident: "
