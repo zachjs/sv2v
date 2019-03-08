@@ -411,8 +411,8 @@ Stmt :: { Stmt }
   | Identifier      ";" { Subroutine $1 [] }
 StmtNonAsgn :: { Stmt }
   : ";" { Null }
-  | "begin"                DeclsAndStmts "end" { Block Nothing   (fst $2) (snd $2) }
-  | "begin" ":" Identifier DeclsAndStmts "end" { Block (Just $3) (fst $4) (snd $4) }
+  | "begin"                DeclsAndStmts "end" opt(Tag) { Block Nothing   (fst $2) (snd $2) }
+  | "begin" ":" Identifier DeclsAndStmts "end" opt(Tag) { Block (Just $3) (fst $4) (snd $4) }
   | "if" "(" Expr ")" Stmt "else" Stmt         { If $3 $5 $7        }
   | "if" "(" Expr ")" Stmt %prec NoElse        { If $3 $5 Null      }
   | "for" "(" Identifier "=" Expr ";" Expr ";" Identifier "=" Expr ")" Stmt { For ($3, $5) $7 ($9, $11) $13 }
@@ -564,12 +564,15 @@ GenItems :: { [GenItem] }
 GenItem :: { GenItem }
   : "if" "(" Expr ")" GenItemOrNull "else" GenItemOrNull { GenIf $3 $5 $7      }
   | "if" "(" Expr ")" GenItemOrNull %prec NoElse         { GenIf $3 $5 GenNull }
-  | "begin"                GenItems "end"                { GenBlock Nothing   $2 }
-  | "begin" ":" Identifier GenItems "end"                { GenBlock (Just $3) $4 }
+  | GenBlock                                             { uncurry GenBlock $1 }
   | "case" "(" Expr ")" GenCases opt(GenCaseDefault) "endcase" { GenCase $3 $5 $6 }
-  | "for" "(" Identifier "=" Expr ";" Expr ";" GenvarIteration ")" "begin" ":" Identifier GenItems "end" { GenFor ($3, $5) $7 $9 $13 $14 }
+  | "for" "(" Identifier "=" Expr ";" Expr ";" GenvarIteration ")" GenBlock { (uncurry $ GenFor ($3, $5) $7 $9) $11  }
   -- TODO: We should restrict it to the module items that are actually allowed.
   | ModuleItem { genItemsToGenItem $ map GenModuleItem $1 }
+
+GenBlock :: { (Maybe Identifier, [GenItem]) }
+  : "begin"                GenItems "end" opt(Tag) { (Nothing, $2) }
+  | "begin" ":" Identifier GenItems "end" opt(Tag) { (Just $3, $4) }
 
 GenCases :: { [GenCase] }
   : {- empty -}      { [] }

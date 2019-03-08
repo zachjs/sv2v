@@ -157,7 +157,7 @@ unflattener writeToFlatVariant arr (t, (majorHi, majorLo)) =
             (index, majorLo)
             (BinOp Le (Ident index) majorHi)
             (index, AsgnOp Add, Number "1")
-            (prefix "unflatten")
+            (Just $ prefix "unflatten")
             [ localparam startBit
                 (simplify $ BinOp Add majorLo
                     (BinOp Mul (Ident index) size))
