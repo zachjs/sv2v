@@ -95,6 +95,7 @@ traverseModuleItemsM mapper (PackageItem packageItem) = do
     return $ case item' of
         MIPackageItem packageItem' -> PackageItem packageItem'
         other -> error $ "encountered bad package module item: " ++ show other
+traverseModuleItemsM _ (Directive str) = return $ Directive str
 
 traverseModuleItems :: Mapper ModuleItem -> Mapper Description
 traverseModuleItems = unmonad traverseModuleItemsM

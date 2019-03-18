@@ -160,6 +160,8 @@ string             { Token Lit_string      _ _ }
 "<<<="             { Token Sym_lt_lt_lt_eq _ _ }
 ">>>="             { Token Sym_gt_gt_gt_eq _ _ }
 
+directive          { Token Spe_Directive _ _ }
+
 -- operator precedences, from *lowest* to *highest*
 %nonassoc NoElse
 %nonassoc "else"
@@ -193,6 +195,10 @@ Descriptions :: { [Description] }
 Description :: { Description }
   : Part        { $1 }
   | PackageItem { PackageItem $1 }
+  | Directive   { Directive $1 }
+
+Directive :: { String }
+  : directive { tokenString $1 }
 
 Type :: { Type }
   : PartialType Dimensions { $1 $2 }

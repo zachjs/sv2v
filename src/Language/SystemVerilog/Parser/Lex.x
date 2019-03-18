@@ -56,6 +56,21 @@ $decimalDigit = [0-9]
 @simpleIdentifier  = [a-zA-Z_] [a-zA-Z0-9_\$]*
 @systemIdentifier = "$" [a-zA-Z0-9_\$]+
 
+-- Comments
+
+@commentBegin = "/*"
+@commentEnd = "*/" | "**/"
+@comment = "//" [^\n]* | "/**/"
+
+-- Directives
+
+@directive = "`" @simpleIdentifier
+
+-- Whitespace
+
+@newline = \n
+@escapedNewline = \\\n
+@whitespace = ($white # \n) | @escapedNewline
 
 tokens :-
 
@@ -206,7 +221,13 @@ tokens :-
   "<<<="             { tok Sym_lt_lt_lt_eq }
   ">>>="             { tok Sym_gt_gt_gt_eq }
 
-  $white             ;
+  @comment           { tok Spe_Comment }
+  @commentBegin      { tok Spe_CommentBegin }
+  @commentEnd        { tok Spe_CommentEnd }
+  @directive         { tok Spe_Directive }
+  @newline           { tok Spe_Newline }
+
+  @whitespace        ;
 
   .                  { tok Unknown }
 

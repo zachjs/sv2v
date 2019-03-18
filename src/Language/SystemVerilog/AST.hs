@@ -72,6 +72,7 @@ instance Show PackageItem where
 data Description
   = Part PartKW Identifier [Identifier] [ModuleItem]
   | PackageItem PackageItem
+  | Directive String
   deriving Eq
 
 instance Show Description where
@@ -86,6 +87,7 @@ instance Show Description where
           then ""
           else indentedParenList ports
   show (PackageItem i) = show i
+  show (Directive str) = str
 
 data PartKW
   = Module

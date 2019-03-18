@@ -16,8 +16,7 @@ main = do
     job <- readJob
     -- parse the input file
     let filePath = file job
-    content <- readFile filePath
-    let ast = parseFile [] filePath content
+    ast <- parseFile [] filePath
     -- convert the file
     let ast' = convert (exclude job) ast
     -- print the converted file out
