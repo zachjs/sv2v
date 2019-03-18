@@ -179,6 +179,7 @@ data ModuleItem
   = MIDecl     Decl
   | AlwaysC    AlwaysKW Stmt
   | Assign     LHS Expr
+  | Defparam   LHS Expr
   | Instance   Identifier [PortBinding] Identifier [PortBinding]
   | Genvar     Identifier
   | Generate   [GenItem]
@@ -208,6 +209,7 @@ instance Show ModuleItem where
     MIDecl     nest  -> show nest
     AlwaysC    k b   -> printf "%s %s" (show k) (show b)
     Assign     a b   -> printf "assign %s = %s;" (show a) (show b)
+    Defparam   a b   -> printf "defparam %s = %s;" (show a) (show b)
     Instance   m params i ports
       | null params -> printf "%s %s%s;"     m                    i (showPorts ports)
       | otherwise   -> printf "%s #%s %s%s;" m (showPorts params) i (showPorts ports)

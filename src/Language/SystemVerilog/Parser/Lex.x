@@ -85,6 +85,7 @@ tokens :-
   "casex"            { tok KW_casex        }
   "casez"            { tok KW_casez        }
   "default"          { tok KW_default      }
+  "defparam"         { tok KW_defparam     }
   "do"               { tok KW_do           }
   "else"             { tok KW_else         }
   "end"              { tok KW_end          }

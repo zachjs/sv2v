@@ -293,6 +293,8 @@ traverseExprsM mapper = moduleItemMapper
         declMapper decl >>= return . MIDecl
     moduleItemMapper (Assign lhs expr) =
         exprMapper expr >>= return . Assign lhs
+    moduleItemMapper (Defparam lhs expr) =
+        exprMapper expr >>= return . Defparam lhs
     moduleItemMapper (AlwaysC kw stmt) =
         stmtMapper stmt >>= return . AlwaysC kw
     moduleItemMapper (Initial stmt) =
@@ -334,6 +336,9 @@ traverseLHSsM mapper item =
         traverseModuleItemLHSsM (Assign lhs expr) = do
             lhs' <- traverseNestedLHSsM mapper lhs
             return $ Assign lhs' expr
+        traverseModuleItemLHSsM (Defparam lhs expr) = do
+            lhs' <- traverseNestedLHSsM mapper lhs
+            return $ Defparam lhs' expr
         traverseModuleItemLHSsM other = return other
 
 traverseLHSs :: Mapper LHS -> Mapper ModuleItem
@@ -460,6 +465,9 @@ traverseAsgnsM mapper = moduleItemMapper
         miMapperA (Assign lhs expr) = do
             (lhs', expr') <- mapper (lhs, expr)
             return $ Assign lhs' expr'
+        miMapperA (Defparam lhs expr) = do
+            (lhs', expr') <- mapper (lhs, expr)
+            return $ Defparam lhs' expr'
         miMapperA other = return other
 
         miMapperB = traverseStmtsM stmtMapper

@@ -28,6 +28,7 @@ import Language.SystemVerilog.Parser.Tokens
 "casex"            { Token KW_casex        _ _ }
 "casez"            { Token KW_casez        _ _ }
 "default"          { Token KW_default      _ _ }
+"defparam"         { Token KW_defparam     _ _ }
 "do"               { Token KW_do           _ _ }
 "else"             { Token KW_else         _ _ }
 "end"              { Token KW_end          _ _ }
@@ -322,6 +323,7 @@ ModuleItem :: { [ModuleItem] }
   : DeclTokens(";")  { parseDTsAsModuleItems $1 }
   | "parameter"  ParamType DeclAsgns ";" { map MIDecl $ map (uncurry $ Parameter  $2) $3 }
   | "localparam" ParamType DeclAsgns ";" { map MIDecl $ map (uncurry $ Localparam $2) $3 }
+  | "defparam" DefparamAsgns ";"         { map (uncurry Defparam) $2 }
   | "assign" LHS "=" Expr ";"            { [Assign $2 $4] }
   | AlwaysKW Stmt                        { [AlwaysC $1 $2] }
   | "initial" Stmt                       { [Initial $2] }
@@ -329,6 +331,12 @@ ModuleItem :: { [ModuleItem] }
   | "generate" GenItems "endgenerate"    { [Generate $2] }
   | "modport" ModportItems ";"           { map (uncurry Modport) $2 }
   | PackageItem                          { [MIPackageItem $1] }
+
+DefparamAsgns :: { [(LHS, Expr)] }
+  : DefparamAsgn                   { [$1] }
+  | DefparamAsgns "," DefparamAsgn { $1 ++ [$3] }
+DefparamAsgn :: { (LHS, Expr) }
+  : LHS "=" Expr { ($1, $3) }
 
 PackageItem :: { PackageItem }
   : "typedef" Type Identifier ";" { Typedef $2 $3 }
