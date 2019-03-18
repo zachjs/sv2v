@@ -43,7 +43,8 @@ convertDescription other = other
 
 regIdents :: ModuleItem -> Writer RegIdents ()
 regIdents (AlwaysC _ stmt) =
-    collectStmtLHSsM idents $ traverseNestedStmts removeTimings stmt
+    collectStmtLHSsM (collectNestedLHSsM idents) $
+    traverseNestedStmts removeTimings stmt
     where
         idents :: LHS -> Writer RegIdents ()
         idents (LHSIdent  vx  ) = tell $ Set.singleton vx

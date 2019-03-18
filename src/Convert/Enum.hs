@@ -35,7 +35,7 @@ convertDescription (description @ (Part _ _ _ _)) =
         enumItems = map (\(x, v) -> MIDecl $ Localparam (Implicit []) x v) enumPairs
         (Part kw name ports items, enums) =
             runWriter $ traverseModuleItemsM (traverseTypesM traverseType) $
-            traverseModuleItems (traverseExprs traverseExpr) $
+            traverseModuleItems (traverseExprs $ traverseNestedExprs traverseExpr) $
             description
         traverseType :: Type -> Writer Enums Type
         traverseType (Enum t v r) = do

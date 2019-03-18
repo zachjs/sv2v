@@ -87,13 +87,19 @@ recordSeqUsage i = modify $ \s -> s { sSeqUses = Set.insert i $ sSeqUses s }
 recordIdxUsage :: Identifier -> State Info ()
 recordIdxUsage i = modify $ \s -> s { sIdxUses = Set.insert i $ sIdxUses s }
 collectExpr :: Expr -> State Info ()
-collectExpr (Range (Ident i) _) = recordSeqUsage i
-collectExpr (Bit   (Ident i) _) = recordIdxUsage i
-collectExpr _ = return ()
+collectExpr (Ident i) = recordSeqUsage i
+collectExpr other = collectNestedExprsM collectNestedExpr other
+collectNestedExpr :: Expr -> State Info ()
+collectNestedExpr (Range (Ident i) _) = recordSeqUsage i
+collectNestedExpr (Bit   (Ident i) _) = recordIdxUsage i
+collectNestedExpr _ = return ()
 collectLHS :: LHS -> State Info ()
-collectLHS (LHSRange (LHSIdent i) _) = recordSeqUsage i
-collectLHS (LHSBit   (LHSIdent i) _) = recordIdxUsage i
-collectLHS _ = return ()
+collectLHS (LHSIdent i) = recordSeqUsage i
+collectLHS other = collectNestedLHSsM collectNestedLHS other
+collectNestedLHS :: LHS -> State Info ()
+collectNestedLHS (LHSRange (LHSIdent i) _) = recordSeqUsage i
+collectNestedLHS (LHSBit   (LHSIdent i) _) = recordIdxUsage i
+collectNestedLHS _ = return ()
 
 -- VCS doesn't like port declarations inside of `generate` blocks, so we hoist
 -- them out with this function. This obviously isn't ideal, but it's a
@@ -205,7 +211,7 @@ flattenRanges rs =
 rewriteModuleItem :: Info -> ModuleItem -> ModuleItem
 rewriteModuleItem info =
     traverseStmts rewriteStmt .
-    traverseExprs rewriteExpr
+    traverseExprs (traverseNestedExprs rewriteExpr)
     where
         Info typeDims _ idxUses seqUses = info
         duoUses = Set.intersection idxUses seqUses

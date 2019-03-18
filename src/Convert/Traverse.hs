@@ -43,6 +43,11 @@ module Convert.Traverse
 , traverseNestedModuleItems
 , collectNestedModuleItemsM
 , traverseNestedStmts
+, traverseNestedExprs
+, collectNestedExprsM
+, traverseNestedLHSsM
+, traverseNestedLHSs
+, collectNestedLHSsM
 ) where
 
 import Control.Monad.State
@@ -156,7 +161,7 @@ traverseNestedStmtsM mapper = fullMapper
 traverseStmtLHSsM :: Monad m => MapperM m LHS -> MapperM m Stmt
 traverseStmtLHSsM mapper = traverseNestedStmtsM stmtMapper
     where
-        fullMapper = traverseNestedLHSsM mapper
+        fullMapper = mapper
         stmtMapper (Timing (Event sense) stmt) = do
             sense' <- senseMapper sense
             return $ Timing (Event sense') stmt
@@ -248,7 +253,7 @@ traverseExprsM mapper = moduleItemMapper
         me' <- maybeExprMapper me
         return $ Variable d t x a' me'
 
-    exprMapper = traverseNestedExprsM mapper
+    exprMapper = mapper
 
     caseMapper (exprs, stmt) = do
         exprs' <- mapM exprMapper exprs
@@ -334,10 +339,10 @@ traverseLHSsM mapper item =
     traverseStmtsM (traverseStmtLHSsM mapper) item >>= traverseModuleItemLHSsM
     where
         traverseModuleItemLHSsM (Assign lhs expr) = do
-            lhs' <- traverseNestedLHSsM mapper lhs
+            lhs' <- mapper lhs
             return $ Assign lhs' expr
         traverseModuleItemLHSsM (Defparam lhs expr) = do
-            lhs' <- traverseNestedLHSsM mapper lhs
+            lhs' <- mapper lhs
             return $ Defparam lhs' expr
         traverseModuleItemLHSsM other = return other
 
@@ -355,6 +360,11 @@ traverseNestedLHSsM mapper = fullMapper
         tl (LHSRange  l r ) = fullMapper l >>= \l' -> return $ LHSRange  l' r
         tl (LHSDot    l x ) = fullMapper l >>= \l' -> return $ LHSDot    l' x
         tl (LHSConcat lhss) = mapM fullMapper lhss >>= return . LHSConcat
+
+traverseNestedLHSs :: Mapper LHS -> Mapper LHS
+traverseNestedLHSs = unmonad traverseNestedLHSsM
+collectNestedLHSsM :: Monad m => CollectorM m LHS -> CollectorM m LHS
+collectNestedLHSsM = collectify traverseNestedLHSsM
 
 traverseDeclsM :: Monad m => MapperM m Decl -> MapperM m ModuleItem
 traverseDeclsM mapper item = do
@@ -382,7 +392,9 @@ collectDeclsM = collectify traverseDeclsM
 
 traverseTypesM :: Monad m => MapperM m Type -> MapperM m ModuleItem
 traverseTypesM mapper item =
-    miMapper item >>= traverseDeclsM declMapper >>= traverseExprsM exprMapper
+    miMapper item >>=
+    traverseDeclsM declMapper >>=
+    traverseExprsM (traverseNestedExprsM exprMapper)
     where
         fullMapper t = tm t >>= mapper
         tm (Reg      r) = return $ Reg      r
@@ -497,3 +509,8 @@ collectNestedModuleItemsM = collectify traverseNestedModuleItemsM
 
 traverseNestedStmts :: Mapper Stmt -> Mapper Stmt
 traverseNestedStmts = unmonad traverseNestedStmtsM
+
+traverseNestedExprs :: Mapper Expr -> Mapper Expr
+traverseNestedExprs = unmonad traverseNestedExprsM
+collectNestedExprsM :: Monad m => CollectorM m Expr -> CollectorM m Expr
+collectNestedExprsM = collectify traverseNestedExprsM

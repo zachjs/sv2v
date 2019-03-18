@@ -38,8 +38,8 @@ convertDescription interfaces (Part Module name ports items) =
     Part Module name ports' items'
     where
         items' =
-            map (traverseNestedModuleItems $ traverseExprs convertExpr) $
-            map (traverseNestedModuleItems $ traverseLHSs  convertLHS) $
+            map (traverseNestedModuleItems $ traverseExprs (traverseNestedExprs convertExpr)) $
+            map (traverseNestedModuleItems $ traverseLHSs  (traverseNestedLHSs  convertLHS)) $
             map (traverseNestedModuleItems mapInterface) $
             items
         ports' = concatMap convertPort ports
@@ -132,8 +132,8 @@ convertDescription _ other = other
 prefixModuleItems :: Identifier -> ModuleItem -> ModuleItem
 prefixModuleItems prefix =
     traverseDecls prefixDecl .
-    traverseExprs prefixExpr .
-    traverseLHSs  prefixLHS
+    traverseExprs (traverseNestedExprs prefixExpr) .
+    traverseLHSs  (traverseNestedLHSs  prefixLHS )
     where
         prefixDecl :: Decl -> Decl
         prefixDecl (Variable d t x a me) = Variable d t (prefix ++ x) a me
