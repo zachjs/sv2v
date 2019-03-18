@@ -452,10 +452,12 @@ traverseNestedGenItemsM :: Monad m => MapperM m GenItem -> MapperM m GenItem
 traverseNestedGenItemsM mapper = fullMapper
     where
         fullMapper genItem = gim genItem >>= mapper
-        gim (GenBlock x subItems) =
-            mapM fullMapper subItems >>= return . GenBlock x
-        gim (GenFor a b c d subItems) =
-            mapM fullMapper subItems >>= return . GenFor a b c d
+        gim (GenBlock x subItems) = do
+            subItems' <- mapM fullMapper subItems
+            return $ GenBlock x (concatMap flattenBlocks subItems')
+        gim (GenFor a b c d subItems) = do
+            subItems' <- mapM fullMapper subItems
+            return $ GenFor a b c d (concatMap flattenBlocks subItems')
         gim (GenIf e i1 i2) = do
             i1' <- fullMapper i1
             i2' <- fullMapper i2
@@ -468,6 +470,9 @@ traverseNestedGenItemsM mapper = fullMapper
         gim (GenModuleItem moduleItem) =
             return $ GenModuleItem moduleItem
         gim (GenNull) = return GenNull
+        flattenBlocks :: GenItem -> [GenItem]
+        flattenBlocks (GenBlock Nothing items) = items
+        flattenBlocks other = [other]
 
 traverseAsgnsM :: Monad m => MapperM m (LHS, Expr) -> MapperM m ModuleItem
 traverseAsgnsM mapper = moduleItemMapper

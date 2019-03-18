@@ -425,8 +425,7 @@ Stmt :: { Stmt }
   | Identifier      ";" { Subroutine $1 [] }
 StmtNonAsgn :: { Stmt }
   : ";" { Null }
-  | "begin"                DeclsAndStmts "end" opt(Tag) { Block Nothing   (fst $2) (snd $2) }
-  | "begin" ":" Identifier DeclsAndStmts "end" opt(Tag) { Block (Just $3) (fst $4) (snd $4) }
+  | "begin" opt(Tag) DeclsAndStmts "end" opt(Tag) { Block (combineTags $2 $5) (fst $3) (snd $3) }
   | "if" "(" Expr ")" Stmt "else" Stmt         { If $3 $5 $7        }
   | "if" "(" Expr ")" Stmt %prec NoElse        { If $3 $5 Null      }
   | "for" "(" Identifier "=" Expr ";" Expr ";" Identifier "=" Expr ")" Stmt { For ($3, $5) $7 ($9, $11) $13 }
@@ -588,8 +587,7 @@ GenItem :: { GenItem }
   | ModuleItem { genItemsToGenItem $ map GenModuleItem $1 }
 
 GenBlock :: { (Maybe Identifier, [GenItem]) }
-  : "begin"                GenItems "end" opt(Tag) { (Nothing, $2) }
-  | "begin" ":" Identifier GenItems "end" opt(Tag) { (Just $3, $4) }
+  : "begin" opt(Tag) GenItems "end" opt(Tag) { (combineTags $2 $5, $3) }
 
 GenCases :: { [GenCase] }
   : {- empty -}      { [] }
@@ -648,5 +646,13 @@ defaultFuncInput :: Decl -> Decl
 defaultFuncInput (Variable Input (Implicit rs) x a me) =
   Variable Input (Logic rs) x a me
 defaultFuncInput other = other
+
+combineTags :: Maybe Identifier -> Maybe Identifier -> Maybe Identifier
+combineTags (Just a) (Just b) =
+  if a == b
+    then Just a
+    else error $ "tag mismatch: " ++ show (a, b)
+combineTags Nothing other = other
+combineTags other   _     = other
 
 }
