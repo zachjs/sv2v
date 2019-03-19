@@ -20,6 +20,7 @@ import qualified Convert.Return
 import qualified Convert.StarPort
 import qualified Convert.Struct
 import qualified Convert.Typedef
+import qualified Convert.UnbasedUnsized
 import qualified Convert.Unique
 
 type Phase = AST -> AST
@@ -35,6 +36,7 @@ phases excludes =
     , Convert.Struct.convert
     , Convert.Return.convert
     , Convert.Typedef.convert
+    , Convert.UnbasedUnsized.convert
     , Convert.Unique.convert
     ]
     where
