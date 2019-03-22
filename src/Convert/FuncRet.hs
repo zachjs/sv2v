@@ -17,7 +17,7 @@ convertFunction (MIPackageItem (Function ml t f decls stmts)) =
     MIPackageItem $ Function ml t' f decls stmts
     where
         t' = case t of
-            Reg rs -> Implicit rs
-            Logic rs -> Implicit rs
+            IntegerVector TReg   sg rs -> Implicit sg rs
+            IntegerVector TLogic sg rs -> Implicit sg rs
             _ -> t
 convertFunction other = other

@@ -51,12 +51,13 @@ data DeclToken
     | DTRange    Range
     | DTIdent    Identifier
     | DTDir      Direction
-    | DTType     ([Range] -> Type)
+    | DTType     (Signing -> [Range] -> Type)
     | DTParams   [PortBinding]
     | DTInstance (Identifier, [PortBinding])
     | DTBit      Expr
     | DTConcat   [LHS]
     | DTDot      Identifier
+    | DTSigning  Signing
     deriving (Show, Eq)
 
 
@@ -256,12 +257,14 @@ takeDir (DTDir dir : rest) = (dir  , rest)
 takeDir              rest  = (Local, rest)
 
 takeType :: [DeclToken] -> ([Range] -> Type, [DeclToken])
-takeType (DTIdent a : DTDot b  : rest) = (InterfaceT a (Just b),           rest)
-takeType (DTType  tf           : rest) = (tf      ,                        rest)
-takeType (DTIdent tn : DTComma : rest) = (Implicit, DTIdent tn : DTComma : rest)
-takeType (DTIdent tn           : [  ]) = (Implicit, DTIdent tn           : [  ])
-takeType (DTIdent tn           : rest) = (Alias tn,                        rest)
-takeType                         rest  = (Implicit,                        rest)
+takeType (DTIdent a  : DTDot b      : rest) = (InterfaceT a (Just b),                       rest)
+takeType (DTType  tf : DTSigning sg : rest) = (tf       sg         ,                        rest)
+takeType (DTType  tf                : rest) = (tf       Unspecified,                        rest)
+takeType (DTSigning sg              : rest) = (Implicit sg         ,                        rest)
+takeType (DTIdent tn : DTComma      : rest) = (Implicit Unspecified, DTIdent tn : DTComma : rest)
+takeType (DTIdent tn                : [  ]) = (Implicit Unspecified, DTIdent tn           : [  ])
+takeType (DTIdent tn                : rest) = (Alias tn            ,                        rest)
+takeType                              rest  = (Implicit Unspecified,                        rest)
 
 takeRanges :: [DeclToken] -> ([Range], [DeclToken])
 takeRanges [] = ([], [])

@@ -25,14 +25,14 @@ convert :: AST -> AST
 convert = traverseDescriptions convertDescription
 
 defaultType :: Type
-defaultType = Logic [(Number "31", Number "0")]
+defaultType = IntegerVector TLogic Unspecified [(Number "31", Number "0")]
 
 convertDescription :: Description -> Description
 convertDescription (description @ (Part _ _ _ _)) =
     Part kw name ports (enumItems ++ items)
     where
         enumPairs = concat $ map (uncurry enumVals) $ Set.toList enums
-        enumItems = map (\(x, v) -> MIDecl $ Localparam (Implicit []) x v) enumPairs
+        enumItems = map (\(x, v) -> MIDecl $ Localparam (Implicit Unspecified []) x v) enumPairs
         (Part kw name ports items, enums) =
             runWriter $ traverseModuleItemsM (traverseTypesM traverseType) $
             traverseModuleItems (traverseExprs $ traverseNestedExprs traverseExpr) $

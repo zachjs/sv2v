@@ -158,7 +158,7 @@ unflattener writeToFlatVariant arr (t, (majorHi, majorLo)) =
         [ GenModuleItem $ MIPackageItem $ Comment $ "sv2v packed-array-flatten unflattener for " ++ arr
         , GenModuleItem $ MIDecl $ Variable Local t arrUnflat [(majorHi, majorLo)] Nothing
         , GenModuleItem $ Genvar index
-        , GenModuleItem $ MIDecl $ Variable Local IntegerT (arrUnflat ++ "_repeater_index") [] Nothing
+        , GenModuleItem $ MIDecl $ Variable Local (IntegerAtom TInteger Unspecified) (arrUnflat ++ "_repeater_index") [] Nothing
         , GenFor
             (index, majorLo)
             (BinOp Le (Ident index) majorHi)
@@ -180,13 +180,13 @@ unflattener writeToFlatVariant arr (t, (majorHi, majorLo)) =
         (minorHi, minorLo) = head $ snd $ typeRanges t
         size = rangeSize (minorHi, minorLo)
         localparam :: Identifier -> Expr -> GenItem
-        localparam x v = GenModuleItem $ MIDecl $ Localparam (Implicit []) x v
+        localparam x v = GenModuleItem $ MIDecl $ Localparam (Implicit Unspecified []) x v
         origRange = ( (BinOp Add (Ident startBit)
                         (BinOp Sub size (Number "1")))
                     , Ident startBit )
 
 typeIsImplicit :: Type -> Bool
-typeIsImplicit (Implicit _) = True
+typeIsImplicit (Implicit _ _) = True
 typeIsImplicit _ = False
 
 -- prefix a string with a namespace of sorts

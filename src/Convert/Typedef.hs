@@ -49,11 +49,11 @@ convertDescription globalTypes description =
         removeTypedef other = other
 
 resolveType :: Types -> Type -> Type
-resolveType _ (Reg      rs) = Reg      rs
-resolveType _ (Wire     rs) = Wire     rs
-resolveType _ (Logic    rs) = Logic    rs
-resolveType _ (Implicit rs) = Implicit rs
-resolveType _ (IntegerT   ) = IntegerT
+resolveType _ (Net           kw    rs) = Net           kw    rs
+resolveType _ (Implicit         sg rs) = Implicit         sg rs
+resolveType _ (IntegerVector kw sg rs) = IntegerVector kw sg rs
+resolveType _ (IntegerAtom   kw sg   ) = IntegerAtom   kw sg
+resolveType _ (NonInteger    kw      ) = NonInteger    kw
 resolveType _ (InterfaceT x my rs) = InterfaceT x my rs
 resolveType _ (Enum Nothing vals rs) = Enum Nothing vals rs
 resolveType types (Enum (Just t) vals rs) = Enum (Just $ resolveType types t) vals rs
@@ -65,12 +65,12 @@ resolveType types (Alias st rs1) =
     if Map.notMember st types
     then InterfaceT st Nothing rs1
     else case resolveType types $ types Map.! st of
-        (Reg      rs2) -> Reg      $ rs2 ++ rs1
-        (Wire     rs2) -> Wire     $ rs2 ++ rs1
-        (Logic    rs2) -> Logic    $ rs2 ++ rs1
+        (Net           kw    rs2) -> Net           kw    $ rs2 ++ rs1
+        (Implicit         sg rs2) -> Implicit         sg $ rs2 ++ rs1
+        (IntegerVector kw sg rs2) -> IntegerVector kw sg $ rs2 ++ rs1
         (Enum t v rs2) -> Enum t v $ rs2 ++ rs1
         (Struct p l rs2) -> Struct p l $ rs2 ++ rs1
         (InterfaceT x my rs2) -> InterfaceT x my $ rs2 ++ rs1
-        (Implicit rs2) -> Implicit $ rs2 ++ rs1
-        (IntegerT    ) -> error $ "resolveType encountered packed `integer` on " ++ st
+        (IntegerAtom   kw _ ) -> error $ "resolveType encountered packed `" ++ (show kw) ++ "` on " ++ st
+        (NonInteger    kw   ) -> error $ "resolveType encountered packed `" ++ (show kw) ++ "` on " ++ st
         (Alias    _ _) -> error $ "resolveType invariant failed on " ++ st

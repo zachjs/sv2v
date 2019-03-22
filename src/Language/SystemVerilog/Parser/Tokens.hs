@@ -227,6 +227,7 @@ data TokenName
   | KW_unique
   | KW_unsigned
   | KW_use
+  | KW_uwire
   | KW_var
   | KW_vectored
   | KW_virtual

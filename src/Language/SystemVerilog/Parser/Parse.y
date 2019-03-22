@@ -25,7 +25,9 @@ import Language.SystemVerilog.Parser.Tokens
 "assign"           { Token KW_assign       _ _ }
 "automatic"        { Token KW_automatic    _ _ }
 "begin"            { Token KW_begin        _ _ }
+"bit"              { Token KW_bit          _ _ }
 "buf"              { Token KW_buf          _ _ }
+"byte"             { Token KW_byte         _ _ }
 "case"             { Token KW_case         _ _ }
 "casex"            { Token KW_casex        _ _ }
 "casez"            { Token KW_casez        _ _ }
@@ -50,10 +52,12 @@ import Language.SystemVerilog.Parser.Tokens
 "initial"          { Token KW_initial      _ _ }
 "inout"            { Token KW_inout        _ _ }
 "input"            { Token KW_input        _ _ }
+"int"              { Token KW_int          _ _ }
 "integer"          { Token KW_integer      _ _ }
 "interface"        { Token KW_interface    _ _ }
 "localparam"       { Token KW_localparam   _ _ }
 "logic"            { Token KW_logic        _ _ }
+"longint"          { Token KW_longint      _ _ }
 "modport"          { Token KW_modport      _ _ }
 "module"           { Token KW_module       _ _ }
 "nand"             { Token KW_nand         _ _ }
@@ -65,16 +69,34 @@ import Language.SystemVerilog.Parser.Tokens
 "packed"           { Token KW_packed       _ _ }
 "parameter"        { Token KW_parameter    _ _ }
 "posedge"          { Token KW_posedge      _ _ }
+"real"             { Token KW_real         _ _ }
+"realtime"         { Token KW_realtime     _ _ }
 "reg"              { Token KW_reg          _ _ }
 "repeat"           { Token KW_repeat       _ _ }
 "return"           { Token KW_return       _ _ }
+"shortint"         { Token KW_shortint     _ _ }
+"shortreal"        { Token KW_shortreal    _ _ }
+"signed"           { Token KW_signed       _ _ }
 "static"           { Token KW_static       _ _ }
 "struct"           { Token KW_struct       _ _ }
+"supply0"          { Token KW_supply0      _ _ }
+"supply1"          { Token KW_supply1      _ _ }
 "task"             { Token KW_task         _ _ }
+"time"             { Token KW_time         _ _ }
+"tri"              { Token KW_tri          _ _ }
+"tri0"             { Token KW_tri0         _ _ }
+"tri1"             { Token KW_tri1         _ _ }
+"triand"           { Token KW_triand       _ _ }
+"trior"            { Token KW_trior        _ _ }
+"trireg"           { Token KW_trireg       _ _ }
 "typedef"          { Token KW_typedef      _ _ }
 "unique"           { Token KW_unique       _ _ }
+"unsigned"         { Token KW_unsigned     _ _ }
+"uwire"            { Token KW_uwire        _ _ }
+"wand"             { Token KW_wand         _ _ }
 "while"            { Token KW_while        _ _ }
 "wire"             { Token KW_wire         _ _ }
+"wor"              { Token KW_wor          _ _ }
 "xnor"             { Token KW_xnor         _ _ }
 "xor"              { Token KW_xor          _ _ }
 
@@ -209,15 +231,56 @@ Directive :: { String }
   : directive { tokenString $1 }
 
 Type :: { Type }
-  : PartialType Dimensions { $1 $2 }
-  | Identifier  Dimensions { Alias $1 $2 }
-PartialType :: { [Range] -> Type }
-  : "wire"                                  { Wire }
-  | "reg"                                   { Reg }
-  | "logic"                                 { Logic }
-  | "enum"   opt(Type) "{" EnumItems   "}"  { Enum   $2 $4 }
-  | "struct" Packed    "{" StructItems "}"  { Struct $2 $4 }
-  | "integer"                               { \[] -> IntegerT }
+  : PartialType         Dimensions { $1 Unspecified $2 }
+  | PartialType Signing Dimensions { $1 $2 $3 }
+  | Identifier          Dimensions { Alias $1 $2 }
+PartialType :: { Signing -> [Range] -> Type }
+  : NetType                                 { \Unspecified ->        Net           $1    }
+  | IntegerVectorType                       {                        IntegerVector $1    }
+  | IntegerAtomType                         { \sg          -> \[] -> IntegerAtom   $1 sg }
+  | NonIntegerType                          { \Unspecified -> \[] -> NonInteger    $1    }
+  | "enum"   opt(Type) "{" EnumItems   "}"  { \Unspecified -> Enum   $2 $4 }
+  | "struct" Packing   "{" StructItems "}"  { \Unspecified -> Struct $2 $4 }
+
+CastingType :: { Type }
+  : IntegerVectorType { IntegerVector $1 Unspecified [] }
+  | IntegerAtomType   { IntegerAtom   $1 Unspecified    }
+  | NonIntegerType    { NonInteger    $1                }
+  | Signing           { Implicit      $1             [] }
+
+
+Signing :: { Signing }
+  : "signed"   { Signed }
+  | "unsigned" { Unsigned }
+
+NetType :: { NetType }
+  : "supply0"   { TSupply0   }
+  | "supply1"   { TSupply1   }
+  | "tri"       { TTri       }
+  | "triand"    { TTriand    }
+  | "trior"     { TTrior     }
+  | "trireg"    { TTrireg    }
+  | "tri0"      { TTri0      }
+  | "tri1"      { TTri1      }
+  | "uwire"     { TUwire     }
+  | "wire"      { TWire      }
+  | "wand"      { TWand      }
+  | "wor"       { TWor       }
+IntegerVectorType :: { IntegerVectorType }
+  : "bit"       { TBit       }
+  | "logic"     { TLogic     }
+  | "reg"       { TReg       }
+IntegerAtomType :: { IntegerAtomType }
+  : "byte"      { TByte      }
+  | "shortint"  { TShortint  }
+  | "int"       { TInt       }
+  | "longint"   { TLongint   }
+  | "integer"   { TInteger   }
+  | "time"      { TTime      }
+NonIntegerType :: { NonIntegerType }
+  : "shortreal" { TShortreal }
+  | "real"      { TReal      }
+  | "realtime"  { TRealtime  }
 
 EnumItems :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifiers { $1 }
@@ -228,9 +291,10 @@ StructItems :: { [(Type, Identifier)] }
 StructItem :: { (Type, Identifier) }
   : Type Identifier ";" { ($1, $2) }
 
-Packed :: { Bool }
-  : "packed"    { True }
-  | {- empty -} { False }
+Packing :: { Packing }
+  : "packed" Signing { Packed $2 }
+  | "packed"         { Packed Unspecified }
+  | {- empty -}      { Unpacked }
 
 Part :: { Description }
   : "module"    Identifier Params PortDecls ";" ModuleItems "endmodule"    opt(Tag) { Part Module    $2 (fst $4) ($3 ++ (snd $4) ++ $6) }
@@ -300,14 +364,15 @@ DeclOrStmtTokens(delim) :: { [DeclToken] }
   | "<=" opt(DelayOrEventControl) Expr "," DeclOrStmtTokens(delim) { [DTAsgnNBlk $2 $3, DTComma] ++ $5 }
   | "<=" opt(DelayOrEventControl) Expr                      delim  { [DTAsgnNBlk $2 $3] }
 DeclOrStmtToken :: { DeclToken }
-  : ","                       { DTComma }
-  | Range                     { DTRange  $1 }
-  | Identifier                { DTIdent  $1 }
-  | Direction                 { DTDir    $1 }
-  | "[" Expr "]"              { DTBit    $2 }
-  | "{" LHSs "}"              { DTConcat $2 }
-  | PartialType               { DTType   $1 }
-  | "." Identifier            { DTDot    $2 }
+  : ","            { DTComma }
+  | Range          { DTRange   $1 }
+  | Identifier     { DTIdent   $1 }
+  | Direction      { DTDir     $1 }
+  | "[" Expr "]"   { DTBit     $2 }
+  | "{" LHSs "}"   { DTConcat  $2 }
+  | PartialType    { DTType    $1 }
+  | "." Identifier { DTDot     $2 }
+  | Signing        { DTSigning $1 }
 
 VariablePortIdentifiers :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifier                             { [$1] }
@@ -379,9 +444,11 @@ PackageItem :: { PackageItem }
   | "task" opt(Lifetime) Identifier TFItems DeclsAndStmts "endtask" opt(Tag) { Task $2 $3 (map defaultFuncInput $ $4 ++ fst $5) (snd $5) }
 
 FuncRetAndName :: { (Type, Identifier) }
-  : {- empty -}        Identifier { (Implicit [], $1) }
-  | DimensionsNonEmpty Identifier { (Implicit $1, $2) }
-  | Type               Identifier { ($1         , $2) }
+  : Type                       Identifier { ($1                     , $2) }
+  |                            Identifier { (Implicit Unspecified [], $1) }
+  | Signing                    Identifier { (Implicit $1          [], $2) }
+  |         DimensionsNonEmpty Identifier { (Implicit Unspecified $1, $2) }
+  | Signing DimensionsNonEmpty Identifier { (Implicit $1          $2, $3) }
 
 AlwaysKW :: { AlwaysKW }
   : "always"       { Always      }
@@ -401,8 +468,10 @@ TFItems :: { [Decl] }
   |                     ";" { [] }
 
 ParamType :: { Type }
-  : Dimensions { Implicit $1 }
-  | "integer"  { IntegerT }
+  : "integer" Signing  { IntegerAtom TInteger $2 }
+  | "integer"          { IntegerAtom TInteger Unspecified }
+  |         Dimensions { Implicit Unspecified $1 }
+  | Signing Dimensions { Implicit $1          $2 }
 
 Dimensions :: { [Range] }
   : {- empty -}        { [] }
@@ -599,7 +668,7 @@ Expr :: { Expr }
 | "^"  Expr %prec RedOps      { UniOp RedXor  $2 }
 | "~^" Expr %prec RedOps      { UniOp RedXnor $2 }
 | "^~" Expr %prec RedOps      { UniOp RedXnor $2 }
-| PartialType "'" "(" Expr ")" { Cast ($1       []) $4 }
+| CastingType "'" "(" Expr ")" { Cast ($1         ) $4 }
 | Identifier  "'" "(" Expr ")" { Cast (Alias $1 []) $4 }
 | Expr "." Identifier         { Access $1 $3 }
 | "'" "{" PatternItems "}"    { Pattern $3 }
@@ -689,8 +758,8 @@ makeInput (Variable _ t x a me) = Variable Input t x a me
 makeInput other = error $ "unexpected non-var decl: " ++ (show other)
 
 defaultFuncInput :: Decl -> Decl
-defaultFuncInput (Variable Input (Implicit rs) x a me) =
-  Variable Input (Logic rs) x a me
+defaultFuncInput (Variable Input (Implicit sg rs) x a me) =
+  Variable Input (IntegerVector TLogic sg rs) x a me
 defaultFuncInput other = other
 
 combineTags :: Maybe Identifier -> Maybe Identifier -> Maybe Identifier

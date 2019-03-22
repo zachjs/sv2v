@@ -40,10 +40,12 @@ convertDescription description =
 
 -- write down unstructured versions of a packed struct type
 collectType :: Type -> Writer Structs ()
-collectType (Struct True fields _) = do
+collectType (Struct (Packed sg) fields _) = do
+    -- TODO: How should we combine the structs Signing with that of the types it
+    -- contains?
     if canUnstructure
         then tell $ Map.singleton
-            (Struct True fields)
+            (Struct (Packed sg) fields)
             (unstructType, unstructFields)
         else return ()
     where
@@ -98,7 +100,7 @@ convertType structs t1 =
 
 -- write down the type a declarations
 collectDecl :: Decl -> Writer Types ()
-collectDecl (Variable _ (Implicit []) _ _ _) = return ()
+collectDecl (Variable _ (Implicit _ []) _ _ _) = return ()
 collectDecl (Variable _ t x a _) =
     -- We add the unpacked dimensions to the type so that our type traversal can
     -- correctly match-off the dimensions whenever we see a `Bit` or `Range`
@@ -125,18 +127,18 @@ convertAsgn structs types (lhs, expr) =
         convertLHS :: LHS -> (Type, LHS)
         convertLHS (LHSIdent  x) =
             case Map.lookup x types of
-                Nothing -> (Implicit [], LHSIdent x)
+                Nothing -> (Implicit Unspecified [], LHSIdent x)
                 Just t -> (t, LHSIdent x)
         convertLHS (LHSBit l e) =
             if null rs
-                then (Implicit [], LHSBit l' e)
+                then (Implicit Unspecified [], LHSBit l' e)
                 else (tf $ tail rs, LHSBit l' e)
             where
                 (t, l') = convertLHS l
                 (tf, rs) = typeRanges t
         convertLHS (LHSRange l r ) =
             if null rs
-                then (Implicit [], LHSRange l' r)
+                then (Implicit Unspecified [], LHSRange l' r)
                 else (tf rs', LHSRange l' r)
             where
                 (t, l') = convertLHS l
@@ -144,7 +146,7 @@ convertAsgn structs types (lhs, expr) =
                 rs' = r : tail rs
         convertLHS (LHSDot    l x ) =
             case t of
-                InterfaceT _ _ _ -> (Implicit [], LHSDot l' x)
+                InterfaceT _ _ _ -> (Implicit Unspecified [], LHSDot l' x)
                 Struct _ _ _ -> case Map.lookup structTf structs of
                     Nothing -> (fieldType, LHSDot l' x)
                     Just (structT, m) -> (tf [tr], LHSRange l' r)
@@ -154,7 +156,7 @@ convertAsgn structs types (lhs, expr) =
                             hi' = BinOp Add base $ BinOp Sub hi lo
                             lo' = base
                             tr = (simplify hi', simplify lo')
-                Implicit _ -> (Implicit [], LHSDot l' x)
+                Implicit sg _ -> (Implicit sg [], LHSDot l' x)
                 _ -> error $ "convertLHS encountered dot for bad type: " ++ show (t, l, x)
             where
                 (t, l') = convertLHS l
@@ -162,18 +164,18 @@ convertAsgn structs types (lhs, expr) =
                 structTf = Struct p fields
                 fieldType = lookupFieldType fields x
         convertLHS (LHSConcat lhss) =
-            (Implicit [], LHSConcat $ map (snd . convertLHS) lhss)
+            (Implicit Unspecified [], LHSConcat $ map (snd . convertLHS) lhss)
 
         -- try expression conversion by looking at the *outermost* type first
         convertExpr :: Type -> Expr -> Expr
-        convertExpr (Struct True fields []) (Pattern items) =
+        convertExpr (Struct (Packed sg) fields []) (Pattern items) =
             if Map.notMember structTf structs
                 then Pattern items''
                 else Concat exprs
             where
                 subMap = \(Just ident, subExpr) ->
                     (Just ident, convertExpr (lookupFieldType fields ident) subExpr)
-                structTf = Struct True fields
+                structTf = Struct (Packed sg) fields
                 items' =
                     -- if the pattern does not use identifiers, use the
                     -- identifiers from the struct type definition in order
@@ -189,7 +191,7 @@ convertAsgn structs types (lhs, expr) =
         convertSubExpr :: Expr -> (Type, Expr)
         convertSubExpr (Ident x) =
             case Map.lookup x types of
-                Nothing -> (Implicit [], Ident x)
+                Nothing -> (Implicit Unspecified [], Ident x)
                 Just t -> (t, Ident x)
         convertSubExpr (Access e x) =
             case subExprType of
@@ -197,7 +199,7 @@ convertAsgn structs types (lhs, expr) =
                     if Map.notMember structTf structs
                         then (fieldType, Access e' x)
                         else (fieldType, Range  e' r)
-                _ -> (Implicit [], Access e' x)
+                _ -> (Implicit Unspecified [], Access e' x)
             where
                 (subExprType, e') = convertSubExpr e
                 Struct p fields [] = subExprType
@@ -217,16 +219,16 @@ convertAsgn structs types (lhs, expr) =
                 _ -> (t, Range eOuter' rOuter)
             where (t, eOuter') = convertSubExpr eOuter
         convertSubExpr (Concat exprs) =
-            (Implicit [], Concat $ map (snd . convertSubExpr) exprs)
+            (Implicit Unspecified [], Concat $ map (snd . convertSubExpr) exprs)
         convertSubExpr (BinOp op e1 e2) =
-            (Implicit [], BinOp op e1' e2')
+            (Implicit Unspecified [], BinOp op e1' e2')
             where
                 (_, e1') = convertSubExpr e1
                 (_, e2') = convertSubExpr e2
         -- TODO: There are other expression cases that we probably need to
         -- recurse into. That said, it's not clear to me how much we really
         -- expect to see things like concatenated packed structs, for example.
-        convertSubExpr other = (Implicit [], other)
+        convertSubExpr other = (Implicit Unspecified [], other)
 
         -- lookup the range of a field in its unstructured type
         lookupUnstructRange :: TypeFunc -> Identifier -> Range

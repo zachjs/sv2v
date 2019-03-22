@@ -30,14 +30,17 @@ convertDescription (orig @ (Part Module _ _ _)) =
     where
         idents = execWriter (collectModuleItemsM regIdents orig)
         convertModuleItem :: ModuleItem -> ModuleItem
-        convertModuleItem (MIDecl (Variable dir (Logic mr) ident a me)) =
+        convertModuleItem (MIDecl (Variable dir (IntegerVector TLogic sg mr) ident a me)) =
             MIDecl $ Variable dir (t mr) ident a me
-            where t = if Set.member ident idents then Reg else Wire
+            where
+                t = if sg /= Unspecified || Set.member ident idents
+                    then IntegerVector TReg sg
+                    else Net TWire
         convertModuleItem other = other
         -- all other logics (i.e. inside of functions) become regs
         convertDecl :: Decl -> Decl
-        convertDecl (Variable d (Logic rs) x a me) =
-            Variable d (Reg rs) x a me
+        convertDecl (Variable d (IntegerVector TLogic sg rs) x a me) =
+            Variable d (IntegerVector TReg sg rs) x a me
         convertDecl other = other
 convertDescription other = other
 

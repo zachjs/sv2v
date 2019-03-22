@@ -412,12 +412,12 @@ traverseTypesM mapper item =
     traverseExprsM (traverseNestedExprsM exprMapper)
     where
         fullMapper t = tm t >>= mapper
-        tm (Reg      r) = return $ Reg      r
-        tm (Wire     r) = return $ Wire     r
-        tm (Logic    r) = return $ Logic    r
-        tm (Alias x  r) = return $ Alias  x r
-        tm (Implicit r) = return $ Implicit r
-        tm (IntegerT  ) = return $ IntegerT
+        tm (Alias         xx    rs) = return $ Alias         xx    rs
+        tm (Net           kw    rs) = return $ Net           kw    rs
+        tm (Implicit         sg rs) = return $ Implicit         sg rs
+        tm (IntegerVector kw sg rs) = return $ IntegerVector kw sg rs
+        tm (IntegerAtom   kw sg   ) = return $ IntegerAtom   kw sg
+        tm (NonInteger    kw      ) = return $ NonInteger    kw
         tm (InterfaceT x my r) = return $ InterfaceT x my r
         tm (Enum Nothing vals r) =
             return $ Enum Nothing vals r

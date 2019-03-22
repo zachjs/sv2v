@@ -16,10 +16,10 @@ $decimalDigit = [0-9]
 @octalDigit   = @xDigit | @zDigit | [0-7]
 @hexDigit     = @xDigit | @zDigit | [0-9a-fA-F]
 
-@decimalBase = "'" [dD]
-@binaryBase  = "'" [bB]
-@octalBase   = "'" [oO]
-@hexBase     = "'" [hH]
+@decimalBase = "'" [sS]? [dD]
+@binaryBase  = "'" [sS]? [bB]
+@octalBase   = "'" [sS]? [oO]
+@hexBase     = "'" [sS]? [hH]
 
 @binaryValue = @binaryDigit ("_" | @binaryDigit)*
 @octalValue  = @octalDigit  ("_" | @octalDigit)*
@@ -80,7 +80,9 @@ tokens :-
   "assign"           { tok KW_assign       }
   "automatic"        { tok KW_automatic    }
   "begin"            { tok KW_begin        }
+  "bit"              { tok KW_bit          }
   "buf"              { tok KW_buf          }
+  "byte"             { tok KW_byte         }
   "case"             { tok KW_case         }
   "casex"            { tok KW_casex        }
   "casez"            { tok KW_casez        }
@@ -105,10 +107,12 @@ tokens :-
   "initial"          { tok KW_initial      }
   "inout"            { tok KW_inout        }
   "input"            { tok KW_input        }
+  "int"              { tok KW_int          }
   "integer"          { tok KW_integer      }
   "interface"        { tok KW_interface    }
   "localparam"       { tok KW_localparam   }
   "logic"            { tok KW_logic        }
+  "longint"          { tok KW_longint      }
   "modport"          { tok KW_modport      }
   "module"           { tok KW_module       }
   "nand"             { tok KW_nand         }
@@ -120,16 +124,34 @@ tokens :-
   "packed"           { tok KW_packed       }
   "parameter"        { tok KW_parameter    }
   "posedge"          { tok KW_posedge      }
+  "real"             { tok KW_real         }
+  "realtime"         { tok KW_realtime     }
   "reg"              { tok KW_reg          }
   "repeat"           { tok KW_repeat       }
   "return"           { tok KW_return       }
+  "shortint"         { tok KW_shortint     }
+  "shortreal"        { tok KW_shortreal    }
+  "signed"           { tok KW_signed       }
   "static"           { tok KW_static       }
   "struct"           { tok KW_struct       }
+  "supply0"          { tok KW_supply0      }
+  "supply1"          { tok KW_supply1      }
   "task"             { tok KW_task         }
+  "time"             { tok KW_time         }
+  "tri"              { tok KW_tri          }
+  "tri0"             { tok KW_tri0         }
+  "tri1"             { tok KW_tri1         }
+  "triand"           { tok KW_triand       }
+  "trior"            { tok KW_trior        }
+  "trireg"           { tok KW_trireg       }
   "typedef"          { tok KW_typedef      }
   "unique"           { tok KW_unique       }
+  "unsigned"         { tok KW_unsigned     }
+  "uwire"            { tok KW_uwire        }
+  "wand"             { tok KW_wand         }
   "while"            { tok KW_while        }
   "wire"             { tok KW_wire         }
+  "wor"              { tok KW_wor          }
   "xnor"             { tok KW_xnor         }
   "xor"              { tok KW_xor          }
 
