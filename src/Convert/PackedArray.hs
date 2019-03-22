@@ -255,7 +255,7 @@ rewriteModuleItem info =
 
         rewriteStmt :: Stmt -> Stmt
         rewriteStmt (AsgnBlk op lhs expr) = convertAssignment (AsgnBlk op) lhs expr
-        rewriteStmt (Asgn       lhs expr) = convertAssignment Asgn         lhs expr
+        rewriteStmt (Asgn    mt lhs expr) = convertAssignment (Asgn    mt) lhs expr
         rewriteStmt other = other
         convertAssignment :: (LHS -> Expr -> Stmt) -> LHS -> Expr -> Stmt
         convertAssignment constructor (lhs @ (LHSIdent ident)) (expr @ (Repeat _ exprs)) =

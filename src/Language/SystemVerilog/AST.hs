@@ -457,7 +457,7 @@ data Stmt
   | Case    Bool CaseKW Expr [Case] (Maybe Stmt)
   | For     (Identifier, Expr) Expr (Identifier, Expr) Stmt
   | AsgnBlk AsgnOp LHS Expr
-  | Asgn    LHS Expr
+  | Asgn    (Maybe Timing) LHS Expr
   | While   Expr Stmt
   | RepeatL Expr Stmt
   | DoWhile Expr Stmt
@@ -488,7 +488,7 @@ instance Show Stmt where
         Just c -> printf "\n\tdefault: %s" (show c)
   show (For (a,b) c (d,e) f) = printf "for (%s = %s; %s; %s = %s)\n%s" a (show b) (show c) d (show e) $ indent $ show f
   show (AsgnBlk o v e) = printf "%s %s %s;" (show v) (show o) (show e)
-  show (Asgn      v e) = printf "%s <= %s;" (show v) (show e)
+  show (Asgn    t v e) = printf "%s <= %s%s;" (show v) (maybe "" showPad t) (show e)
   show (While   e s) = printf  "while (%s) %s" (show e) (show s)
   show (RepeatL e s) = printf "repeat (%s) %s" (show e) (show s)
   show (DoWhile e s) = printf "do %s while (%s);" (show s) (show e)

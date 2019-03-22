@@ -47,7 +47,7 @@ import Language.SystemVerilog.AST
 data DeclToken
     = DTComma
     | DTAsgn     AsgnOp Expr
-    | DTAsgnNBlk Expr
+    | DTAsgnNBlk (Maybe Timing) Expr
     | DTRange    Range
     | DTIdent    Identifier
     | DTDir      Direction
@@ -70,7 +70,7 @@ forbidNonEqAsgn tokens =
         else id
     where
         isNonEqAsgn :: DeclToken -> Bool
-        isNonEqAsgn (DTAsgnNBlk _) = True
+        isNonEqAsgn (DTAsgnNBlk _ _) = True
         isNonEqAsgn (DTAsgn (AsgnOp _) _) = True
         isNonEqAsgn _ = False
 
@@ -173,14 +173,14 @@ parseDTsAsDeclOrAsgn tokens =
         else (parseDTsAsDecl tokens, [])
     where
         (constructor, expr) = case last tokens of
-            DTAsgn  op e -> (AsgnBlk op, e)
-            DTAsgnNBlk e -> (Asgn      , e)
+            DTAsgn     op e -> (AsgnBlk op, e)
+            DTAsgnNBlk mt e -> (Asgn    mt, e)
             _ -> error $ "invalid block item decl or stmt: " ++ (show tokens)
         Just lhs = foldl takeLHSStep Nothing $ init tokens
         isAsgnToken :: DeclToken -> Bool
         isAsgnToken (DTBit             _) = True
         isAsgnToken (DTConcat          _) = True
-        isAsgnToken (DTAsgnNBlk        _) = True
+        isAsgnToken (DTAsgnNBlk      _ _) = True
         isAsgnToken (DTAsgn (AsgnOp _) _) = True
         isAsgnToken _ = False
 
@@ -280,7 +280,7 @@ takeRanges (token : tokens) =
 -- `DTAsgnNBlk`, so this doesn't liberalize the parser.
 takeAsgn :: [DeclToken] -> (Maybe Expr, [DeclToken])
 takeAsgn (DTAsgn AsgnOpEq e : rest) = (Just e , rest)
-takeAsgn (DTAsgnNBlk      e : rest) = (Just e , rest)
+takeAsgn (DTAsgnNBlk    _ e : rest) = (Just e , rest)
 takeAsgn                 rest  = (Nothing, rest)
 
 takeComma :: [DeclToken] -> (Bool, [DeclToken])

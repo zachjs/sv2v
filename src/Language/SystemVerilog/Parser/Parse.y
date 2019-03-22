@@ -295,10 +295,10 @@ DeclToken :: { DeclToken }
 DeclOrStmtTokens(delim) :: { [DeclToken] }
   : DeclOrStmtToken                  delim  { [$1] }
   | DeclOrStmtToken DeclOrStmtTokens(delim) { [$1] ++ $2 }
-  | AsgnOp Expr "," DeclOrStmtTokens(delim) { [DTAsgn $1  $2, DTComma] ++ $4 }
-  | "<="   Expr "," DeclOrStmtTokens(delim) { [DTAsgnNBlk $2, DTComma] ++ $4 }
-  | AsgnOp Expr                      delim  { [DTAsgn $1  $2] }
-  | "<="   Expr                      delim  { [DTAsgnNBlk $2] }
+  | AsgnOp Expr "," DeclOrStmtTokens(delim) { [DTAsgn $1 $2, DTComma] ++ $4 }
+  | AsgnOp Expr                      delim  { [DTAsgn $1 $2] }
+  | "<=" opt(DelayOrEventControl) Expr "," DeclOrStmtTokens(delim) { [DTAsgnNBlk $2 $3, DTComma] ++ $5 }
+  | "<=" opt(DelayOrEventControl) Expr                      delim  { [DTAsgnNBlk $2 $3] }
 DeclOrStmtToken :: { DeclToken }
   : ","                       { DTComma }
   | Range                     { DTRange  $1 }
@@ -456,8 +456,8 @@ Stmts :: { [Stmt] }
 Stmt :: { Stmt }
   : StmtNonAsgn         { $1 }
   | LHS AsgnOp Expr ";" { AsgnBlk $2 $1 $3 }
-  | LHS "<="   Expr ";" { Asgn       $1 $3 }
   | Identifier      ";" { Subroutine $1 [] }
+  | LHS "<=" opt(DelayOrEventControl) Expr ";" { Asgn $3 $1 $4 }
 StmtNonAsgn :: { Stmt }
   : ";" { Null }
   | "begin" opt(Tag) DeclsAndStmts "end" opt(Tag) { Block (combineTags $2 $5) (fst $3) (snd $3) }
@@ -483,11 +483,14 @@ DeclOrStmt :: { ([Decl], [Stmt]) }
   | "localparam" ParamType DeclAsgns ";" { (map (uncurry $ Localparam $2) $3, []) }
 
 TimingControl :: { Timing }
+  : DelayOrEventControl { $1 }
+  | CycleDelay          { $1 }
+DelayOrEventControl :: { Timing }
   : DelayControl { $1 }
-  | CycleDelay   { $1 }
   | EventControl { $1 }
 DelayControl :: { Timing }
-  : "#"  Expr { Delay $2 }
+  : "#" DelayValue   { Delay $2 }
+  | "#" "(" Expr ")" { Delay $3 }
 CycleDelay :: { Timing }
   : "##" Expr { Cycle $2 }
 EventControl :: { Timing }
@@ -502,6 +505,14 @@ Sense :: { Sense }
   :           LHS { Sense        $1 }
   | "posedge" LHS { SensePosedge $2 }
   | "negedge" LHS { SenseNegedge $2 }
+
+DelayValue :: { Expr }
+  : Number { Number $1 }
+-- TODO: Support these other DelayValues?
+-- | real_number
+-- | ps_identifier
+-- | time_literal
+-- | 1step
 
 Unique :: { Bool }
   : "unique"    { True  }
