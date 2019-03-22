@@ -30,7 +30,7 @@ convertStmt other = other
 
 lhsToExpr :: LHS -> Expr
 lhsToExpr (LHSIdent   x) = Ident x
-lhsToExpr (LHSBit   l e) = Bit    (lhsToExpr l) e
-lhsToExpr (LHSRange l r) = Range  (lhsToExpr l) r
-lhsToExpr (LHSDot   l x) = Access (lhsToExpr l) x
+lhsToExpr (LHSBit   l e) = Bit   (lhsToExpr l) e
+lhsToExpr (LHSRange l r) = Range (lhsToExpr l) r
+lhsToExpr (LHSDot   l x) = Dot   (lhsToExpr l) x
 lhsToExpr (LHSConcat ls) = Concat $ map lhsToExpr ls

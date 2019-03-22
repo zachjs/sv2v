@@ -83,7 +83,7 @@ convertDescription interfaces (Part Module name ports items) =
         mapInterface other = other
 
         expandPortBinding :: PortBinding -> [PortBinding]
-        expandPortBinding (origBinding @ (portName, Just (Access (Ident instanceName) modportName))) =
+        expandPortBinding (origBinding @ (portName, Just (Dot (Ident instanceName) modportName))) =
             case Map.lookup instanceName instances of
                 Nothing -> [origBinding]
                 Just interfaceName ->
@@ -108,7 +108,7 @@ convertDescription interfaces (Part Module name ports items) =
                 collectModport _ = return ()
 
         convertExpr :: Expr -> Expr
-        convertExpr (orig @ (Access (Ident x) y)) =
+        convertExpr (orig @ (Dot (Ident x) y)) =
             if Map.member x modports
                 then Ident (x ++ "_" ++ y)
                 else orig

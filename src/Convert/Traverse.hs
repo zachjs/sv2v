@@ -193,10 +193,9 @@ traverseNestedExprsM mapper = exprMapper
         maybeExprMapper Nothing = return Nothing
         maybeExprMapper (Just e) =
             exprMapper e >>= return . Just
-        em (String     s) = return $ String    s
-        em (Number     s) = return $ Number    s
-        em (ConstBool  b) = return $ ConstBool b
-        em (Ident      i) = return $ Ident     i
+        em (String s) = return $ String s
+        em (Number s) = return $ Number s
+        em (Ident  i) = return $ Ident  i
         em (Range e (e1, e2)) = do
             e' <- exprMapper e
             e1' <- exprMapper e1
@@ -227,8 +226,8 @@ traverseNestedExprsM mapper = exprMapper
             return $ Mux e1' e2' e3'
         em (Cast       t e) =
             exprMapper e >>= return . Cast t
-        em (Access e x) =
-            exprMapper e >>= \e' -> return $ Access e' x
+        em (Dot e x) =
+            exprMapper e >>= \e' -> return $ Dot e' x
         em (Pattern l) = do
             let names = map fst l
             exprs <- mapM exprMapper $ map snd l

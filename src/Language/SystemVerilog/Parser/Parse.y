@@ -207,7 +207,7 @@ directive          { Token Spe_Directive _ _ }
 %left  "+" "-"
 %left  "*" "/" "%"
 %left  "**"
-%right  UPlus UMinus "!" "~" RedOps "++" "--"
+%right REDUCE_OP "!" "~" "++" "--"
 %left  "(" ")" "[" "]" "."
 
 
@@ -618,60 +618,62 @@ CallArgsFollow :: { [Maybe Expr] }
   | "," opt(Expr) CallArgsFollow { $2 : $3 }
 
 Exprs :: { [Expr] }
-:           Expr  { [$1] }
-| Exprs "," Expr  { $1 ++ [$3] }
+  :           Expr  { [$1] }
+  | Exprs "," Expr  { $1 ++ [$3] }
 
 Expr :: { Expr }
-: "(" Expr ")"                { $2 }
-| String                      { String $1 }
-| Number                      { Number $1 }
-| Identifier "(" CallArgs ")" { Call $1 $3 }
-| Identifier                  { Ident      $1    }
-| Expr Range                  { Range $1 $2 }
-| Expr "[" Expr "]"           { Bit   $1 $3 }
-| "{" Expr "{" Exprs "}" "}"  { Repeat $2 $4 }
-| "{" Exprs "}"               { Concat $2 }
-| Expr "?" Expr ":" Expr      { Mux $1 $3 $5 }
-| Expr "||" Expr              { BinOp Or  $1 $3 }
-| Expr "&&" Expr              { BinOp And $1 $3 }
-| Expr "|"  Expr              { BinOp BWOr $1 $3 }
-| Expr "^"  Expr              { BinOp BWXor $1 $3 }
-| Expr "&"  Expr              { BinOp BWAnd $1 $3 }
-| Expr "==" Expr              { BinOp Eq $1 $3 }
-| Expr "!=" Expr              { BinOp Ne $1 $3 }
-| Expr "<"  Expr              { BinOp Lt $1 $3 }
-| Expr "<=" Expr              { BinOp Le $1 $3 }
-| Expr ">"  Expr              { BinOp Gt $1 $3 }
-| Expr ">=" Expr              { BinOp Ge $1 $3 }
-| Expr "<<" Expr              { BinOp ShiftL $1 $3 }
-| Expr ">>" Expr              { BinOp ShiftR $1 $3 }
-| Expr "+"  Expr              { BinOp Add $1 $3 }
-| Expr "-"  Expr              { BinOp Sub $1 $3 }
-| Expr "*"  Expr              { BinOp Mul $1 $3 }
-| Expr "/"  Expr              { BinOp Div $1 $3 }
-| Expr "%"  Expr              { BinOp Mod $1 $3 }
-| Expr "**" Expr              { BinOp Pow $1 $3 }
-| Expr "<<<" Expr             { BinOp ShiftAL $1 $3 }
-| Expr ">>>" Expr             { BinOp ShiftAR $1 $3 }
-| Expr "===" Expr             { BinOp TEq $1 $3 }
-| Expr "!==" Expr             { BinOp TNe $1 $3 }
-| Expr "==?" Expr             { BinOp WEq $1 $3 }
-| Expr "!=?" Expr             { BinOp WNe $1 $3 }
-| "!" Expr                    { UniOp Not $2 }
-| "~" Expr                    { UniOp BWNot $2 }
-| "+" Expr %prec UPlus        { UniOp UAdd $2 }
-| "-" Expr %prec UMinus       { UniOp USub $2 }
-| "&"  Expr %prec RedOps      { UniOp RedAnd  $2 }
-| "~&" Expr %prec RedOps      { UniOp RedNand $2 }
-| "|"  Expr %prec RedOps      { UniOp RedOr   $2 }
-| "~|" Expr %prec RedOps      { UniOp RedNor  $2 }
-| "^"  Expr %prec RedOps      { UniOp RedXor  $2 }
-| "~^" Expr %prec RedOps      { UniOp RedXnor $2 }
-| "^~" Expr %prec RedOps      { UniOp RedXnor $2 }
-| CastingType "'" "(" Expr ")" { Cast ($1         ) $4 }
-| Identifier  "'" "(" Expr ")" { Cast (Alias $1 []) $4 }
-| Expr "." Identifier         { Access $1 $3 }
-| "'" "{" PatternItems "}"    { Pattern $3 }
+  : "(" Expr ")"                { $2 }
+  | String                      { String $1 }
+  | Number                      { Number $1 }
+  | Identifier "(" CallArgs ")" { Call $1 $3 }
+  | Identifier                  { Ident $1 }
+  | Expr Range                  { Range $1 $2 }
+  | Expr "[" Expr "]"           { Bit   $1 $3 }
+  | "{" Expr "{" Exprs "}" "}"  { Repeat $2 $4 }
+  | "{" Exprs "}"               { Concat $2 }
+  | Expr "?" Expr ":" Expr      { Mux $1 $3 $5 }
+  | CastingType "'" "(" Expr ")" { Cast ($1         ) $4 }
+  | Identifier  "'" "(" Expr ")" { Cast (Alias $1 []) $4 }
+  | Expr "." Identifier         { Dot $1 $3 }
+  | "'" "{" PatternItems "}"    { Pattern $3 }
+  -- binary expressions
+  | Expr "||"  Expr { BinOp LogOr  $1 $3 }
+  | Expr "&&"  Expr { BinOp LogAnd $1 $3 }
+  | Expr "|"   Expr { BinOp BitOr  $1 $3 }
+  | Expr "^"   Expr { BinOp BitXor $1 $3 }
+  | Expr "&"   Expr { BinOp BitAnd $1 $3 }
+  | Expr "+"   Expr { BinOp Add $1 $3 }
+  | Expr "-"   Expr { BinOp Sub $1 $3 }
+  | Expr "*"   Expr { BinOp Mul $1 $3 }
+  | Expr "/"   Expr { BinOp Div $1 $3 }
+  | Expr "%"   Expr { BinOp Mod $1 $3 }
+  | Expr "**"  Expr { BinOp Pow $1 $3 }
+  | Expr "=="  Expr { BinOp Eq $1 $3 }
+  | Expr "!="  Expr { BinOp Ne $1 $3 }
+  | Expr "<"   Expr { BinOp Lt $1 $3 }
+  | Expr "<="  Expr { BinOp Le $1 $3 }
+  | Expr ">"   Expr { BinOp Gt $1 $3 }
+  | Expr ">="  Expr { BinOp Ge $1 $3 }
+  | Expr "===" Expr { BinOp TEq $1 $3 }
+  | Expr "!==" Expr { BinOp TNe $1 $3 }
+  | Expr "==?" Expr { BinOp WEq $1 $3 }
+  | Expr "!=?" Expr { BinOp WNe $1 $3 }
+  | Expr "<<"  Expr { BinOp ShiftL $1 $3 }
+  | Expr ">>"  Expr { BinOp ShiftR $1 $3 }
+  | Expr "<<<" Expr { BinOp ShiftAL $1 $3 }
+  | Expr ">>>" Expr { BinOp ShiftAR $1 $3 }
+  -- unary expressions
+  | "!"  Expr                 { UniOp LogNot $2 }
+  | "~"  Expr                 { UniOp BitNot $2 }
+  | "+"  Expr %prec REDUCE_OP { UniOp UniAdd $2 }
+  | "-"  Expr %prec REDUCE_OP { UniOp UniSub $2 }
+  | "&"  Expr %prec REDUCE_OP { UniOp RedAnd  $2 }
+  | "~&" Expr %prec REDUCE_OP { UniOp RedNand $2 }
+  | "|"  Expr %prec REDUCE_OP { UniOp RedOr   $2 }
+  | "~|" Expr %prec REDUCE_OP { UniOp RedNor  $2 }
+  | "^"  Expr %prec REDUCE_OP { UniOp RedXor  $2 }
+  | "~^" Expr %prec REDUCE_OP { UniOp RedXnor $2 }
+  | "^~" Expr %prec REDUCE_OP { UniOp RedXnor $2 }
 
 PatternItems :: { [(Maybe Identifier, Expr)] }
   : PatternNamedItems   { map (\(x,e) -> (Just x, e)) $1 }
@@ -726,9 +728,9 @@ AsgnOp :: { AsgnOp }
   | "*="   { AsgnOp Mul }
   | "/="   { AsgnOp Div }
   | "%="   { AsgnOp Mod }
-  | "&="   { AsgnOp BWAnd }
-  | "|="   { AsgnOp BWOr  }
-  | "^="   { AsgnOp BWXor }
+  | "&="   { AsgnOp BitAnd }
+  | "|="   { AsgnOp BitOr  }
+  | "^="   { AsgnOp BitXor }
   | "<<="  { AsgnOp ShiftL }
   | ">>="  { AsgnOp ShiftR }
   | "<<<=" { AsgnOp ShiftAL }
@@ -771,11 +773,11 @@ combineTags Nothing other = other
 combineTags other   _     = other
 
 exprToLHS :: Expr -> LHS
-exprToLHS (Ident    x) = LHSIdent x
-exprToLHS (Bit    e b) = LHSBit   (exprToLHS e) b
-exprToLHS (Range  e r) = LHSRange (exprToLHS e) r
-exprToLHS (Access e x) = LHSDot   (exprToLHS e) x
-exprToLHS (Concat es ) = LHSConcat (map exprToLHS es)
+exprToLHS (Ident   x) = LHSIdent x
+exprToLHS (Bit   e b) = LHSBit   (exprToLHS e) b
+exprToLHS (Range e r) = LHSRange (exprToLHS e) r
+exprToLHS (Dot   e x) = LHSDot   (exprToLHS e) x
+exprToLHS (Concat es) = LHSConcat (map exprToLHS es)
 exprToLHS other =
   error $ "Parse error: cannot convert expression to LHS: " ++ show other
 

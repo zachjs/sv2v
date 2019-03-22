@@ -193,13 +193,13 @@ convertAsgn structs types (lhs, expr) =
             case Map.lookup x types of
                 Nothing -> (Implicit Unspecified [], Ident x)
                 Just t -> (t, Ident x)
-        convertSubExpr (Access e x) =
+        convertSubExpr (Dot e x) =
             case subExprType of
                 Struct _ _ _ ->
                     if Map.notMember structTf structs
-                        then (fieldType, Access e' x)
+                        then (fieldType, Dot e' x)
                         else (fieldType, Range  e' r)
-                _ -> (Implicit Unspecified [], Access e' x)
+                _ -> (Implicit Unspecified [], Dot e' x)
             where
                 (subExprType, e') = convertSubExpr e
                 Struct p fields [] = subExprType

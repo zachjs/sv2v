@@ -1,60 +1,63 @@
-{-# LANGUAGE FlexibleInstances #-}
-module Language.SystemVerilog.AST
-  ( Identifier
-  , Description(..)
-  , PackageItem(..)
-  , ModuleItem (..)
-  , Direction  (..)
-  , Type       (..)
-  , Stmt       (..)
-  , LHS        (..)
-  , Expr       (..)
-  , UniOp      (..)
-  , BinOp      (..)
-  , AsgnOp     (..)
-  , Sense      (..)
-  , Timing     (..)
-  , GenItem    (..)
-  , AlwaysKW   (..)
-  , CaseKW     (..)
-  , PartKW     (..)
-  , Decl       (..)
-  , Lifetime   (..)
-  , NInputGateKW  (..)
-  , NOutputGateKW (..)
-  , AST
-  , PortBinding
-  , ModportDecl
-  , Case
-  , Range
-  , GenCase
-  , typeRanges
-  , simplify
-  , rangeSize
-  , Signing (..)
-  , NetType (..)
-  , IntegerVectorType (..)
-  , IntegerAtomType   (..)
-  , NonIntegerType    (..)
-  , Packing           (..)
-  ) where
+{- sv2v
+ - Author: Zachary Snow <zach@zachjs.com>
+ - Initial Verilog AST Author: Tom Hawkins <tomahawkins@gmail.com>
+ -
+ - This AST allows for the representation of many syntactically invalid things,
+ - like input regs or modport declarations inside a module. Representing only
+ - syntactically valid files would make working with the AST a nightmare. We
+ - have placed an emphasis on making the conversion procedures in this project
+ - more easier to write, interpret, and maintain.
+ -
+ - In the future, we may want to have a utility which performs some basic
+ - invariant checks. I want to avoid making a full type-checker though, as we
+ - should only be given valid SystemVerilog input files.
+ -}
 
-import Data.List
-import Data.Maybe
-import Text.Printf
+module Language.SystemVerilog.AST
+    ( Description(..)
+    , PackageItem(..)
+    , ModuleItem (..)
+    , Direction  (..)
+    , Stmt       (..)
+    , LHS        (..)
+    , Expr       (..)
+    , Sense      (..)
+    , Timing     (..)
+    , GenItem    (..)
+    , AlwaysKW   (..)
+    , CaseKW     (..)
+    , PartKW     (..)
+    , Decl       (..)
+    , Lifetime   (..)
+    , NInputGateKW  (..)
+    , NOutputGateKW (..)
+    , AST
+    , PortBinding
+    , ModportDecl
+    , Case
+    , GenCase
+    , simplify
+    , rangeSize
+    , module Expr
+    , module Op
+    , module Type
+    ) where
+
+import Data.List (intercalate)
+import Data.Maybe (maybe, fromJust, isJust)
+import Text.Printf (printf)
 import Text.Read (readMaybe)
 
-type Identifier = String
+import Language.SystemVerilog.AST.Expr as Expr
+import Language.SystemVerilog.AST.Op as Op
+import Language.SystemVerilog.AST.Type as Type
+
+import Language.SystemVerilog.AST.ShowHelp
 
 -- Note: Verilog allows modules to be declared with either a simple list of
 -- ports _identifiers_, or a list of port _declarations_. If only the
 -- identifiers are used, they must be declared with a type and direction
 -- (potentially separately!) within the module itself.
-
--- Note: This AST will allow for the representation of syntactically invalid
--- things, like input regs. We might want to have a function for doing some
--- basing invariant checks. I want to avoid making a full type-checker though,
--- as we should only be given valid SystemVerilog input files.
 
 type AST = [Description]
 
@@ -118,146 +121,6 @@ instance Show Direction where
   show Output = "output"
   show Inout  = "inout"
   show Local  = ""
-
-data Signing
-  = Unspecified
-  | Signed
-  | Unsigned
-  deriving (Eq, Ord)
-
-instance Show Signing where
-  show Unspecified = ""
-  show Signed = "signed"
-  show Unsigned = "unsigned"
-
-data NetType
-  = TSupply0
-  | TSupply1
-  | TTri
-  | TTriand
-  | TTrior
-  | TTrireg
-  | TTri0
-  | TTri1
-  | TUwire
-  | TWire
-  | TWand
-  | TWor
-  deriving (Eq, Ord)
-data IntegerVectorType
-  = TBit
-  | TLogic
-  | TReg
-  deriving (Eq, Ord)
-data IntegerAtomType
-  = TByte
-  | TShortint
-  | TInt
-  | TLongint
-  | TInteger
-  | TTime
-  deriving (Eq, Ord)
-data NonIntegerType
-  = TShortreal
-  | TReal
-  | TRealtime
-  deriving (Eq, Ord)
-instance Show NetType where
-  show TSupply0   = "supply0"
-  show TSupply1   = "supply1"
-  show TTri       = "tri"
-  show TTriand    = "triand"
-  show TTrior     = "trior"
-  show TTrireg    = "trireg"
-  show TTri0      = "tri0"
-  show TTri1      = "tri1"
-  show TUwire     = "uwire"
-  show TWire      = "wire"
-  show TWand      = "wand"
-  show TWor       = "wor"
-instance Show IntegerVectorType where
-  show TBit       = "bit"
-  show TLogic     = "logic"
-  show TReg       = "reg"
-instance Show IntegerAtomType where
-  show TByte      = "byte"
-  show TShortint  = "shortint"
-  show TInt       = "int"
-  show TLongint   = "longint"
-  show TInteger   = "integer"
-  show TTime      = "time"
-instance Show NonIntegerType where
-  show TShortreal = "shortreal"
-  show TReal      = "real"
-  show TRealtime  = "realtime"
-
-data Packing
-  = Unpacked
-  | Packed Signing
-  deriving (Eq, Ord)
-
-instance Show Packing where
-  show (Unpacked) = ""
-  show (Packed s) = "packed" ++ (showPadBefore s)
-
-type Item = (Identifier, Maybe Expr)
-type Field = (Type, Identifier)
-
-data Type
-  = IntegerVector IntegerVectorType  Signing [Range]
-  | IntegerAtom   IntegerAtomType    Signing
-  | NonInteger    NonIntegerType
-  | Net           NetType                    [Range]
-  | Implicit                         Signing [Range]
-  | Alias                 Identifier         [Range]
-  | Enum     (Maybe Type) [Item]             [Range]
-  | Struct   Packing      [Field]            [Range]
-  | InterfaceT Identifier (Maybe Identifier) [Range]
-  deriving (Eq, Ord)
-
-instance Show Type where
-  show (Alias         xx    rs) = printf "%s%s"   xx                           (showRanges rs)
-  show (Net           kw    rs) = printf "%s%s"   (show kw)                    (showRanges rs)
-  show (Implicit         sg rs) = printf "%s%s"             (show          sg) (showRanges rs)
-  show (IntegerVector kw sg rs) = printf "%s%s%s" (show kw) (showPadBefore sg) (showRanges rs)
-  show (IntegerAtom   kw sg   ) = printf "%s%s"   (show kw) (showPadBefore sg)
-  show (NonInteger    kw      ) = printf "%s"     (show kw)
-  show (InterfaceT x my r) = x ++ yStr ++ (showRanges r)
-    where yStr = maybe "" ("."++) my
-  show (Enum mt vals r) = printf "enum %s{%s}%s" tStr (commas $ map showVal vals) (showRanges r)
-    where
-      tStr = maybe "" showPad mt
-      showVal :: (Identifier, Maybe Expr) -> String
-      showVal (x, e) = x ++ (showAssignment e)
-  show (Struct p items r) = printf "struct %s{\n%s\n}%s" (showPad p) itemsStr (showRanges r)
-    where
-      itemsStr = indent $ unlines' $ map showItem items
-      showItem (t, x) = printf "%s %s;" (show t) x
-
-instance Show ([Range] -> Type) where
-  show tf = show (tf [])
-instance Eq ([Range] -> Type) where
-  (==) tf1 tf2 = (tf1 []) == (tf2 [])
-instance Ord ([Range] -> Type) where
-  compare tf1 tf2 = compare (tf1 []) (tf2 [])
-
-instance Show (Signing -> [Range] -> Type) where
-  show tf = show (tf Unspecified)
-instance Eq (Signing -> [Range] -> Type) where
-  (==) tf1 tf2 = (tf1 Unspecified) == (tf2 Unspecified)
-instance Ord (Signing -> [Range] -> Type) where
-  compare tf1 tf2 = compare (tf1 Unspecified) (tf2 Unspecified)
-
-typeRanges :: Type -> ([Range] -> Type, [Range])
-typeRanges (Alias         xx    rs) = (Alias         xx   , rs)
-typeRanges (Net           kw    rs) = (Net           kw   , rs)
-typeRanges (Implicit         sg rs) = (Implicit         sg, rs)
-typeRanges (IntegerVector kw sg rs) = (IntegerVector kw sg, rs)
-typeRanges (IntegerAtom   kw sg   ) = (\[] -> IntegerAtom   kw sg, [])
-typeRanges (NonInteger    kw      ) = (\[] -> NonInteger    kw   , [])
-typeRanges (Enum   t v r) = (Enum   t v, r)
-typeRanges (Struct p l r) = (Struct p l, r)
-typeRanges (InterfaceT x my r) = (InterfaceT x my, r)
 
 data Decl
   = Parameter            Type Identifier Expr
@@ -357,176 +220,6 @@ instance Show NOutputGateKW where
   show GateBuf  = "buf"
   show GateNot  = "not"
 
-showAssignment :: Maybe Expr -> String
-showAssignment Nothing = ""
-showAssignment (Just val) = " = " ++ show val
-
-showRanges :: [Range] -> String
-showRanges [] = ""
-showRanges l = " " ++ (concat $ map rangeToString l)
-  where rangeToString d = init $ showRange $ Just d
-
-showRange :: Maybe Range -> String
-showRange Nothing = ""
-showRange (Just (h, l)) = printf "[%s:%s] " (show h) (show l)
-
-showPad :: Show t => t -> String
-showPad x =
-    if str == ""
-      then ""
-      else str ++ " "
-    where str = show x
-
-showPadBefore :: Show t => t -> String
-showPadBefore x =
-    if str == ""
-      then ""
-      else " " ++ str
-    where str = show x
-
-indent :: String -> String
-indent a = '\t' : f a
-  where
-  f [] = []
-  f (x : xs)
-    | x == '\n' = "\n\t" ++ f xs
-    | otherwise = x : f xs
-
-unlines' :: [String] -> String
-unlines' = intercalate "\n"
-
-data Expr
-  = String     String
-  | Number     String
-  | ConstBool  Bool
-  | Ident      Identifier
-  | Range      Expr Range
-  | Bit        Expr Expr
-  | Repeat     Expr [Expr]
-  | Concat     [Expr]
-  | Call       Identifier [Maybe Expr]
-  | UniOp      UniOp Expr
-  | BinOp      BinOp Expr Expr
-  | Mux        Expr Expr Expr
-  | Cast       Type Expr
-  | Access     Expr Identifier
-  | Pattern    [(Maybe Identifier, Expr)]
-  deriving (Eq, Ord)
-
-data UniOp
-  = Not
-  | BWNot
-  | UAdd
-  | USub
-  | RedAnd
-  | RedNand
-  | RedOr
-  | RedNor
-  | RedXor
-  | RedXnor
-  deriving (Eq, Ord)
-
-instance Show UniOp where
-  show Not     = "!"
-  show BWNot   = "~"
-  show UAdd    = "+"
-  show USub    = "-"
-  show RedAnd  = "&"
-  show RedNand = "~&"
-  show RedOr   = "|"
-  show RedNor  = "~|"
-  show RedXor  = "^"
-  show RedXnor = "~^"
-
-data BinOp
-  = And
-  | Or
-  | BWAnd
-  | BWXor
-  | BWOr
-  | Mul
-  | Div
-  | Mod
-  | Add
-  | Sub
-  | ShiftL
-  | ShiftR
-  | Eq
-  | Ne
-  | Lt
-  | Le
-  | Gt
-  | Ge
-  | Pow
-  | ShiftAL
-  | ShiftAR
-  | TEq
-  | TNe
-  | WEq
-  | WNe
-  deriving (Eq, Ord)
-
-instance Show BinOp where
-  show a = case a of
-    And    -> "&&"
-    Or     -> "||"
-    BWAnd  -> "&"
-    BWXor  -> "^"
-    BWOr   -> "|"
-    Mul    -> "*"
-    Div    -> "/"
-    Mod    -> "%"
-    Add    -> "+"
-    Sub    -> "-"
-    ShiftL -> "<<"
-    ShiftR -> ">>"
-    Eq     -> "=="
-    Ne     -> "!="
-    Lt     -> "<"
-    Le     -> "<="
-    Gt     -> ">"
-    Ge     -> ">="
-    Pow    -> "**"
-    ShiftAL -> "<<<"
-    ShiftAR -> ">>>"
-    TEq     -> "==="
-    TNe     -> "!=="
-    WEq     -> "==?"
-    WNe     -> "!=?"
-
-instance Show Expr where
-  show x = case x of
-    String     a        -> printf "\"%s\"" a
-    Number     a        -> a
-    ConstBool  a        -> printf "1'b%s" (if a then "1" else "0")
-    Ident      a        -> a
-    Bit        a b      -> printf "%s[%s]"    (show a) (show b)
-    Range      a (b, c) -> printf "%s[%s:%s]" (show a) (show b) (show c)
-    Repeat     a b      -> printf "{%s {%s}}" (show a) (commas $ map show b)
-    Concat     a        -> printf "{%s}" (commas $ map show a)
-    Call       a b      -> printf "%s(%s)" a (commas $ map (maybe "" show) b)
-    UniOp      a b      -> printf "(%s %s)" (show a) (show b)
-    BinOp      a b c    -> printf "(%s %s %s)" (show b) (show a) (show c)
-    Mux        a b c    -> printf "(%s ? %s : %s)" (show a) (show b) (show c)
-    Cast       a b      -> printf "%s'(%s)" (show a) (show b)
-    Access     e n      -> printf "%s.%s" (show e) n
-    Pattern    l        -> printf "'{\n%s\n}" (showPatternItems l)
-    where
-      showPatternItems :: [(Maybe Identifier, Expr)] -> String
-      showPatternItems l = indent $ intercalate ",\n" (map showPatternItem l)
-      showPatternItem :: (Maybe Identifier, Expr) -> String
-      showPatternItem (Nothing, e) = show e
-      showPatternItem (Just n , e) = printf "%s: %s" n (show e)
-
-data AsgnOp
-  = AsgnOpEq
-  | AsgnOp BinOp
-  deriving Eq
-
-instance Show AsgnOp where
-  show AsgnOpEq = "="
-  show (AsgnOp op) = (show op) ++ "="
-
 data LHS
   = LHSIdent  Identifier
   | LHSBit    LHS Expr
@@ -569,9 +262,6 @@ data Stmt
   | Subroutine Identifier [Maybe Expr]
   | Null
   deriving Eq
-
-commas :: [String] -> String
-commas = intercalate ", "
 
 instance Show Stmt where
   show (Block name decls stmts) =
@@ -636,14 +326,6 @@ instance Show Sense where
   show (SensePosedge a  ) = printf "posedge %s" (show a)
   show (SenseNegedge a  ) = printf "negedge %s" (show a)
   show (SenseStar       ) = "*"
-
-type Range = (Expr, Expr)
-
-indentedParenList :: [String] -> String
-indentedParenList [] = "()"
-indentedParenList [x] = "(" ++ x ++ ")"
-indentedParenList l =
-  "(\n" ++ (indent $ intercalate ",\n" l) ++ "\n)"
 
 type GenCase = ([Expr], GenItem)
 
