@@ -24,7 +24,14 @@ unskippableDirectives :: [String]
 unskippableDirectives = ["else", "elsif", "endif"]
 
 preprocess :: [Token] -> (StateT PP IO) [Token]
-preprocess tokens = pp tokens
+preprocess tokens = pp tokens >>= return . combineNumbers
+
+-- a bit of a hack to allow things like: `WIDTH'b0
+combineNumbers :: [Token] -> [Token]
+combineNumbers (Token Lit_number size pos : Token Lit_number ('\'' : num) _ : tokens) =
+    Token Lit_number (size ++ "'" ++ num) pos : combineNumbers tokens
+combineNumbers (token : tokens) = token : combineNumbers tokens
+combineNumbers [] = []
 
 data Cond
     = CurrentlyTrue

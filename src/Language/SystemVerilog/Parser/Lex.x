@@ -27,20 +27,18 @@ $decimalDigit = [0-9]
 
 @unsignedNumber = $decimalDigit ("_" | $decimalDigit)*
 
-@size = @unsignedNumber
+@size = @unsignedNumber " "?
 
-@decimalNumber
-  = @unsignedNumber
-  | @size? @decimalBase @unsignedNumber
-
-@binaryNumber = @size? @binaryBase @binaryValue
-@octalNumber  = @size? @octalBase  @octalValue
-@hexNumber    = @size? @hexBase    @hexValue
+@decimalNumber = @size? @decimalBase " "? @unsignedNumber
+@binaryNumber  = @size? @binaryBase  " "? @binaryValue
+@octalNumber   = @size? @octalBase   " "? @octalValue
+@hexNumber     = @size? @hexBase     " "? @hexValue
 
 @unbasedUnsizedLiteral = "'" ( 0 | 1 | x | X | z | Z )
 
 @number
-  = @decimalNumber
+  = @unsignedNumber
+  | @decimalNumber
   | @octalNumber
   | @binaryNumber
   | @hexNumber
