@@ -20,6 +20,8 @@ module Language.SystemVerilog.AST
   , PartKW     (..)
   , Decl       (..)
   , Lifetime   (..)
+  , NInputGateKW  (..)
+  , NOutputGateKW (..)
   , AST
   , PortBinding
   , ModportDecl
@@ -186,6 +188,8 @@ data ModuleItem
   | Modport    Identifier [ModportDecl]
   | Initial    Stmt
   | MIPackageItem PackageItem
+  | NInputGate  NInputGateKW  (Maybe Identifier)  LHS [Expr]
+  | NOutputGate NOutputGateKW (Maybe Identifier) [LHS] Expr
   deriving Eq
 
 data AlwaysKW
@@ -218,6 +222,8 @@ instance Show ModuleItem where
     Modport    x l   -> printf "modport %s(\n%s\n);" x (indent $ intercalate ",\n" $ map showModportDecl l)
     Initial    s     -> printf "initial %s" (show s)
     MIPackageItem i  -> show i
+    NInputGate  kw x lhs  exprs -> printf "%s%s (%s, %s);" (show kw) (maybe "" (" " ++) x) (show lhs) (commas $ map show exprs)
+    NOutputGate kw x lhss expr  -> printf "%s%s (%s, %s);" (show kw) (maybe "" (" " ++) x) (commas $ map show lhss) (show expr)
     where
     showPorts :: [PortBinding] -> String
     showPorts ports = indentedParenList $ map showPort ports
@@ -232,6 +238,30 @@ instance Show ModuleItem where
       if me == Just (Ident ident)
         then printf "%s %s" (show dir) ident
         else printf "%s .%s(%s)" (show dir) ident (maybe "" show me)
+
+data NInputGateKW
+  = GateAnd
+  | GateNand
+  | GateOr
+  | GateNor
+  | GateXor
+  | GateXnor
+  deriving Eq
+data NOutputGateKW
+  = GateBuf
+  | GateNot
+  deriving Eq
+
+instance Show NInputGateKW where
+  show GateAnd  = "and"
+  show GateNand = "nand"
+  show GateOr   = "or"
+  show GateNor  = "nor"
+  show GateXor  = "xor"
+  show GateXnor = "xnor"
+instance Show NOutputGateKW where
+  show GateBuf  = "buf"
+  show GateNot  = "not"
 
 showAssignment :: Maybe Expr -> String
 showAssignment Nothing = ""

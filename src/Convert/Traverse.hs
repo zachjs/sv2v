@@ -317,6 +317,11 @@ traverseExprsM mapper = moduleItemMapper
         return $ Instance m params x l'
     moduleItemMapper (Modport x l) =
         mapM modportDeclMapper l >>= return . Modport x
+    moduleItemMapper (NInputGate  kw x lhs exprs) = do
+        exprs' <- mapM exprMapper exprs
+        return $ NInputGate kw x lhs exprs'
+    moduleItemMapper (NOutputGate kw x lhss expr) =
+        exprMapper expr >>= return . NOutputGate kw x lhss
     moduleItemMapper (Genvar   x) = return $ Genvar   x
     moduleItemMapper (Generate x) = return $ Generate x
     moduleItemMapper (MIPackageItem (Typedef t x)) =
@@ -344,6 +349,12 @@ traverseLHSsM mapper item =
         traverseModuleItemLHSsM (Defparam lhs expr) = do
             lhs' <- mapper lhs
             return $ Defparam lhs' expr
+        traverseModuleItemLHSsM (NOutputGate kw x lhss expr) = do
+            lhss' <- mapM mapper lhss
+            return $ NOutputGate kw x lhss' expr
+        traverseModuleItemLHSsM (NInputGate  kw x lhs exprs) = do
+            lhs' <- mapper lhs
+            return $ NInputGate kw x lhs' exprs
         traverseModuleItemLHSsM other = return other
 
 traverseLHSs :: Mapper LHS -> Mapper ModuleItem

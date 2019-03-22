@@ -21,9 +21,11 @@ import Language.SystemVerilog.Parser.Tokens
 "always_comb"      { Token KW_always_comb  _ _ }
 "always_ff"        { Token KW_always_ff    _ _ }
 "always_latch"     { Token KW_always_latch _ _ }
+"and"              { Token KW_and          _ _ }
 "assign"           { Token KW_assign       _ _ }
 "automatic"        { Token KW_automatic    _ _ }
 "begin"            { Token KW_begin        _ _ }
+"buf"              { Token KW_buf          _ _ }
 "case"             { Token KW_case         _ _ }
 "casex"            { Token KW_casex        _ _ }
 "casez"            { Token KW_casez        _ _ }
@@ -54,7 +56,10 @@ import Language.SystemVerilog.Parser.Tokens
 "logic"            { Token KW_logic        _ _ }
 "modport"          { Token KW_modport      _ _ }
 "module"           { Token KW_module       _ _ }
+"nand"             { Token KW_nand         _ _ }
 "negedge"          { Token KW_negedge      _ _ }
+"nor"              { Token KW_nor          _ _ }
+"not"              { Token KW_not          _ _ }
 "or"               { Token KW_or           _ _ }
 "output"           { Token KW_output       _ _ }
 "packed"           { Token KW_packed       _ _ }
@@ -70,6 +75,8 @@ import Language.SystemVerilog.Parser.Tokens
 "unique"           { Token KW_unique       _ _ }
 "while"            { Token KW_while        _ _ }
 "wire"             { Token KW_wire         _ _ }
+"xnor"             { Token KW_xnor         _ _ }
+"xor"              { Token KW_xor          _ _ }
 
 simpleIdentifier   { Token Id_simple       _ _ }
 escapedIdentifier  { Token Id_escaped      _ _ }
@@ -331,6 +338,34 @@ ModuleItem :: { [ModuleItem] }
   | "generate" GenItems "endgenerate"    { [Generate $2] }
   | "modport" ModportItems ";"           { map (uncurry Modport) $2 }
   | PackageItem                          { [MIPackageItem $1] }
+  | NInputGateKW  NInputGates  ";"       { map (\(a, b, c) -> NInputGate  $1 a b c) $2 }
+  | NOutputGateKW NOutputGates ";"       { map (\(a, b, c) -> NOutputGate $1 a b c) $2 }
+
+NInputGates :: { [(Maybe Identifier, LHS, [Expr])] }
+  : NInputGate                 { [$1] }
+  | NInputGates "," NInputGate { $1 ++ [$3]}
+NOutputGates :: { [(Maybe Identifier, [LHS], Expr)] }
+  : NOutputGate                  { [$1] }
+  | NOutputGates "," NOutputGate { $1 ++ [$3]}
+
+NInputGate :: { (Maybe Identifier, LHS, [Expr]) }
+  : opt(Identifier) "(" LHS "," Exprs ")" { ($1, $3, $5) }
+NOutputGate :: { (Maybe Identifier, [LHS], Expr) }
+  : opt(Identifier) "(" NOutputGateItems { ($1, fst $3, snd $3) }
+NOutputGateItems :: { ([LHS], Expr) }
+  : Expr ")" { ([], $1) }
+  | Expr "," NOutputGateItems { (fst $3 ++ [exprToLHS $1], snd $3) }
+
+NInputGateKW :: { NInputGateKW }
+  : "and"  { GateAnd  }
+  | "nand" { GateNand }
+  | "or"   { GateOr   }
+  | "nor"  { GateNor  }
+  | "xor"  { GateXor  }
+  | "xnor" { GateXnor }
+NOutputGateKW :: { NOutputGateKW }
+  : "buf"  { GateBuf  }
+  | "not"  { GateNot  }
 
 DefparamAsgns :: { [(LHS, Expr)] }
   : DefparamAsgn                   { [$1] }
@@ -654,5 +689,14 @@ combineTags (Just a) (Just b) =
     else error $ "tag mismatch: " ++ show (a, b)
 combineTags Nothing other = other
 combineTags other   _     = other
+
+exprToLHS :: Expr -> LHS
+exprToLHS (Ident    x) = LHSIdent x
+exprToLHS (Bit    e b) = LHSBit   (exprToLHS e) b
+exprToLHS (Range  e r) = LHSRange (exprToLHS e) r
+exprToLHS (Access e x) = LHSDot   (exprToLHS e) x
+exprToLHS (Concat es ) = LHSConcat (map exprToLHS es)
+exprToLHS other =
+  error $ "Parse error: cannot convert expression to LHS: " ++ show other
 
 }

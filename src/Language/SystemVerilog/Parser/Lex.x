@@ -78,9 +78,11 @@ tokens :-
   "always_comb"      { tok KW_always_comb  }
   "always_ff"        { tok KW_always_ff    }
   "always_latch"     { tok KW_always_latch }
+  "and"              { tok KW_and          }
   "assign"           { tok KW_assign       }
   "automatic"        { tok KW_automatic    }
   "begin"            { tok KW_begin        }
+  "buf"              { tok KW_buf          }
   "case"             { tok KW_case         }
   "casex"            { tok KW_casex        }
   "casez"            { tok KW_casez        }
@@ -111,7 +113,10 @@ tokens :-
   "logic"            { tok KW_logic        }
   "modport"          { tok KW_modport      }
   "module"           { tok KW_module       }
+  "nand"             { tok KW_nand         }
   "negedge"          { tok KW_negedge      }
+  "nor"              { tok KW_nor          }
+  "not"              { tok KW_not          }
   "or"               { tok KW_or           }
   "output"           { tok KW_output       }
   "packed"           { tok KW_packed       }
@@ -127,6 +132,8 @@ tokens :-
   "unique"           { tok KW_unique       }
   "while"            { tok KW_while        }
   "wire"             { tok KW_wire         }
+  "xnor"             { tok KW_xnor         }
+  "xor"              { tok KW_xor          }
 
   @simpleIdentifier  { tok Id_simple  }
   @escapedIdentifier { tok Id_escaped }
