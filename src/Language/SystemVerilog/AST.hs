@@ -18,28 +18,24 @@ module Language.SystemVerilog.AST
     , PackageItem(..)
     , ModuleItem (..)
     , Direction  (..)
-    , Stmt       (..)
-    , LHS        (..)
-    , Expr       (..)
-    , Sense      (..)
-    , Timing     (..)
     , GenItem    (..)
     , AlwaysKW   (..)
     , CaseKW     (..)
     , PartKW     (..)
-    , Decl       (..)
     , Lifetime   (..)
     , NInputGateKW  (..)
     , NOutputGateKW (..)
     , AST
     , PortBinding
     , ModportDecl
-    , Case
     , GenCase
     , simplify
     , rangeSize
+    , module Decl
     , module Expr
+    , module LHS
     , module Op
+    , module Stmt
     , module Type
     ) where
 
@@ -48,8 +44,11 @@ import Data.Maybe (maybe, fromJust, isJust)
 import Text.Printf (printf)
 import Text.Read (readMaybe)
 
+import Language.SystemVerilog.AST.Decl as Decl
 import Language.SystemVerilog.AST.Expr as Expr
+import Language.SystemVerilog.AST.LHS as LHS
 import Language.SystemVerilog.AST.Op as Op
+import Language.SystemVerilog.AST.Stmt as Stmt
 import Language.SystemVerilog.AST.Type as Type
 
 import Language.SystemVerilog.AST.ShowHelp
@@ -108,31 +107,6 @@ data PartKW
 instance Show PartKW where
   show Module    = "module"
   show Interface = "interface"
-
-data Direction
-  = Input
-  | Output
-  | Inout
-  | Local
-  deriving Eq
-
-instance Show Direction where
-  show Input  = "input"
-  show Output = "output"
-  show Inout  = "inout"
-  show Local  = ""
-
-data Decl
-  = Parameter            Type Identifier Expr
-  | Localparam           Type Identifier Expr
-  | Variable   Direction Type Identifier [Range] (Maybe Expr)
-  deriving Eq
-
-instance Show Decl where
-  showList l _ = unlines' $ map show l
-  show (Parameter  t x e) = printf  "parameter %s%s = %s;" (showPad t) x (show e)
-  show (Localparam t x e) = printf "localparam %s%s = %s;" (showPad t) x (show e)
-  show (Variable d t x a me) = printf "%s%s %s%s%s;" (showPad d) (show t) x (showRanges a) (showAssignment me)
 
 data ModuleItem
   = MIDecl     Decl
@@ -219,113 +193,6 @@ instance Show NInputGateKW where
 instance Show NOutputGateKW where
   show GateBuf  = "buf"
   show GateNot  = "not"
-
-data LHS
-  = LHSIdent  Identifier
-  | LHSBit    LHS Expr
-  | LHSRange  LHS Range
-  | LHSDot    LHS Identifier
-  | LHSConcat [LHS]
-  deriving Eq
-
-instance Show LHS where
-  show (LHSIdent   x       ) = x
-  show (LHSBit     l e     ) = printf "%s[%s]"    (show l) (show e)
-  show (LHSRange   l (a, b)) = printf "%s[%s:%s]" (show l) (show a) (show b)
-  show (LHSDot     l x     ) = printf "%s.%s"     (show l) x
-  show (LHSConcat  lhss    ) = printf "{%s}" (commas $ map show lhss)
-
-data CaseKW
-  = CaseN
-  | CaseZ
-  | CaseX
-  deriving Eq
-
-instance Show CaseKW where
-  show CaseN = "case"
-  show CaseZ = "casez"
-  show CaseX = "casex"
-
-data Stmt
-  = Block   (Maybe Identifier) [Decl] [Stmt]
-  | Case    Bool CaseKW Expr [Case] (Maybe Stmt)
-  | For     (Identifier, Expr) Expr (Identifier, Expr) Stmt
-  | AsgnBlk AsgnOp LHS Expr
-  | Asgn    (Maybe Timing) LHS Expr
-  | While   Expr Stmt
-  | RepeatL Expr Stmt
-  | DoWhile Expr Stmt
-  | Forever Stmt
-  | If      Expr Stmt Stmt
-  | Timing  Timing Stmt
-  | Return  Expr
-  | Subroutine Identifier [Maybe Expr]
-  | Null
-  deriving Eq
-
-instance Show Stmt where
-  show (Block name decls stmts) =
-    printf "begin%s\n%s\n%s\nend" header (block decls) (block stmts)
-    where
-      header = maybe "" (" : " ++) name
-      block :: Show t => [t] -> String
-      block = indent . unlines' . map show
-  show (Case u kw e cs def) =
-    printf "%s%s (%s)\n%s%s\nendcase" uniqStr (show kw) (show e) (indent $ unlines' $ map showCase cs) defStr
-    where
-      uniqStr = if u then "unique " else ""
-      defStr = case def of
-        Nothing -> ""
-        Just c -> printf "\n\tdefault: %s" (show c)
-  show (For (a,b) c (d,e) f) = printf "for (%s = %s; %s; %s = %s)\n%s" a (show b) (show c) d (show e) $ indent $ show f
-  show (AsgnBlk o v e) = printf "%s %s %s;" (show v) (show o) (show e)
-  show (Asgn    t v e) = printf "%s <= %s%s;" (show v) (maybe "" showPad t) (show e)
-  show (While   e s) = printf  "while (%s) %s" (show e) (show s)
-  show (RepeatL e s) = printf "repeat (%s) %s" (show e) (show s)
-  show (DoWhile e s) = printf "do %s while (%s);" (show s) (show e)
-  show (Forever s  ) = printf "forever %s" (show s)
-  show (If a b Null) = printf "if (%s) %s"         (show a) (show b)
-  show (If a b c   ) = printf "if (%s) %s\nelse %s" (show a) (show b) (show c)
-  show (Return e   ) = printf "return %s;" (show e)
-  show (Subroutine x a) = printf "%s(%s);" x (commas $ map (maybe "" show) a)
-  show (Timing t s ) = printf "%s%s" (show t) rest
-    where
-      rest = case s of
-        Null -> ";"
-        Block _ _ _ -> " " ++   (show s)
-        _ -> "\n" ++ (indent $ show s)
-  show (Null       ) = ";"
-
-type Case = ([Expr], Stmt)
-
-showCase :: (Show x, Show y) => ([x], y) -> String
-showCase (a, b) = printf "%s: %s" (commas $ map show a) (show b)
-
-data Timing
-  = Event Sense
-  | Delay Expr
-  | Cycle Expr
-  deriving Eq
-
-instance Show Timing where
-  show (Event s) = printf  "@(%s)" (show s)
-  show (Delay e) = printf  "#(%s)" (show e)
-  show (Cycle e) = printf "##(%s)" (show e)
-
-data Sense
-  = Sense        LHS
-  | SenseOr      Sense Sense
-  | SensePosedge LHS
-  | SenseNegedge LHS
-  | SenseStar
-  deriving Eq
-
-instance Show Sense where
-  show (Sense        a  ) = show a
-  show (SenseOr      a b) = printf "%s or %s" (show a) (show b)
-  show (SensePosedge a  ) = printf "posedge %s" (show a)
-  show (SenseNegedge a  ) = printf "negedge %s" (show a)
-  show (SenseStar       ) = "*"
 
 type GenCase = ([Expr], GenItem)
 

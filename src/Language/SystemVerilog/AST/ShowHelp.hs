@@ -12,9 +12,11 @@ module Language.SystemVerilog.AST.ShowHelp
     , unlines'
     , commas
     , indentedParenList
+    , showCase
     ) where
 
 import Data.List (intercalate)
+import Text.Printf (printf)
 
 showPad :: Show t => t -> String
 showPad x =
@@ -48,3 +50,5 @@ indentedParenList [] = "()"
 indentedParenList [x] = "(" ++ x ++ ")"
 indentedParenList l = "(\n" ++ (indent $ intercalate ",\n" l) ++ "\n)"
 
+showCase :: (Show x, Show y) => ([x], y) -> String
+showCase (a, b) = printf "%s: %s" (commas $ map show a) (show b)
