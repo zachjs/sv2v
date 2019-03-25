@@ -41,11 +41,11 @@ data Stmt
 
 instance Show Stmt where
     show (Block name decls stmts) =
-        printf "begin%s\n%s\n%s\nend" header (block decls) (block stmts)
+        printf "begin%s\n%s\nend" header body
         where
             header = maybe "" (" : " ++) name
-            block :: Show t => [t] -> String
-            block = indent . unlines' . map show
+            bodyLines = (map show decls) ++ (map show stmts)
+            body = indent $ unlines' bodyLines
     show (Case u kw e cs def) =
         printf "%s%s (%s)\n%s%s\nendcase" uniqStr (show kw) (show e) bodyStr defStr
         where
@@ -66,7 +66,7 @@ instance Show Stmt where
     show (If a b Null) = printf "if (%s) %s"         (show a) (show b)
     show (If a b c   ) = printf "if (%s) %s\nelse %s" (show a) (show b) (show c)
     show (Return e   ) = printf "return %s;" (show e)
-    show (Timing t s ) = printf "%s%s" (show t) (show s)
+    show (Timing t s ) = printf "%s %s" (show t) (show s)
     show (Null       ) = ";"
 
 data CaseKW
