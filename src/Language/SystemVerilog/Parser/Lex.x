@@ -46,7 +46,7 @@ $decimalDigit = [0-9]
 
 -- Strings
 
-@string = \" [^\r\n]* \"
+@string = \" (\\\"|[^\"\r\n])* \"
 
 -- Identifiers
 
