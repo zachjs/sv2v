@@ -301,14 +301,16 @@ traverseExprsM mapper = moduleItemMapper
 
     moduleItemMapper (MIDecl decl) =
         declMapper decl >>= return . MIDecl
-    moduleItemMapper (Assign lhs expr) =
-        exprMapper expr >>= return . Assign lhs
     moduleItemMapper (Defparam lhs expr) =
         exprMapper expr >>= return . Defparam lhs
     moduleItemMapper (AlwaysC kw stmt) =
         stmtMapper stmt >>= return . AlwaysC kw
     moduleItemMapper (Initial stmt) =
         stmtMapper stmt >>= return . Initial
+    moduleItemMapper (Assign delay lhs expr) = do
+        delay' <- maybeExprMapper delay
+        expr' <- exprMapper expr
+        return $ Assign delay' lhs expr'
     moduleItemMapper (MIPackageItem (Function lifetime ret f decls stmts)) = do
         decls' <- mapM declMapper decls
         stmts' <- mapM stmtMapper stmts
@@ -349,9 +351,9 @@ traverseLHSsM :: Monad m => MapperM m LHS -> MapperM m ModuleItem
 traverseLHSsM mapper item =
     traverseStmtsM (traverseStmtLHSsM mapper) item >>= traverseModuleItemLHSsM
     where
-        traverseModuleItemLHSsM (Assign lhs expr) = do
+        traverseModuleItemLHSsM (Assign delay lhs expr) = do
             lhs' <- mapper lhs
-            return $ Assign lhs' expr
+            return $ Assign delay lhs' expr
         traverseModuleItemLHSsM (Defparam lhs expr) = do
             lhs' <- mapper lhs
             return $ Defparam lhs' expr
@@ -496,9 +498,9 @@ traverseAsgnsM mapper = moduleItemMapper
     where
         moduleItemMapper item = miMapperA item >>= miMapperB
 
-        miMapperA (Assign lhs expr) = do
+        miMapperA (Assign delay lhs expr) = do
             (lhs', expr') <- mapper (lhs, expr)
-            return $ Assign lhs' expr'
+            return $ Assign delay lhs' expr'
         miMapperA (Defparam lhs expr) = do
             (lhs', expr') <- mapper (lhs, expr)
             return $ Defparam lhs' expr'

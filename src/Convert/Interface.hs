@@ -177,7 +177,7 @@ inlineInterface (ports, items) (instanceName, instancePorts) =
                 then ports
                 else origInstancePortNames
         portBindings =
-            map (\(ident, Just expr) -> Assign (LHSIdent ident) expr) $
+            map (\(ident, Just expr) -> Assign Nothing (LHSIdent ident) expr) $
             filter (isJust . snd) $
             zip instancePortNames instancePortExprs
 

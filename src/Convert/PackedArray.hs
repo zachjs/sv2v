@@ -167,7 +167,7 @@ unflattener writeToFlatVariant arr (t, (majorHi, majorLo)) =
             [ localparam startBit
                 (simplify $ BinOp Add majorLo
                     (BinOp Mul (Ident index) size))
-            , GenModuleItem $ (uncurry Assign) $
+            , GenModuleItem $ (uncurry $ Assign Nothing) $
                 if not writeToFlatVariant
                     then (LHSBit (LHSIdent arrUnflat) $ Ident index, Range (Ident arr) origRange)
                     else (LHSRange (LHSIdent arr) origRange, Bit (Ident arrUnflat) (Ident index))

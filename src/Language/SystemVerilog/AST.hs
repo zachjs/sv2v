@@ -111,7 +111,7 @@ instance Show PartKW where
 data ModuleItem
   = MIDecl     Decl
   | AlwaysC    AlwaysKW Stmt
-  | Assign     LHS Expr
+  | Assign     (Maybe Expr) LHS Expr
   | Defparam   LHS Expr
   | Instance   Identifier [PortBinding] Identifier (Maybe Range) [PortBinding]
   | Genvar     Identifier
@@ -143,7 +143,8 @@ instance Show ModuleItem where
   show thing = case thing of
     MIDecl     nest  -> show nest
     AlwaysC    k b   -> printf "%s %s" (show k) (show b)
-    Assign     a b   -> printf "assign %s = %s;" (show a) (show b)
+    Assign     d a b -> printf "assign %s%s = %s;" delayStr (show a) (show b)
+      where delayStr = maybe "" (\e -> "#(" ++ show e ++ ") ") d
     Defparam   a b   -> printf "defparam %s = %s;" (show a) (show b)
     Instance   m params i r ports
       | null params -> printf "%s %s%s%s;"     m                    i rStr (showPorts ports)

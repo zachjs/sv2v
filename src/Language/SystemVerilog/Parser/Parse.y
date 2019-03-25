@@ -396,7 +396,7 @@ ModuleItem :: { [ModuleItem] }
   | "parameter"  ParamType DeclAsgns ";" { map MIDecl $ map (uncurry $ Parameter  $2) $3 }
   | "localparam" ParamType DeclAsgns ";" { map MIDecl $ map (uncurry $ Localparam $2) $3 }
   | "defparam" DefparamAsgns ";"         { map (uncurry Defparam) $2 }
-  | "assign" LHS "=" Expr ";"            { [Assign $2 $4] }
+  | "assign" opt(DelayControl) LHS "=" Expr ";" { [Assign $2 $3 $5] }
   | AlwaysKW Stmt                        { [AlwaysC $1 $2] }
   | "initial" Stmt                       { [Initial $2] }
   | "genvar" Identifiers ";"             { map Genvar $2 }
@@ -554,19 +554,19 @@ DeclOrStmt :: { ([Decl], [Stmt]) }
 
 TimingControl :: { Timing }
   : DelayOrEventControl { $1 }
-  | CycleDelay          { $1 }
+  | CycleDelay          { Cycle $1 }
 DelayOrEventControl :: { Timing }
-  : DelayControl { $1 }
-  | EventControl { $1 }
-DelayControl :: { Timing }
-  : "#" DelayValue   { Delay $2 }
-  | "#" "(" Expr ")" { Delay $3 }
-CycleDelay :: { Timing }
-  : "##" Expr { Cycle $2 }
-EventControl :: { Timing }
-  : "@" "(" Senses ")" { Event $3 }
-  | "@" "(*)"          { Event SenseStar }
-  | "@*"               { Event SenseStar }
+  : DelayControl { Delay $1 }
+  | EventControl { Event $1 }
+DelayControl :: { Expr }
+  : "#" DelayValue   { $2 }
+  | "#" "(" Expr ")" { $3 }
+CycleDelay :: { Expr }
+  : "##" Expr { $2 }
+EventControl :: { Sense }
+  : "@" "(" Senses ")" { $3 }
+  | "@" "(*)"          { SenseStar }
+  | "@*"               { SenseStar }
 Senses :: { Sense }
   : Sense             { $1 }
   | Senses "or" Sense { SenseOr $1 $3 }
