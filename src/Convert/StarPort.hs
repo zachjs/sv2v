@@ -22,8 +22,8 @@ convert descriptions =
         getPorts _ = return ()
 
         mapInstance :: ModuleItem -> ModuleItem
-        mapInstance (Instance m p x bindings) =
-            Instance m p x $ concatMap expandBinding bindings
+        mapInstance (Instance m p x r bindings) =
+            Instance m p x r $ concatMap expandBinding bindings
             where
                 alreadyBound :: [Identifier]
                 alreadyBound = map fst bindings

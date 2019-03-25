@@ -54,7 +54,7 @@ convertDescription interfaces (Part Module name ports items) =
                     tell (Map.empty, Map.singleton ident modportDecls)
                     where modportDecls = lookupModport Nothing interfaceName modportName
                 _ -> return ()
-        collectInterface (Instance part _ ident _) =
+        collectInterface (Instance part _ ident Nothing _) =
             if Map.member part interfaces
                 then tell (Map.singleton ident part, Map.empty)
                 else return ()
@@ -73,12 +73,12 @@ convertDescription interfaces (Part Module name ports items) =
                 mapper = \(dir, port, Just expr) ->
                     Variable dir (lookupType interfaceItems expr)
                     (ident ++ "_" ++ port) [] Nothing
-        mapInterface (Instance part params ident instancePorts) =
+        mapInterface (Instance part params ident Nothing instancePorts) =
             case Map.lookup part interfaces of
                 Just interface ->
                     Generate $ map GenModuleItem $
                     inlineInterface interface (ident, expandedPorts)
-                Nothing -> Instance part params ident expandedPorts
+                Nothing -> Instance part params ident Nothing expandedPorts
             where expandedPorts = concatMap expandPortBinding instancePorts
         mapInterface other = other
 

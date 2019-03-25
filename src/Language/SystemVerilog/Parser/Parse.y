@@ -460,8 +460,8 @@ Lifetime :: { Lifetime }
   : "static"    { Static    }
   | "automatic" { Automatic }
 
-ModuleInstantiation :: { (Identifier, [PortBinding]) }
-  : Identifier "(" Bindings ")" { ($1, $3) }
+ModuleInstantiation :: { [PortBinding] }
+  : "(" Bindings ")" { $2 }
 
 TFItems :: { [Decl] }
   : "(" DeclTokens(")") ";" { parseDTsAsDecls $2 }

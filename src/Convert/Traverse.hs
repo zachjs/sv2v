@@ -315,9 +315,10 @@ traverseExprsM mapper = moduleItemMapper
         decls' <- mapM declMapper decls
         stmts' <- mapM stmtMapper stmts
         return $ MIPackageItem $ Task lifetime f decls' stmts'
-    moduleItemMapper (Instance m params x l) = do
+    moduleItemMapper (Instance m params x r l) = do
         l' <- mapM portBindingMapper l
-        return $ Instance m params x l'
+        r' <- mapM rangeMapper r
+        return $ Instance m params x r' l'
     moduleItemMapper (Modport x l) =
         mapM modportDeclMapper l >>= return . Modport x
     moduleItemMapper (NInputGate  kw x lhs exprs) = do

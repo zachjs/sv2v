@@ -53,7 +53,7 @@ data DeclToken
     | DTDir      Direction
     | DTType     (Signing -> [Range] -> Type)
     | DTParams   [PortBinding]
-    | DTInstance (Identifier, [PortBinding])
+    | DTInstance [PortBinding]
     | DTBit      Expr
     | DTConcat   [LHS]
     | DTDot      Identifier
@@ -125,21 +125,31 @@ parseDTsAsModuleItems tokens =
 -- internal; parser for module instantiations
 parseDTsAsIntantiations :: [DeclToken] -> [ModuleItem]
 parseDTsAsIntantiations (DTIdent name : tokens) =
-    if not (all isInstanceOrComma rest)
+    if not (all isInstanceToken rest)
         then error $ "instantiations mixed with other items: " ++ (show rest)
-        else map (uncurry $ Instance name params) instances
+        else step rest
     where
+        step :: [DeclToken] -> [ModuleItem]
+        step [] = error $ "unexpected end of instantiation list: " ++ (show tokens)
+        step toks =
+            Instance name params x mr p : follow
+            where
+                (inst, toks') = span (DTComma /=) toks
+                (x, mr, p) = case inst of
+                    [DTIdent a, DTRange s, DTInstance b] -> (a, Just s , b)
+                    [DTIdent a,            DTInstance b] -> (a, Nothing, b)
+                    _ -> error $ "unrecognized instantiation: " ++ show inst
+                follow = x `seq` if null toks' then [] else step (tail toks')
         (params, rest) =
             case head tokens of
                 DTParams ps -> (ps, tail tokens)
                 _           -> ([],      tokens)
-        instances =
-            map (\(DTInstance inst) -> inst) $
-            filter (DTComma /=) $ rest
-        isInstanceOrComma :: DeclToken -> Bool
-        isInstanceOrComma (DTInstance _) = True
-        isInstanceOrComma DTComma = True
-        isInstanceOrComma _ = False
+        isInstanceToken :: DeclToken -> Bool
+        isInstanceToken (DTInstance _) = True
+        isInstanceToken (DTRange _) = True
+        isInstanceToken (DTIdent _) = True
+        isInstanceToken DTComma = True
+        isInstanceToken _ = False
 parseDTsAsIntantiations tokens =
     error $
         "DeclTokens contain instantiations, but start with non-ident: "
