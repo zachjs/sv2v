@@ -541,6 +541,7 @@ StmtNonAsgn :: { Stmt }
   | "repeat" "(" Expr ")" Stmt                 { RepeatL $3 $5 }
   | "do"      Stmt "while" "(" Expr ")" ";"    { DoWhile $5 $2 }
   | "forever" Stmt                             { Forever $2 }
+  | "->" Identifier ";"                        { Trigger $2 }
 
 DeclsAndStmts :: { ([Decl], [Stmt]) }
   : DeclOrStmt DeclsAndStmts { combineDeclsAndStmts $1 $2 }

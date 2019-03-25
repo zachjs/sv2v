@@ -156,6 +156,7 @@ traverseNestedStmtsM mapper = fullMapper
         cs (Timing event stmt) = fullMapper stmt >>= return . Timing event
         cs (Return expr) = return $ Return expr
         cs (Subroutine f exprs) = return $ Subroutine f exprs
+        cs (Trigger x) = return $ Trigger x
         cs (Null) = return Null
 
 traverseStmtLHSsM :: Monad m => MapperM m LHS -> MapperM m Stmt
@@ -292,6 +293,7 @@ traverseExprsM mapper = moduleItemMapper
         mapM maybeExprMapper exprs >>= return . Subroutine f
     flatStmtMapper (Return expr) =
         exprMapper expr >>= return . Return
+    flatStmtMapper (Trigger x) = return $ Trigger x
     flatStmtMapper (Null) = return Null
 
     portBindingMapper (p, me) =
