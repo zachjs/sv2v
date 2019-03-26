@@ -27,12 +27,17 @@ $decimalDigit = [0-9]
 
 @unsignedNumber = $decimalDigit ("_" | $decimalDigit)*
 
+@sign = [\-\+]
+@fixedPointNumber    = @unsignedNumber "." @unsignedNumber
+@floatingPointNumber = @unsignedNumber ("." @unsignedNumber)? [eE] @sign? @unsignedNumber
+
 @size = @unsignedNumber " "?
 
 @decimalNumber = @size? @decimalBase " "? @unsignedNumber
 @binaryNumber  = @size? @binaryBase  " "? @binaryValue
 @octalNumber   = @size? @octalBase   " "? @octalValue
 @hexNumber     = @size? @hexBase     " "? @hexValue
+@realNumber    = @fixedPointNumber | @floatingPointNumber
 
 @unbasedUnsizedLiteral = "'" ( 0 | 1 | x | X | z | Z )
 
@@ -43,6 +48,7 @@ $decimalDigit = [0-9]
   | @binaryNumber
   | @hexNumber
   | @unbasedUnsizedLiteral
+  | @realNumber
 
 -- Strings
 
