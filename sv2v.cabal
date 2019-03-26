@@ -33,6 +33,7 @@ executable sv2v
     -- SystemVerilog modules
     Language.SystemVerilog
     Language.SystemVerilog.AST
+    Language.SystemVerilog.AST.Attr
     Language.SystemVerilog.AST.Decl
     Language.SystemVerilog.AST.Expr
     Language.SystemVerilog.AST.LHS

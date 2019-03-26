@@ -135,6 +135,7 @@ traverseNestedStmtsM :: Monad m => MapperM m Stmt -> MapperM m Stmt
 traverseNestedStmtsM mapper = fullMapper
     where
         fullMapper stmt = mapper stmt >>= cs
+        cs (StmtAttr a stmt) = fullMapper stmt >>= return . StmtAttr a
         cs (Block name decls stmts) =
             mapM fullMapper stmts >>= return . Block name decls
         cs (Case u kw expr cases def) = do
@@ -263,6 +264,9 @@ traverseExprsM mapper = moduleItemMapper
         exprs' <- mapM exprMapper exprs
         return (exprs', stmt)
     stmtMapper = traverseNestedStmtsM flatStmtMapper
+    flatStmtMapper (StmtAttr attr stmt) =
+        -- note: we exclude expressions in attributes from conversion
+        return $ StmtAttr attr stmt
     flatStmtMapper (Block name decls stmts) = do
         decls' <- mapM declMapper decls
         return $ Block name decls' stmts
@@ -299,6 +303,9 @@ traverseExprsM mapper = moduleItemMapper
     portBindingMapper (p, me) =
         maybeExprMapper me >>= \me' -> return (p, me')
 
+    moduleItemMapper (MIAttr attr mi) =
+        -- note: we exclude expressions in attributes from conversion
+        return $ MIAttr attr mi
     moduleItemMapper (MIDecl decl) =
         declMapper decl >>= return . MIDecl
     moduleItemMapper (Defparam lhs expr) =

@@ -16,6 +16,7 @@ module Language.SystemVerilog.AST.Stmt
 import Text.Printf (printf)
 
 import Language.SystemVerilog.AST.ShowHelp (commas, indent, unlines', showPad, showCase)
+import Language.SystemVerilog.AST.Attr (Attr)
 import Language.SystemVerilog.AST.Decl (Decl)
 import Language.SystemVerilog.AST.Expr (Expr)
 import Language.SystemVerilog.AST.LHS (LHS)
@@ -23,7 +24,8 @@ import Language.SystemVerilog.AST.Op (AsgnOp)
 import Language.SystemVerilog.AST.Type (Identifier)
 
 data Stmt
-    = Block   (Maybe Identifier) [Decl] [Stmt]
+    = StmtAttr Attr Stmt
+    | Block   (Maybe Identifier) [Decl] [Stmt]
     | Case    Bool CaseKW Expr [Case] (Maybe Stmt)
     | For     (Identifier, Expr) Expr (Identifier, Expr) Stmt
     | AsgnBlk AsgnOp LHS Expr
@@ -41,6 +43,7 @@ data Stmt
     deriving Eq
 
 instance Show Stmt where
+    show (StmtAttr attr stmt) = printf "%s\n%s" (show attr) (show stmt)
     show (Block name decls stmts) =
         printf "begin%s\n%s\nend" header body
         where

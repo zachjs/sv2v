@@ -31,6 +31,7 @@ module Language.SystemVerilog.AST
     , GenCase
     , simplify
     , rangeSize
+    , module Attr
     , module Decl
     , module Expr
     , module LHS
@@ -44,6 +45,7 @@ import Data.Maybe (maybe, fromJust, isJust)
 import Text.Printf (printf)
 import Text.Read (readMaybe)
 
+import Language.SystemVerilog.AST.Attr as Attr
 import Language.SystemVerilog.AST.Decl as Decl
 import Language.SystemVerilog.AST.Expr as Expr
 import Language.SystemVerilog.AST.LHS as LHS
@@ -109,7 +111,8 @@ instance Show PartKW where
   show Interface = "interface"
 
 data ModuleItem
-  = MIDecl     Decl
+  = MIAttr     Attr ModuleItem
+  | MIDecl     Decl
   | AlwaysC    AlwaysKW Stmt
   | Assign     (Maybe Expr) LHS Expr
   | Defparam   LHS Expr
@@ -141,6 +144,7 @@ type ModportDecl = (Direction, Identifier, Maybe Expr)
 
 instance Show ModuleItem where
   show thing = case thing of
+    MIAttr attr mi -> printf "%s %s" (show attr) (show mi)
     MIDecl     nest  -> show nest
     AlwaysC    k b   -> printf "%s %s" (show k) (show b)
     Assign     d a b -> printf "assign %s%s = %s;" delayStr (show a) (show b)

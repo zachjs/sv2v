@@ -405,6 +405,16 @@ ModuleItem :: { [ModuleItem] }
   | PackageItem                          { [MIPackageItem $1] }
   | NInputGateKW  NInputGates  ";"       { map (\(a, b, c) -> NInputGate  $1 a b c) $2 }
   | NOutputGateKW NOutputGates ";"       { map (\(a, b, c) -> NOutputGate $1 a b c) $2 }
+  | AttributeInstance ModuleItem         { map (MIAttr $1) $2 }
+
+AttributeInstance :: { Attr }
+  : "(*" AttrSpecs "*)" { Attr $2 }
+AttrSpecs :: { [AttrSpec] }
+  : AttrSpec               { [$1] }
+  | AttrSpecs "," AttrSpec { $1 ++ [$3] }
+AttrSpec :: { AttrSpec }
+  : Identifier "=" Expr { ($1, Just $3) }
+  | Identifier          { ($1, Nothing) }
 
 NInputGates :: { [(Maybe Identifier, LHS, [Expr])] }
   : NInputGate                 { [$1] }
@@ -542,6 +552,7 @@ StmtNonAsgn :: { Stmt }
   | "do"      Stmt "while" "(" Expr ")" ";"    { DoWhile $5 $2 }
   | "forever" Stmt                             { Forever $2 }
   | "->" Identifier ";"                        { Trigger $2 }
+  | AttributeInstance Stmt                     { StmtAttr $1 $2 }
 
 DeclsAndStmts :: { ([Decl], [Stmt]) }
   : DeclOrStmt DeclsAndStmts { combineDeclsAndStmts $1 $2 }
