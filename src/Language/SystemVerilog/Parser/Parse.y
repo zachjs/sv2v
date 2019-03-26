@@ -43,6 +43,7 @@ import Language.SystemVerilog.Parser.Tokens
 "endmodule"        { Token KW_endmodule    _ _ }
 "endtask"          { Token KW_endtask      _ _ }
 "enum"             { Token KW_enum         _ _ }
+"extern"           { Token KW_extern       _ _ }
 "for"              { Token KW_for          _ _ }
 "forever"          { Token KW_forever      _ _ }
 "function"         { Token KW_function     _ _ }
@@ -223,7 +224,8 @@ Descriptions :: { [Description] }
   | Descriptions Description { $1 ++ [$2] }
 
 Description :: { Description }
-  : Part        { $1 }
+  : Part(ModuleKW   , "endmodule"   ) { $1 }
+  | Part(InterfaceKW, "endinterface") { $1 }
   | PackageItem { PackageItem $1 }
   | Directive   { Directive $1 }
 
@@ -296,9 +298,14 @@ Packing :: { Packing }
   | "packed"         { Packed Unspecified }
   | {- empty -}      { Unpacked }
 
-Part :: { Description }
-  : "module"    Identifier Params PortDecls ";" ModuleItems "endmodule"    opt(Tag) { Part Module    $2 (fst $4) ($3 ++ (snd $4) ++ $6) }
-  | "interface" Identifier Params PortDecls ";" ModuleItems "endinterface" opt(Tag) { Part Interface $2 (fst $4) ($3 ++ (snd $4) ++ $6) }
+Part(begin, end) :: { Description }
+  :          begin opt(Lifetime) Identifier Params PortDecls ";" ModuleItems end opt(Tag) { Part False $1 $2 $3 (fst $5) ($4 ++ (snd $5) ++ $7) }
+  | "extern" begin opt(Lifetime) Identifier Params PortDecls ";"                          { Part True  $2 $3 $4 (fst $6) ($5 ++ (snd $6)      ) }
+
+ModuleKW :: { PartKW }
+  : "module" { Module }
+InterfaceKW :: { PartKW }
+  : "interface" { Interface }
 
 Tag :: { Identifier }
   : ":" Identifier { $2 }

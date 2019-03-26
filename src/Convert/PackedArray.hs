@@ -49,7 +49,7 @@ convert :: AST -> AST
 convert = traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription (description @ (Part _ _ ports _)) =
+convertDescription (description @ (Part _ _ _ _ ports _)) =
     hoistPortDecls $
     traverseModuleItems (flattenModuleItem info . rewriteModuleItem info) description
     where
@@ -105,8 +105,8 @@ collectNestedLHS _ = return ()
 -- them out with this function. This obviously isn't ideal, but it's a
 -- relatively straightforward transformation, and testing in VCS is important.
 hoistPortDecls :: Description -> Description
-hoistPortDecls (Part kw name ports items) =
-    Part kw name ports (concat $ map explode items)
+hoistPortDecls (Part extern kw lifetime name ports items) =
+    Part extern kw lifetime name ports (concat $ map explode items)
     where
         explode :: ModuleItem -> [ModuleItem]
         explode (Generate genItems) =

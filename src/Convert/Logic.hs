@@ -25,7 +25,7 @@ convert :: AST -> AST
 convert = traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription (orig @ (Part Module _ _ _)) =
+convertDescription (orig @ (Part _ Module _ _ _ _)) =
     traverseModuleItems (traverseDecls convertDecl . convertModuleItem) orig
     where
         idents = execWriter (collectModuleItemsM regIdents orig)

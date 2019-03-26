@@ -80,8 +80,8 @@ maybeDo _ Nothing = return Nothing
 maybeDo fun (Just val) = fun val >>= return . Just
 
 traverseModuleItemsM :: Monad m => MapperM m ModuleItem -> MapperM m Description
-traverseModuleItemsM mapper (Part kw name ports items) =
-    mapM fullMapper items >>= return . Part kw name ports
+traverseModuleItemsM mapper (Part extern kw lifetime name ports items) =
+    mapM fullMapper items >>= return . Part extern kw lifetime name ports
     where
         fullMapper (Generate genItems) =
             mapM fullGenItemMapper genItems >>= mapper . Generate
@@ -95,8 +95,8 @@ traverseModuleItemsM mapper (Part kw name ports items) =
         genItemMapper other = return other
 traverseModuleItemsM mapper (PackageItem packageItem) = do
     let item = MIPackageItem packageItem
-    Part Module "DNE" [] [item'] <-
-        traverseModuleItemsM mapper (Part Module "DNE" [] [item])
+    Part False Module Nothing "DNE" [] [item'] <-
+        traverseModuleItemsM mapper (Part False Module Nothing "DNE" [] [item])
     return $ case item' of
         MIPackageItem packageItem' -> PackageItem packageItem'
         other -> error $ "encountered bad package module item: " ++ show other
@@ -529,8 +529,8 @@ collectAsgnsM = collectify traverseAsgnsM
 
 traverseNestedModuleItemsM :: Monad m => MapperM m ModuleItem -> MapperM m ModuleItem
 traverseNestedModuleItemsM mapper item = do
-    Part Module "DNE" [] [item'] <-
-        traverseModuleItemsM mapper (Part Module "DNE" [] [item])
+    Part False Module Nothing "DNE" [] [item'] <-
+        traverseModuleItemsM mapper (Part False Module Nothing "DNE" [] [item])
     return item'
 
 traverseNestedModuleItems :: Mapper ModuleItem -> Mapper ModuleItem

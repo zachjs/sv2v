@@ -82,22 +82,26 @@ instance Show PackageItem where
   show (Comment c) = "// " ++ c
 
 data Description
-  = Part PartKW Identifier [Identifier] [ModuleItem]
+  = Part Bool PartKW (Maybe Lifetime) Identifier [Identifier] [ModuleItem]
   | PackageItem PackageItem
   | Directive String
   deriving Eq
 
 instance Show Description where
   showList descriptions _ = intercalate "\n" $ map show descriptions
-  show (Part kw name ports items) = unlines
-    [ (show kw) ++ " " ++ name ++ portsStr ++ ";"
-    , indent $ unlines' $ map show items
-    , "end" ++ (show kw) ]
+  show (Part True  kw lifetime name _ items) =
+    printf "extern %s %s%s %s;"
+      (show kw) (showLifetime lifetime) name (indentedParenList itemStrs)
+    where itemStrs = map (\(MIDecl a) -> init $ show a) items
+  show (Part False kw lifetime name ports items) =
+    printf "%s %s%s%s;\n%s\nend%s"
+      (show kw) (showLifetime lifetime) name portsStr bodyStr (show kw)
     where
       portsStr =
         if null ports
           then ""
-          else indentedParenList ports
+          else " " ++ indentedParenList ports
+      bodyStr = indent $ unlines' $ map show items
   show (PackageItem i) = show i
   show (Directive str) = str
 

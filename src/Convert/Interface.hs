@@ -25,17 +25,18 @@ convert descriptions =
     descriptions
     where
         interfaces = execWriter $ collectDescriptionsM collectDesc descriptions
+        -- we can only collect/map non-extern interfaces
         collectDesc :: Description -> Writer Interfaces ()
-        collectDesc (Part Interface name ports items) =
+        collectDesc (Part False Interface _ name ports items) =
             tell $ Map.singleton name (ports, items)
         collectDesc _ = return ()
         isInterface :: Description -> Bool
-        isInterface (Part Interface _ _ _) = True
+        isInterface (Part False Interface _ _ _ _) = True
         isInterface _ = False
 
 convertDescription :: Interfaces -> Description -> Description
-convertDescription interfaces (Part Module name ports items) =
-    Part Module name ports' items'
+convertDescription interfaces (Part extern Module lifetime name ports items) =
+    Part extern Module lifetime name ports' items'
     where
         items' =
             map (traverseNestedModuleItems $ traverseExprs (traverseNestedExprs convertExpr)) $

@@ -98,6 +98,7 @@ tokens :-
   "endmodule"        { tok KW_endmodule    }
   "endtask"          { tok KW_endtask      }
   "enum"             { tok KW_enum         }
+  "extern"           { tok KW_extern       }
   "for"              { tok KW_for          }
   "forever"          { tok KW_forever      }
   "function"         { tok KW_function     }
