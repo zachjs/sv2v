@@ -18,6 +18,7 @@ import qualified Convert.Logic
 import qualified Convert.PackedArray
 import qualified Convert.Return
 import qualified Convert.StarPort
+import qualified Convert.StmtBlock
 import qualified Convert.Struct
 import qualified Convert.Typedef
 import qualified Convert.UnbasedUnsized
@@ -33,6 +34,7 @@ phases excludes =
     , Convert.Enum.convert
     , Convert.PackedArray.convert
     , Convert.StarPort.convert
+    , Convert.StmtBlock.convert
     , Convert.Struct.convert
     , Convert.Return.convert
     , Convert.Typedef.convert

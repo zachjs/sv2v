@@ -58,6 +58,7 @@ executable sv2v
     Convert.PackedArray
     Convert.Return
     Convert.StarPort
+    Convert.StmtBlock
     Convert.Struct
     Convert.Typedef
     Convert.Traverse
