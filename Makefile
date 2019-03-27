@@ -1,4 +1,4 @@
-.PHONY: all sv2v clean
+.PHONY: all sv2v clean test
 
 all: sv2v
 
@@ -9,3 +9,6 @@ sv2v:
 clean:
 	stack clean
 	rm -rf bin
+
+test:
+	(cd test/relong; ./run.sh)
