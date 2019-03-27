@@ -36,10 +36,11 @@ module Language.SystemVerilog.Parser.ParseDecl
 , parseDTsAsDecls
 , parseDTsAsDecl
 , parseDTsAsDeclOrAsgn
+, parseDTsAsDeclsAndAsgns
 ) where
 
-import Data.List (findIndices)
-import Data.Maybe (mapMaybe)
+import Data.List (elemIndex, findIndex, findIndices)
+import Data.Maybe (fromJust, mapMaybe)
 
 import Language.SystemVerilog.AST
 
@@ -187,13 +188,41 @@ parseDTsAsDeclOrAsgn tokens =
             DTAsgn     op e -> (AsgnBlk op, e)
             DTAsgnNBlk mt e -> (Asgn    mt, e)
             _ -> error $ "invalid block item decl or stmt: " ++ (show tokens)
-        Just lhs = foldl takeLHSStep Nothing $ init tokens
-        isAsgnToken :: DeclToken -> Bool
-        isAsgnToken (DTBit             _) = True
-        isAsgnToken (DTConcat          _) = True
-        isAsgnToken (DTAsgnNBlk      _ _) = True
-        isAsgnToken (DTAsgn (AsgnOp _) _) = True
-        isAsgnToken _ = False
+        lhs = takeLHS $ init tokens
+
+-- [PUBLIC]: parser for mixed comma-separated declaration and assignment lists;
+-- the main use case is for `for` loop initialization lists
+parseDTsAsDeclsAndAsgns :: [DeclToken] -> [Either Decl (LHS, Expr)]
+parseDTsAsDeclsAndAsgns [] = []
+parseDTsAsDeclsAndAsgns tokens =
+    if hasLeadingAsgn
+        then
+            let (lhsToks, l0) = break isAsgnToken tokens
+                lhs = takeLHS lhsToks
+                DTAsgnNBlk Nothing expr : l1 = l0
+                DTComma : remaining = l1
+            in Right (lhs, expr) : parseDTsAsDeclsAndAsgns remaining
+        else
+            let (component, remaining) = parseDTsAsComponent tokens
+                decls = finalize component
+            in (map Left decls) ++ parseDTsAsDeclsAndAsgns remaining
+    where
+        hasLeadingAsgn =
+            -- if there is an asgn token before the next comma
+            case (elemIndex DTComma tokens, findIndex isAsgnToken tokens) of
+                (Just a, Just b) -> a > b
+                (Nothing, Just _) -> True
+                _ -> False
+
+isAsgnToken :: DeclToken -> Bool
+isAsgnToken (DTBit             _) = True
+isAsgnToken (DTConcat          _) = True
+isAsgnToken (DTAsgnNBlk      _ _) = True
+isAsgnToken (DTAsgn (AsgnOp _) _) = True
+isAsgnToken _ = False
+
+takeLHS :: [DeclToken] -> LHS
+takeLHS tokens = fromJust $ foldl takeLHSStep Nothing tokens
 
 takeLHSStep :: Maybe LHS -> DeclToken -> Maybe LHS
 takeLHSStep (Nothing  ) (DTConcat lhss) = Just $ LHSConcat lhss
@@ -216,8 +245,15 @@ finalize (dir, typ, trips) =
 -- internal; entrypoint of the critical portion of our parser
 parseDTsAsComponents :: [DeclToken] -> [Component]
 parseDTsAsComponents [] = []
-parseDTsAsComponents l0 =
-    component : parseDTsAsComponents l4
+parseDTsAsComponents tokens =
+    component : parseDTsAsComponents tokens'
+    where
+        (component, tokens') = parseDTsAsComponent tokens
+
+parseDTsAsComponent :: [DeclToken] -> (Component, [DeclToken])
+parseDTsAsComponent [] = error "parseDTsAsComponent unexpected end of tokens"
+parseDTsAsComponent l0 =
+    (component, l4)
     where
         (dir, l1) = takeDir    l0
         (tf , l2) = takeType   l1

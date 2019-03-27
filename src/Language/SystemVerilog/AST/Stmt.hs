@@ -27,7 +27,7 @@ data Stmt
     = StmtAttr Attr Stmt
     | Block   (Maybe Identifier) [Decl] [Stmt]
     | Case    Bool CaseKW Expr [Case] (Maybe Stmt)
-    | For     (Identifier, Expr) Expr (Identifier, Expr) Stmt
+    | For     [Either Decl (LHS, Expr)] (Maybe Expr) [(LHS, AsgnOp, Expr)] Stmt
     | AsgnBlk AsgnOp LHS Expr
     | Asgn    (Maybe Timing) LHS Expr
     | While   Expr Stmt
@@ -58,8 +58,18 @@ instance Show Stmt where
             defStr = case def of
                 Nothing -> ""
                 Just c -> printf "\n\tdefault: %s" (show c)
-    show (For (a,b) c (d,e) f) =
-        printf "for (%s = %s; %s; %s = %s)\n%s" a (show b) (show c) d (show e) (indent $ show f)
+    show (For inits mc assigns stmt) =
+        printf "for (%s; %s; %s)\n%s"
+            (commas $ map showInit inits)
+            (maybe "" show mc)
+            (commas $ map showAssign assigns)
+            (indent $ show stmt)
+        where
+            showInit :: Either Decl (LHS, Expr) -> String
+            showInit (Left d) = init $ show d
+            showInit (Right (l, e)) = printf "%s = %s" (show l) (show e)
+            showAssign :: (LHS, AsgnOp, Expr) -> String
+            showAssign (l, op, e) = printf "%s %s %s" (show l) (show op) (show e)
     show (Subroutine x a) = printf "%s(%s);" x (commas $ map (maybe "" show) a)
     show (AsgnBlk o v e) = printf "%s %s %s;" (show v) (show o) (show e)
     show (Asgn    t v e) = printf "%s <= %s%s;" (show v) (maybe "" showPad t) (show e)

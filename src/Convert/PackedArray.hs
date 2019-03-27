@@ -268,8 +268,8 @@ rewriteModuleItem info =
                 assign = constructor
                     (LHSBit (LHSIdent $ prefix ident) (Ident index))
                     (Concat exprs)
-                inir = (index, b)
-                chkr = BinOp Le (Ident index) a
-                incr = (index, BinOp Add (Ident index) (Number "1"))
+                inir = [Right (LHSIdent index, b)]
+                chkr = Just $ BinOp Le (Ident index) a
+                incr = [(LHSIdent index, AsgnOp Add, Number "1")]
         convertAssignment constructor lhs expr =
             constructor (rewriteLHS lhs) expr

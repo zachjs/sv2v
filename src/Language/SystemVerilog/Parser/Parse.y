@@ -548,7 +548,7 @@ StmtNonAsgn :: { Stmt }
   | "begin" opt(Tag) DeclsAndStmts "end" opt(Tag) { Block (combineTags $2 $5) (fst $3) (snd $3) }
   | "if" "(" Expr ")" Stmt "else" Stmt         { If $3 $5 $7        }
   | "if" "(" Expr ")" Stmt %prec NoElse        { If $3 $5 Null      }
-  | "for" "(" Identifier "=" Expr ";" Expr ";" Identifier "=" Expr ")" Stmt { For ($3, $5) $7 ($9, $11) $13 }
+  | "for" "(" DeclTokens(";") opt(Expr) ";" ForStep ")" Stmt { For (parseDTsAsDeclsAndAsgns $3) $4 $6 $8 }
   | Unique CaseKW "(" Expr ")" Cases opt(CaseDefault) "endcase" { Case $1 $2 $4 $6 $7 }
   | TimingControl Stmt                         { Timing $1 $2 }
   | "return" Expr ";"                          { Return $2 }
@@ -559,6 +559,17 @@ StmtNonAsgn :: { Stmt }
   | "forever" Stmt                             { Forever $2 }
   | "->" Identifier ";"                        { Trigger $2 }
   | AttributeInstance Stmt                     { StmtAttr $1 $2 }
+
+ForStep :: { [(LHS, AsgnOp, Expr)] }
+  : {- empty -}     { [] }
+  | ForStepNonEmpty { $1 }
+ForStepNonEmpty :: { [(LHS, AsgnOp, Expr)] }
+  : ForStepAssignment                     { [$1] }
+  | ForStepNonEmpty "," ForStepAssignment { $1 ++ [$3] }
+ForStepAssignment :: { (LHS, AsgnOp, Expr) }
+  : LHS AsgnOp Expr { ($1, $2, $3) }
+  | IncOrDecOperator LHS { ($2, AsgnOp $1, Number "1") }
+  | LHS IncOrDecOperator { ($1, AsgnOp $2, Number "1") }
 
 DeclsAndStmts :: { ([Decl], [Stmt]) }
   : DeclOrStmt DeclsAndStmts { combineDeclsAndStmts $1 $2 }

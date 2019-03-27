@@ -282,11 +282,11 @@ traverseExprsM mapper = moduleItemMapper
         exprMapper expr >>= return . AsgnBlk op lhs
     flatStmtMapper (Asgn    mt lhs expr) =
         exprMapper expr >>= return . Asgn    mt lhs
-    flatStmtMapper (For (x1, e1) cc (x2, e2) stmt) = do
-        e1' <- exprMapper e1
-        e2' <- exprMapper e2
-        cc' <- exprMapper cc
-        return $ For (x1, e1') cc' (x2, e2') stmt
+    flatStmtMapper (For inits cc asgns stmt) = do
+        inits' <- mapM initMapper inits
+        cc' <- maybeExprMapper cc
+        asgns' <- mapM asgnMapper asgns
+        return $ For inits' cc' asgns' stmt
     flatStmtMapper (While   e stmt) =
         exprMapper e >>= \e' -> return $ While   e' stmt
     flatStmtMapper (RepeatL e stmt) =
@@ -303,6 +303,11 @@ traverseExprsM mapper = moduleItemMapper
         exprMapper expr >>= return . Return
     flatStmtMapper (Trigger x) = return $ Trigger x
     flatStmtMapper (Null) = return Null
+
+    initMapper (Left decl) = declMapper decl >>= return . Left
+    initMapper (Right (l, e)) = exprMapper e >>= \e' -> return $ Right (l, e')
+
+    asgnMapper (l, op, e) = exprMapper e >>= \e' -> return $ (l, op, e')
 
     portBindingMapper (p, me) =
         maybeExprMapper me >>= \me' -> return (p, me')
