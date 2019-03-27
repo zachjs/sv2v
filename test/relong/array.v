@@ -41,30 +41,12 @@ endmodule
 
 module Array #(parameter ELEMENTS=16, WIDTH=32)(
 
-  input wire [clog2(ELEMENTS)-1:0] index,
+  input wire [$clog2(ELEMENTS)-1:0] index,
   input wire [WIDTH-1:0] element,
   // Flattened array
   output wire [(ELEMENTS*WIDTH)-1:0] array,
   input wire clock, clear, enable
 );
-
-    // Manually implemented clog2 (which the toolchain could in theory just copy
-    // into the source where-ever the build-in $clog2 is referenced)
-
-    // Verilog functions are super gross. This is defining a function called
-    // clog2 which takes a 32-bit input value.
-    function integer clog2;
-    input [31:0] value;
-    begin
-        value = value - 1;
-        // The return value is simply a variable with the same name as the
-        // function and the last value written to that variable is the return
-        // value.
-        for (clog2 = 0; value > 0; clog2 = clog2 + 1) begin
-            value = value >> 1;
-        end
-    end
-    endfunction
 
     reg [WIDTH-1:0] __array[ELEMENTS-1:0];
     genvar g_index;
