@@ -226,8 +226,12 @@ traverseNestedExprsM mapper = exprMapper
             e2' <- exprMapper e2
             e3' <- exprMapper e3
             return $ Mux e1' e2' e3'
-        em (Cast       t e) =
-            exprMapper e >>= return . Cast t
+        em (Cast (Left t) e) =
+            exprMapper e >>= return . Cast (Left t)
+        em (Cast (Right e1) e2) = do
+            e1' <- exprMapper e1
+            e2' <- exprMapper e2
+            return $ Cast (Right e1') e2'
         em (Dot e x) =
             exprMapper e >>= \e' -> return $ Dot e' x
         em (Pattern l) = do
@@ -439,8 +443,10 @@ traverseTypesM mapper item =
             types <- mapM fullMapper $ map fst fields
             let idents = map snd fields
             return $ Struct p (zip types idents) r
-        exprMapper (Cast t e) =
-            fullMapper t >>= \t' -> return $ Cast t' e
+        exprMapper (Cast (Left t) e) =
+            fullMapper t >>= \t' -> return $ Cast (Left t') e
+        exprMapper (Cast (Right e1) e2) =
+            return $ Cast (Right e1) e2
         exprMapper other = return other
         declMapper (Parameter  t x    e) =
             fullMapper t >>= \t' -> return $ Parameter  t' x   e

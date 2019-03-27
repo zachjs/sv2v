@@ -33,7 +33,7 @@ data Expr
     | UniOp   UniOp Expr
     | BinOp   BinOp Expr Expr
     | Mux     Expr Expr Expr
-    | Cast    Type Expr
+    | Cast    (Either Type Expr) Expr
     | Dot     Expr Identifier
     | Pattern [(Maybe Identifier, Expr)]
     deriving (Eq, Ord)
@@ -48,10 +48,14 @@ instance Show Expr where
     show (Concat  l    ) = printf "{%s}"                (commas $ map show l)
     show (UniOp   a b  ) = printf "(%s %s)"    (show a) (show b)
     show (BinOp   o a b) = printf "(%s %s %s)" (show a) (show o) (show b)
-    show (Cast    t e  ) = printf "%s'(%s)"    (show t) (show e)
     show (Dot     e n  ) = printf "%s.%s"      (show e) n
     show (Mux     c a b) = printf "(%s ? %s : %s)" (show c) (show a) (show b)
     show (Call    f l  ) = printf "%s(%s)" f (commas $ map (maybe "" show) l)
+    show (Cast tore e  ) = printf "%s'(%s)" tStr (show e)
+        where
+            tStr = case tore of
+                Left  a -> show a
+                Right a -> show a
     show (Pattern l    ) =
         printf "'{\n%s\n}" (indent $ intercalate ",\n" $ map showPatternItem l)
         where

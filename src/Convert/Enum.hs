@@ -47,7 +47,7 @@ convertDescription (description @ (Part _ _ _ _ _ _)) =
         -- drop any enum type casts in favor of implicit conversion from the
         -- converted type
         traverseExpr :: Expr -> Expr
-        traverseExpr (Cast (Enum _ _ _) e) = e
+        traverseExpr (Cast (Left (Enum _ _ _)) e) = e
         traverseExpr other = other
 convertDescription other = other
 

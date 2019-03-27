@@ -209,7 +209,7 @@ directive          { Token Spe_Directive _ _ }
 %left  "*" "/" "%"
 %left  "**"
 %right REDUCE_OP "!" "~" "++" "--"
-%left  "(" ")" "[" "]" "."
+%left  "(" ")" "[" "]" "." "'"
 
 
 %%
@@ -249,7 +249,6 @@ CastingType :: { Type }
   | IntegerAtomType   { IntegerAtom   $1 Unspecified    }
   | NonIntegerType    { NonInteger    $1                }
   | Signing           { Implicit      $1             [] }
-
 
 Signing :: { Signing }
   : "signed"   { Signed }
@@ -651,8 +650,9 @@ Expr :: { Expr }
   | "{" Expr "{" Exprs "}" "}"  { Repeat $2 $4 }
   | "{" Exprs "}"               { Concat $2 }
   | Expr "?" Expr ":" Expr      { Mux $1 $3 $5 }
-  | CastingType "'" "(" Expr ")" { Cast ($1         ) $4 }
-  | Identifier  "'" "(" Expr ")" { Cast (Alias $1 []) $4 }
+  | CastingType "'" "(" Expr ")" { Cast (Left            $1) $4 }
+  | Identifier  "'" "(" Expr ")" { Cast (Left $ Alias $1 []) $4 }
+  | Number      "'" "(" Expr ")" { Cast (Right $ Number  $1) $4 }
   | Expr "." Identifier         { Dot $1 $3 }
   | "'" "{" PatternItems "}"    { Pattern $3 }
   -- binary expressions
