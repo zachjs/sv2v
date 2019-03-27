@@ -1,12 +1,13 @@
 # sv2v: SystemVerilog to Verilog
 
-sv2v is a tool for converting [SystemVerilog] into [Verilog-2005], with an
-emphasis on supporting synthesizable SystemVerilog features. This project was
-originally developed to target [Yosys], and so allows for disabling the
-conversion of those [SystemVerilog features which Yosys supports].
+sv2v is a tool for converting SystemVerilog ([IEEE 1800-2017]) to ([IEEE
+1364-2005]), with an emphasis on supporting synthesizable SystemVerilog
+features. This project was originally developed to target [Yosys], and so allows
+for disabling the conversion of those [SystemVerilog features which Yosys
+supports].
 
-[SystemVerilog]: http://ecee.colorado.edu/~mathys/ecen2350/IntelSoftware/pdf/IEEE_Std1800-2017_8299595.pdf
-[Verilog-2005]: https://www.eg.bucknell.edu/~csci320/2016-fall/wp-content/uploads/2015/08/verilog-std-1364-2005.pdf
+[IEEE 1800-2017]: https://ieeexplore.ieee.org/servlet/opac?punumber=8299593
+[IEEE 1364-2005]: https://ieeexplore.ieee.org/servlet/opac?punumber=10779
 [Yosys]: http://www.clifford.at/yosys/
 [SystemVerilog features which Yosys supports]: https://github.com/YosysHQ/yosys#supported-features-from-systemverilog
 
