@@ -1,0 +1,27 @@
+# base on: https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/travis-simple.yml
+
+dist: xenial
+
+language: generic
+
+cache:
+  directories:
+    - $HOME/.stack
+
+addons:
+  apt:
+    packages:
+      - libgmp-dev
+      - shunit2
+      - iverilog
+
+before_install:
+  - mkdir -p ~/.local/bin
+  - export PATH=$HOME/.local/bin:$PATH
+  - travis_retry curl -L https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+
+install:
+  make
+
+script:
+  make test
