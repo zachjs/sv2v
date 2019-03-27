@@ -1,5 +1,7 @@
 #!/bin/sh
 
+SV2V=../../bin/sv2v
+
 assertExists() {
     file=$1
     [ -f "$file" ]
@@ -28,6 +30,15 @@ simulate() {
     sed -i.orig -e "1,3d" "$sim_outfile"
 }
 
+assertConverts() {
+    ac_file="$1"
+    ac_temp="$SHUNIT_TMPDIR/ac-conv-temp.v"
+    $SV2V "$ac_file" 2> /dev/null > "$ac_temp"
+    assertTrue "1st conversion of $ac_file failed" $?
+    $SV2V "$ac_temp" 2> /dev/null > /dev/null
+    assertTrue "2nd conversion of $ac_file failed" $?
+}
+
 runTest() {
     test=$1
     assertNotNull "test not specified" $test
@@ -38,11 +49,15 @@ runTest() {
 
     assertExists $sv
     assertExists $ve
-    assertExists $sv
+    assertExists $tb
+
+    assertConverts "$sv"
+    assertConverts "$ve"
+    assertConverts "$tb"
 
     # convert the SystemVerilog source file
     cv="$SHUNIT_TMPDIR/conv-$test.v"
-    ../../bin/sv2v $sv 2> /dev/null > $cv
+    $SV2V $sv 2> /dev/null > $cv
     assertTrue "conversion failed" $?
     assertExists $cv
 

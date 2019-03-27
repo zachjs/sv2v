@@ -195,13 +195,16 @@ parseDTsAsDeclOrAsgn tokens =
 parseDTsAsDeclsAndAsgns :: [DeclToken] -> [Either Decl (LHS, Expr)]
 parseDTsAsDeclsAndAsgns [] = []
 parseDTsAsDeclsAndAsgns tokens =
-    if hasLeadingAsgn
+    if hasLeadingAsgn || tripLookahead tokens
         then
-            let (lhsToks, l0) = break isAsgnToken tokens
+            let (lhsToks, l0) = break isDTAsgn tokens
                 lhs = takeLHS lhsToks
-                DTAsgnNBlk Nothing expr : l1 = l0
-                DTComma : remaining = l1
-            in Right (lhs, expr) : parseDTsAsDeclsAndAsgns remaining
+                DTAsgn AsgnOpEq expr : l1 = l0
+                asgn = Right (lhs, expr)
+            in case l1 of
+                DTComma : remaining -> asgn : parseDTsAsDeclsAndAsgns remaining
+                [] -> [asgn]
+                _ -> error $ "bad decls and asgns tokens: " ++ show tokens
         else
             let (component, remaining) = parseDTsAsComponent tokens
                 decls = finalize component
@@ -213,6 +216,9 @@ parseDTsAsDeclsAndAsgns tokens =
                 (Just a, Just b) -> a > b
                 (Nothing, Just _) -> True
                 _ -> False
+        isDTAsgn :: DeclToken -> Bool
+        isDTAsgn (DTAsgn _ _) = True
+        isDTAsgn _ = False
 
 isAsgnToken :: DeclToken -> Bool
 isAsgnToken (DTBit             _) = True
