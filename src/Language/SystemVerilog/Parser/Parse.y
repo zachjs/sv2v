@@ -779,8 +779,12 @@ makeInput (Variable _ t x a me) = Variable Input t x a me
 makeInput other = error $ "unexpected non-var decl: " ++ (show other)
 
 defaultFuncInput :: Decl -> Decl
-defaultFuncInput (Variable Input (Implicit sg rs) x a me) =
-  Variable Input (IntegerVector TLogic sg rs) x a me
+defaultFuncInput (Variable dir (Implicit sg rs) x a me) =
+  Variable dir t x a me
+  where
+    t = if dir == Input || dir == Inout
+      then IntegerVector TLogic sg rs
+      else Implicit sg rs
 defaultFuncInput other = other
 
 combineTags :: Maybe Identifier -> Maybe Identifier -> Maybe Identifier

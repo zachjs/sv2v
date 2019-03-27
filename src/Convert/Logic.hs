@@ -25,9 +25,17 @@ convert :: AST -> AST
 convert = traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription (orig @ (Part _ Module _ _ _ _)) =
-    traverseModuleItems (traverseDecls convertDecl . convertModuleItem) orig
+convertDescription orig =
+    if shouldConvert
+        then traverseModuleItems conversion orig
+        else orig
     where
+        shouldConvert = case orig of
+            Part _ Interface _ _ _ _ -> False
+            Part _ Module _ _ _ _ -> True
+            PackageItem _ -> True
+            Directive _ -> False
+        conversion = traverseDecls convertDecl . convertModuleItem
         idents = execWriter (collectModuleItemsM regIdents orig)
         convertModuleItem :: ModuleItem -> ModuleItem
         convertModuleItem (MIDecl (Variable dir (IntegerVector TLogic sg mr) ident a me)) =
@@ -42,7 +50,6 @@ convertDescription (orig @ (Part _ Module _ _ _ _)) =
         convertDecl (Variable d (IntegerVector TLogic sg rs) x a me) =
             Variable d (IntegerVector TReg sg rs) x a me
         convertDecl other = other
-convertDescription other = other
 
 regIdents :: ModuleItem -> Writer RegIdents ()
 regIdents (AlwaysC _ stmt) =
