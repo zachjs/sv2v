@@ -21,7 +21,7 @@ isNewline :: Token -> Bool
 isNewline (Token t _ _) = t == Spe_Newline
 
 unskippableDirectives :: [String]
-unskippableDirectives = ["else", "elsif", "endif"]
+unskippableDirectives = ["else", "elsif", "endif", "ifdef", "ifndef"]
 
 preprocess :: [Token] -> (StateT PP IO) [Token]
 preprocess tokens = pp tokens >>= return . combineNumbers
