@@ -27,6 +27,7 @@ executable sv2v
     base,
     cmdargs,
     containers,
+    directory,
     filepath,
     mtl
   other-modules:

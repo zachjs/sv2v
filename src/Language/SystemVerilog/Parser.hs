@@ -6,17 +6,12 @@ module Language.SystemVerilog.Parser
 ) where
 
 import Language.SystemVerilog.AST
-import Language.SystemVerilog.Parser.Lex
 import Language.SystemVerilog.Parser.Parse
 import Language.SystemVerilog.Parser.Preprocess
 
-import Control.Monad.State
-import qualified Data.Map.Strict as Map
-
 -- parses a file given a table of predefined macros and the file name
-parseFile :: [(String, String)] -> FilePath -> IO AST
-parseFile env file = do
-    let initialEnv = Map.map alexScanTokens $ Map.fromList env
-    let initialState = PP initialEnv []
-    ast <- evalStateT (loadFile file) initialState
-    return $ descriptions ast
+parseFile :: [String] -> [(String, String)] -> FilePath -> IO AST
+parseFile includePaths env file =
+    loadFile file >>=
+    preprocess includePaths env >>=
+    return . descriptions

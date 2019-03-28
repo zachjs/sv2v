@@ -5,13 +5,15 @@
  -}
 module Language.SystemVerilog.Parser.Preprocess
 ( loadFile
+, preprocess
 , PP (..)
 ) where
 
 import Control.Monad.State
 import Data.List (intercalate)
 import qualified Data.Map.Strict as Map
-import System.FilePath (replaceFileName)
+import System.FilePath (dropFileName)
+import System.Directory (findFile)
 
 import Language.SystemVerilog.Parser.Lex
 import Language.SystemVerilog.Parser.Tokens
@@ -23,15 +25,22 @@ isNewline (Token t _ _) = t == Spe_Newline
 unskippableDirectives :: [String]
 unskippableDirectives = ["else", "elsif", "endif", "ifdef", "ifndef"]
 
-preprocess :: [Token] -> (StateT PP IO) [Token]
-preprocess tokens = pp tokens >>= return . combineNumbers
-
 -- a bit of a hack to allow things like: `WIDTH'b0
 combineNumbers :: [Token] -> [Token]
 combineNumbers (Token Lit_number size pos : Token Lit_number ('\'' : num) _ : tokens) =
     Token Lit_number (size ++ "'" ++ num) pos : combineNumbers tokens
 combineNumbers (token : tokens) = token : combineNumbers tokens
 combineNumbers [] = []
+
+includeSearch :: FilePath -> FilePath -> (StateT PP IO) FilePath
+includeSearch base file = do
+    includePaths <- gets ppIncludePaths
+    let directories = dropFileName base : includePaths
+    result <- lift $ findFile directories file
+    case result of
+        Just path -> return path
+        Nothing ->
+            error $ "Could not find file " ++ file ++ " included from " ++ base
 
 data Cond
     = CurrentlyTrue
@@ -42,6 +51,7 @@ data Cond
 data PP = PP
     { ppEnv :: Map.Map String [Token]
     , ppCondStack :: [Cond]
+    , ppIncludePaths :: [FilePath]
     } deriving (Eq, Show)
 
 pp :: [Token] -> (StateT PP IO) [Token]
@@ -81,10 +91,9 @@ pp (Token Spe_Directive str pos : tokens) = do
         "include" -> do
             let file = init $ tail $ tokenString $ head tokens
             let Position basePath _ _ = pos
-            let filePath = replaceFileName basePath file
-            includedTokens <- loadFile filePath
-            remainingTokens <- pp $ tail tokens
-            return $ includedTokens ++ remainingTokens
+            filePath <- includeSearch basePath file
+            includedTokens <- lift $ loadFile filePath
+            pp $ includedTokens ++ tail tokens
 
         "ifdef" -> do
             let name = tokenString $ head tokens
@@ -163,14 +172,19 @@ pp (token : tokens) = do
         then return tokens'
         else return $ token : tokens'
 
--- loads, lexes, and preprocesses the file at the given path
-loadFile :: FilePath -> (StateT PP IO) [Token]
+-- loads and lexes the file at the given path
+loadFile :: FilePath -> IO [Token]
 loadFile file = do
-    content <- lift $ readFile file
-    preprocess $
-        map relocate $
-        alexScanTokens $
-        content
+    content <- readFile file
+    let tokens = alexScanTokens content
+    return $ map relocate tokens
     where
         relocate :: Token -> Token
         relocate (Token t s (Position _ l c)) = Token t s $ Position file l c
+
+preprocess :: [String] -> [(String, String)] -> [Token] -> IO [Token]
+preprocess includePaths env tokens = do
+    let initialEnv = Map.map alexScanTokens $ Map.fromList env
+    let initialState = PP initialEnv [] includePaths
+    res <- evalStateT (pp tokens) initialState
+    return $ combineNumbers res

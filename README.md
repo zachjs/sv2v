@@ -41,11 +41,12 @@ The interface for this tool has not yet been finalized. Currently, running `sv2v
 path/to/file.sv` will output the converted file to `stdout`.
 
 ```
-sv2v [OPTIONS] [FILE]
+sv2v [OPTIONS] [FILES]
 
 Common flags:
   -e --exclude=CONV     conversion to exclude (always, interface, logic); can
                         be specified multiple times
+  -i --incdir=DIR       add directory to include search path
   -? --help             Display help message
   -V --version          Print version information
      --numeric-version  Print just the version number

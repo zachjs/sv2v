@@ -17,7 +17,8 @@ data Exclude
 
 data Job = Job
     { exclude :: [Exclude]
-    , file :: FilePath
+    , files :: [FilePath]
+    , incdir :: [FilePath]
     } deriving (Show, Typeable, Data)
 
 defaultJob :: Job
@@ -26,7 +27,8 @@ defaultJob = Job
         &= help
             ("conversion to exclude (always, interface, logic)"
             ++ "; can be specified multiple times")
-    , file = def &= args &= typFile
+    , files = def &= args &= typ "FILES"
+    , incdir = def &= typDir &= help "add directory to include search path"
     }
     &= program "sv2v"
     &= summary "sv2v v0.0.1, (C) Zachary Snow 2019, Tom Hawkins, 2011-2015"
