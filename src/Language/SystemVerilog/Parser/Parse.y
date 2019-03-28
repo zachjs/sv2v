@@ -543,6 +543,8 @@ Stmt :: { Stmt }
   | LHS AsgnOp Expr ";" { AsgnBlk $2 $1 $3 }
   | Identifier      ";" { Subroutine $1 [] }
   | LHS "<=" opt(DelayOrEventControl) Expr ";" { Asgn $3 $1 $4 }
+  | LHS IncOrDecOperator ";" { AsgnBlk (AsgnOp $2) $1 (Number "1") }
+  | IncOrDecOperator LHS ";" { AsgnBlk (AsgnOp $1) $2 (Number "1") }
 StmtNonAsgn :: { Stmt }
   : ";" { Null }
   | "begin" opt(Tag) DeclsAndStmts "end" opt(Tag) { Block (combineTags $2 $5) (fst $3) (snd $3) }
