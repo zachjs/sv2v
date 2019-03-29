@@ -335,6 +335,5 @@ data TokenName
   | Sym_lt_lt_lt_eq
   | Sym_gt_gt_gt_eq
   | Spe_Directive
-  | Spe_Newline
   | Unknown
   deriving (Show, Eq)

@@ -6,12 +6,11 @@ module Language.SystemVerilog.Parser
 ) where
 
 import Language.SystemVerilog.AST
+import Language.SystemVerilog.Parser.Lex
 import Language.SystemVerilog.Parser.Parse
-import Language.SystemVerilog.Parser.Preprocess
 
 -- parses a file given a table of predefined macros and the file name
 parseFile :: [String] -> [(String, String)] -> FilePath -> IO AST
 parseFile includePaths env file =
-    loadFile file >>=
-    preprocess includePaths env >>=
+    lexFile includePaths env file >>=
     return . descriptions
