@@ -279,9 +279,7 @@ tokens :-
     "<<<="             { tok Sym_lt_lt_lt_eq }
     ">>>="             { tok Sym_gt_gt_gt_eq }
 
-    "`include"         { includeFile }
     @directive         { handleDirective }
-
     @commentLine       { removeUntil "\n" }
     @commentBlock      { removeUntil "*/" }
 
@@ -291,30 +289,43 @@ tokens :-
 
 {
 
+-- our actions don't return any data
+type Action = AlexInput -> Int -> Alex ()
+
+-- keeps track of the state of an if-else cascade level
 data Cond
     = CurrentlyTrue
     | PreviouslyTrue
     | NeverTrue
     deriving (Eq, Show)
 
+-- our custom lexer state
 data AlexUserState = LS
-    { lsToks :: [Token]
-    , lsCurrFile :: FilePath
-    , lsEnv :: Map.Map String String
-    , lsCondStack :: [Cond]
-    , lsIncludePaths :: [FilePath]
+    { lsToks         :: [Token] -- tokens read so far
+    , lsCurrFile     :: FilePath -- currently active filename
+    , lsEnv          :: Map.Map String String -- active macro definitions
+    , lsCondStack    :: [Cond] -- if-else cascade state
+    , lsIncludePaths :: [FilePath] -- folders to search for includes
     } deriving (Eq, Show)
 
+-- this initial user state does not contain the initial filename, environment,
+-- or include paths; alex requires that this be defined; we override it before
+-- we begin the actual lexing procedure
 alexInitUserState :: AlexUserState
 alexInitUserState = LS [] "" Map.empty [] []
 
+-- public-facing lexer entrypoint
 lexFile :: [String] -> [(String, String)] -> FilePath -> IO [Token]
 lexFile includePaths env path = do
     str <- readFile path
     let result = runAlex str $ setEnv >> alexMonadScan >> get
     return $ case result of
         Left msg -> error $ "Lexical Error: " ++ msg
-        Right tokens -> lsToks tokens
+        Right finalState ->
+            if null $ lsCondStack finalState
+                then lsToks finalState
+                else error $ "unfinished conditional directives: " ++
+                        (show $ length $ lsCondStack finalState)
     where
         initialEnv = Map.fromList env
         setEnv = modify $ \s -> s
@@ -323,32 +334,37 @@ lexFile includePaths env path = do
             , lsCurrFile = path
             }
 
+-- invoked by alexMonadScan
+alexEOF :: Alex ()
+alexEOF = return ()
+
+-- raises an alexError with the current file position appended
+lexicalError :: String -> Alex a
+lexicalError msg = do
+    pos <- getCurrentPos
+    alexError $ msg ++ ", at " ++ show pos
+
+-- get the current user state
 get :: Alex AlexUserState
 get = Alex $ \s -> Right (s, alex_ust s)
 
+-- get the current user state and apply a function to it
 gets :: (AlexUserState -> a) -> Alex a
 gets f = get >>= return . f
 
+-- apply a transformation to the current user state
 modify :: (AlexUserState -> AlexUserState) -> Alex ()
 modify f = Alex func
     where func s = Right (s { alex_ust = new }, ())
             where new = f (alex_ust s)
 
+-- helpers specifically accessing the current file state
 getCurrentFile :: Alex String
 getCurrentFile = gets lsCurrFile
-
 setCurrentFile :: String -> Alex ()
 setCurrentFile x = modify $ \s -> s { lsCurrFile = x }
 
-alexEOF :: Alex ()
-alexEOF = return ()
-
-type Action = AlexInput -> Int -> Alex ()
-
-breakAfter :: (a -> Bool) -> [a] -> ([a], [a])
-breakAfter f l = (a ++ [b], bs)
-    where (a, b : bs) = break f l
-
+-- find the given file for inclusion
 includeSearch :: FilePath -> Alex FilePath
 includeSearch file = do
     base <- getCurrentFile
@@ -357,35 +373,12 @@ includeSearch file = do
     let result = unsafePerformIO $ findFile directories file
     case result of
         Just path -> return path
-        Nothing ->
-            alexError
-                $ "Could not find file " ++ file ++ " included from " ++ base
+        Nothing -> lexicalError $ "Could not find file " ++ show file ++
+                        ", included from " ++ show base
 
-loadFile :: String -> Alex String
-loadFile s = return $ unsafePerformIO $ readFile s
-
-includeFile :: Action
-includeFile (AlexPn f l c, _, _, str) len = do
-    let (dropped , rest1) = breakAfter (== '"') (drop len str)
-    let (filename, rest2) = break (== '"') rest1
-    let rest3 = if null rest2 then [] else tail rest2
-    let offset = len + length dropped + length filename + 1
-    let inputFollow = (AlexPn (f + offset) l (c + offset), ' ', [], rest3)
-    fileFollow <- getCurrentFile
-    -- process the the included file
-    path <- includeSearch filename
-    content <- loadFile path
-    let inputIncluded = (AlexPn 0 0 0, ' ', [], content)
-    setCurrentFile path
-    alexSetInput inputIncluded
-    alexMonadScan
-    -- resume processing the original file
-    setCurrentFile fileFollow
-    alexSetInput inputFollow
-    alexMonadScan
-
-unskippableDirectives :: [String]
-unskippableDirectives = ["else", "elsif", "endif", "ifdef", "ifndef"]
+-- read in the given file
+loadFile :: FilePath -> Alex String
+loadFile = return . unsafePerformIO . readFile
 
 isIdentChar :: Char -> Bool
 isIdentChar ch =
@@ -396,10 +389,10 @@ isIdentChar ch =
 
 takeString :: Alex String
 takeString = do
-    (AlexPn f l c, _, _, str) <- alexGetInput
+    (pos, _, _, str) <- alexGetInput
     let (x, rest) = span isIdentChar str
-    let len = length x
-    alexSetInput (AlexPn (f+len) l (c+len), ' ', [], rest)
+    let lastChar = if null x then ' ' else last x
+    alexSetInput (foldl alexMove pos x, lastChar, [], rest)
     return x
 
 getCurrentPos :: Alex Position
@@ -408,37 +401,91 @@ getCurrentPos = do
     file <- getCurrentFile
     return $ Position file l c
 
-dropSpace :: Alex ()
-dropSpace = do
-    (AlexPn f l c, _, _, str) <- alexGetInput
-    case str of
-        [] -> return ()
-        ' ' : rest -> alexSetInput (AlexPn (f+1) l (c+1), ' ', [], rest)
-        ch : _ -> do
-            pos <- getCurrentPos
-            alexError $ "dropSpace encountered bad char: " ++ show ch ++
-                " at " ++ show pos
-
 -- read tokens after the name until the first (un-escaped) newline
 takeUntilNewline :: Alex String
 takeUntilNewline = do
-    (AlexPn f l c, _, _, str) <- alexGetInput
+    (pos, _, _, str) <- alexGetInput
     case str of
         []                 -> return ""
         '\n' :        _    -> do
             return ""
         '\\' : '\n' : rest -> do
-            alexSetInput (AlexPn (f+2) (l+1) 0, ' ', [], rest)
+            let newPos = alexMove (alexMove pos '\\') '\n'
+            alexSetInput (newPos, '\n', [], rest)
             takeUntilNewline >>= return . (' ' :)
         ch   :        rest -> do
-            alexSetInput (AlexPn (f+1) l (c+1), ' ', [], rest)
+            let newPos = alexMove pos ch
+            alexSetInput (newPos, ch, [], rest)
             takeUntilNewline >>= return . (ch :)
 
+-- select characters up to and including the given character
+takeThrough :: Char -> Alex String
+takeThrough goal = do
+    (_, _, _, str) <- alexGetInput
+    if null str
+        then lexicalError $
+                "unexpected end of input, looking for " ++ (show goal)
+        else do
+            ch <- takeChar
+            if ch == goal
+                then return [ch]
+                else do
+                    rest <- takeThrough goal
+                    return $ ch : rest
+
+-- pop one character from the input stream
+takeChar :: Alex Char
+takeChar = do
+    (pos, _, _, ch : str) <- alexGetInput
+    let newPos = alexMove pos ch
+    alexSetInput (newPos, ch, [], str)
+    return ch
+
+-- drop spaces in the input until a non-space is reached or EOF
+dropSpaces :: Alex ()
+dropSpaces = do
+    (_, _, _, str) <- alexGetInput
+    if null str || head str /= ' '
+        then return ()
+        else dropSpace >> dropSpaces
+    where
+        dropSpace :: Alex ()
+        dropSpace = do
+            (pos, _, _, str) <- alexGetInput
+            case str of
+                [] -> return ()
+                ' ' : rest -> alexSetInput (alexMove pos ' ', ' ', [], rest)
+                ch : _ -> lexicalError $ "expected ' ', but found: " ++ show ch
+
+
+-- removes and returns a quoted string such as <foo.bar> or "foo.bar"
+takeQuotedString :: Alex String
+takeQuotedString = do
+    dropSpaces
+    ch <- takeChar
+    end <-
+        case ch of
+            '"' -> return '"'
+            '<' -> return '>'
+            _ -> lexicalError $ "bad beginning of include arg: " ++ (show ch)
+    rest <- takeThrough end
+    let res = ch : rest
+    if end == '>'
+        then lexicalError $ "library includes are not supported: " ++ res
+        else return res
+
+-- directives that must always be processed even if the current code block is
+-- being excluded; we have to process conditions so we can match them up with
+-- their ending tag, even if they're being skipped
+unskippableDirectives :: [String]
+unskippableDirectives = ["else", "elsif", "endif", "ifdef", "ifndef"]
+
 handleDirective :: Action
-handleDirective (AlexPn fOrig lOrig cOrig, _, _, strOrig) len = do
-    let directive = tail $ take len strOrig
-    let newPos = AlexPn (fOrig + len) lOrig (cOrig + len)
-    alexSetInput (newPos, ' ', [], drop len strOrig)
+handleDirective (posOrig, _, _, strOrig) len = do
+    let thisTokenStr = take len strOrig
+    let directive = tail $ thisTokenStr
+    let newPos = foldl alexMove posOrig thisTokenStr
+    alexSetInput (newPos, last thisTokenStr, [], drop len strOrig)
 
     env <- gets lsEnv
     tempInput <- alexGetInput
@@ -454,8 +501,25 @@ handleDirective (AlexPn fOrig lOrig cOrig, _, _, strOrig) len = do
         "default_nettype" -> dropUntilNewline
         "timescale" -> dropUntilNewline
 
+        "include" -> do
+            quotedFilename <- takeQuotedString
+            inputFollow <- alexGetInput
+            fileFollow <- getCurrentFile
+            -- process the included file
+            let filename = init $ tail quotedFilename
+            path <- includeSearch filename
+            content <- loadFile path
+            let inputIncluded = (alexStartPos, ' ', [], content)
+            setCurrentFile path
+            alexSetInput inputIncluded
+            alexMonadScan
+            -- resume processing the original file
+            setCurrentFile fileFollow
+            alexSetInput inputFollow
+            alexMonadScan
+
         "ifdef" -> do
-            dropSpace
+            dropSpaces
             name <- takeString
             let newCond = if Map.member name env
                     then CurrentlyTrue
@@ -463,7 +527,7 @@ handleDirective (AlexPn fOrig lOrig cOrig, _, _, strOrig) len = do
             modify $ \s -> s { lsCondStack = newCond : condStack }
             alexMonadScan
         "ifndef" -> do
-            dropSpace
+            dropSpaces
             name <- takeString
             let newCond = if Map.notMember name env
                     then CurrentlyTrue
@@ -477,7 +541,7 @@ handleDirective (AlexPn fOrig lOrig cOrig, _, _, strOrig) len = do
             modify $ \s -> s { lsCondStack = newCond : tail condStack }
             alexMonadScan
         "elsif" -> do
-            dropSpace
+            dropSpaces
             name <- takeString
             let currCond = head condStack
             let newCond =
@@ -495,13 +559,13 @@ handleDirective (AlexPn fOrig lOrig cOrig, _, _, strOrig) len = do
 
         "define" -> do
             -- TODO: We don't yet support macros with arguments!
-            dropSpace
+            dropSpaces
             name <- takeString
             defn <- takeUntilNewline
             modify $ \s -> s { lsEnv = Map.insert name defn env }
             alexMonadScan
         "undef" -> do
-            dropSpace
+            dropSpaces
             name <- takeString
             modify $ \s -> s { lsEnv = Map.delete name env }
             alexMonadScan
@@ -511,14 +575,12 @@ handleDirective (AlexPn fOrig lOrig cOrig, _, _, strOrig) len = do
 
         _ -> do
             case Map.lookup directive env of
-                Nothing -> do
-                    pos <- getCurrentPos >>= return . show
-                    alexError $ "Undefined macro: " ++ directive ++ " at " ++ pos
+                Nothing -> lexicalError $ "Undefined macro: " ++ directive
                 Just replacement -> do
                     let size = length replacement
                     -- TODO: How should we track the file position when we
                     -- substitute in a macro?
-                    (AlexPn f l c, ' ', [], str) <- alexGetInput
+                    (AlexPn f l c, _, [], str) <- alexGetInput
                     let pos = AlexPn (f - size) l (c - size)
                     alexSetInput (pos, ' ', [], replacement ++ str)
                     alexMonadScan
@@ -531,28 +593,29 @@ removeUntil pattern _ _ = loop
         patternLen = length pattern
         wantNewline = pattern == "\n"
         loop = do
-            (AlexPn f l c, _, _, str) <- alexGetInput
+            (pos, _, _, str) <- alexGetInput
             let found = (null str && wantNewline)
                      || pattern == take patternLen str
-            let nextPos = if head str == '\n'
-                    then AlexPn (f+1) (l+1) 0
-                    else AlexPn (f+1) l (c+1)
+            let nextPos = alexMove pos (head str)
             let afterPos = if wantNewline
-                    then AlexPn (f+1) (l+1) 0
-                    else AlexPn (f+1) l (c + patternLen)
+                    then alexMove pos '\n'
+                    else foldl alexMove pos pattern
             let (newPos, newStr) = if found
                     then (afterPos, drop patternLen str)
                     else (nextPos, drop 1 str)
-            alexSetInput (newPos, ' ', [], newStr)
-            if found
-                then alexMonadScan
-                else loop
+            if not found && null str
+                then lexicalError $ "Reached EOF while looking for: " ++
+                        show pattern
+                else do
+                    alexSetInput (newPos, ' ', [], newStr)
+                    if found
+                        then alexMonadScan
+                        else loop
 
 tok :: TokenName -> Action
-tok tokId ((AlexPn _ l c), _, _, input) len = do
-    currFile <- gets lsCurrFile
+tok tokId (_, _, _, input) len = do
     let tokStr = take len input
-    let tokPos = Position currFile l c
+    tokPos <- getCurrentPos
     condStack <- gets lsCondStack
     () <- if not (null condStack) && head condStack /= CurrentlyTrue
         then modify id
