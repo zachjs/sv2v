@@ -287,10 +287,10 @@ EnumItems :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifiers { $1 }
 
 StructItems :: { [(Type, Identifier)] }
-  : StructItem             { [$1] }
-  | StructItems StructItem { $1 ++ [$2] }
-StructItem :: { (Type, Identifier) }
-  : Type Identifier ";" { ($1, $2) }
+  : StructItem             { $1 }
+  | StructItems StructItem { $1 ++ $2 }
+StructItem :: { [(Type, Identifier)] }
+  : Type Identifiers ";" { map (\a -> ($1, a)) $2 }
 
 Packing :: { Packing }
   : "packed" Signing { Packed $2 }
@@ -395,6 +395,7 @@ Direction :: { Direction }
 ModuleItems :: { [ModuleItem] }
   : {- empty -}            { [] }
   | ModuleItems ModuleItem { $1 ++ $2 }
+  | ModuleItems ";"        { $1 }
 
 ModuleItem :: { [ModuleItem] }
   -- This item covers module instantiations and all declarations
