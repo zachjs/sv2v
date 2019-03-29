@@ -29,8 +29,7 @@ executable sv2v
     containers,
     directory,
     filepath,
-    mtl,
-    split
+    mtl
   other-modules:
     -- SystemVerilog modules
     Language.SystemVerilog

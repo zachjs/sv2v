@@ -25,7 +25,6 @@ import System.Directory (findFile)
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Map.Strict as Map
 import Data.List (findIndex, isPrefixOf)
-import Data.List.Split (splitOn)
 
 import Language.SystemVerilog.Parser.Tokens
 }
@@ -511,18 +510,60 @@ takeMacroDefinition = do
                 then lexicalError "macros cannot have 0 args"
                 else return (body, args)
 
--- TODO FIXME XXX: This currently assumes that macro arguments contain no commas
--- or parentheses, which obviously isn't valid. See 22.5.1 of the spec for
--- details on how to deal with macros with arguments.
+-- commas and right parens are forbidden outside matched pairs of: (), [], {},
+-- "", except to delimit arguments or end the list of arguments; see 22.5.1
 takeMacroArguments :: Alex [String]
 takeMacroArguments = do
     dropSpaces
-    str <- takeThrough ')'
-    return $ splitOn "," str
+    '(' <- takeChar
+    loop "" []
+    where
+        loop :: String -> [Char] -> Alex [String]
+        loop curr stack = do
+            ch <- takeChar
+            case (stack, ch) of
+                (      s,'\\') -> do
+                    ch2 <- takeChar
+                    loop (curr ++ [ch, ch2]) s
+                ([     ], ',') -> do
+                    rest <- loop "" stack
+                    return $ curr : rest
+                ([     ], ')') -> return [curr]
 
--- TODO FIXME XXX: This doens't handle escape sequences in macros.
+                ('"' : s, '"') -> loop (curr ++ [ch]) s
+                (      s, '"') -> loop (curr ++ [ch]) ('"' : s)
+                ('[' : s, ']') -> loop (curr ++ [ch]) s
+                (      s, '[') -> loop (curr ++ [ch]) ('[' : s)
+                ('(' : s, ')') -> loop (curr ++ [ch]) s
+                (      s, '(') -> loop (curr ++ [ch]) ('(' : s)
+                ('{' : s, '}') -> loop (curr ++ [ch]) s
+                (      s, '{') -> loop (curr ++ [ch]) ('{' : s)
+
+                (      s,'\n') -> loop (curr ++ [' ']) s
+                (      s, _  ) -> loop (curr ++ [ch ]) s
+
+findUnescapedQuote :: String -> (String, String)
+findUnescapedQuote [] = ([], [])
+findUnescapedQuote ('`' : '\\' : '`' : '"' : rest) = ('\\' : '"' : start, end)
+    where (start, end) = findUnescapedQuote rest
+findUnescapedQuote ('\\' : '"' : rest) = ('\\' : '"' : start, end)
+    where (start, end) = findUnescapedQuote rest
+findUnescapedQuote ('"' : rest) = ("\"", rest)
+findUnescapedQuote (ch : rest) = (ch : start, end)
+    where (start, end) = findUnescapedQuote rest
+
+-- substitute in the arguments for a macro expension
 substituteArgs :: String -> [String] -> [String] -> String
 substituteArgs "" _ _ = ""
+substituteArgs ('`' : '`' : body) names args =
+    substituteArgs body names args
+substituteArgs ('"' : body) names args =
+    '"' : start ++ substituteArgs rest names args
+    where (start, rest) = findUnescapedQuote body
+substituteArgs ('`' : '"' : body) names args =
+    '"' : substituteArgs (init start) names args
+    ++ '"' : substituteArgs rest names args
+    where (start, rest) = findUnescapedQuote body
 substituteArgs body names args =
     case findIndex isPresent names of
         Nothing -> head body : substituteArgs (tail body) names args
@@ -628,7 +669,6 @@ handleDirective (posOrig, _, _, strOrig) len = do
             alexMonadScan
 
         "define" -> do
-            -- TODO: We don't yet support macros with arguments!
             dropSpaces
             name <- takeString
             defn <- takeMacroDefinition
