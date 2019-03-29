@@ -334,9 +334,6 @@ data TokenName
   | Sym_amp_amp_amp
   | Sym_lt_lt_lt_eq
   | Sym_gt_gt_gt_eq
-  | Spe_Comment
-  | Spe_CommentBegin
-  | Spe_CommentEnd
   | Spe_Directive
   | Spe_Newline
   | Unknown

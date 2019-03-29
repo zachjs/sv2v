@@ -159,11 +159,6 @@ pp (Token Spe_Directive str pos : tokens) = do
                     return $ replacement ++ tokens'
 
 pp (Token Spe_Newline _ _ : tokens) = pp tokens
-pp (Token Spe_Comment _ _ : tokens) = pp tokens
-
-pp (Token Spe_CommentBegin _ _ : tokens) =
-    pp $ tail $ dropWhile (not . isEnd) tokens
-    where isEnd (Token t _ _ ) = t == Spe_CommentEnd
 
 pp (token : tokens) = do
     condStack <- gets ppCondStack
