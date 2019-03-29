@@ -24,6 +24,8 @@ import System.FilePath (dropFileName)
 import System.Directory (findFile)
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Map.Strict as Map
+import Data.List (findIndex, isPrefixOf)
+import Data.List.Split (splitOn)
 
 import Language.SystemVerilog.Parser.Tokens
 }
@@ -303,7 +305,7 @@ data Cond
 data AlexUserState = LS
     { lsToks         :: [Token] -- tokens read so far
     , lsCurrFile     :: FilePath -- currently active filename
-    , lsEnv          :: Map.Map String String -- active macro definitions
+    , lsEnv          :: Map.Map String (String, [String]) -- active macro definitions
     , lsCondStack    :: [Cond] -- if-else cascade state
     , lsIncludePaths :: [FilePath] -- folders to search for includes
     } deriving (Eq, Show)
@@ -327,7 +329,7 @@ lexFile includePaths env path = do
                 else error $ "unfinished conditional directives: " ++
                         (show $ length $ lsCondStack finalState)
     where
-        initialEnv = Map.fromList env
+        initialEnv = Map.map (\a -> (a, [])) $ Map.fromList env
         setEnv = modify $ \s -> s
             { lsEnv = initialEnv
             , lsIncludePaths = includePaths
@@ -341,7 +343,8 @@ alexEOF = return ()
 -- raises an alexError with the current file position appended
 lexicalError :: String -> Alex a
 lexicalError msg = do
-    pos <- getCurrentPos
+    (pn, _, _, _) <- alexGetInput
+    pos <- toTokPos pn
     alexError $ msg ++ ", at " ++ show pos
 
 -- get the current user state
@@ -395,9 +398,8 @@ takeString = do
     alexSetInput (foldl alexMove pos x, lastChar, [], rest)
     return x
 
-getCurrentPos :: Alex Position
-getCurrentPos = do
-    (AlexPn _ l c, _, _, _) <- alexGetInput
+toTokPos :: AlexPosn -> Alex Position
+toTokPos (AlexPn _ l c) = do
     file <- getCurrentFile
     return $ Position file l c
 
@@ -474,6 +476,61 @@ takeQuotedString = do
         then lexicalError $ "library includes are not supported: " ++ res
         else return res
 
+peekChar :: Alex Char
+peekChar = do
+    (_, _, _, str) <- alexGetInput
+    return $ if null str
+        then '\n'
+        else head str
+
+takeMacroArgNames :: Alex [String]
+takeMacroArgNames = do
+    dropSpaces
+    name <- takeString
+    dropSpaces
+    ch <- takeChar
+    rest <- case ch of
+        ',' -> takeMacroArgNames
+        ')' -> return []
+        _   -> lexicalError $ "unexpected char in macro defn. args: " ++ show ch
+    return $ name : rest
+
+-- TODO FIXME: We don't currently support macro arguments with default values!
+takeMacroDefinition :: Alex (String, [String])
+takeMacroDefinition = do
+    leadCh <- peekChar
+    if leadCh /= '('
+        then do
+            body <- takeUntilNewline
+            return (body, [])
+        else do
+            '(' <- takeChar
+            args <- takeMacroArgNames
+            body <- takeUntilNewline
+            if null args
+                then lexicalError "macros cannot have 0 args"
+                else return (body, args)
+
+-- TODO FIXME XXX: This currently assumes that macro arguments contain no commas
+-- or parentheses, which obviously isn't valid. See 22.5.1 of the spec for
+-- details on how to deal with macros with arguments.
+takeMacroArguments :: Alex [String]
+takeMacroArguments = do
+    dropSpaces
+    str <- takeThrough ')'
+    return $ splitOn "," str
+
+-- TODO FIXME XXX: This doens't handle escape sequences in macros.
+substituteArgs :: String -> [String] -> [String] -> String
+substituteArgs "" _ _ = ""
+substituteArgs body names args =
+    case findIndex isPresent names of
+        Nothing -> head body : substituteArgs (tail body) names args
+        Just idx ->
+            (args !! idx) ++ substituteArgs (drop nameLen body) names args
+            where nameLen = length $ names !! idx
+    where isPresent a = isPrefixOf a body
+
 -- directives that must always be processed even if the current code block is
 -- being excluded; we have to process conditions so we can match them up with
 -- their ending tag, even if they're being skipped
@@ -500,6 +557,19 @@ handleDirective (posOrig, _, _, strOrig) len = do
 
         "default_nettype" -> dropUntilNewline
         "timescale" -> dropUntilNewline
+
+        "__FILE__" -> do
+            tokPos <- toTokPos posOrig
+            currFile <- gets lsCurrFile
+            let tokStr = show currFile
+            modify $ push $ Token Lit_string tokStr tokPos
+            alexMonadScan
+        "__LINE__" -> do
+            tokPos <- toTokPos posOrig
+            let Position _ currLine _ = tokPos
+            let tokStr = show currLine
+            modify $ push $ Token Lit_number tokStr tokPos
+            alexMonadScan
 
         "include" -> do
             quotedFilename <- takeQuotedString
@@ -561,7 +631,7 @@ handleDirective (posOrig, _, _, strOrig) len = do
             -- TODO: We don't yet support macros with arguments!
             dropSpaces
             name <- takeString
-            defn <- takeUntilNewline
+            defn <- takeMacroDefinition
             modify $ \s -> s { lsEnv = Map.insert name defn env }
             alexMonadScan
         "undef" -> do
@@ -576,15 +646,24 @@ handleDirective (posOrig, _, _, strOrig) len = do
         _ -> do
             case Map.lookup directive env of
                 Nothing -> lexicalError $ "Undefined macro: " ++ directive
-                Just replacement -> do
-                    let size = length replacement
+                Just (body, formalArgs) -> do
                     -- TODO: How should we track the file position when we
                     -- substitute in a macro?
+                    replacement <- if null formalArgs
+                        then return body
+                        else do
+                            actualArgs <- takeMacroArguments
+                            if length formalArgs == length actualArgs
+                                then return $ substituteArgs body formalArgs actualArgs
+                                else lexicalError $
+                                        "different number of macro args: " ++
+                                        (show $ length formalArgs) ++ " vs. " ++
+                                        (show $ length actualArgs)
+                    let size = length replacement
                     (AlexPn f l c, _, [], str) <- alexGetInput
                     let pos = AlexPn (f - size) l (c - size)
                     alexSetInput (pos, ' ', [], replacement ++ str)
                     alexMonadScan
-
 
 -- remove characters from the input until the pattern is reached
 removeUntil :: String -> Action
@@ -612,14 +691,16 @@ removeUntil pattern _ _ = loop
                         then alexMonadScan
                         else loop
 
+push :: Token -> AlexUserState -> AlexUserState
+push t s = s { lsToks = (lsToks s) ++ [t] }
+
 tok :: TokenName -> Action
-tok tokId (_, _, _, input) len = do
+tok tokId (pos, _, _, input) len = do
     let tokStr = take len input
-    tokPos <- getCurrentPos
+    tokPos <- toTokPos pos
     condStack <- gets lsCondStack
     () <- if not (null condStack) && head condStack /= CurrentlyTrue
         then modify id
         else modify (push $ Token tokId tokStr tokPos)
     alexMonadScan
-    where push t s = s { lsToks = (lsToks s) ++ [t] }
 }
