@@ -410,6 +410,11 @@ takeUntilNewline = do
         []                 -> return ""
         '\n' :        _    -> do
             return ""
+        '/' : '/' : _ -> do
+            remainder <- takeThrough '\n'
+            case last $ init remainder of
+                '\\' -> takeUntilNewline >>= return . (' ' :)
+                _ -> return ""
         '\\' : '\n' : rest -> do
             let newPos = alexMove (alexMove pos '\\') '\n'
             alexSetInput (newPos, '\n', [], rest)
