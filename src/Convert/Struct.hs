@@ -89,7 +89,7 @@ collectType (Struct (Packed sg) fields _) = do
         isComplex (Alias _ _) = True
         isComplex _ = False
         canUnstructure =
-            all (head fieldClasses ==) (map show fieldClasses) &&
+            all (head fieldClasses ==) fieldClasses &&
             not (any isComplex fieldTypes)
 
 collectType _ = return ()
