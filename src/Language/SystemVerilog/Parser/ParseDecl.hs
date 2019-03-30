@@ -178,7 +178,7 @@ parseDTsAsDecl tokens =
 -- [PUBLIC]: parser for single block item declarations or assign or arg-less
 -- subroutine call statetments
 parseDTsAsDeclOrAsgn :: [DeclToken] -> ([Decl], [Stmt])
-parseDTsAsDeclOrAsgn [DTIdent f] = ([], [Subroutine f []])
+parseDTsAsDeclOrAsgn [DTIdent f] = ([], [Subroutine f (Args [] [])])
 parseDTsAsDeclOrAsgn tokens =
     if any isAsgnToken tokens || tripLookahead tokens
         then ([], [constructor lhs expr])

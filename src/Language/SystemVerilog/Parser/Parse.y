@@ -625,7 +625,7 @@ Stmts :: { [Stmt] }
 Stmt :: { Stmt }
   : StmtNonAsgn         { $1 }
   | LHS AsgnOp Expr ";" { AsgnBlk $2 $1 $3 }
-  | Identifier      ";" { Subroutine $1 [] }
+  | Identifier      ";" { Subroutine $1 (Args [] []) }
   | LHS "<=" opt(DelayOrEventControl) Expr ";" { Asgn $3 $1 $4 }
   | LHS IncOrDecOperator ";" { AsgnBlk (AsgnOp $2) $1 (Number "1") }
   | IncOrDecOperator LHS ";" { AsgnBlk (AsgnOp $1) $2 (Number "1") }
@@ -737,14 +737,23 @@ Number :: { String }
 String :: { String }
   : string { tail $ init $ tokenString $1 }
 
-CallArgs :: { [Maybe Expr] }
-  : {- empty -}         { [] }
-  | Expr                { [Just $1] }
-  |      CallArgsFollow { (Nothing) : $1 }
-  | Expr CallArgsFollow { (Just $1) : $2 }
-CallArgsFollow :: { [Maybe Expr] }
+CallArgs :: { Args }
+  : {- empty -}                        { Args [            ] [] }
+  |                NamedCallArgsFollow { Args [            ] $1 }
+  | Expr                 NamedCallArgs { Args [Just $1     ] $2 }
+  |      UnnamedCallArgs NamedCallArgs { Args (Nothing : $1) $2 }
+  | Expr UnnamedCallArgs NamedCallArgs { Args (Just $1 : $2) $3 }
+UnnamedCallArgs :: { [Maybe Expr] }
   : "," opt(Expr)                { [$2] }
-  | "," opt(Expr) CallArgsFollow { $2 : $3 }
+  | UnnamedCallArgs "," opt(Expr) { $1 ++ [$3] }
+NamedCallArgs :: { [(Identifier, Maybe Expr)] }
+  : {- empty -}        { [] }
+  | "," NamedCallArgsFollow  { $2 }
+NamedCallArgsFollow :: { [(Identifier, Maybe Expr)] }
+  : NamedCallArg                         { [$1] }
+  | NamedCallArgsFollow "," NamedCallArg { $1 ++ [$3] }
+NamedCallArg :: { (Identifier, Maybe Expr) }
+  : "." Identifier "(" opt(Expr) ")" { ($2, $4) }
 
 Exprs :: { [Expr] }
   :           Expr  { [$1] }

@@ -10,6 +10,7 @@ module Language.SystemVerilog.AST.Expr
     , Range
     , showAssignment
     , showRanges
+    , Args (..)
     ) where
 
 import Data.List (intercalate)
@@ -29,7 +30,7 @@ data Expr
     | Bit     Expr Expr
     | Repeat  Expr [Expr]
     | Concat  [Expr]
-    | Call    Identifier [Maybe Expr]
+    | Call    Identifier Args
     | UniOp   UniOp Expr
     | BinOp   BinOp Expr Expr
     | Mux     Expr Expr Expr
@@ -50,7 +51,7 @@ instance Show Expr where
     show (BinOp   o a b) = printf "(%s %s %s)" (show a) (show o) (show b)
     show (Dot     e n  ) = printf "%s.%s"      (show e) n
     show (Mux     c a b) = printf "(%s ? %s : %s)" (show c) (show a) (show b)
-    show (Call    f l  ) = printf "%s(%s)" f (commas $ map (maybe "" show) l)
+    show (Call    f l  ) = printf "%s(%s)" f (show l)
     show (Cast tore e  ) = printf "%s'(%s)" tStr (show e)
         where
             tStr = case tore of
@@ -62,6 +63,17 @@ instance Show Expr where
             showPatternItem :: (Maybe Identifier, Expr) -> String
             showPatternItem (Nothing, e) = show e
             showPatternItem (Just n , e) = printf "%s: %s" n (show e)
+
+data Args
+    = Args [Maybe Expr] [(Identifier, Maybe Expr)]
+    deriving (Eq, Ord)
+
+instance Show Args where
+    show (Args pnArgs kwArgs) = commas strs
+        where
+            strs = (map showPnArg pnArgs) ++ (map showKwArg kwArgs)
+            showPnArg = maybe "" show
+            showKwArg (x, me) = printf ".%s(%s)" (show x) (showPnArg me)
 
 showAssignment :: Maybe Expr -> String
 showAssignment Nothing = ""

@@ -213,8 +213,11 @@ traverseNestedExprsM mapper = exprMapper
             return $ Repeat e' l'
         em (Concat     l) =
             mapM exprMapper l >>= return . Concat
-        em (Call       f l) =
-            mapM maybeExprMapper l >>= return . Call f
+        em (Call       f (Args l p)) = do
+            l' <- mapM maybeExprMapper l
+            pes <- mapM maybeExprMapper $ map snd p
+            let p' = zip (map fst p) pes
+            return $ Call f (Args l' p')
         em (UniOp      o e) =
             exprMapper e >>= return . UniOp o
         em (BinOp      o e1 e2) = do
@@ -297,8 +300,11 @@ traverseExprsM mapper = moduleItemMapper
     flatStmtMapper (If u cc s1 s2) =
         exprMapper cc >>= \cc' -> return $ If u cc' s1 s2
     flatStmtMapper (Timing event stmt) = return $ Timing event stmt
-    flatStmtMapper (Subroutine f exprs) =
-        mapM maybeExprMapper exprs >>= return . Subroutine f
+    flatStmtMapper (Subroutine f (Args l p)) = do
+        l' <- mapM maybeExprMapper l
+        pes <- mapM maybeExprMapper $ map snd p
+        let p' = zip (map fst p) pes
+        return $ Subroutine f (Args l' p')
     flatStmtMapper (Return expr) =
         exprMapper expr >>= return . Return
     flatStmtMapper (Trigger x) = return $ Trigger x
