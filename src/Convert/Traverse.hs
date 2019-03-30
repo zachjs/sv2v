@@ -150,10 +150,10 @@ traverseNestedStmtsM mapper = fullMapper
         cs (RepeatL e stmt) = fullMapper stmt >>= return . RepeatL e
         cs (DoWhile e stmt) = fullMapper stmt >>= return . DoWhile e
         cs (Forever   stmt) = fullMapper stmt >>= return . Forever
-        cs (If e s1 s2) = do
+        cs (If u e s1 s2) = do
             s1' <- fullMapper s1
             s2' <- fullMapper s2
-            return $ If e s1' s2'
+            return $ If u e s1' s2'
         cs (Timing event stmt) = fullMapper stmt >>= return . Timing event
         cs (Return expr) = return $ Return expr
         cs (Subroutine f exprs) = return $ Subroutine f exprs
@@ -294,8 +294,8 @@ traverseExprsM mapper = moduleItemMapper
     flatStmtMapper (DoWhile e stmt) =
         exprMapper e >>= \e' -> return $ DoWhile e' stmt
     flatStmtMapper (Forever   stmt) = return $ Forever stmt
-    flatStmtMapper (If cc s1 s2) =
-        exprMapper cc >>= \cc' -> return $ If cc' s1 s2
+    flatStmtMapper (If u cc s1 s2) =
+        exprMapper cc >>= \cc' -> return $ If u cc' s1 s2
     flatStmtMapper (Timing event stmt) = return $ Timing event stmt
     flatStmtMapper (Subroutine f exprs) =
         mapM maybeExprMapper exprs >>= return . Subroutine f

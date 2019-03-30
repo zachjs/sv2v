@@ -225,6 +225,7 @@ data TokenName
   | KW_type_option
   | KW_union
   | KW_unique
+  | KW_unique0
   | KW_unsigned
   | KW_use
   | KW_uwire
@@ -327,6 +328,8 @@ data TokenName
   | Sym_gt_gt_eq
   | Sym_bar_dash_gt
   | Sym_bar_eq_gt
+  | Sym_pound_dash_pound
+  | Sym_pound_eq_pound
   | Sym_brack_l_dash_gt
   | Sym_at_at_paren_l
   | Sym_paren_l_aster_paren_r

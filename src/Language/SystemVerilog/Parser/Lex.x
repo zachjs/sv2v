@@ -107,6 +107,7 @@ tokens :-
     "always_ff"        { tok KW_always_ff    }
     "always_latch"     { tok KW_always_latch }
     "and"              { tok KW_and          }
+    "assert"           { tok KW_assert       }
     "assign"           { tok KW_assign       }
     "automatic"        { tok KW_automatic    }
     "begin"            { tok KW_begin        }
@@ -118,6 +119,7 @@ tokens :-
     "casez"            { tok KW_casez        }
     "default"          { tok KW_default      }
     "defparam"         { tok KW_defparam     }
+    "disable"          { tok KW_disable      }
     "do"               { tok KW_do           }
     "else"             { tok KW_else         }
     "end"              { tok KW_end          }
@@ -129,18 +131,21 @@ tokens :-
     "endtask"          { tok KW_endtask      }
     "enum"             { tok KW_enum         }
     "extern"           { tok KW_extern       }
+    "first_match"      { tok KW_first_match  }
     "for"              { tok KW_for          }
     "forever"          { tok KW_forever      }
     "function"         { tok KW_function     }
     "generate"         { tok KW_generate     }
     "genvar"           { tok KW_genvar       }
     "if"               { tok KW_if           }
+    "iff"              { tok KW_iff          }
     "initial"          { tok KW_initial      }
     "inout"            { tok KW_inout        }
     "input"            { tok KW_input        }
     "int"              { tok KW_int          }
     "integer"          { tok KW_integer      }
     "interface"        { tok KW_interface    }
+    "intersect"        { tok KW_intersect    }
     "localparam"       { tok KW_localparam   }
     "logic"            { tok KW_logic        }
     "longint"          { tok KW_longint      }
@@ -155,6 +160,8 @@ tokens :-
     "packed"           { tok KW_packed       }
     "parameter"        { tok KW_parameter    }
     "posedge"          { tok KW_posedge      }
+    "priority"         { tok KW_priority     }
+    "property"         { tok KW_property     }
     "real"             { tok KW_real         }
     "realtime"         { tok KW_realtime     }
     "reg"              { tok KW_reg          }
@@ -168,6 +175,7 @@ tokens :-
     "supply0"          { tok KW_supply0      }
     "supply1"          { tok KW_supply1      }
     "task"             { tok KW_task         }
+    "throughout"       { tok KW_throughout   }
     "time"             { tok KW_time         }
     "tri"              { tok KW_tri          }
     "tri0"             { tok KW_tri0         }
@@ -177,11 +185,13 @@ tokens :-
     "trireg"           { tok KW_trireg       }
     "typedef"          { tok KW_typedef      }
     "unique"           { tok KW_unique       }
+    "unique0"          { tok KW_unique0      }
     "unsigned"         { tok KW_unsigned     }
     "uwire"            { tok KW_uwire        }
     "wand"             { tok KW_wand         }
     "while"            { tok KW_while        }
     "wire"             { tok KW_wire         }
+    "within"           { tok KW_within       }
     "wor"              { tok KW_wor          }
     "xnor"             { tok KW_xnor         }
     "xor"              { tok KW_xor          }
@@ -272,6 +282,8 @@ tokens :-
     "|->"              { tok Sym_bar_dash_gt }
     "|=>"              { tok Sym_bar_eq_gt }
     "[->"              { tok Sym_brack_l_dash_gt }
+    "#-#"              { tok Sym_pound_dash_pound }
+    "#=#"              { tok Sym_pound_eq_pound }
     "@@("              { tok Sym_at_at_paren_l }
     "(*)"              { tok Sym_paren_l_aster_paren_r }
     "->>"              { tok Sym_dash_gt_gt }

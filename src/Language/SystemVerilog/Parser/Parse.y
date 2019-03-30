@@ -22,6 +22,7 @@ import Language.SystemVerilog.Parser.Tokens
 "always_ff"        { Token KW_always_ff    _ _ }
 "always_latch"     { Token KW_always_latch _ _ }
 "and"              { Token KW_and          _ _ }
+"assert"           { Token KW_assert       _ _ }
 "assign"           { Token KW_assign       _ _ }
 "automatic"        { Token KW_automatic    _ _ }
 "begin"            { Token KW_begin        _ _ }
@@ -33,6 +34,7 @@ import Language.SystemVerilog.Parser.Tokens
 "casez"            { Token KW_casez        _ _ }
 "default"          { Token KW_default      _ _ }
 "defparam"         { Token KW_defparam     _ _ }
+"disable"          { Token KW_disable      _ _ }
 "do"               { Token KW_do           _ _ }
 "else"             { Token KW_else         _ _ }
 "end"              { Token KW_end          _ _ }
@@ -44,18 +46,21 @@ import Language.SystemVerilog.Parser.Tokens
 "endtask"          { Token KW_endtask      _ _ }
 "enum"             { Token KW_enum         _ _ }
 "extern"           { Token KW_extern       _ _ }
+"first_match"      { Token KW_first_match  _ _ }
 "for"              { Token KW_for          _ _ }
 "forever"          { Token KW_forever      _ _ }
 "function"         { Token KW_function     _ _ }
 "generate"         { Token KW_generate     _ _ }
 "genvar"           { Token KW_genvar       _ _ }
 "if"               { Token KW_if           _ _ }
+"iff"              { Token KW_iff          _ _ }
 "initial"          { Token KW_initial      _ _ }
 "inout"            { Token KW_inout        _ _ }
 "input"            { Token KW_input        _ _ }
 "int"              { Token KW_int          _ _ }
 "integer"          { Token KW_integer      _ _ }
 "interface"        { Token KW_interface    _ _ }
+"intersect"        { Token KW_intersect    _ _ }
 "localparam"       { Token KW_localparam   _ _ }
 "logic"            { Token KW_logic        _ _ }
 "longint"          { Token KW_longint      _ _ }
@@ -70,6 +75,8 @@ import Language.SystemVerilog.Parser.Tokens
 "packed"           { Token KW_packed       _ _ }
 "parameter"        { Token KW_parameter    _ _ }
 "posedge"          { Token KW_posedge      _ _ }
+"priority"         { Token KW_priority     _ _ }
+"property"         { Token KW_property     _ _ }
 "real"             { Token KW_real         _ _ }
 "realtime"         { Token KW_realtime     _ _ }
 "reg"              { Token KW_reg          _ _ }
@@ -83,6 +90,7 @@ import Language.SystemVerilog.Parser.Tokens
 "supply0"          { Token KW_supply0      _ _ }
 "supply1"          { Token KW_supply1      _ _ }
 "task"             { Token KW_task         _ _ }
+"throughout"       { Token KW_throughout   _ _ }
 "time"             { Token KW_time         _ _ }
 "tri"              { Token KW_tri          _ _ }
 "tri0"             { Token KW_tri0         _ _ }
@@ -92,11 +100,13 @@ import Language.SystemVerilog.Parser.Tokens
 "trireg"           { Token KW_trireg       _ _ }
 "typedef"          { Token KW_typedef      _ _ }
 "unique"           { Token KW_unique       _ _ }
+"unique0"          { Token KW_unique0      _ _ }
 "unsigned"         { Token KW_unsigned     _ _ }
 "uwire"            { Token KW_uwire        _ _ }
 "wand"             { Token KW_wand         _ _ }
 "while"            { Token KW_while        _ _ }
 "wire"             { Token KW_wire         _ _ }
+"within"           { Token KW_within       _ _ }
 "wor"              { Token KW_wor          _ _ }
 "xnor"             { Token KW_xnor         _ _ }
 "xor"              { Token KW_xor          _ _ }
@@ -184,6 +194,8 @@ string             { Token Lit_string      _ _ }
 "|->"              { Token Sym_bar_dash_gt _ _ }
 "|=>"              { Token Sym_bar_eq_gt _ _ }
 "[->"              { Token Sym_brack_l_dash_gt _ _ }
+"#-#"              { Token Sym_pound_dash_pound _ _ }
+"#=#"              { Token Sym_pound_eq_pound _ _ }
 "@@("              { Token Sym_at_at_paren_l _ _ }
 "(*)"              { Token Sym_paren_l_aster_paren_r _ _ }
 "->>"              { Token Sym_dash_gt_gt _ _ }
@@ -196,6 +208,15 @@ directive          { Token Spe_Directive _ _ }
 -- operator precedences, from *lowest* to *highest*
 %nonassoc NoElse
 %nonassoc "else"
+%right  "|->" "|=>" "#-#" "#=#"
+%right "iff"
+%left "or"
+%left "and"
+%left "intersect"
+%left "within"
+%right "throughout"
+%left "##"
+%nonassoc "[*]" "[=]" "[->]"
 %right "?" ":"
 %left  "||"
 %left  "&&"
@@ -316,7 +337,9 @@ ParamDecls :: { [ModuleItem] }
   : ParamDecl(")")            { $1 }
   | ParamDecl(",") ParamDecls { $1 ++ $2 }
 ParamDecl(delim) :: { [ModuleItem] }
-  : "parameter" ParamType DeclAsgns delim { map (MIDecl . (uncurry $ Parameter $2)) $3 }
+  : ParameterDecl(OnlyParamKW, delim) { map MIDecl $1 }
+OnlyParamKW :: { Type -> Identifier -> Expr -> Decl }
+  : "parameter" { Parameter }
 
 PortDecls :: { ([Identifier], [ModuleItem]) }
   : "(" DeclTokens(")") { parseDTsAsPortDecls $2 }
@@ -400,8 +423,7 @@ ModuleItems :: { [ModuleItem] }
 ModuleItem :: { [ModuleItem] }
   -- This item covers module instantiations and all declarations
   : DeclTokens(";")  { parseDTsAsModuleItems $1 }
-  | "parameter"  ParamType DeclAsgns ";" { map MIDecl $ map (uncurry $ Parameter  $2) $3 }
-  | "localparam" ParamType DeclAsgns ";" { map MIDecl $ map (uncurry $ Localparam $2) $3 }
+  | ParameterDecl(ParameterDeclKW, ";")  { map MIDecl $1 }
   | "defparam" DefparamAsgns ";"         { map (uncurry Defparam) $2 }
   | "assign" opt(DelayControl) LHS "=" Expr ";" { [Assign $2 $3 $5] }
   | AlwaysKW Stmt                        { [AlwaysC $1 $2] }
@@ -413,6 +435,67 @@ ModuleItem :: { [ModuleItem] }
   | NInputGateKW  NInputGates  ";"       { map (\(a, b, c) -> NInputGate  $1 a b c) $2 }
   | NOutputGateKW NOutputGates ";"       { map (\(a, b, c) -> NOutputGate $1 a b c) $2 }
   | AttributeInstance ModuleItem         { map (MIAttr $1) $2 }
+  | AssertionItem                        { [] } -- AssertionItem $1] }
+
+-- for ModuleItem, for now
+AssertionItem :: { AssertionItem }
+  : ConcurrentAssertionItem { $1 }
+
+-- for Stmt, for now
+ProceduralAssertionStatement :: { Assertion }
+  : ConcurrentAssertionStatement { $1 }
+  | ImmediateAssertionStatement  { $1 }
+
+ConcurrentAssertionItem :: { AssertionItem }
+  : Identifier ":" ConcurrentAssertionStatement { (Just $1, $3) }
+  |                ConcurrentAssertionStatement { (Nothing, $1) }
+ConcurrentAssertionStatement :: { Assertion }
+  : "assert" "property" "(" PropertySpec ")" ActionBlock { AssertProperty $4 $6 }
+  -- TODO: Add support for assume, cover, and restrict
+
+ImmediateAssertionStatement :: { Assertion }
+  : SimpleImmediateAssertionStatement { $1 }
+SimpleImmediateAssertionStatement :: { Assertion }
+  : "assert" "(" Expr ")" ActionBlock { Assert $3 $5 }
+  -- TODO: Add support for assume and cover
+
+PropertySpec :: { PropertySpec }
+  : opt(ClockingEvent) "disable" "iff" "(" Expr ")" PropertyExpr { PropertySpec $1 (Just $5) $7 }
+  | opt(ClockingEvent)                              PropertyExpr { PropertySpec $1 (Nothing) $2 }
+
+-- TODO: This is pretty incomplete!
+PropertyExpr :: { PropertyExpr }
+  : SeqExpr          { PESE $1 }
+  | SeqExpr PESPBinOp PropertyExpr { PESPBinOp $1 $2 $3 }
+  -- | "(" PropertyExpr ")"  { [] }
+
+PESPBinOp :: { PESPBinOp }
+  : "|->" { ImpliesO     }
+  | "|=>" { ImpliesNO    }
+  | "#-#" { FollowedByO  }
+  | "#=#" { FollowedByNO }
+
+SeqExpr :: { SeqExpr }
+  : Expr { SeqExpr $1 }
+  | SeqExpr "and"        SeqExpr { SeqExprAnd        $1 $3 }
+  | SeqExpr "or"         SeqExpr { SeqExprOr         $1 $3 }
+  | SeqExpr "intersect"  SeqExpr { SeqExprIntersect  $1 $3 }
+  | Expr    "throughout" SeqExpr { SeqExprThroughout $1 $3 }
+  | SeqExpr "within"     SeqExpr { SeqExprWithin     $1 $3 }
+  | SeqExpr "##" Number  SeqExpr { SeqExprDelay (Just $1) (Number $3) $4 }
+  |         "##" Number  SeqExpr { SeqExprDelay (Nothing) (Number $2) $3 }
+  | "first_match" "(" SeqExpr SeqMatchItems ")" { SeqExprFirstMatch $3 $4 }
+SeqMatchItems :: { [SeqMatchItem] }
+  : "," SeqMatchItem               { [$2] }
+  | SeqMatchItems "," SeqMatchItem { $1 ++ [$3] }
+SeqMatchItem :: { SeqMatchItem }
+  : ForStepAssignment           { Left $1 }
+  | Identifier "(" CallArgs ")" { Right ($1, $3) }
+
+ActionBlock :: { ActionBlock }
+  : Stmt %prec NoElse { ActionBlockIf   $1 }
+  |      "else" Stmt  { ActionBlockElse (Nothing) $2 }
+  | Stmt "else" Stmt  { ActionBlockElse (Just $1) $3 }
 
 AttributeInstance :: { Attr }
   : "(*" AttrSpecs "*)" { Attr $2 }
@@ -487,7 +570,7 @@ TFItems :: { [Decl] }
 ParamType :: { Type }
   : "integer" Signing  { IntegerAtom TInteger $2 }
   | "integer"          { IntegerAtom TInteger Unspecified }
-  |         Dimensions { Implicit Unspecified $1 }
+  | DimensionsNonEmpty { Implicit Unspecified $1 }
   | Signing Dimensions { Implicit $1          $2 }
 
 Dimensions :: { [Range] }
@@ -549,8 +632,8 @@ Stmt :: { Stmt }
 StmtNonAsgn :: { Stmt }
   : ";" { Null }
   | "begin" opt(Tag) DeclsAndStmts "end" opt(Tag) { Block (combineTags $2 $5) (fst $3) (snd $3) }
-  | "if" "(" Expr ")" Stmt "else" Stmt         { If $3 $5 $7        }
-  | "if" "(" Expr ")" Stmt %prec NoElse        { If $3 $5 Null      }
+  | Unique "if" "(" Expr ")" Stmt "else" Stmt         { If $1 $4 $6 $8        }
+  | Unique "if" "(" Expr ")" Stmt %prec NoElse        { If $1 $4 $6 Null      }
   | "for" "(" DeclTokens(";") opt(Expr) ";" ForStep ")" Stmt { For (parseDTsAsDeclsAndAsgns $3) $4 $6 $8 }
   | Unique CaseKW "(" Expr ")" Cases opt(CaseDefault) "endcase" { Case $1 $2 $4 $6 $7 }
   | TimingControl Stmt                         { Timing $1 $2 }
@@ -562,6 +645,13 @@ StmtNonAsgn :: { Stmt }
   | "forever" Stmt                             { Forever $2 }
   | "->" Identifier ";"                        { Trigger $2 }
   | AttributeInstance Stmt                     { StmtAttr $1 $2 }
+  | ProceduralAssertionStatement               { Null } --Assertion $1 }
+
+Unique :: { Maybe UniquePriority }
+  : {- empty -} { Nothing }
+  | "unique"    { Just Unique   }
+  | "unique0"   { Just Unique0  }
+  | "priority"  { Just Priority }
 
 ForStep :: { [(LHS, AsgnOp, Expr)] }
   : {- empty -}     { [] }
@@ -580,8 +670,19 @@ DeclsAndStmts :: { ([Decl], [Stmt]) }
   | {- empty -}              { ([], []) }
 DeclOrStmt :: { ([Decl], [Stmt]) }
   : DeclOrStmtTokens(";") { parseDTsAsDeclOrAsgn $1 }
-  | "parameter"  ParamType DeclAsgns ";" { (map (uncurry $ Parameter  $2) $3, []) }
-  | "localparam" ParamType DeclAsgns ";" { (map (uncurry $ Localparam $2) $3, []) }
+  | ParameterDecl(ParameterDeclKW, ";") { ($1, []) }
+
+ParameterDecl(kw, delim) :: { [Decl] }
+  : kw            DeclAsgns delim { map (uncurry $ $1 (Implicit Unspecified [])) $2 }
+  | kw ParamType  DeclAsgns delim { map (uncurry $ $1 ($2                     )) $3 }
+  | kw Identifier DeclAsgns delim { map (uncurry $ $1 (Alias    $2          [])) $3 }
+ParameterDeclKW :: { Type -> Identifier -> Expr -> Decl }
+  : "parameter"  { Parameter  }
+  | "localparam" { Localparam }
+
+-- TODO: This does not allow for @identifier
+ClockingEvent :: { Sense }
+  : "@" "(" Senses ")" { $3 }
 
 TimingControl :: { Timing }
   : DelayOrEventControl { $1 }
@@ -614,10 +715,6 @@ DelayValue :: { Expr }
 -- | ps_identifier
 -- | time_literal
 -- | 1step
-
-Unique :: { Bool }
-  : "unique"    { True  }
-  | {- empty -} { False }
 
 CaseKW :: { CaseKW }
   : "case"  { CaseN }
@@ -716,6 +813,7 @@ PatternNamedItems :: { [(Identifier, Expr)] }
   | PatternNamedItems "," PatternNamedItem { $1 ++ [$3] }
 PatternNamedItem :: { (Identifier, Expr) }
   : Identifier ":" Expr { ($1, $3) }
+  | "default"  ":" Expr { (tokenString $1, $3) }
 PatternUnnamedItems :: { [Expr] }
   : Exprs { $1 }
 

@@ -11,6 +11,15 @@ module Language.SystemVerilog.AST.Stmt
     , Sense  (..)
     , CaseKW (..)
     , Case
+    , ActionBlock  (..)
+    , PropertyExpr (..)
+    , PESPBinOp    (..)
+    , SeqMatchItem
+    , SeqExpr      (..)
+    , AssertionItem
+    , Assertion    (..)
+    , PropertySpec (..)
+    , UniquePriority (..)
     ) where
 
 import Text.Printf (printf)
@@ -26,7 +35,7 @@ import Language.SystemVerilog.AST.Type (Identifier)
 data Stmt
     = StmtAttr Attr Stmt
     | Block   (Maybe Identifier) [Decl] [Stmt]
-    | Case    Bool CaseKW Expr [Case] (Maybe Stmt)
+    | Case    (Maybe UniquePriority) CaseKW Expr [Case] (Maybe Stmt)
     | For     [Either Decl (LHS, Expr)] (Maybe Expr) [(LHS, AsgnOp, Expr)] Stmt
     | AsgnBlk AsgnOp LHS Expr
     | Asgn    (Maybe Timing) LHS Expr
@@ -34,11 +43,13 @@ data Stmt
     | RepeatL Expr Stmt
     | DoWhile Expr Stmt
     | Forever Stmt
-    | If      Expr Stmt Stmt
+    | If      (Maybe UniquePriority) Expr Stmt Stmt
     | Timing  Timing Stmt
     | Return  Expr
     | Subroutine Identifier [Maybe Expr]
     | Trigger Identifier
+    -- TODO: Should we support coversion of assertions?
+    -- | Assertion Assertion
     | Null
     deriving Eq
 
@@ -51,9 +62,8 @@ instance Show Stmt where
             bodyLines = (map show decls) ++ (map show stmts)
             body = indent $ unlines' bodyLines
     show (Case u kw e cs def) =
-        printf "%s%s (%s)\n%s%s\nendcase" uniqStr (show kw) (show e) bodyStr defStr
+        printf "%s%s (%s)\n%s%s\nendcase" (maybe "" showPad u) (show kw) (show e) bodyStr defStr
         where
-            uniqStr = if u then "unique " else ""
             bodyStr = indent $ unlines' $ map showCase cs
             defStr = case def of
                 Nothing -> ""
@@ -77,11 +87,12 @@ instance Show Stmt where
     show (RepeatL e s) = printf "repeat (%s) %s" (show e) (show s)
     show (DoWhile e s) = printf "do %s while (%s);" (show s) (show e)
     show (Forever s  ) = printf "forever %s" (show s)
-    show (If a b Null) = printf "if (%s) %s"         (show a) (show b)
-    show (If a b c   ) = printf "if (%s) %s\nelse %s" (show a) (show b) (show c)
+    show (If u a b Null) = printf "%sif (%s) %s"          (maybe "" showPad u) (show a) (show b)
+    show (If u a b c   ) = printf "%sif (%s) %s\nelse %s" (maybe "" showPad u) (show a) (show b) (show c)
     show (Return e   ) = printf "return %s;" (show e)
     show (Timing t s ) = printf "%s %s" (show t) (show s)
     show (Trigger x  ) = printf "-> %s;" x
+    --show (Assertion a) = show a
     show (Null       ) = ";"
 
 data CaseKW
@@ -122,3 +133,85 @@ instance Show Sense where
     show (SensePosedge a  ) = printf "posedge %s" (show a)
     show (SenseNegedge a  ) = printf "negedge %s" (show a)
     show (SenseStar       ) = "*"
+
+data ActionBlock
+    = ActionBlockIf   Stmt
+    | ActionBlockElse (Maybe Stmt) Stmt
+    deriving Eq
+instance Show ActionBlock where
+    show (ActionBlockIf   Null        ) = ";"
+    show (ActionBlockIf   s           ) = printf " %s" (show s)
+    show (ActionBlockElse Nothing   s ) = printf " else %s" (show s)
+    show (ActionBlockElse (Just s1) s2) = printf " %s else %s" (show s1) (show s2)
+
+data PropertyExpr
+    = PESE SeqExpr
+    | PESPBinOp SeqExpr PESPBinOp PropertyExpr
+    deriving Eq
+instance Show PropertyExpr where
+    show (PESE se) = show se
+    show (PESPBinOp a o b) = printf "(%s %s %s)" (show a) (show o) (show b)
+data PESPBinOp
+    = ImpliesO
+    | ImpliesNO
+    | FollowedByO
+    | FollowedByNO
+    deriving (Eq, Ord)
+instance Show PESPBinOp where
+    show ImpliesO     = "|->"
+    show ImpliesNO    = "|=>"
+    show FollowedByO  = "#-#"
+    show FollowedByNO = "#=#"
+type SeqMatchItem = Either (LHS, AsgnOp, Expr) (Identifier, [Maybe Expr])
+data SeqExpr
+    = SeqExpr Expr
+    | SeqExprAnd        SeqExpr SeqExpr
+    | SeqExprOr         SeqExpr SeqExpr
+    | SeqExprIntersect  SeqExpr SeqExpr
+    | SeqExprThroughout Expr    SeqExpr
+    | SeqExprWithin     SeqExpr SeqExpr
+    | SeqExprDelay (Maybe SeqExpr) Expr SeqExpr
+    | SeqExprFirstMatch SeqExpr [SeqMatchItem]
+    deriving Eq
+instance Show SeqExpr where
+    show (SeqExpr           a  ) = show a
+    show (SeqExprAnd        a b) = printf "(%s %s %s)" (show a) "and"        (show b)
+    show (SeqExprOr         a b) = printf "(%s %s %s)" (show a) "or"         (show b)
+    show (SeqExprIntersect  a b) = printf "(%s %s %s)" (show a) "intersect"  (show b)
+    show (SeqExprThroughout a b) = printf "(%s %s %s)" (show a) "throughout" (show b)
+    show (SeqExprWithin     a b) = printf "(%s %s %s)" (show a) "within"     (show b)
+    show (SeqExprDelay   me e s) = printf "%s##%s %s" (maybe "" showPad me) (show e) (show s)
+    show (SeqExprFirstMatch e l) = printf "first_match(%s, %s)" (show e) (commas $ map show l)
+
+type AssertionItem = (Maybe Identifier, Assertion)
+data Assertion
+    = Assert         Expr         ActionBlock
+    | AssertProperty PropertySpec ActionBlock
+    deriving Eq
+instance Show Assertion where
+    show (Assert e a) =
+        printf "assert (%s)%s" (show e) (show a)
+    show (AssertProperty p a) =
+        printf "assert property (%s)%s" (show p) (show a)
+
+data PropertySpec
+    = PropertySpec (Maybe Sense) (Maybe Expr) PropertyExpr
+    deriving Eq
+instance Show PropertySpec where
+    show (PropertySpec ms me pe) =
+        printf "%s%s%s" (maybe "" showPad ms) meStr (show pe)
+        where
+            meStr = case me of
+                Nothing -> ""
+                Just e -> printf "disable iff (%s) " (show e)
+
+data UniquePriority
+    = Unique
+    | Unique0
+    | Priority
+    deriving Eq
+
+instance Show UniquePriority where
+    show Unique   = "unique"
+    show Unique0  = "unique0"
+    show Priority = "priority"

@@ -1,9 +1,9 @@
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
- - Conversion for `unique`
+ - Conversion for `unique`, `unique0`, and `priority`
  -
- - This conversion simply drops the `unique` keyword, as it is only used for
+ - This conversion simply drops the keywords, as it is only used for
  - optimization. There is no way to force toolchains which don't support the
  - keyword to perform such optimization.
  -}
@@ -17,6 +17,8 @@ convert :: AST -> AST
 convert = traverseDescriptions $ traverseModuleItems $ traverseStmts convertStmt
 
 convertStmt :: Stmt -> Stmt
-convertStmt (Case True kw expr cases def) =
-    Case False kw expr cases def
+convertStmt (If (Just _) cc s1 s2) =
+    If Nothing cc s1 s2
+convertStmt (Case (Just _) kw expr cases def) =
+    Case Nothing kw expr cases def
 convertStmt other = other
