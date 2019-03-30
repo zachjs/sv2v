@@ -314,7 +314,7 @@ data Cond
 
 -- our custom lexer state
 data AlexUserState = LS
-    { lsToks         :: [Token] -- tokens read so far
+    { lsToks         :: [Token] -- tokens read so far, *in reverse order* for efficiency
     , lsCurrFile     :: FilePath -- currently active filename
     , lsEnv          :: Map.Map String (String, [String]) -- active macro definitions
     , lsCondStack    :: [Cond] -- if-else cascade state
@@ -336,7 +336,7 @@ lexFile includePaths env path = do
         Left msg -> error $ "Lexical Error: " ++ msg
         Right finalState ->
             if null $ lsCondStack finalState
-                then lsToks finalState
+                then reverse $ lsToks finalState
                 else error $ "unfinished conditional directives: " ++
                         (show $ length $ lsCondStack finalState)
     where
@@ -749,7 +749,7 @@ removeUntil pattern _ _ = loop
                         else loop
 
 push :: Token -> AlexUserState -> AlexUserState
-push t s = s { lsToks = (lsToks s) ++ [t] }
+push t s = s { lsToks = t : (lsToks s) }
 
 tok :: TokenName -> Action
 tok tokId (pos, _, _, input) len = do
