@@ -590,7 +590,10 @@ DeclAsgn :: { (Identifier, Expr) }
   : Identifier "=" Expr { ($1, $3) }
 
 Range :: { Range }
-  : "[" Expr ":" Expr "]"  { ($2, $4) }
+  : "[" Expr ":"  Expr "]" { ($2, $4) }
+  -- TODO: This assumes the ranges are always [hi:lo]; See section 11.5.1!
+  | "[" Expr "+:" Expr "]" { (BinOp Sub (BinOp Add $2 $4) (Number "1"), $2) }
+  | "[" Expr "-:" Expr "]" { ($2, BinOp Add (BinOp Sub $2 $4) (Number "1")) }
 
 LHS :: { LHS }
   : Identifier         { LHSIdent  $1    }
