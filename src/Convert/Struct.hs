@@ -83,7 +83,14 @@ collectType (Struct (Packed sg) fields _) = do
         -- converting everything to a Logic type. This should work in cases of
         -- mixed `wire`/`logic` or `reg`/`logic`.
         fieldClasses = map (show . fst . typeRanges) fieldTypes
-        canUnstructure = all (head fieldClasses ==) fieldClasses
+        isComplex :: Type -> Bool
+        isComplex (Struct _ _ _ ) = True
+        isComplex (Enum _ _ _ ) = True
+        isComplex (Alias _ _) = True
+        isComplex _ = False
+        canUnstructure =
+            all (head fieldClasses ==) (map show fieldClasses) &&
+            not (any isComplex fieldTypes)
 
 collectType _ = return ()
 
@@ -168,6 +175,8 @@ convertAsgn structs types (lhs, expr) =
 
         -- try expression conversion by looking at the *outermost* type first
         convertExpr :: Type -> Expr -> Expr
+        convertExpr (Struct _ fields []) (Pattern [(Just "default", e)]) =
+            Concat $ take (length fields) (repeat e)
         convertExpr (Struct (Packed sg) fields []) (Pattern items) =
             if Map.notMember structTf structs
                 then Pattern items''
