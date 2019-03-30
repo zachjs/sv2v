@@ -41,6 +41,7 @@ data BinOp
     | LogOr
     | BitAnd
     | BitXor
+    | BitXnor
     | BitOr
     | Mul
     | Div
@@ -69,6 +70,7 @@ instance Show BinOp where
     show LogOr   = "||"
     show BitAnd  = "&"
     show BitXor  = "^"
+    show BitXnor = "~^"
     show BitOr   = "|"
     show Mul     = "*"
     show Div     = "/"

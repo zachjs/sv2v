@@ -221,7 +221,7 @@ directive          { Token Spe_Directive _ _ }
 %left  "||"
 %left  "&&"
 %left  "|" "~|"
-%left  "^" "^~"
+%left  "^" "^~" "~^"
 %left  "&" "~&"
 %left  "==" "!=" "===" "!==" "==?" "!=?"
 %left  "<" "<=" ">" ">="
@@ -781,6 +781,8 @@ Expr :: { Expr }
   | Expr "|"   Expr { BinOp BitOr  $1 $3 }
   | Expr "^"   Expr { BinOp BitXor $1 $3 }
   | Expr "&"   Expr { BinOp BitAnd $1 $3 }
+  | Expr "~^"  Expr { BinOp BitXnor $1 $3 }
+  | Expr "^~"  Expr { BinOp BitXnor $1 $3 }
   | Expr "+"   Expr { BinOp Add $1 $3 }
   | Expr "-"   Expr { BinOp Sub $1 $3 }
   | Expr "*"   Expr { BinOp Mul $1 $3 }
