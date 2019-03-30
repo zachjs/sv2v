@@ -223,6 +223,7 @@ parseDTsAsDeclsAndAsgns tokens =
 isAsgnToken :: DeclToken -> Bool
 isAsgnToken (DTBit             _) = True
 isAsgnToken (DTConcat          _) = True
+isAsgnToken (DTDot             _) = True
 isAsgnToken (DTAsgnNBlk      _ _) = True
 isAsgnToken (DTAsgn (AsgnOp _) _) = True
 isAsgnToken _ = False

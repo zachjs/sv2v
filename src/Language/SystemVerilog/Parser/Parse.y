@@ -890,7 +890,6 @@ parseError a = case a of
   Token t s p : _ -> error $ "Parse error: unexpected token '" ++ s ++ "' (" ++ show t ++ ") at " ++ show p ++ "."
 
 genItemsToGenItem :: [GenItem] -> GenItem
-genItemsToGenItem [] = error "genItemsToGenItem given empty list!"
 genItemsToGenItem [x] = x
 genItemsToGenItem xs = GenBlock Nothing xs
 
