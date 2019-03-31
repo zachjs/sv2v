@@ -112,13 +112,13 @@ convertDescription interfaces (Part extern Module lifetime name ports items) =
 
         convertExpr :: Expr -> Expr
         convertExpr (orig @ (Dot (Ident x) y)) =
-            if Map.member x modports
+            if Map.member x modports || Map.member x instances
                 then Ident (x ++ "_" ++ y)
                 else orig
         convertExpr other = other
         convertLHS :: LHS -> LHS
         convertLHS (orig @ (LHSDot (LHSIdent x) y)) =
-            if Map.member x modports
+            if Map.member x modports || Map.member x instances
                 then LHSIdent (x ++ "_" ++ y)
                 else orig
         convertLHS other = other

@@ -28,7 +28,6 @@ type Phase = AST -> AST
 
 phases :: [Job.Exclude] -> [Phase]
 phases excludes =
-    extras ++
     [ Convert.AsgnOp.convert
     , Convert.FuncRet.convert
     , Convert.Enum.convert
@@ -40,7 +39,7 @@ phases excludes =
     , Convert.Typedef.convert
     , Convert.UnbasedUnsized.convert
     , Convert.Unique.convert
-    ]
+    ] ++ extras
     where
         availableExcludes =
             [ (Job.Interface, Convert.Interface.convert)

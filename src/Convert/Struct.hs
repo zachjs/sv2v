@@ -175,7 +175,14 @@ convertAsgn structs types (lhs, expr) =
 
         -- try expression conversion by looking at the *outermost* type first
         convertExpr :: Type -> Expr -> Expr
-        convertExpr (Struct _ fields []) (Pattern [(Just "default", e)]) =
+        -- TODO: This is really a conversion for using default patterns to
+        -- populate arrays. Maybe this should be somewhere else?
+        convertExpr (IntegerVector t sg (r:rs)) (Pattern [(Just "default", e)]) =
+            Repeat (rangeSize r) [e']
+            where e' = convertExpr (IntegerVector t sg rs) e
+        convertExpr (Struct (Packed sg) fields (_:rs)) (Bit e _) =
+            convertExpr (Struct (Packed sg) fields rs) e
+        convertExpr (Struct (Packed _) fields _) (Pattern [(Just "default", e)]) =
             Concat $ take (length fields) (repeat e)
         convertExpr (Struct (Packed sg) fields []) (Pattern items) =
             if Map.notMember structTf structs
