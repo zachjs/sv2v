@@ -25,6 +25,7 @@ convert = traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription description =
+    traverseModuleItems (traverseExprs $ traverseNestedExprs $ convertOnlyExpr structs types) $
     traverseModuleItems (traverseTypes $ convertType structs) $
     traverseModuleItems (traverseAsgns $ convertAsgn structs types) $
     description
@@ -122,6 +123,9 @@ collectFunction :: ModuleItem -> Writer Types ()
 collectFunction (MIPackageItem (Function _ t f _ _)) = tell $ Map.singleton f t
 collectFunction _ = return ()
 
+convertOnlyExpr :: Structs -> Types -> Expr -> Expr
+convertOnlyExpr structs types expr =
+    snd $ convertAsgn structs types (LHSIdent "", expr)
 
 convertAsgn :: Structs -> Types -> (LHS, Expr) -> (LHS, Expr)
 convertAsgn structs types (lhs, expr) =
@@ -241,6 +245,14 @@ convertAsgn structs types (lhs, expr) =
             where
                 (_, e1') = convertSubExpr e1
                 (_, e2') = convertSubExpr e2
+        convertSubExpr (Bit e i) =
+            (t', Bit e' i')
+            where
+                (t, e') = convertSubExpr e
+                t' = case typeRanges t of
+                    (_, []) -> Implicit Unspecified []
+                    (tf, rs) -> tf $ tail rs
+                (_, i') = convertSubExpr i
         -- TODO: There are other expression cases that we probably need to
         -- recurse into. That said, it's not clear to me how much we really
         -- expect to see things like concatenated packed structs, for example.
