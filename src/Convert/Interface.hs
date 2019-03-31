@@ -53,7 +53,7 @@ convertDescription interfaces (Part extern Module lifetime name ports items) =
             case t of
                 InterfaceT interfaceName (Just modportName) [] ->
                     tell (Map.empty, Map.singleton ident modportDecls)
-                    where modportDecls = lookupModport Nothing interfaceName modportName
+                    where Just modportDecls = lookupModport Nothing interfaceName modportName
                 _ -> return ()
         collectInterface (Instance part _ ident Nothing _) =
             if Map.member part interfaces
@@ -88,14 +88,16 @@ convertDescription interfaces (Part extern Module lifetime name ports items) =
             case Map.lookup instanceName instances of
                 Nothing -> [origBinding]
                 Just interfaceName ->
-                    map mapper modportDecls
+                    case modportDecls of
+                        Nothing -> [(portName, Just $ Ident $ instanceName ++ "_" ++ modportName)]
+                        Just decls -> map mapper decls
                     where
                         modportDecls = lookupModport (Just instanceName) interfaceName modportName
                         mapper (_, x, me) = (portName ++ "_" ++ x, me)
         expandPortBinding other = [other]
 
-        lookupModport :: Maybe Identifier -> Identifier -> Identifier -> [ModportDecl]
-        lookupModport instanceName interfaceName = (Map.!) modportMap
+        lookupModport :: Maybe Identifier -> Identifier -> Identifier -> Maybe [ModportDecl]
+        lookupModport instanceName interfaceName = (Map.!?) modportMap
             where
                 prefix = maybe "" (++ "_") instanceName
                 interfaceItems =
