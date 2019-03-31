@@ -19,6 +19,10 @@
  -    derive one from the other. The derivation direction is decided based on
  -    which version, if any, is exposed directly as a port.
  -
+ - Note: We don't count usages with an index in expressions as such, as those
+ - usages could be equivalently converted to range accesses with some added in
+ - multiplication.
+ -
  - TODO: This assumes that the first range index is the upper bound. We could
  - probably get around this with some cleverness in the generate block. I don't
  - think it's urgent to have support for "backwards" ranges.
@@ -49,7 +53,7 @@ convert :: AST -> AST
 convert = traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription (description @ (Part _ _ _ _ ports _)) =
+convertDescription (description @ (Part _ _ _ _ _ _)) =
     hoistPortDecls $
     traverseModuleItems (flattenModuleItem info . rewriteModuleItem info) description
     where
@@ -58,7 +62,8 @@ convertDescription (description @ (Part _ _ _ _ ports _)) =
             execState (collectModuleItemsM (collectLHSsM   collectLHS) description) $
             execState (collectModuleItemsM (collectExprsM collectExpr) description) $
             execState (collectModuleItemsM collectDecl description) $
-            (Info Map.empty Map.empty Set.empty (Set.fromList ports))
+            execState (collectModuleItemsM collectTF   description) $
+            (Info Map.empty Map.empty Set.empty Set.empty)
         relevantIdents = Map.keysSet $ sTypeDims rawInfo
         -- restrict the sets/maps to only contain keys which need transformation
         info = rawInfo
@@ -77,9 +82,22 @@ collectDecl (MIDecl (Variable dir t ident _ _)) = do
             modify $ \s -> s { sTypeDims = Map.insert ident dets (sTypeDims s) }
         else return ()
     if dir /= Local
-        then modify $ \s -> s { sPortDirs = Map.insert ident dir (sPortDirs s) }
+        then do
+            () <- recordSeqUsage ident
+            modify $ \s -> s { sPortDirs = Map.insert ident dir (sPortDirs s) }
         else return ()
 collectDecl _ = return ()
+
+-- collects task and function info into the state
+collectTF :: ModuleItem -> State Info ()
+collectTF (MIPackageItem (Function _ t x decls _)) = do
+    collectDecl (MIDecl $ Variable Local t x [] Nothing)
+    _ <- mapM collectDecl $ map MIDecl decls
+    return ()
+collectTF (MIPackageItem (Task     _   _ decls _)) = do
+    _ <- mapM collectDecl $ map MIDecl decls
+    return ()
+collectTF _ = return ()
 
 -- collectors for identifier usage information
 recordSeqUsage :: Identifier -> State Info ()
@@ -91,7 +109,6 @@ collectExpr (Ident i) = recordSeqUsage i
 collectExpr other = collectNestedExprsM collectNestedExpr other
 collectNestedExpr :: Expr -> State Info ()
 collectNestedExpr (Range (Ident i) _) = recordSeqUsage i
-collectNestedExpr (Bit   (Ident i) _) = recordIdxUsage i
 collectNestedExpr _ = return ()
 collectLHS :: LHS -> State Info ()
 collectLHS (LHSIdent i) = recordSeqUsage i
@@ -125,6 +142,20 @@ hoistPortDecls other = other
 
 -- rewrite a module item if it contains a declaration to flatten
 flattenModuleItem :: Info -> ModuleItem -> ModuleItem
+flattenModuleItem info (MIPackageItem (Function ml t x decls stmts)) =
+    MIPackageItem $ Function ml t' x decls' stmts
+    where
+        MIPackageItem (Task _ _ decls' _) =
+            flattenModuleItem info $ MIPackageItem $ Task ml x decls stmts
+        MIDecl (Variable Local t' _ [] Nothing) =
+            flattenModuleItem info $ MIDecl (Variable Local t x [] Nothing)
+flattenModuleItem info (MIPackageItem (Task     ml   x decls stmts)) =
+    MIPackageItem $ Task ml x decls' stmts
+    where
+        decls' = map mapDecl decls
+        mapDecl :: Decl -> Decl
+        mapDecl decl = decl'
+            where MIDecl decl' = flattenModuleItem info $ MIDecl decl
 flattenModuleItem info (origDecl @ (MIDecl (Variable dir t ident a me))) =
     -- if it doesn't need any mapping, then skip it
     if Map.notMember ident typeDims then origDecl
@@ -231,7 +262,15 @@ rewriteModuleItem info =
 
         rewriteExpr :: Expr -> Expr
         rewriteExpr (Ident i) = Ident $ rewriteSeqIdent i
-        rewriteExpr (Bit   (Ident i) e) = Bit (Ident $ rewriteIdxIdent i) e
+        rewriteExpr (Bit   (Ident i) e) =
+            if Map.member i typeDims && Set.member i seqUses && Set.notMember i idxUses
+                then Range (Ident $ rewriteSeqIdent i) (hi, lo)
+                else Bit   (Ident $ rewriteIdxIdent i) e
+            where
+                r = head $ snd $ typeRanges $ fst $ typeDims Map.! i
+                size = rangeSize r
+                lo = simplify $ BinOp Mul e size
+                hi = simplify $ BinOp Add lo (BinOp Sub size (Number "1"))
         rewriteExpr (Range (Ident i) (r @ (s, e))) =
             if Map.member i typeDims
                 then Range (Ident i) r'
