@@ -73,7 +73,7 @@ instance Show Args where
         where
             strs = (map showPnArg pnArgs) ++ (map showKwArg kwArgs)
             showPnArg = maybe "" show
-            showKwArg (x, me) = printf ".%s(%s)" (show x) (showPnArg me)
+            showKwArg (x, me) = printf ".%s(%s)" x (showPnArg me)
 
 showAssignment :: Maybe Expr -> String
 showAssignment Nothing = ""

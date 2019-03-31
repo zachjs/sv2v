@@ -568,8 +568,8 @@ TFItems :: { [Decl] }
   |                     ";" { [] }
 
 ParamType :: { Type }
-  : "integer" Signing  { IntegerAtom TInteger $2 }
-  | "integer"          { IntegerAtom TInteger Unspecified }
+  : PartialType         Dimensions { $1 Unspecified $2 }
+  | PartialType Signing Dimensions { $1 $2 $3 }
   | DimensionsNonEmpty { Implicit Unspecified $1 }
   | Signing Dimensions { Implicit $1          $2 }
 
