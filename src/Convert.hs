@@ -29,6 +29,7 @@ type Phase = AST -> AST
 phases :: [Job.Exclude] -> [Phase]
 phases excludes =
     [ Convert.AsgnOp.convert
+    , selectExclude (Job.Logic    , Convert.Logic.convert)
     , Convert.FuncRet.convert
     , Convert.Enum.convert
     , Convert.PackedArray.convert
@@ -39,13 +40,10 @@ phases excludes =
     , Convert.Typedef.convert
     , Convert.UnbasedUnsized.convert
     , Convert.Unique.convert
-    ] ++ extras
+    , selectExclude (Job.Interface, Convert.Interface.convert)
+    , selectExclude (Job.Always   , Convert.AlwaysKW.convert)
+    ]
     where
-        availableExcludes =
-            [ (Job.Interface, Convert.Interface.convert)
-            , (Job.Logic    , Convert.Logic.convert)
-            , (Job.Always   , Convert.AlwaysKW.convert) ]
-        extras = map selectExclude availableExcludes
         selectExclude :: (Job.Exclude, Phase) -> Phase
         selectExclude (exclude, phase) =
             if elem exclude excludes
