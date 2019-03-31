@@ -147,14 +147,20 @@ convertAsgn structs types (lhs, expr) =
             where
                 (t, l') = convertLHS l
                 (tf, rs) = typeRanges t
-        convertLHS (LHSRange l r ) =
-            if null rs
-                then (Implicit Unspecified [], LHSRange l' r)
-                else (tf rs', LHSRange l' r)
+        convertLHS (LHSRange l (rOuter @ (hiO, loO))) =
+            case l' of
+                LHSRange lInner (hiI, loI) ->
+                    (t, LHSRange lInner (simplify hi, simplify lo))
+                    where
+                        hi = BinOp Add (BinOp Sub hiI loI) hiO
+                        lo = BinOp Add loI loO
+                _ -> if null rs
+                        then (Implicit Unspecified [], LHSRange l' rOuter)
+                        else (tf rs', LHSRange l' rOuter)
             where
                 (t, l') = convertLHS l
                 (tf, rs) = typeRanges t
-                rs' = r : tail rs
+                rs' = rOuter : tail rs
         convertLHS (LHSDot    l x ) =
             case t of
                 InterfaceT _ _ _ -> (Implicit Unspecified [], LHSDot l' x)
@@ -229,7 +235,7 @@ convertAsgn structs types (lhs, expr) =
         convertSubExpr (Range eOuter (rOuter @ (hiO, loO))) =
             -- VCS doesn't allow ranges to be cascaded, so we need to combine
             -- nested Ranges into a single range. My understanding of the
-            -- semantics are that a range return a new, zero-indexed sub-range.
+            -- semantics are that a range returns a new, zero-indexed sub-range.
             case eOuter' of
                 Range eInner (hiI, loI) ->
                     (t, Range eInner (simplify hi, simplify lo))
@@ -246,7 +252,10 @@ convertAsgn structs types (lhs, expr) =
                 (_, e1') = convertSubExpr e1
                 (_, e2') = convertSubExpr e2
         convertSubExpr (Bit e i) =
-            (t', Bit e' i')
+            case e' of
+                Range eInner (_, loI) ->
+                    (t', Bit eInner (simplify $ BinOp Add loI i'))
+                _ -> (t', Bit e' i')
             where
                 (t, e') = convertSubExpr e
                 t' = case typeRanges t of
