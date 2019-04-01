@@ -14,6 +14,7 @@ import qualified Convert.AsgnOp
 import qualified Convert.Enum
 import qualified Convert.FuncRet
 import qualified Convert.Interface
+import qualified Convert.KWArgs
 import qualified Convert.Logic
 import qualified Convert.PackedArray
 import qualified Convert.Return
@@ -32,6 +33,7 @@ phases excludes =
     , selectExclude (Job.Logic    , Convert.Logic.convert)
     , Convert.FuncRet.convert
     , Convert.Enum.convert
+    , Convert.KWArgs.convert
     , Convert.PackedArray.convert
     , Convert.StarPort.convert
     , Convert.StmtBlock.convert
