@@ -175,7 +175,8 @@ flattenModuleItem info (origDecl @ (MIDecl (Variable dir t ident a me))) =
     where
         Info typeDims portDirs idxUses seqUses = info
         duoUses = Set.intersection idxUses seqUses
-        writeToFlatVariant = Map.lookup ident portDirs == Just Output
+        portDir = Map.lookup ident portDirs
+        writeToFlatVariant = portDir == Just Output || portDir == Nothing
         genItems = unflattener writeToFlatVariant ident (typeDims Map.! ident)
         (tf, rs) = typeRanges t
         flipDecl = MIDecl $ Variable dir (tf $          tail rs) ident (a ++ [head rs]) me
