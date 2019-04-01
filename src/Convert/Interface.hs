@@ -17,25 +17,33 @@ type Instances = Map.Map Identifier Identifier
 type Interface = ([Identifier], [ModuleItem])
 type Interfaces = Map.Map Identifier Interface
 type Modports = Map.Map Identifier [ModportDecl]
+type Modules = Map.Map (Identifier, Identifier) Type
 
 convert :: AST -> AST
 convert descriptions =
     filter (not . isInterface) $
-    traverseDescriptions (convertDescription interfaces) $
+    traverseDescriptions (convertDescription interfaces modules) $
     descriptions
     where
-        interfaces = execWriter $ collectDescriptionsM collectDesc descriptions
+        (interfaces, modules) =
+            execWriter $ collectDescriptionsM collectDesc descriptions
         -- we can only collect/map non-extern interfaces
-        collectDesc :: Description -> Writer Interfaces ()
-        collectDesc (Part False Interface _ name ports items) =
-            tell $ Map.singleton name (ports, items)
+        collectDesc :: Description -> Writer (Interfaces, Modules) ()
+        collectDesc (orig @ (Part False kw _ name ports items)) = do
+            if kw == Interface
+                then tell (Map.singleton name (ports, items), Map.empty)
+                else collectModuleItemsM (collectDeclsM $ collectDecl name) orig
         collectDesc _ = return ()
+        collectDecl :: Identifier -> Decl -> Writer (Interfaces, Modules) ()
+        collectDecl name (Variable _ t ident _ _) = do
+            tell (Map.empty, Map.singleton (name, ident) t)
+        collectDecl _ _ = return ()
         isInterface :: Description -> Bool
         isInterface (Part False Interface _ _ _ _) = True
         isInterface _ = False
 
-convertDescription :: Interfaces -> Description -> Description
-convertDescription interfaces (Part extern Module lifetime name ports items) =
+convertDescription :: Interfaces -> Modules -> Description -> Description
+convertDescription interfaces modules (Part extern Module lifetime name ports items) =
     Part extern Module lifetime name ports' items'
     where
         items' =
@@ -49,7 +57,7 @@ convertDescription interfaces (Part extern Module lifetime name ports items) =
         (instances, modports) = execWriter $ mapM
             (collectNestedModuleItemsM collectInterface) items
         collectInterface :: ModuleItem -> Writer (Instances, Modports)  ()
-        collectInterface (MIDecl (Variable Local t ident _ _)) =
+        collectInterface (MIDecl (Variable _ t ident _ _)) =
             case t of
                 InterfaceT interfaceName (Just modportName) [] ->
                     tell (Map.empty, Map.singleton ident modportDecls)
@@ -80,13 +88,16 @@ convertDescription interfaces (Part extern Module lifetime name ports items) =
                     Generate $ map GenModuleItem $
                     inlineInterface interface (ident, expandedPorts)
                 Nothing -> Instance part params ident Nothing expandedPorts
-            where expandedPorts = concatMap expandPortBinding instancePorts
+            where expandedPorts = concatMap (expandPortBinding part) instancePorts
         mapInterface other = other
 
-        expandPortBinding :: PortBinding -> [PortBinding]
-        expandPortBinding (origBinding @ (portName, Just (Dot (Ident instanceName) modportName))) =
+        expandPortBinding :: Identifier -> PortBinding -> [PortBinding]
+        expandPortBinding _ (origBinding @ (portName, Just (Dot (Ident instanceName) modportName))) =
             case Map.lookup instanceName instances of
-                Nothing -> [origBinding]
+                Nothing ->
+                    case Map.lookup instanceName modports of
+                        Nothing -> [origBinding]
+                        Just _ -> [(portName, Just $ Ident $ instanceName ++ "_" ++ modportName)]
                 Just interfaceName ->
                     case modportDecls of
                         Nothing -> [(portName, Just $ Ident $ instanceName ++ "_" ++ modportName)]
@@ -94,7 +105,22 @@ convertDescription interfaces (Part extern Module lifetime name ports items) =
                     where
                         modportDecls = lookupModport (Just instanceName) interfaceName modportName
                         mapper (_, x, me) = (portName ++ "_" ++ x, me)
-        expandPortBinding other = [other]
+        expandPortBinding moduleName (origBinding @ (portName, Just (Ident instanceName))) =
+            case (instances Map.!? instanceName, modports Map.!? instanceName) of
+                (Nothing, Nothing) -> [origBinding]
+                (Just _, _) ->
+                    map mapper modportDecls
+                    where
+                        InterfaceT interfaceName (Just modportName) [] =
+                            modules Map.! (moduleName, portName)
+                        Just modportDecls = lookupModport (Just instanceName) interfaceName modportName
+                        mapper (_, x, me) = (portName ++ "_" ++ x, me)
+                (_, Just decls) ->
+                    map mapper decls
+                    where mapper (_, x, _) =
+                            ( portName ++ "_" ++ x
+                            , Just $ Ident $ instanceName ++ "_" ++ x )
+        expandPortBinding _ other = [other]
 
         lookupModport :: Maybe Identifier -> Identifier -> Identifier -> Maybe [ModportDecl]
         lookupModport instanceName interfaceName = (Map.!?) modportMap
@@ -128,7 +154,7 @@ convertDescription interfaces (Part extern Module lifetime name ports items) =
                 Nothing -> [ident]
                 Just decls -> map (\(_, x, _) -> ident ++ "_" ++ x) decls
 
-convertDescription _ other = other
+convertDescription _ _ other = other
 
 
 -- add a prefix to all standard identifiers in a module item
