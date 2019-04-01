@@ -149,11 +149,11 @@ convertAsgn structs types (lhs, expr) =
                 (tf, rs) = typeRanges t
         convertLHS (LHSRange l (rOuter @ (hiO, loO))) =
             case l' of
-                LHSRange lInner (hiI, loI) ->
+                LHSRange lInner (_, loI) ->
                     (t, LHSRange lInner (simplify hi, simplify lo))
                     where
-                        hi = BinOp Add (BinOp Sub hiI loI) hiO
                         lo = BinOp Add loI loO
+                        hi = BinOp Add loI hiO
                 _ -> if null rs
                         then (Implicit Unspecified [], LHSRange l' rOuter)
                         else (tf rs', LHSRange l' rOuter)
@@ -237,11 +237,11 @@ convertAsgn structs types (lhs, expr) =
             -- nested Ranges into a single range. My understanding of the
             -- semantics are that a range returns a new, zero-indexed sub-range.
             case eOuter' of
-                Range eInner (hiI, loI) ->
+                Range eInner (_, loI) ->
                     (t, Range eInner (simplify hi, simplify lo))
                     where
-                        hi = BinOp Add (BinOp Sub hiI loI) hiO
                         lo = BinOp Add loI loO
+                        hi = BinOp Add loI hiO
                 _ -> (t, Range eOuter' rOuter)
             where (t, eOuter') = convertSubExpr eOuter
         convertSubExpr (Concat exprs) =
