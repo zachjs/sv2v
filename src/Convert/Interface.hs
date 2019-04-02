@@ -9,6 +9,7 @@ module Convert.Interface (convert) where
 import Data.Maybe (isJust, mapMaybe)
 import Control.Monad.Writer
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 
 import Convert.Traverse
 import Language.SystemVerilog.AST
@@ -47,8 +48,8 @@ convertDescription interfaces modules (Part extern Module lifetime name ports it
     Part extern Module lifetime name ports' items'
     where
         items' =
-            map (traverseNestedModuleItems $ traverseExprs (traverseNestedExprs convertExpr)) $
-            map (traverseNestedModuleItems $ traverseLHSs  (traverseNestedLHSs  convertLHS)) $
+            map (traverseNestedModuleItems $ traverseExprs' ExcludeTFs (traverseNestedExprs $ convertExpr instances modports)) $
+            map (traverseNestedModuleItems $ traverseLHSs'  ExcludeTFs (traverseNestedLHSs  $ convertLHS  instances modports)) $
             map (traverseNestedModuleItems mapInterface) $
             items
         ports' = concatMap convertPort ports
@@ -89,7 +90,24 @@ convertDescription interfaces modules (Part extern Module lifetime name ports it
                     inlineInterface interface (ident, expandedPorts)
                 Nothing -> Instance part params ident Nothing expandedPorts
             where expandedPorts = concatMap (expandPortBinding part) instancePorts
+        mapInterface (orig @ (MIPackageItem (Function _ _ _ decls _))) =
+            convertTF decls orig
+        mapInterface (orig @ (MIPackageItem (Task _ _ decls _))) =
+            convertTF decls orig
         mapInterface other = other
+
+        convertTF :: [Decl] -> ModuleItem -> ModuleItem
+        convertTF decls orig =
+            traverseExprs (traverseNestedExprs $ convertExpr its mps) $
+            traverseLHSs  (traverseNestedLHSs  $ convertLHS  its mps) $
+            orig
+            where
+                locals = Set.fromList $ mapMaybe declVarIdent decls
+                its = Map.withoutKeys instances locals
+                mps = Map.withoutKeys modports  locals
+        declVarIdent :: Decl -> Maybe Identifier
+        declVarIdent (Variable _ _ x _ _) = Just x
+        declVarIdent _ = Nothing
 
         expandPortBinding :: Identifier -> PortBinding -> [PortBinding]
         expandPortBinding _ (origBinding @ (portName, Just (Dot (Ident instanceName) modportName))) =
@@ -136,22 +154,22 @@ convertDescription interfaces modules (Part extern Module lifetime name ports it
                 collectModport (Modport ident l) = tell $ Map.singleton ident l
                 collectModport _ = return ()
 
-        convertExpr :: Expr -> Expr
-        convertExpr (orig @ (Dot (Ident x) y)) =
-            if Map.member x modports || Map.member x instances
+        convertExpr :: Instances -> Modports -> Expr -> Expr
+        convertExpr its mps (orig @ (Dot (Ident x) y)) =
+            if Map.member x mps || Map.member x its
                 then Ident (x ++ "_" ++ y)
                 else orig
-        convertExpr other = other
-        convertLHS :: LHS -> LHS
-        convertLHS (orig @ (LHSDot (LHSIdent x) y)) =
-            if Map.member x modports || Map.member x instances
+        convertExpr _ _ other = other
+        convertLHS :: Instances -> Modports -> LHS -> LHS
+        convertLHS its mps (orig @ (LHSDot (LHSIdent x) y)) =
+            if Map.member x mps || Map.member x its
                 then LHSIdent (x ++ "_" ++ y)
                 else orig
-        convertLHS (LHSBit   l e) =
-            LHSBit l (traverseNestedExprs convertExpr e)
-        convertLHS (LHSRange l (e1, e2)) =
-            LHSRange l (traverseNestedExprs convertExpr e1, traverseNestedExprs convertExpr e2)
-        convertLHS other = other
+        convertLHS its mps (LHSBit   l e) =
+            LHSBit l (traverseNestedExprs (convertExpr its mps) e)
+        convertLHS its mps (LHSRange l (e1, e2)) =
+            LHSRange l (traverseNestedExprs (convertExpr its mps) e1, traverseNestedExprs (convertExpr its mps) e2)
+        convertLHS _ _ other = other
         convertPort :: Identifier -> [Identifier]
         convertPort ident =
             case Map.lookup ident modports of
