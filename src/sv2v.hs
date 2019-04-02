@@ -7,16 +7,24 @@
 import System.IO
 import System.Exit
 
-import Job (readJob, files, exclude, incdir)
+import Data.List (elemIndex)
+import Job (readJob, files, exclude, incdir, define)
 import Convert (convert)
 import Language.SystemVerilog.Parser
+
+splitDefine :: String -> (String, String)
+splitDefine str =
+    case elemIndex '=' str of
+        Nothing -> (str, "")
+        Just idx -> (take idx str, drop (idx + 1) str)
 
 main :: IO ()
 main = do
     job <- readJob
     -- parse the input file
     let includePaths = incdir job
-    asts <- mapM (parseFile includePaths []) (files job)
+    let defines = map splitDefine $ define job
+    asts <- mapM (parseFile includePaths defines) (files job)
     let ast = concat asts
     -- convert the file
     let ast' = convert (exclude job) ast

@@ -19,6 +19,7 @@ data Job = Job
     { exclude :: [Exclude]
     , files :: [FilePath]
     , incdir :: [FilePath]
+    , define :: [String]
     } deriving (Show, Typeable, Data)
 
 defaultJob :: Job
@@ -29,6 +30,7 @@ defaultJob = Job
             ++ "; can be specified multiple times")
     , files = def &= args &= typ "FILES"
     , incdir = def &= typDir &= help "add directory to include search path"
+    , define = def &= typ "NAME[=VALUE]" &= help "define value for compilation"
     }
     &= program "sv2v"
     &= summary "sv2v v0.0.1, (C) Zachary Snow 2019, Tom Hawkins, 2011-2015"
