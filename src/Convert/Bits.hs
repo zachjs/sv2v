@@ -18,6 +18,13 @@ convert =
     convertExpr
 
 convertExpr :: Expr -> Expr
-convertExpr (Bits (Left (IntegerVector _ _ [r]))) = rangeSize r
-convertExpr (Bits (Left (Implicit        _ [r]))) = rangeSize r
+convertExpr (Bits (Left (IntegerVector _ _ rs))) = size rs
+convertExpr (Bits (Left (Implicit        _ rs))) = size rs
 convertExpr other = other
+
+size :: [Range] -> Expr
+size ranges =
+    simplify $
+    foldl (BinOp Mul) (Number "1") $
+    map rangeSize $
+    ranges
