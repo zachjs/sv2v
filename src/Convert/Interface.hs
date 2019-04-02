@@ -147,6 +147,10 @@ convertDescription interfaces modules (Part extern Module lifetime name ports it
             if Map.member x modports || Map.member x instances
                 then LHSIdent (x ++ "_" ++ y)
                 else orig
+        convertLHS (LHSBit   l e) =
+            LHSBit l (traverseNestedExprs convertExpr e)
+        convertLHS (LHSRange l (e1, e2)) =
+            LHSRange l (traverseNestedExprs convertExpr e1, traverseNestedExprs convertExpr e2)
         convertLHS other = other
         convertPort :: Identifier -> [Identifier]
         convertPort ident =

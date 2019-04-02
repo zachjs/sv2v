@@ -142,12 +142,13 @@ convertAsgn structs types (lhs, expr) =
                 Just t -> (t, LHSIdent x)
         convertLHS (LHSBit l e) =
             if null rs
-                then (Implicit Unspecified [], LHSBit l' e)
-                else (tf $ tail rs, LHSBit l' e)
+                then (Implicit Unspecified [], LHSBit l' e')
+                else (tf $ tail rs, LHSBit l' e')
             where
                 (t, l') = convertLHS l
                 (tf, rs) = typeRanges t
-        convertLHS (LHSRange l (rOuter @ (hiO, loO))) =
+                e' = snd $ convertSubExpr e
+        convertLHS (LHSRange l rOuterOrig) =
             case l' of
                 LHSRange lInner (_, loI) ->
                     (t, LHSRange lInner (simplify hi, simplify lo))
@@ -160,6 +161,9 @@ convertAsgn structs types (lhs, expr) =
             where
                 (t, l') = convertLHS l
                 (tf, rs) = typeRanges t
+                hiO = snd $ convertSubExpr $ fst rOuterOrig
+                loO = snd $ convertSubExpr $ snd rOuterOrig
+                rOuter = (hiO, loO)
                 rs' = rOuter : tail rs
         convertLHS (LHSDot    l x ) =
             case t of
