@@ -12,6 +12,7 @@ module Convert.Enum (convert) where
 
 import Text.Read (readMaybe)
 import Data.Maybe (fromMaybe)
+import Data.List (sortOn)
 import Control.Monad.Writer
 import qualified Data.Set as Set
 
@@ -31,7 +32,7 @@ convertDescription :: Description -> Description
 convertDescription (description @ (Part _ _ _ _ _ _)) =
     Part extern kw lifetime name ports (enumItems ++ items)
     where
-        enumPairs = concat $ map (uncurry enumVals) $ Set.toList enums
+        enumPairs = sortOn snd $ concatMap (uncurry enumVals) $ Set.toList enums
         enumItems = map (\(x, v) -> MIDecl $ Localparam (Implicit Unspecified []) x v) enumPairs
         (Part extern kw lifetime name ports items, enums) =
             runWriter $ traverseModuleItemsM (traverseTypesM traverseType) $

@@ -105,6 +105,8 @@ traverseModuleItemsM :: Monad m => MapperM m ModuleItem -> MapperM m Description
 traverseModuleItemsM mapper (Part extern kw lifetime name ports items) =
     mapM fullMapper items >>= return . Part extern kw lifetime name ports
     where
+        fullMapper (Generate [GenBlock Nothing genItems]) =
+            mapM fullGenItemMapper genItems >>= mapper . Generate
         fullMapper (Generate genItems) =
             mapM fullGenItemMapper genItems >>= mapper . Generate
         fullMapper other = mapper other

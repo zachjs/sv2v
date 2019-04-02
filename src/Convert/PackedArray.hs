@@ -195,7 +195,7 @@ unflattener writeToFlatVariant arr (t, (majorHi, majorLo)) =
             (index, majorLo)
             (BinOp Le (Ident index) majorHi)
             (index, AsgnOp Add, Number "1")
-            (Just $ prefix "unflatten")
+            (Just $ prefix "unflatten_" ++ arr)
             [ localparam startBit
                 (simplify $ BinOp Add majorLo
                     (BinOp Mul (Ident index) size))
@@ -206,9 +206,9 @@ unflattener writeToFlatVariant arr (t, (majorHi, majorLo)) =
             ]
         ]
     where
-        startBit = prefix "_tmp_start"
+        startBit = prefix "_tmp_start_" ++ arr
         arrUnflat = prefix arr
-        index = prefix "_tmp_index"
+        index = prefix "_tmp_index_" ++ arr
         (minorHi, minorLo) = head $ snd $ typeRanges t
         size = rangeSize (minorHi, minorLo)
         localparam :: Identifier -> Expr -> GenItem
