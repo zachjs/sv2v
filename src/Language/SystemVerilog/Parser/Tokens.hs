@@ -63,6 +63,7 @@ data TokenName
   | KW_disable
   | KW_dist
   | KW_do
+  | KW_dollar_bits
   | KW_edge
   | KW_else
   | KW_end

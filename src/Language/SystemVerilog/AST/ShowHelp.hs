@@ -13,6 +13,7 @@ module Language.SystemVerilog.AST.ShowHelp
     , commas
     , indentedParenList
     , showCase
+    , showEither
     ) where
 
 import Data.List (intercalate)
@@ -52,3 +53,7 @@ indentedParenList l = "(\n" ++ (indent $ intercalate ",\n" l) ++ "\n)"
 
 showCase :: (Show x, Show y) => ([x], y) -> String
 showCase (a, b) = printf "%s: %s" (commas $ map show a) (show b)
+
+showEither :: (Show a, Show b) => Either a b -> String
+showEither (Left  v) = show v
+showEither (Right v) = show v

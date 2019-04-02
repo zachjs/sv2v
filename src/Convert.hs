@@ -11,6 +11,7 @@ import qualified Job (Exclude(..))
 
 import qualified Convert.AlwaysKW
 import qualified Convert.AsgnOp
+import qualified Convert.Bits
 import qualified Convert.Enum
 import qualified Convert.FuncRet
 import qualified Convert.Interface
@@ -30,6 +31,7 @@ type Phase = AST -> AST
 phases :: [Job.Exclude] -> [Phase]
 phases excludes =
     [ Convert.AsgnOp.convert
+    , Convert.Bits.convert
     , selectExclude (Job.Logic    , Convert.Logic.convert)
     , Convert.FuncRet.convert
     , Convert.Enum.convert

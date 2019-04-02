@@ -102,6 +102,7 @@ $decimalDigit = [0-9]
 
 tokens :-
 
+    "$bits"            { tok KW_dollar_bits  }
     "always"           { tok KW_always       }
     "always_comb"      { tok KW_always_comb  }
     "always_ff"        { tok KW_always_ff    }

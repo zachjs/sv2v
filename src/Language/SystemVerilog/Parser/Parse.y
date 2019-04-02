@@ -17,6 +17,7 @@ import Language.SystemVerilog.Parser.Tokens
 
 %token
 
+"$bits"            { Token KW_dollar_bits  _ _ }
 "always"           { Token KW_always       _ _ }
 "always_comb"      { Token KW_always_comb  _ _ }
 "always_ff"        { Token KW_always_ff    _ _ }
@@ -264,6 +265,9 @@ PartialType :: { Signing -> [Range] -> Type }
   | NonIntegerType                          { \Unspecified -> \[] -> NonInteger    $1    }
   | "enum"   opt(Type) "{" EnumItems   "}"  { \Unspecified -> Enum   $2 $4 }
   | "struct" Packing   "{" StructItems "}"  { \Unspecified -> Struct $2 $4 }
+TypeNonIdent :: { Type }
+  : PartialType         Dimensions { $1 Unspecified $2 }
+  | PartialType Signing Dimensions { $1 $2 $3 }
 
 CastingType :: { Type }
   : IntegerVectorType { IntegerVector $1 Unspecified [] }
@@ -762,11 +766,15 @@ Exprs :: { [Expr] }
   :           Expr  { [$1] }
   | Exprs "," Expr  { $1 ++ [$3] }
 
+BitsArg :: { Either Type Expr }
+  : TypeNonIdent { Left $1 }
+  | Expr         { Right $1 }
 Expr :: { Expr }
   : "(" Expr ")"                { $2 }
   | String                      { String $1 }
   | Number                      { Number $1 }
   | Identifier "(" CallArgs ")" { Call $1 $3 }
+  | "$bits"    "(" BitsArg  ")" { Bits $3 }
   | Identifier                  { Ident $1 }
   | Expr Range                  { Range $1 $2 }
   | Expr "[" Expr "]"           { Bit   $1 $3 }

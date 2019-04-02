@@ -35,6 +35,7 @@ data Expr
     | BinOp   BinOp Expr Expr
     | Mux     Expr Expr Expr
     | Cast    (Either Type Expr) Expr
+    | Bits    (Either Type Expr)
     | Dot     Expr Identifier
     | Pattern [(Maybe Identifier, Expr)]
     deriving (Eq, Ord)
@@ -52,11 +53,8 @@ instance Show Expr where
     show (Dot     e n  ) = printf "%s.%s"      (show e) n
     show (Mux     c a b) = printf "(%s ? %s : %s)" (show c) (show a) (show b)
     show (Call    f l  ) = printf "%s(%s)" f (show l)
-    show (Cast tore e  ) = printf "%s'(%s)" tStr (show e)
-        where
-            tStr = case tore of
-                Left  a -> show a
-                Right a -> show a
+    show (Cast tore e  ) = printf "%s'(%s)" (showEither tore) (show e)
+    show (Bits tore    ) = printf "$bits(%s)" (showEither tore)
     show (Pattern l    ) =
         printf "'{\n%s\n}" (indent $ intercalate ",\n" $ map showPatternItem l)
         where

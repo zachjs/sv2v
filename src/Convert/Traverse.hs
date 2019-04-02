@@ -235,6 +235,9 @@ traverseNestedExprsM mapper = exprMapper
             e1' <- exprMapper e1
             e2' <- exprMapper e2
             return $ Cast (Right e1') e2'
+        em (Bits (Right e)) =
+            exprMapper e >>= return . Bits . Right
+        em (Bits (Left t)) = return $ Bits (Left t)
         em (Dot e x) =
             exprMapper e >>= \e' -> return $ Dot e' x
         em (Pattern l) = do
@@ -341,10 +344,11 @@ traverseExprsM mapper = moduleItemMapper
         decls' <- mapM declMapper decls
         stmts' <- mapM stmtMapper stmts
         return $ MIPackageItem $ Task lifetime f decls' stmts'
-    moduleItemMapper (Instance m params x r l) = do
+    moduleItemMapper (Instance m p x r l) = do
+        p' <- mapM portBindingMapper p
         l' <- mapM portBindingMapper l
         r' <- mapM rangeMapper r
-        return $ Instance m params x r' l'
+        return $ Instance m p' x r' l'
     moduleItemMapper (Modport x l) =
         mapM modportDeclMapper l >>= return . Modport x
     moduleItemMapper (NInputGate  kw x lhs exprs) = do
@@ -353,11 +357,28 @@ traverseExprsM mapper = moduleItemMapper
     moduleItemMapper (NOutputGate kw x lhss expr) =
         exprMapper expr >>= return . NOutputGate kw x lhss
     moduleItemMapper (Genvar   x) = return $ Genvar   x
-    moduleItemMapper (Generate x) = return $ Generate x
+    moduleItemMapper (Generate items) = do
+        items' <- mapM (traverseNestedGenItemsM genItemMapper) items
+        return $ Generate items'
     moduleItemMapper (MIPackageItem (Typedef t x)) =
         return $ MIPackageItem $ Typedef t x
     moduleItemMapper (MIPackageItem (Comment c)) =
         return $ MIPackageItem $ Comment c
+
+    genItemMapper (GenFor (x1, e1) cc (x2, op2, e2) mn subItems) = do
+        e1' <- exprMapper e1
+        e2' <- exprMapper e2
+        cc' <- exprMapper cc
+        return $ GenFor (x1, e1') cc' (x2, op2, e2') mn subItems
+    genItemMapper (GenIf e i1 i2) = do
+        e' <- exprMapper e
+        return $ GenIf e' i1 i2
+    genItemMapper (GenCase e cases def) = do
+        e' <- exprMapper e
+        caseExprs <- mapM (mapM exprMapper . fst) cases
+        let cases' = zip caseExprs (map snd cases)
+        return $ GenCase e' cases' def
+    genItemMapper other = return other
 
     modportDeclMapper (dir, ident, Just e) = do
         e' <- exprMapper e
@@ -456,8 +477,8 @@ traverseTypesM mapper item =
             return $ Struct p (zip types idents) r
         exprMapper (Cast (Left t) e) =
             fullMapper t >>= \t' -> return $ Cast (Left t') e
-        exprMapper (Cast (Right e1) e2) =
-            return $ Cast (Right e1) e2
+        exprMapper (Bits (Left t)) =
+            fullMapper t >>= return . Bits . Left
         exprMapper other = return other
         declMapper (Parameter  t x    e) =
             fullMapper t >>= \t' -> return $ Parameter  t' x   e
