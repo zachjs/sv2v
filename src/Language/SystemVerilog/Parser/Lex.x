@@ -749,18 +749,29 @@ handleDirective (posOrig, _, _, strOrig) len = do
             case Map.lookup directive env of
                 Nothing -> lexicalError $ "Undefined macro: " ++ directive
                 Just (body, formalArgs) -> do
-                    -- TODO: How should we track the file position when we
-                    -- substitute in a macro?
+                    (AlexPn _ l c, _, _, _) <- alexGetInput
                     replacement <- if null formalArgs
                         then return body
                         else do
                             actualArgs <- takeMacroArguments
                             defaultedArgs <- defaultMacroArgs (map snd formalArgs) actualArgs
                             return $ substituteArgs body (map fst formalArgs) defaultedArgs
-                    let size = length replacement
-                    (AlexPn f l c, _, [], str) <- alexGetInput
-                    let pos = AlexPn (f - size) l (c - size)
-                    alexSetInput (pos, ' ', [], replacement ++ str)
+                    -- save our current state
+                    currInput <- alexGetInput
+                    currToks <- gets lsToks
+                    modify $ \s -> s { lsToks = [] }
+                    -- lex the macro expansion, preserving the file and line
+                    alexSetInput (AlexPn 0 l 0, ' ' , [], replacement)
+                    alexMonadScan
+                    -- re-tag and save tokens from the macro expansion
+                    newToks <- gets lsToks
+                    currFile <- getCurrentFile
+                    let loc = "macro expansion of " ++ directive ++ " at " ++ currFile
+                    let pos = Position loc l (c - length directive - 1)
+                    let reTag (Token a b _) = Token a b pos
+                    modify $ \s -> s { lsToks = (map reTag newToks) ++ currToks }
+                    -- continue lexing after the macro
+                    alexSetInput currInput
                     alexMonadScan
 
 -- remove characters from the input until the pattern is reached
