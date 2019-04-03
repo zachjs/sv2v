@@ -12,8 +12,7 @@ module Language.SystemVerilog.AST.Stmt
     , CaseKW (..)
     , Case
     , ActionBlock  (..)
-    , PropertyExpr (..)
-    , PESPBinOp    (..)
+    , PropExpr     (..)
     , SeqMatchItem
     , SeqExpr      (..)
     , AssertionItem
@@ -144,24 +143,21 @@ instance Show ActionBlock where
     show (ActionBlockElse Nothing   s ) = printf " else %s" (show s)
     show (ActionBlockElse (Just s1) s2) = printf " %s else %s" (show s1) (show s2)
 
-data PropertyExpr
-    = PESE SeqExpr
-    | PESPBinOp SeqExpr PESPBinOp PropertyExpr
+data PropExpr
+    = PropExpr SeqExpr
+    | PropExprImpliesO  SeqExpr PropExpr
+    | PropExprImpliesNO SeqExpr PropExpr
+    | PropExprFollowsO  SeqExpr PropExpr
+    | PropExprFollowsNO SeqExpr PropExpr
+    | PropExprIff PropExpr PropExpr
     deriving Eq
-instance Show PropertyExpr where
-    show (PESE se) = show se
-    show (PESPBinOp a o b) = printf "(%s %s %s)" (show a) (show o) (show b)
-data PESPBinOp
-    = ImpliesO
-    | ImpliesNO
-    | FollowedByO
-    | FollowedByNO
-    deriving (Eq, Ord)
-instance Show PESPBinOp where
-    show ImpliesO     = "|->"
-    show ImpliesNO    = "|=>"
-    show FollowedByO  = "#-#"
-    show FollowedByNO = "#=#"
+instance Show PropExpr where
+    show (PropExpr se) = show se
+    show (PropExprImpliesO  a b) = printf "(%s |-> %s)" (show a) (show b)
+    show (PropExprImpliesNO a b) = printf "(%s |=> %s)" (show a) (show b)
+    show (PropExprFollowsO  a b) = printf "(%s #-# %s)" (show a) (show b)
+    show (PropExprFollowsNO a b) = printf "(%s #=# %s)" (show a) (show b)
+    show (PropExprIff a b) = printf "(%s and %s)" (show a) (show b)
 type SeqMatchItem = Either (LHS, AsgnOp, Expr) (Identifier, Args)
 data SeqExpr
     = SeqExpr Expr
@@ -195,7 +191,7 @@ instance Show Assertion where
         printf "assert property (%s)%s" (show p) (show a)
 
 data PropertySpec
-    = PropertySpec (Maybe Sense) (Maybe Expr) PropertyExpr
+    = PropertySpec (Maybe Sense) (Maybe Expr) PropExpr
     deriving Eq
 instance Show PropertySpec where
     show (PropertySpec ms me pe) =

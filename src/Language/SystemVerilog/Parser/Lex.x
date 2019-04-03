@@ -14,17 +14,19 @@
  - Trying to thread the IO Monad through alex's interface would be very
  - convoluted. The operations performed are not effectful, and are type safe.
  -}
+
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 -- The above pragma gets rid of annoying warning caused by alex 3.2.4. This has
 -- been fixed on their development branch, so this can be removed once they roll
 -- a new release. (no new release as of 3/29/2018)
+
 module Language.SystemVerilog.Parser.Lex (lexFile) where
 
 import System.FilePath (dropFileName)
 import System.Directory (findFile)
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Map.Strict as Map
-import Data.List (span, elemIndex, isPrefixOf, dropWhileEnd)
+import Data.List (span, elemIndex, dropWhileEnd)
 import Data.Maybe (isJust, fromJust)
 
 import Language.SystemVerilog.Parser.Tokens

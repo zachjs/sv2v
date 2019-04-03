@@ -1,3 +1,11 @@
+{- sv2v
+ - Author: Zachary Snow <zach@zachjs.com>
+ - Original Parser Author: Tom Hawkins <tomahawkins@gmail.com>
+ -
+ - This file has been *heavily* modified and extended from the original version
+ - in tomahawkins/verilog. I have added support for numerous SystemVerilog
+ - constructs, which has necessitated rewriting nearly all of this.
+ -}
 {
 module Language.SystemVerilog.Parser.Parse (descriptions) where
 
@@ -204,7 +212,6 @@ string             { Token Lit_string      _ _ }
 "<<<="             { Token Sym_lt_lt_lt_eq _ _ }
 ">>>="             { Token Sym_gt_gt_gt_eq _ _ }
 
-directive          { Token Spe_Directive _ _ }
 
 -- operator precedences, from *lowest* to *highest*
 %nonassoc NoElse
@@ -233,7 +240,6 @@ directive          { Token Spe_Directive _ _ }
 %right REDUCE_OP "!" "~" "++" "--"
 %left  "(" ")" "[" "]" "." "'"
 
-
 %%
 
 opt(p) :: { Maybe a }
@@ -249,15 +255,12 @@ Description :: { Description }
   : Part(ModuleKW   , "endmodule"   ) { $1 }
   | Part(InterfaceKW, "endinterface") { $1 }
   | PackageItem { PackageItem $1 }
-  | Directive   { Directive $1 }
-
-Directive :: { String }
-  : directive { tokenString $1 }
 
 Type :: { Type }
-  : PartialType         Dimensions { $1 Unspecified $2 }
-  | PartialType Signing Dimensions { $1 $2 $3 }
-  | Identifier          Dimensions { Alias $1 $2 }
+  : TypeNonIdent { $1 }
+  | Identifier Dimensions { Alias $1 $2 }
+TypeNonIdent :: { Type }
+  : PartialType OptSigning Dimensions { $1 $2 $3 }
 PartialType :: { Signing -> [Range] -> Type }
   : NetType                                 { \Unspecified ->        Net           $1    }
   | IntegerVectorType                       {                        IntegerVector $1    }
@@ -265,10 +268,6 @@ PartialType :: { Signing -> [Range] -> Type }
   | NonIntegerType                          { \Unspecified -> \[] -> NonInteger    $1    }
   | "enum"   opt(Type) "{" EnumItems   "}"  { \Unspecified -> Enum   $2 $4 }
   | "struct" Packing   "{" StructItems "}"  { \Unspecified -> Struct $2 $4 }
-TypeNonIdent :: { Type }
-  : PartialType         Dimensions { $1 Unspecified $2 }
-  | PartialType Signing Dimensions { $1 $2 $3 }
-
 CastingType :: { Type }
   : IntegerVectorType { IntegerVector $1 Unspecified [] }
   | IntegerAtomType   { IntegerAtom   $1 Unspecified    }
@@ -276,8 +275,11 @@ CastingType :: { Type }
   | Signing           { Implicit      $1             [] }
 
 Signing :: { Signing }
-  : "signed"   { Signed }
+  : "signed"   { Signed   }
   | "unsigned" { Unsigned }
+OptSigning :: { Signing }
+  : Signing { $1 }
+  | {- empty -} { Unspecified }
 
 NetType :: { NetType }
   : "supply0"   { TSupply0   }
@@ -318,9 +320,8 @@ StructItem :: { [(Type, Identifier)] }
   : Type Identifiers ";" { map (\a -> ($1, a)) $2 }
 
 Packing :: { Packing }
-  : "packed" Signing { Packed $2 }
-  | "packed"         { Packed Unspecified }
-  | {- empty -}      { Unpacked }
+  : "packed" OptSigning { Packed $2 }
+  | {- empty -}         { Unpacked }
 
 Part(begin, end) :: { Description }
   :          begin opt(Lifetime) Identifier Params PortDecls ";" ModuleItems end opt(Tag) { Part False $1 $2 $3 (fst $5) ($4 ++ (snd $5) ++ $7) }
@@ -464,20 +465,17 @@ SimpleImmediateAssertionStatement :: { Assertion }
   -- TODO: Add support for assume and cover
 
 PropertySpec :: { PropertySpec }
-  : opt(ClockingEvent) "disable" "iff" "(" Expr ")" PropertyExpr { PropertySpec $1 (Just $5) $7 }
-  | opt(ClockingEvent)                              PropertyExpr { PropertySpec $1 (Nothing) $2 }
+  : opt(ClockingEvent) "disable" "iff" "(" Expr ")" PropExpr { PropertySpec $1 (Just $5) $7 }
+  | opt(ClockingEvent)                              PropExpr { PropertySpec $1 (Nothing) $2 }
 
--- TODO: This is pretty incomplete!
-PropertyExpr :: { PropertyExpr }
-  : SeqExpr          { PESE $1 }
-  | SeqExpr PESPBinOp PropertyExpr { PESPBinOp $1 $2 $3 }
-  -- | "(" PropertyExpr ")"  { [] }
-
-PESPBinOp :: { PESPBinOp }
-  : "|->" { ImpliesO     }
-  | "|=>" { ImpliesNO    }
-  | "#-#" { FollowedByO  }
-  | "#=#" { FollowedByNO }
+PropExpr :: { PropExpr }
+  : SeqExpr { PropExpr $1 }
+  | SeqExpr "|->" PropExpr { PropExprImpliesO  $1 $3 }
+  | SeqExpr "|=>" PropExpr { PropExprImpliesNO $1 $3 }
+  | SeqExpr "#-#" PropExpr { PropExprFollowsO  $1 $3 }
+  | SeqExpr "#=#" PropExpr { PropExprFollowsNO $1 $3 }
+  | PropExpr "iff" PropExpr { PropExprIff $1 $3 }
+  -- | "(" PropExpr ")"  { $2 }
 
 SeqExpr :: { SeqExpr }
   : Expr { SeqExpr $1 }
@@ -572,8 +570,7 @@ TFItems :: { [Decl] }
   |                     ";" { [] }
 
 ParamType :: { Type }
-  : PartialType         Dimensions { $1 Unspecified $2 }
-  | PartialType Signing Dimensions { $1 $2 $3 }
+  : PartialType OptSigning Dimensions { $1 $2 $3 }
   | DimensionsNonEmpty { Implicit Unspecified $1 }
   | Signing Dimensions { Implicit $1          $2 }
 
@@ -853,7 +850,6 @@ GenItem :: { GenItem }
   | GenBlock                                             { uncurry GenBlock $1 }
   | "case" "(" Expr ")" GenCases opt(GenCaseDefault) "endcase" { GenCase $3 $5 $6 }
   | "for" "(" Identifier "=" Expr ";" Expr ";" GenvarIteration ")" GenBlock { (uncurry $ GenFor ($3, $5) $7 $9) $11  }
-  -- TODO: We should restrict it to the module items that are actually allowed.
   | ModuleItem { genItemsToGenItem $ map GenModuleItem $1 }
 
 GenBlock :: { (Maybe Identifier, [GenItem]) }
