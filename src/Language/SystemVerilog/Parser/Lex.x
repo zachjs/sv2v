@@ -24,7 +24,8 @@ import System.FilePath (dropFileName)
 import System.Directory (findFile)
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Map.Strict as Map
-import Data.List (findIndex, isPrefixOf)
+import Data.List (span, elemIndex, isPrefixOf, dropWhileEnd)
+import Data.Maybe (isJust, fromJust)
 
 import Language.SystemVerilog.Parser.Tokens
 }
@@ -317,7 +318,7 @@ data Cond
 data AlexUserState = LS
     { lsToks         :: [Token] -- tokens read so far, *in reverse order* for efficiency
     , lsCurrFile     :: FilePath -- currently active filename
-    , lsEnv          :: Map.Map String (String, [String]) -- active macro definitions
+    , lsEnv          :: Map.Map String (String, [(String, Maybe String)]) -- active macro definitions
     , lsCondStack    :: [Cond] -- if-else cascade state
     , lsIncludePaths :: [FilePath] -- folders to search for includes
     } deriving (Eq, Show)
@@ -476,6 +477,21 @@ dropSpaces = do
                 ' ' : rest -> alexSetInput (alexMove pos ' ', ' ', [], rest)
                 ch : _ -> lexicalError $ "expected ' ', but found: " ++ show ch
 
+isWhitespaceChar :: Char -> Bool
+isWhitespaceChar ch = elem ch [' ', '\t', '\n']
+
+-- drop leading whitespace in the input
+dropWhitespace :: Alex ()
+dropWhitespace = do
+    (_, _, _, str) <- alexGetInput
+    if null str || not (isWhitespaceChar $ head str)
+        then return ()
+        else dropChar >> dropWhitespace
+    where
+        dropChar :: Alex ()
+        dropChar = do
+            (pos, _, _, ch : rest) <- alexGetInput
+            alexSetInput (alexMove pos ch, ch, [], rest)
 
 -- removes and returns a quoted string such as <foo.bar> or "foo.bar"
 takeQuotedString :: Alex String
@@ -500,20 +516,7 @@ peekChar = do
         then '\n'
         else head str
 
-takeMacroArgNames :: Alex [String]
-takeMacroArgNames = do
-    dropSpaces
-    name <- takeString
-    dropSpaces
-    ch <- takeChar
-    rest <- case ch of
-        ',' -> takeMacroArgNames
-        ')' -> return []
-        _   -> lexicalError $ "unexpected char in macro defn. args: " ++ show ch
-    return $ name : rest
-
--- TODO FIXME: We don't currently support macro arguments with default values!
-takeMacroDefinition :: Alex (String, [String])
+takeMacroDefinition :: Alex (String, [(String, Maybe String)])
 takeMacroDefinition = do
     leadCh <- peekChar
     if leadCh /= '('
@@ -521,12 +524,27 @@ takeMacroDefinition = do
             body <- takeUntilNewline
             return (body, [])
         else do
-            '(' <- takeChar
-            args <- takeMacroArgNames
+            args <- takeMacroArguments
             body <- takeUntilNewline
+            argsWithDefaults <- mapM splitArg args
             if null args
                 then lexicalError "macros cannot have 0 args"
-                else return (body, args)
+                else return (body, argsWithDefaults)
+    where
+        splitArg :: String -> Alex (String, Maybe String)
+        splitArg [] = lexicalError "macro defn. empty argument"
+        splitArg str = do
+            let (name, rest) = span isIdentChar str
+            if null name || not (all isIdentChar name) then
+                lexicalError $ "invalid macro arg name: " ++ show name
+            else if null rest then
+                return (name, Nothing)
+            else do
+                let trimmed = dropWhile isWhitespaceChar rest
+                let leadCh = head trimmed
+                if leadCh /= '='
+                then lexicalError $ "bad char after arg name: " ++ (show leadCh)
+                else return (name, Just $ tail trimmed)
 
 -- commas and right parens are forbidden outside matched pairs of: (), [], {},
 -- "", except to delimit arguments or end the list of arguments; see 22.5.1
@@ -534,19 +552,27 @@ takeMacroArguments :: Alex [String]
 takeMacroArguments = do
     dropSpaces
     '(' <- takeChar
-    loop "" []
+    argLoop
     where
-        loop :: String -> [Char] -> Alex [String]
+        argLoop :: Alex [String]
+        argLoop = do
+            dropWhitespace
+            (arg, isEnd) <- loop "" []
+            let arg' = dropWhileEnd isWhitespaceChar arg
+            if isEnd
+                then return [arg']
+                else do
+                    rest <- argLoop
+                    return $ arg' : rest
+        loop :: String -> [Char] -> Alex (String, Bool)
         loop curr stack = do
             ch <- takeChar
             case (stack, ch) of
                 (      s,'\\') -> do
                     ch2 <- takeChar
                     loop (curr ++ [ch, ch2]) s
-                ([     ], ',') -> do
-                    rest <- loop "" stack
-                    return $ curr : rest
-                ([     ], ')') -> return [curr]
+                ([     ], ',') -> return (curr, False)
+                ([     ], ')') -> return (curr, True)
 
                 ('"' : s, '"') -> loop (curr ++ [ch]) s
                 (      s, '"') -> loop (curr ++ [ch]) ('"' : s)
@@ -578,17 +604,33 @@ substituteArgs ('`' : '`' : body) names args =
 substituteArgs ('"' : body) names args =
     '"' : start ++ substituteArgs rest names args
     where (start, rest) = findUnescapedQuote body
+substituteArgs ('\\' : '"' : body) names args =
+    '\\' : '"' : substituteArgs body names args
 substituteArgs ('`' : '"' : body) names args =
     '"' : substituteArgs (init start) names args
     ++ '"' : substituteArgs rest names args
     where (start, rest) = findUnescapedQuote body
 substituteArgs body names args =
-    case findIndex isPresent names of
-        Nothing -> head body : substituteArgs (tail body) names args
-        Just idx ->
-            (args !! idx) ++ substituteArgs (drop nameLen body) names args
-            where nameLen = length $ names !! idx
-    where isPresent a = isPrefixOf a body
+    case span isIdentChar body of
+        ([], _) -> head body : substituteArgs (tail body) names args
+        (ident, rest) ->
+            case elemIndex ident names of
+                Nothing -> ident ++ substituteArgs rest names args
+                Just idx -> (args !! idx) ++ substituteArgs rest names args
+
+defaultMacroArgs :: [Maybe String] -> [String] -> Alex [String]
+defaultMacroArgs [] [] = return []
+defaultMacroArgs [] _ = lexicalError "too many macro arguments given"
+defaultMacroArgs defaults [] = do
+    if all isJust defaults
+        then return $ map fromJust defaults
+        else lexicalError "too few macro arguments given"
+defaultMacroArgs (f : fs) (a : as) = do
+    let arg = if a == "" && isJust f
+            then fromJust f
+            else a
+    args <- defaultMacroArgs fs as
+    return $ arg : args
 
 -- directives that must always be processed even if the current code block is
 -- being excluded; we have to process conditions so we can match them up with
@@ -608,8 +650,7 @@ handleDirective (posOrig, _, _, strOrig) len = do
     let dropUntilNewline = removeUntil "\n" tempInput 0
 
     condStack <- gets lsCondStack
-    if not (null condStack)
-        && head condStack /= CurrentlyTrue
+    if any (/= CurrentlyTrue) condStack
         && not (elem directive unskippableDirectives)
     then alexMonadScan
     else case directive of
@@ -711,12 +752,8 @@ handleDirective (posOrig, _, _, strOrig) len = do
                         then return body
                         else do
                             actualArgs <- takeMacroArguments
-                            if length formalArgs == length actualArgs
-                                then return $ substituteArgs body formalArgs actualArgs
-                                else lexicalError $
-                                        "different number of macro args: " ++
-                                        (show $ length formalArgs) ++ " vs. " ++
-                                        (show $ length actualArgs)
+                            defaultedArgs <- defaultMacroArgs (map snd formalArgs) actualArgs
+                            return $ substituteArgs body (map fst formalArgs) defaultedArgs
                     let size = length replacement
                     (AlexPn f l c, _, [], str) <- alexGetInput
                     let pos = AlexPn (f - size) l (c - size)
@@ -757,7 +794,7 @@ tok tokId (pos, _, _, input) len = do
     let tokStr = take len input
     tokPos <- toTokPos pos
     condStack <- gets lsCondStack
-    () <- if not (null condStack) && head condStack /= CurrentlyTrue
+    () <- if any (/= CurrentlyTrue) condStack
         then modify id
         else modify (push $ Token tokId tokStr tokPos)
     alexMonadScan
