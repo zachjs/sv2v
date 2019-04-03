@@ -16,6 +16,7 @@ module Language.SystemVerilog.AST.Stmt
     , SeqMatchItem
     , SeqExpr      (..)
     , AssertionItem
+    , AssertionExpr
     , Assertion    (..)
     , PropertySpec (..)
     , UniquePriority (..)
@@ -47,8 +48,7 @@ data Stmt
     | Return  Expr
     | Subroutine Identifier Args
     | Trigger Identifier
-    -- TODO: Should we support coversion of assertions?
-    -- | Assertion Assertion
+    | Assertion Assertion
     | Null
     deriving Eq
 
@@ -91,7 +91,7 @@ instance Show Stmt where
     show (Return e   ) = printf "return %s;" (show e)
     show (Timing t s ) = printf "%s %s" (show t) (show s)
     show (Trigger x  ) = printf "-> %s;" x
-    --show (Assertion a) = show a
+    show (Assertion a) = show a
     show (Null       ) = ";"
 
 data CaseKW
@@ -180,23 +180,31 @@ instance Show SeqExpr where
     show (SeqExprFirstMatch e a) = printf "first_match(%s, %s)" (show e) (show a)
 
 type AssertionItem = (Maybe Identifier, Assertion)
+type AssertionExpr = Either PropertySpec Expr
 data Assertion
-    = Assert         Expr         ActionBlock
-    | AssertProperty PropertySpec ActionBlock
+    = Assert AssertionExpr ActionBlock
+    | Assume AssertionExpr ActionBlock
+    | Cover  AssertionExpr Stmt
     deriving Eq
 instance Show Assertion where
-    show (Assert e a) =
-        printf "assert (%s)%s" (show e) (show a)
-    show (AssertProperty p a) =
-        printf "assert property (%s)%s" (show p) (show a)
+    show (Assert e a) = printf "assert %s%s" (showAssertionExpr e) (show a)
+    show (Assume e a) = printf "assume %s%s" (showAssertionExpr e) (show a)
+    show (Cover  e a) = printf  "cover %s%s" (showAssertionExpr e) (show a)
+
+showAssertionExpr :: AssertionExpr -> String
+showAssertionExpr (Left e) = printf "property (%s)" (show e)
+showAssertionExpr (Right e) = printf "(%s)" (show e)
 
 data PropertySpec
     = PropertySpec (Maybe Sense) (Maybe Expr) PropExpr
     deriving Eq
 instance Show PropertySpec where
     show (PropertySpec ms me pe) =
-        printf "%s%s%s" (maybe "" showPad ms) meStr (show pe)
+        printf "%s%s%s" msStr meStr (show pe)
         where
+            msStr = case ms of
+                Nothing -> ""
+                Just s -> printf "@(%s) " (show s)
             meStr = case me of
                 Nothing -> ""
                 Just e -> printf "disable iff (%s) " (show e)

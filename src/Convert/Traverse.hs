@@ -195,7 +195,112 @@ traverseNestedStmtsM mapper = fullMapper
         cs (Return expr) = return $ Return expr
         cs (Subroutine f exprs) = return $ Subroutine f exprs
         cs (Trigger x) = return $ Trigger x
+        cs (Assertion a) =
+            traverseAssertionStmtsM fullMapper a >>= return . Assertion
         cs (Null) = return Null
+
+traverseAssertionStmtsM :: Monad m => MapperM m Stmt -> MapperM m Assertion
+traverseAssertionStmtsM mapper = assertionMapper
+    where
+        actionBlockMapper (ActionBlockIf stmt) =
+            mapper stmt >>= return . ActionBlockIf
+        actionBlockMapper (ActionBlockElse Nothing stmt) =
+            mapper stmt >>= return . ActionBlockElse Nothing
+        actionBlockMapper (ActionBlockElse (Just s1) s2) = do
+            s1' <- mapper s1
+            s2' <- mapper s2
+            return $ ActionBlockElse (Just s1') s2'
+        assertionMapper (Assert e ab) =
+            actionBlockMapper ab >>= return . Assert e
+        assertionMapper (Assume e ab) =
+            actionBlockMapper ab >>= return . Assume e
+        assertionMapper (Cover e stmt) =
+            mapper stmt >>= return . Cover e
+
+-- Note that this does not include the expressions without the statements of the
+-- actions associated with the assertions.
+traverseAssertionExprsM :: Monad m => MapperM m Expr -> MapperM m Assertion
+traverseAssertionExprsM mapper = assertionMapper
+    where
+        seqExprMapper (SeqExpr e) =
+            mapper e >>= return . SeqExpr
+        seqExprMapper (SeqExprAnd        s1 s2) =
+            ssMapper   SeqExprAnd        s1 s2
+        seqExprMapper (SeqExprOr         s1 s2) =
+            ssMapper   SeqExprOr         s1 s2
+        seqExprMapper (SeqExprIntersect  s1 s2) =
+            ssMapper   SeqExprIntersect  s1 s2
+        seqExprMapper (SeqExprWithin     s1 s2) =
+            ssMapper   SeqExprWithin     s1 s2
+        seqExprMapper (SeqExprThroughout e s) = do
+            e' <- mapper e
+            s' <- seqExprMapper s
+            return $ SeqExprThroughout e' s'
+        seqExprMapper (SeqExprDelay ms e s) = do
+            ms' <- case ms of
+                Nothing -> return Nothing
+                Just x -> seqExprMapper x >>= return . Just
+            e' <- mapper e
+            s' <- seqExprMapper s
+            return $ SeqExprDelay ms' e' s'
+        seqExprMapper (SeqExprFirstMatch s items) = do
+            s' <- seqExprMapper s
+            items' <- mapM seqMatchItemMapper items
+            return $ SeqExprFirstMatch s' items'
+        seqMatchItemMapper (Left (a, b, c)) = do
+            c' <- mapper c
+            return $ Left (a, b, c')
+        seqMatchItemMapper (Right (x, (Args l p))) = do
+            l' <- mapM maybeExprMapper l
+            pes <- mapM maybeExprMapper $ map snd p
+            let p' = zip (map fst p) pes
+            return $ Right (x, Args l' p')
+        maybeExprMapper Nothing = return Nothing
+        maybeExprMapper (Just e) =
+            mapper e >>= return . Just
+        ppMapper constructor p1 p2 = do
+            p1' <- propExprMapper p1
+            p2' <- propExprMapper p2
+            return $ constructor p1' p2'
+        ssMapper constructor s1 s2 = do
+            s1' <- seqExprMapper s1
+            s2' <- seqExprMapper s2
+            return $ constructor s1' s2'
+        spMapper constructor se pe = do
+            se' <- seqExprMapper se
+            pe' <- propExprMapper pe
+            return $ constructor se' pe'
+        propExprMapper (PropExpr se) =
+            seqExprMapper se >>= return . PropExpr
+        propExprMapper (PropExprImpliesO se pe) =
+            spMapper PropExprImpliesO se pe
+        propExprMapper (PropExprImpliesNO se pe) =
+            spMapper PropExprImpliesNO se pe
+        propExprMapper (PropExprFollowsO se pe) =
+            spMapper PropExprFollowsO se pe
+        propExprMapper (PropExprFollowsNO se pe) =
+            spMapper PropExprFollowsNO se pe
+        propExprMapper (PropExprIff p1 p2) =
+            ppMapper PropExprIff p1 p2
+        propSpecMapper (PropertySpec ms me pe) = do
+            me' <- case me of
+                Nothing -> return Nothing
+                Just e -> mapper e >>= return . Just
+            pe' <- propExprMapper pe
+            return $ PropertySpec ms me' pe'
+        assertionExprMapper (Left e) =
+            propSpecMapper e >>= return . Left
+        assertionExprMapper (Right e) =
+            mapper e >>= return . Right
+        assertionMapper (Assert e ab) = do
+            e' <- assertionExprMapper e
+            return $ Assert e' ab
+        assertionMapper (Assume e ab) = do
+            e' <- assertionExprMapper e
+            return $ Assume e' ab
+        assertionMapper (Cover e stmt) = do
+            e' <- assertionExprMapper e
+            return $ Cover e' stmt
 
 traverseStmtLHSsM :: Monad m => MapperM m LHS -> MapperM m Stmt
 traverseStmtLHSsM mapper = traverseNestedStmtsM stmtMapper
@@ -210,6 +315,8 @@ traverseStmtLHSsM mapper = traverseNestedStmtsM stmtMapper
             return $ Asgn (Just $ Event sense') lhs' expr
         stmtMapper (AsgnBlk op lhs expr) = fullMapper lhs >>= \lhs' -> return $ AsgnBlk op lhs' expr
         stmtMapper (Asgn    mt lhs expr) = fullMapper lhs >>= \lhs' -> return $ Asgn    mt lhs' expr
+        stmtMapper (Assertion a) =
+            assertionMapper a >>= return . Assertion
         stmtMapper other = return other
         senseMapper (Sense        lhs) = fullMapper lhs >>= return . Sense
         senseMapper (SensePosedge lhs) = fullMapper lhs >>= return . SensePosedge
@@ -219,6 +326,19 @@ traverseStmtLHSsM mapper = traverseNestedStmtsM stmtMapper
             s2' <- senseMapper s2
             return $ SenseOr s1' s2'
         senseMapper (SenseStar       ) = return SenseStar
+        assertionExprMapper (Left (PropertySpec (Just sense) me pe)) = do
+            sense' <- senseMapper sense
+            return $ Left $ PropertySpec (Just sense') me pe
+        assertionExprMapper other = return $ other
+        assertionMapper (Assert e ab) = do
+            e' <- assertionExprMapper e
+            return $ Assert e' ab
+        assertionMapper (Assume e ab) = do
+            e' <- assertionExprMapper e
+            return $ Assume e' ab
+        assertionMapper (Cover e stmt) = do
+            e' <- assertionExprMapper e
+            return $ Cover e' stmt
 
 traverseStmtLHSs :: Mapper LHS -> Mapper Stmt
 traverseStmtLHSs = unmonad traverseStmtLHSsM
@@ -348,6 +468,10 @@ traverseExprsM' strat mapper = moduleItemMapper
     flatStmtMapper (Return expr) =
         exprMapper expr >>= return . Return
     flatStmtMapper (Trigger x) = return $ Trigger x
+    flatStmtMapper (Assertion a) = do
+        a' <- traverseAssertionStmtsM stmtMapper a
+        a'' <- traverseAssertionExprsM exprMapper a'
+        return $ Assertion a''
     flatStmtMapper (Null) = return Null
 
     initMapper (Left decl) = declMapper decl >>= return . Left
@@ -413,6 +537,10 @@ traverseExprsM' strat mapper = moduleItemMapper
         return $ MIPackageItem $ Typedef t x
     moduleItemMapper (MIPackageItem (Comment c)) =
         return $ MIPackageItem $ Comment c
+    moduleItemMapper (AssertionItem (mx, a)) = do
+        a' <- traverseAssertionStmtsM stmtMapper a
+        a'' <- traverseAssertionExprsM exprMapper a'
+        return $ AssertionItem (mx, a'')
 
     genItemMapper (GenFor (x1, e1) cc (x2, op2, e2) mn subItems) = do
         e1' <- exprMapper e1
@@ -462,6 +590,9 @@ traverseLHSsM' strat mapper item =
         traverseModuleItemLHSsM (NInputGate  kw x lhs exprs) = do
             lhs' <- mapper lhs
             return $ NInputGate kw x lhs' exprs
+        traverseModuleItemLHSsM (AssertionItem (mx, a)) = do
+            Assertion a' <- traverseStmtLHSsM mapper (Assertion a)
+            return $ AssertionItem (mx, a')
         traverseModuleItemLHSsM other = return other
 
 traverseLHSs' :: TFStrategy -> Mapper LHS -> Mapper ModuleItem

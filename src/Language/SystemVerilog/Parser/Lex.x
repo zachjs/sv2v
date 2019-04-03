@@ -113,6 +113,7 @@ tokens :-
     "and"              { tok KW_and          }
     "assert"           { tok KW_assert       }
     "assign"           { tok KW_assign       }
+    "assume"           { tok KW_assume       }
     "automatic"        { tok KW_automatic    }
     "begin"            { tok KW_begin        }
     "bit"              { tok KW_bit          }
@@ -121,6 +122,7 @@ tokens :-
     "case"             { tok KW_case         }
     "casex"            { tok KW_casex        }
     "casez"            { tok KW_casez        }
+    "cover"            { tok KW_cover        }
     "default"          { tok KW_default      }
     "defparam"         { tok KW_defparam     }
     "disable"          { tok KW_disable      }

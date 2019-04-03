@@ -128,8 +128,7 @@ data ModuleItem
   | MIPackageItem PackageItem
   | NInputGate  NInputGateKW  (Maybe Identifier)  LHS [Expr]
   | NOutputGate NOutputGateKW (Maybe Identifier) [LHS] Expr
-  -- TODO: Should we support coversion of assertions?
-  -- | AssertionItem AssertionItem
+  | AssertionItem AssertionItem
   deriving Eq
 
 data AlwaysKW
@@ -167,7 +166,8 @@ instance Show ModuleItem where
     MIPackageItem i  -> show i
     NInputGate  kw x lhs  exprs -> printf "%s%s (%s, %s);" (show kw) (maybe "" (" " ++) x) (show lhs) (commas $ map show exprs)
     NOutputGate kw x lhss expr  -> printf "%s%s (%s, %s);" (show kw) (maybe "" (" " ++) x) (commas $ map show lhss) (show expr)
-    --AssertionItem a -> show a
+    AssertionItem (Nothing, a) -> show a
+    AssertionItem (Just x, a) -> printf "%s : %s" x (show a)
     where
     showPorts :: [PortBinding] -> String
     showPorts ports = indentedParenList $ map showPort ports

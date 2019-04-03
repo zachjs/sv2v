@@ -33,6 +33,7 @@ import Language.SystemVerilog.Parser.Tokens
 "and"              { Token KW_and          _ _ }
 "assert"           { Token KW_assert       _ _ }
 "assign"           { Token KW_assign       _ _ }
+"assume"           { Token KW_assume       _ _ }
 "automatic"        { Token KW_automatic    _ _ }
 "begin"            { Token KW_begin        _ _ }
 "bit"              { Token KW_bit          _ _ }
@@ -41,6 +42,7 @@ import Language.SystemVerilog.Parser.Tokens
 "case"             { Token KW_case         _ _ }
 "casex"            { Token KW_casex        _ _ }
 "casez"            { Token KW_casez        _ _ }
+"cover"            { Token KW_cover        _ _ }
 "default"          { Token KW_default      _ _ }
 "defparam"         { Token KW_defparam     _ _ }
 "disable"          { Token KW_disable      _ _ }
@@ -440,7 +442,7 @@ ModuleItem :: { [ModuleItem] }
   | NInputGateKW  NInputGates  ";"       { map (\(a, b, c) -> NInputGate  $1 a b c) $2 }
   | NOutputGateKW NOutputGates ";"       { map (\(a, b, c) -> NOutputGate $1 a b c) $2 }
   | AttributeInstance ModuleItem         { map (MIAttr $1) $2 }
-  | AssertionItem                        { [] } -- AssertionItem $1] }
+  | AssertionItem                        { [AssertionItem $1] }
 
 -- for ModuleItem, for now
 AssertionItem :: { AssertionItem }
@@ -455,14 +457,16 @@ ConcurrentAssertionItem :: { AssertionItem }
   : Identifier ":" ConcurrentAssertionStatement { (Just $1, $3) }
   |                ConcurrentAssertionStatement { (Nothing, $1) }
 ConcurrentAssertionStatement :: { Assertion }
-  : "assert" "property" "(" PropertySpec ")" ActionBlock { AssertProperty $4 $6 }
-  -- TODO: Add support for assume, cover, and restrict
+  : "assert" "property" "(" PropertySpec ")" ActionBlock { Assert (Left $4) $6 }
+  | "assume" "property" "(" PropertySpec ")" ActionBlock { Assume (Left $4) $6 }
+  | "cover"  "property" "(" PropertySpec ")" Stmt        { Cover  (Left $4) $6 }
 
 ImmediateAssertionStatement :: { Assertion }
   : SimpleImmediateAssertionStatement { $1 }
 SimpleImmediateAssertionStatement :: { Assertion }
-  : "assert" "(" Expr ")" ActionBlock { Assert $3 $5 }
-  -- TODO: Add support for assume and cover
+  : "assert" "(" Expr ")" ActionBlock { Assert (Right $3) $5 }
+  | "assume" "(" Expr ")" ActionBlock { Assume (Right $3) $5 }
+  | "cover"  "(" Expr ")" Stmt        { Cover  (Right $3) $5 }
 
 PropertySpec :: { PropertySpec }
   : opt(ClockingEvent) "disable" "iff" "(" Expr ")" PropExpr { PropertySpec $1 (Just $5) $7 }
@@ -470,15 +474,19 @@ PropertySpec :: { PropertySpec }
 
 PropExpr :: { PropExpr }
   : SeqExpr { PropExpr $1 }
+  | PropExprParens { $1 }
+PropExprParens :: { PropExpr }
+  : "(" PropExprParens ")" { $2 }
   | SeqExpr "|->" PropExpr { PropExprImpliesO  $1 $3 }
   | SeqExpr "|=>" PropExpr { PropExprImpliesNO $1 $3 }
   | SeqExpr "#-#" PropExpr { PropExprFollowsO  $1 $3 }
   | SeqExpr "#=#" PropExpr { PropExprFollowsNO $1 $3 }
   | PropExpr "iff" PropExpr { PropExprIff $1 $3 }
-  -- | "(" PropExpr ")"  { $2 }
-
 SeqExpr :: { SeqExpr }
   : Expr { SeqExpr $1 }
+  | SeqExprParens { $1 }
+SeqExprParens :: { SeqExpr }
+  : "(" SeqExprParens ")" { $2 }
   | SeqExpr "and"        SeqExpr { SeqExprAnd        $1 $3 }
   | SeqExpr "or"         SeqExpr { SeqExprOr         $1 $3 }
   | SeqExpr "intersect"  SeqExpr { SeqExprIntersect  $1 $3 }
@@ -649,7 +657,7 @@ StmtNonAsgn :: { Stmt }
   | "forever" Stmt                             { Forever $2 }
   | "->" Identifier ";"                        { Trigger $2 }
   | AttributeInstance Stmt                     { StmtAttr $1 $2 }
-  | ProceduralAssertionStatement               { Null } --Assertion $1 }
+  | ProceduralAssertionStatement               { Assertion $1 }
 
 Unique :: { Maybe UniquePriority }
   : {- empty -} { Nothing }
