@@ -7,6 +7,8 @@ done.
 
 The `inline_concat` files were modified to remove a stray trailing semicolon.
 
+`array.v` previously had a custom implementation of `$clog2`, which was removed.
+
 Each test case (say, "foo") is comprised of the following files:
 
 1. `foo.sv`: original SystemVerilog

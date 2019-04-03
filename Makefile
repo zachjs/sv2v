@@ -11,4 +11,4 @@ clean:
 	rm -rf bin
 
 test:
-	(cd test/relong; ./run.sh)
+	(cd test && ./run-all.sh)
