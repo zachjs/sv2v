@@ -343,11 +343,14 @@ lexFile includePaths env path = do
                         (show $ length $ lsCondStack finalState)
     where
         initialEnv = Map.map (\a -> (a, [])) $ Map.fromList env
-        setEnv = modify $ \s -> s
-            { lsEnv = initialEnv
-            , lsIncludePaths = includePaths
-            , lsCurrFile = path
-            }
+        setEnv = do
+            -- standardize the file path format
+            path' <- includeSearch path
+            modify $ \s -> s
+                { lsEnv = initialEnv
+                , lsIncludePaths = includePaths
+                , lsCurrFile = path'
+                }
 
 -- invoked by alexMonadScan
 alexEOF :: Alex ()
