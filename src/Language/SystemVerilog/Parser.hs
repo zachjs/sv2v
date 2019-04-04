@@ -2,15 +2,15 @@
  - Author: Zachary Snow <zach@zachjs.com>
  -}
 module Language.SystemVerilog.Parser
-( parseFile
-) where
+    ( parseFile
+    ) where
 
-import Language.SystemVerilog.AST
-import Language.SystemVerilog.Parser.Lex
-import Language.SystemVerilog.Parser.Parse
+import Language.SystemVerilog.AST (AST)
+import Language.SystemVerilog.Parser.Lex (lexFile)
+import Language.SystemVerilog.Parser.Parse (parse)
 
--- parses a file given a table of predefined macros and the file name
+-- parses a file given include search paths, a table of predefined macros, and
+-- the file path
 parseFile :: [String] -> [(String, String)] -> FilePath -> IO AST
-parseFile includePaths env file =
-    lexFile includePaths env file >>=
-    return . descriptions
+parseFile includePaths defines path =
+    lexFile includePaths defines path >>= return . parse

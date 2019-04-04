@@ -5,19 +5,20 @@
  - This file has been *heavily* modified and extended from the original version
  - in tomahawkins/verilog. I have added support for numerous SystemVerilog
  - constructs, which has necessitated rewriting nearly all of this.
+ -
+ - This file is the only remaining one that still uses 2-space indentation. I've
+ - decided to leave it this way because I think it is too important to preserve
+ - the ability to easily blame/diff this file.
  -}
 {
-module Language.SystemVerilog.Parser.Parse (descriptions) where
-
-import Data.List
-import Data.Maybe
+module Language.SystemVerilog.Parser.Parse (parse) where
 
 import Language.SystemVerilog.AST
 import Language.SystemVerilog.Parser.ParseDecl
 import Language.SystemVerilog.Parser.Tokens
 }
 
-%name descriptions
+%name parse
 %tokentype { Token }
 %error { parseError }
 

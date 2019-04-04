@@ -8,13 +8,16 @@
 module Language.SystemVerilog.AST.Expr
     ( Expr (..)
     , Range
+    , Args (..)
     , showAssignment
     , showRanges
-    , Args (..)
+    , simplify
+    , rangeSize
     ) where
 
 import Data.List (intercalate)
 import Text.Printf (printf)
+import Text.Read (readMaybe)
 
 import Language.SystemVerilog.AST.Op
 import Language.SystemVerilog.AST.ShowHelp
@@ -83,3 +86,29 @@ showRanges l = " " ++ (concatMap showRange l)
 
 showRange :: Range -> String
 showRange (h, l) = printf "[%s:%s]" (show h) (show l)
+
+-- basic expression simplfication utility to help us generate nicer code in the
+-- common case of ranges like `[FOO-1:0]`
+simplify :: Expr -> Expr
+simplify (BinOp op e1 e2) =
+    case (op, e1', e2') of
+        (Add, Number "0", e) -> e
+        (Add, e, Number "0") -> e
+        (Sub, e, Number "0") -> e
+        (Add, BinOp Sub e (Number "1"), Number "1") -> e
+        (Add, e, BinOp Sub (Number "0") (Number "1")) -> BinOp Sub e (Number "1")
+        (_  , Number a, Number b) ->
+            case (op, readMaybe a :: Maybe Int, readMaybe b :: Maybe Int) of
+                (Add, Just x, Just y) -> Number $ show (x + y)
+                (Sub, Just x, Just y) -> Number $ show (x - y)
+                (Mul, Just x, Just y) -> Number $ show (x * y)
+                _ -> BinOp op e1' e2'
+        _ -> BinOp op e1' e2'
+    where
+        e1' = simplify e1
+        e2' = simplify e2
+simplify other = other
+
+rangeSize :: Range -> Expr
+rangeSize (s, e) =
+    simplify $ BinOp Add (BinOp Sub s e) (Number "1")

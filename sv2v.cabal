@@ -36,8 +36,11 @@ executable sv2v
     Language.SystemVerilog.AST
     Language.SystemVerilog.AST.Attr
     Language.SystemVerilog.AST.Decl
+    Language.SystemVerilog.AST.Description
     Language.SystemVerilog.AST.Expr
+    Language.SystemVerilog.AST.GenItem
     Language.SystemVerilog.AST.LHS
+    Language.SystemVerilog.AST.ModuleItem
     Language.SystemVerilog.AST.Op
     Language.SystemVerilog.AST.ShowHelp
     Language.SystemVerilog.AST.Stmt
