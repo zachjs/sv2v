@@ -90,6 +90,22 @@ showRange (h, l) = printf "[%s:%s]" (show h) (show l)
 -- basic expression simplfication utility to help us generate nicer code in the
 -- common case of ranges like `[FOO-1:0]`
 simplify :: Expr -> Expr
+simplify (Mux (BinOp Ge c1 c2) e1 e2) =
+    case (c1', c2') of
+        (Number a, Number b) ->
+            case (readMaybe a :: Maybe Int, readMaybe b :: Maybe Int) of
+                (Just x, Just y) ->
+                    if x >= y
+                        then e1
+                        else e2
+                _ -> nochange
+        _ -> nochange
+    where
+        c1' = simplify c1
+        c2' = simplify c2
+        e1' = simplify e1
+        e2' = simplify e2
+        nochange = Mux (BinOp Ge c1' c2') e1' e2'
 simplify (BinOp op e1 e2) =
     case (op, e1', e2') of
         (Add, Number "0", e) -> e
@@ -102,6 +118,10 @@ simplify (BinOp op e1 e2) =
                 (Add, Just x, Just y) -> Number $ show (x + y)
                 (Sub, Just x, Just y) -> Number $ show (x - y)
                 (Mul, Just x, Just y) -> Number $ show (x * y)
+                _ -> BinOp op e1' e2'
+        (Add, BinOp Add e (Number a), Number b) ->
+            case (readMaybe a :: Maybe Int, readMaybe b :: Maybe Int) of
+                (Just x, Just y) -> BinOp Add e $ Number $ show (x + y)
                 _ -> BinOp op e1' e2'
         _ -> BinOp op e1' e2'
     where

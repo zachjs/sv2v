@@ -22,16 +22,13 @@
  - Note: We don't count usages with an index in expressions as such, as those
  - usages could be equivalently converted to range accesses with some added in
  - multiplication.
- -
- - TODO: This assumes that the first range index is the upper bound. We could
- - probably get around this with some cleverness in the generate block. I don't
- - think it's urgent to have support for "backwards" ranges.
  -}
 
 module Convert.PackedArray (convert) where
 
 import Control.Monad.State
 import Data.List (partition)
+import Data.Tuple (swap)
 import qualified Data.Set as Set
 import qualified Data.Map.Strict as Map
 
@@ -186,18 +183,20 @@ flattenModuleItem _ other = other
 -- produces `generate` items for creating an unflattened copy of the given
 -- flattened, packed array
 unflattener :: Bool -> Identifier -> (Type, Range) -> [GenItem]
-unflattener writeToFlatVariant arr (t, (majorHi, majorLo)) =
+unflattener writeToFlatVariant arr (t, major @ (majorHi, majorLo)) =
         [ GenModuleItem $ MIPackageItem $ Comment $ "sv2v packed-array-flatten unflattener for " ++ arr
         , GenModuleItem $ MIDecl $ Variable Local t arrUnflat [(majorHi, majorLo)] Nothing
         , GenModuleItem $ Genvar index
         , GenModuleItem $ MIDecl $ Variable Local (IntegerAtom TInteger Unspecified) (arrUnflat ++ "_repeater_index") [] Nothing
         , GenFor
             (index, majorLo)
-            (BinOp Le (Ident index) majorHi)
-            (index, AsgnOp Add, Number "1")
+            (ccExpr major
+                (BinOp Le (Ident index) majorHi)
+                (BinOp Ge (Ident index) majorHi))
+            (index, AsgnOp Add, ccExpr major (Number "1") (Number "-1"))
             (Just $ prefix "unflatten_" ++ arr)
             [ localparam startBit
-                (simplify $ BinOp Add majorLo
+                (simplify $ BinOp Add (ccExpr major majorLo majorHi)
                     (BinOp Mul (Ident index) size))
             , GenModuleItem $ (uncurry $ Assign Nothing) $
                 if not writeToFlatVariant
@@ -209,13 +208,23 @@ unflattener writeToFlatVariant arr (t, (majorHi, majorLo)) =
         startBit = prefix "_tmp_start_" ++ arr
         arrUnflat = prefix arr
         index = prefix "_tmp_index_" ++ arr
-        (minorHi, minorLo) = head $ snd $ typeRanges t
-        size = rangeSize (minorHi, minorLo)
+        minor = head $ snd $ typeRanges t
+        size = rangeSize $ ccRange minor minor (swap minor)
         localparam :: Identifier -> Expr -> GenItem
         localparam x v = GenModuleItem $ MIDecl $ Localparam (Implicit Unspecified []) x v
-        origRange = ( (BinOp Add (Ident startBit)
+        origRangeAg = ( (BinOp Add (Ident startBit)
                         (BinOp Sub size (Number "1")))
-                    , Ident startBit )
+                      , Ident startBit )
+        origRange = ccRange major origRangeAg (swap origRangeAg)
+
+ccExpr :: Range -> Expr -> Expr -> Expr
+ccExpr r e1 e2 = simplify $ Mux (uncurry (BinOp Ge) r) e1 e2
+
+ccRange :: Range -> Range -> Range -> Range
+ccRange r r1 r2 =
+    ( ccExpr r (fst r1) (fst r2)
+    , ccExpr r (snd r1) (snd r2)
+    )
 
 typeIsImplicit :: Type -> Bool
 typeIsImplicit (Implicit _ _) = True
@@ -232,13 +241,26 @@ flattenRanges rs =
         then rs'
         else error $ "flattenRanges on too small list: " ++ (show rs)
     where
-        (s1, e1) = head rs
-        (s2, e2) = head $ tail rs
+        r1 = head rs
+        r2 = head $ tail rs
+        rYY = flattenRangesHelp r1 r2
+        rYN = flattenRangesHelp r1 (swap r2)
+        rNY = flattenRangesHelp (swap r1) r2
+        rNN = flattenRangesHelp (swap r1) (swap r2)
+        rY = ccRange r2 rYY rYN
+        rN = ccRange r2 rNY rNN
+        rAg = ccRange r1 rY rN
+        r = ccRange r1 rAg (swap rAg)
+        rs' = (tail $ tail rs) ++ [r]
+
+flattenRangesHelp :: Range -> Range -> Range
+flattenRangesHelp (s1, e1) (s2, e2) =
+    (simplify upper, simplify lower)
+    where
         size1 = rangeSize (s1, e1)
         size2 = rangeSize (s2, e2)
-        upper = BinOp Add (BinOp Mul size1 size2) (BinOp Sub e1 (Number "1"))
-        r' = (simplify upper, e1)
-        rs' = (tail $ tail rs) ++ [r']
+        lower = BinOp Add e1 (BinOp Mul e2 size2)
+        upper = BinOp Add (BinOp Mul size1 size2) (BinOp Sub lower (Number "1"))
 
 rewriteModuleItem :: Info -> ModuleItem -> ModuleItem
 rewriteModuleItem info =
