@@ -9,10 +9,13 @@ module Language.SystemVerilog.AST.Expr
     ( Expr (..)
     , Range
     , Args (..)
+    , PartSelectMode (..)
     , showAssignment
     , showRanges
     , simplify
     , rangeSize
+    , endianCondExpr
+    , endianCondRange
     ) where
 
 import Data.List (intercalate)
@@ -29,7 +32,7 @@ data Expr
     = String  String
     | Number  String
     | Ident   Identifier
-    | Range   Expr Range
+    | Range   Expr PartSelectMode Range
     | Bit     Expr Expr
     | Repeat  Expr [Expr]
     | Concat  [Expr]
@@ -48,7 +51,7 @@ instance Show Expr where
     show (Ident   str  ) = str
     show (String  str  ) = printf "\"%s\"" str
     show (Bit     e b  ) = printf "%s[%s]"     (show e) (show b)
-    show (Range   e r  ) = printf "%s%s"       (show e) (showRange r)
+    show (Range   e m r) = printf "%s[%s%s%s]" (show e) (show $ fst r) (show m) (show $ snd r)
     show (Repeat  e l  ) = printf "{%s {%s}}"  (show e) (commas $ map show l)
     show (Concat  l    ) = printf "{%s}"                (commas $ map show l)
     show (UniOp   a b  ) = printf "(%s %s)"    (show a) (show b)
@@ -75,6 +78,17 @@ instance Show Args where
             strs = (map showPnArg pnArgs) ++ (map showKwArg kwArgs)
             showPnArg = maybe "" show
             showKwArg (x, me) = printf ".%s(%s)" x (showPnArg me)
+
+data PartSelectMode
+    = NonIndexed
+    | IndexedPlus
+    | IndexedMinus
+    deriving (Eq, Ord)
+
+instance Show PartSelectMode where
+    show NonIndexed   = ":"
+    show IndexedPlus  = "+:"
+    show IndexedMinus = "-:"
 
 showAssignment :: Maybe Expr -> String
 showAssignment Nothing = ""
@@ -132,3 +146,18 @@ simplify other = other
 rangeSize :: Range -> Expr
 rangeSize (s, e) =
     simplify $ BinOp Add (BinOp Sub s e) (Number "1")
+
+-- chooses one or the other expression based on the endianness of the given
+-- range; [hi:lo] chooses the first expression
+endianCondExpr :: Range -> Expr -> Expr -> Expr
+endianCondExpr r e1 e2 = simplify $ Mux (uncurry (BinOp Ge) r) e1 e2
+
+-- chooses one or the other range based on the endianness of the given range,
+-- but in such a way that the result is itself also usable as a range even if
+-- the endianness cannot be resolved during conversion, i.e. if it's dependent
+-- on a parameter value; [hi:lo] chooses the first range
+endianCondRange :: Range -> Range -> Range -> Range
+endianCondRange r r1 r2 =
+    ( endianCondExpr r (fst r1) (fst r2)
+    , endianCondExpr r (snd r1) (snd r2)
+    )

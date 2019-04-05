@@ -37,8 +37,8 @@ convertStmt (AsgnBlk (AsgnOp op) lhs expr) =
 convertStmt other = other
 
 lhsToExpr :: LHS -> Expr
-lhsToExpr (LHSIdent   x) = Ident x
-lhsToExpr (LHSBit   l e) = Bit   (lhsToExpr l) e
-lhsToExpr (LHSRange l r) = Range (lhsToExpr l) r
-lhsToExpr (LHSDot   l x) = Dot   (lhsToExpr l) x
-lhsToExpr (LHSConcat ls) = Concat $ map lhsToExpr ls
+lhsToExpr (LHSIdent   x  ) = Ident x
+lhsToExpr (LHSBit   l e  ) = Bit   (lhsToExpr l) e
+lhsToExpr (LHSRange l m r) = Range (lhsToExpr l) m r
+lhsToExpr (LHSDot   l x  ) = Dot   (lhsToExpr l) x
+lhsToExpr (LHSConcat ls  ) = Concat $ map lhsToExpr ls

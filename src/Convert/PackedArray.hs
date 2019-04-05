@@ -105,14 +105,14 @@ collectExpr :: Expr -> State Info ()
 collectExpr (Ident i) = recordSeqUsage i
 collectExpr other = collectNestedExprsM collectNestedExpr other
 collectNestedExpr :: Expr -> State Info ()
-collectNestedExpr (Range (Ident i) _) = recordSeqUsage i
+collectNestedExpr (Range (Ident i) _ _) = recordSeqUsage i
 collectNestedExpr _ = return ()
 collectLHS :: LHS -> State Info ()
 collectLHS (LHSIdent i) = recordSeqUsage i
 collectLHS other = collectNestedLHSsM collectNestedLHS other
 collectNestedLHS :: LHS -> State Info ()
-collectNestedLHS (LHSRange (LHSIdent i) _) = recordSeqUsage i
-collectNestedLHS (LHSBit   (LHSIdent i) _) = recordIdxUsage i
+collectNestedLHS (LHSRange (LHSIdent i) _ _) = recordSeqUsage i
+collectNestedLHS (LHSBit   (LHSIdent i)   _) = recordIdxUsage i
 collectNestedLHS _ = return ()
 
 -- VCS doesn't like port declarations inside of `generate` blocks, so we hoist
@@ -190,18 +190,18 @@ unflattener writeToFlatVariant arr (t, major @ (majorHi, majorLo)) =
         , GenModuleItem $ MIDecl $ Variable Local (IntegerAtom TInteger Unspecified) (arrUnflat ++ "_repeater_index") [] Nothing
         , GenFor
             (index, majorLo)
-            (ccExpr major
+            (endianCondExpr major
                 (BinOp Le (Ident index) majorHi)
                 (BinOp Ge (Ident index) majorHi))
-            (index, AsgnOp Add, ccExpr major (Number "1") (Number "-1"))
+            (index, AsgnOp Add, endianCondExpr major (Number "1") (Number "-1"))
             (Just $ prefix "unflatten_" ++ arr)
             [ localparam startBit
-                (simplify $ BinOp Add (ccExpr major majorLo majorHi)
+                (simplify $ BinOp Add (endianCondExpr major majorLo majorHi)
                     (BinOp Mul (Ident index) size))
             , GenModuleItem $ (uncurry $ Assign Nothing) $
                 if not writeToFlatVariant
-                    then (LHSBit (LHSIdent arrUnflat) $ Ident index, Range (Ident arr) origRange)
-                    else (LHSRange (LHSIdent arr) origRange, Bit (Ident arrUnflat) (Ident index))
+                    then (LHSBit (LHSIdent arrUnflat) $ Ident index, Range (Ident arr) NonIndexed origRange)
+                    else (LHSRange (LHSIdent arr) NonIndexed origRange, Bit (Ident arrUnflat) (Ident index))
             ]
         ]
     where
@@ -209,22 +209,13 @@ unflattener writeToFlatVariant arr (t, major @ (majorHi, majorLo)) =
         arrUnflat = prefix arr
         index = prefix "_tmp_index_" ++ arr
         minor = head $ snd $ typeRanges t
-        size = rangeSize $ ccRange minor minor (swap minor)
+        size = rangeSize $ endianCondRange minor minor (swap minor)
         localparam :: Identifier -> Expr -> GenItem
         localparam x v = GenModuleItem $ MIDecl $ Localparam (Implicit Unspecified []) x v
         origRangeAg = ( (BinOp Add (Ident startBit)
                         (BinOp Sub size (Number "1")))
                       , Ident startBit )
-        origRange = ccRange major origRangeAg (swap origRangeAg)
-
-ccExpr :: Range -> Expr -> Expr -> Expr
-ccExpr r e1 e2 = simplify $ Mux (uncurry (BinOp Ge) r) e1 e2
-
-ccRange :: Range -> Range -> Range -> Range
-ccRange r r1 r2 =
-    ( ccExpr r (fst r1) (fst r2)
-    , ccExpr r (snd r1) (snd r2)
-    )
+        origRange = endianCondRange major origRangeAg (swap origRangeAg)
 
 typeIsImplicit :: Type -> Bool
 typeIsImplicit (Implicit _ _) = True
@@ -247,10 +238,10 @@ flattenRanges rs =
         rYN = flattenRangesHelp r1 (swap r2)
         rNY = flattenRangesHelp (swap r1) r2
         rNN = flattenRangesHelp (swap r1) (swap r2)
-        rY = ccRange r2 rYY rYN
-        rN = ccRange r2 rNY rNN
-        rAg = ccRange r1 rY rN
-        r = ccRange r1 rAg (swap rAg)
+        rY = endianCondRange r2 rYY rYN
+        rN = endianCondRange r2 rNY rNN
+        rAg = endianCondRange r1 rY rN
+        r = endianCondRange r1 rAg (swap rAg)
         rs' = (tail $ tail rs) ++ [r]
 
 flattenRangesHelp :: Range -> Range -> Range
@@ -287,17 +278,17 @@ rewriteModuleItem info =
         rewriteExpr (Ident i) = Ident $ rewriteSeqIdent i
         rewriteExpr (Bit   (Ident i) e) =
             if Map.member i typeDims && Set.member i seqUses && Set.notMember i idxUses
-                then Range (Ident $ rewriteSeqIdent i) (hi, lo)
+                then Range (Ident $ rewriteSeqIdent i) NonIndexed (hi, lo)
                 else Bit   (Ident $ rewriteIdxIdent i) e
             where
                 r = head $ snd $ typeRanges $ fst $ typeDims Map.! i
                 size = rangeSize r
                 lo = simplify $ BinOp Mul e size
                 hi = simplify $ BinOp Add lo (BinOp Sub size (Number "1"))
-        rewriteExpr (Range (Ident i) (r @ (s, e))) =
+        rewriteExpr (Range (Ident i) m (r @ (s, e))) =
             if Map.member i typeDims
-                then Range (Ident i) r'
-                else Range (Ident i) r
+                then Range (Ident i) m r'
+                else Range (Ident i) m r
             where
                 (a, b) = head $ snd $ typeRanges $ fst $ typeDims Map.! i
                 size = rangeSize (a, b)
@@ -307,13 +298,13 @@ rewriteModuleItem info =
         rewriteExpr other = other
 
         rewriteLHS :: LHS -> LHS
-        rewriteLHS (LHSIdent x  ) = LHSIdent (rewriteSeqIdent x)
+        rewriteLHS (LHSIdent x    ) = LHSIdent (rewriteSeqIdent x)
         rewriteLHS (LHSBit (LHSIdent x) e) =
             LHSBit (LHSIdent $ rewriteIdxIdent x) e
-        rewriteLHS (LHSBit   l e) = LHSBit   (rewriteLHS l) e
-        rewriteLHS (LHSRange l r) = LHSRange (rewriteLHS l) r
-        rewriteLHS (LHSDot   l x) = LHSDot   (rewriteLHS l) x
-        rewriteLHS (LHSConcat ls) = LHSConcat $ map rewriteLHS ls
+        rewriteLHS (LHSBit   l e  ) = LHSBit   (rewriteLHS l) e
+        rewriteLHS (LHSRange l m r) = LHSRange (rewriteLHS l) m r
+        rewriteLHS (LHSDot   l x  ) = LHSDot   (rewriteLHS l) x
+        rewriteLHS (LHSConcat ls  ) = LHSConcat $ map rewriteLHS ls
 
         rewriteStmt :: Stmt -> Stmt
         rewriteStmt (AsgnBlk op lhs expr) = convertAssignment (AsgnBlk op) lhs expr

@@ -601,13 +601,15 @@ DeclAsgn :: { (Identifier, Expr) }
 
 Range :: { Range }
   : "[" Expr ":"  Expr "]" { ($2, $4) }
-  -- TODO: This assumes the ranges are always [hi:lo]; See section 11.5.1!
-  | "[" Expr "+:" Expr "]" { (BinOp Sub (BinOp Add $2 $4) (Number "1"), $2) }
-  | "[" Expr "-:" Expr "]" { ($2, BinOp Add (BinOp Sub $2 $4) (Number "1")) }
+
+PartSelect :: { (PartSelectMode, Range) }
+  : "[" Expr ":"  Expr "]" { (NonIndexed  , ($2, $4)) }
+  | "[" Expr "+:" Expr "]" { (IndexedPlus , ($2, $4)) }
+  | "[" Expr "-:" Expr "]" { (IndexedMinus, ($2, $4)) }
 
 LHS :: { LHS }
   : Identifier         { LHSIdent  $1    }
-  | LHS Range          { LHSRange  $1 $2 }
+  | LHS PartSelect     { LHSRange  $1 (fst $2) (snd $2) }
   | LHS "[" Expr "]"   { LHSBit    $1 $3 }
   | LHS "." Identifier { LHSDot    $1 $3 }
   | "{" LHSs "}"       { LHSConcat $2    }
@@ -782,7 +784,7 @@ Expr :: { Expr }
   | Identifier "(" CallArgs ")" { Call $1 $3 }
   | "$bits"    "(" BitsArg  ")" { Bits $3 }
   | Identifier                  { Ident $1 }
-  | Expr Range                  { Range $1 $2 }
+  | Expr PartSelect             { Range $1 (fst $2) (snd $2) }
   | Expr "[" Expr "]"           { Bit   $1 $3 }
   | "{" Expr "{" Exprs "}" "}"  { Repeat $2 $4 }
   | "{" Exprs "}"               { Concat $2 }
@@ -934,12 +936,11 @@ combineTags Nothing other = other
 combineTags other   _     = other
 
 exprToLHS :: Expr -> LHS
-exprToLHS (Ident   x) = LHSIdent x
-exprToLHS (Bit   e b) = LHSBit   (exprToLHS e) b
-exprToLHS (Range e r) = LHSRange (exprToLHS e) r
-exprToLHS (Dot   e x) = LHSDot   (exprToLHS e) x
-exprToLHS (Concat es) = LHSConcat (map exprToLHS es)
+exprToLHS (Ident   x  ) = LHSIdent x
+exprToLHS (Bit   e b  ) = LHSBit   (exprToLHS e) b
+exprToLHS (Range e m r) = LHSRange (exprToLHS e) m r
+exprToLHS (Dot   e x  ) = LHSDot   (exprToLHS e) x
+exprToLHS (Concat es  ) = LHSConcat (map exprToLHS es)
 exprToLHS other =
   error $ "Parse error: cannot convert expression to LHS: " ++ show other
-
 }

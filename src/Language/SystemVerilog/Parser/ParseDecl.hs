@@ -235,7 +235,7 @@ takeLHSStep :: Maybe LHS -> DeclToken -> Maybe LHS
 takeLHSStep (Nothing  ) (DTConcat lhss) = Just $ LHSConcat lhss
 takeLHSStep (Nothing  ) (DTIdent  x   ) = Just $ LHSIdent x
 takeLHSStep (Just curr) (DTBit    e   ) = Just $ LHSBit   curr e
-takeLHSStep (Just curr) (DTRange  r   ) = Just $ LHSRange curr r
+takeLHSStep (Just curr) (DTRange  r   ) = Just $ LHSRange curr NonIndexed r
 takeLHSStep (Just curr) (DTDot    x   ) = Just $ LHSDot curr x
 takeLHSStep (maybeCurr) token =
     error $ "unexpected token in LHS: " ++ show (maybeCurr, token)

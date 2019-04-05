@@ -148,16 +148,16 @@ convertAsgn structs types (lhs, expr) =
                 (t, l') = convertLHS l
                 (tf, rs) = typeRanges t
                 e' = snd $ convertSubExpr e
-        convertLHS (LHSRange l rOuterOrig) =
+        convertLHS (LHSRange l m rOuterOrig) =
             case l' of
-                LHSRange lInner (_, loI) ->
-                    (t, LHSRange lInner (simplify hi, simplify lo))
+                LHSRange lInner NonIndexed (_, loI) ->
+                    (t, LHSRange lInner m (simplify hi, simplify lo))
                     where
                         lo = BinOp Add loI loO
                         hi = BinOp Add loI hiO
                 _ -> if null rs
-                        then (Implicit Unspecified [], LHSRange l' rOuter)
-                        else (tf rs', LHSRange l' rOuter)
+                        then (Implicit Unspecified [], LHSRange l' m rOuter)
+                        else (tf rs', LHSRange l' m rOuter)
             where
                 (t, l') = convertLHS l
                 (tf, rs) = typeRanges t
@@ -170,7 +170,7 @@ convertAsgn structs types (lhs, expr) =
                 InterfaceT _ _ _ -> (Implicit Unspecified [], LHSDot l' x)
                 Struct _ _ _ -> case Map.lookup structTf structs of
                     Nothing -> (fieldType, LHSDot l' x)
-                    Just (structT, m) -> (tf [tr], LHSRange l' r)
+                    Just (structT, m) -> (tf [tr], LHSRange l' NonIndexed r)
                         where
                             (tf, _) = typeRanges structT
                             (r @ (hi, lo), base) = m Map.! x
@@ -228,7 +228,7 @@ convertAsgn structs types (lhs, expr) =
                 Struct _ _ _ ->
                     if Map.notMember structTf structs
                         then (fieldType, Dot e' x)
-                        else (fieldType, Range  e' r)
+                        else (fieldType, Range  e' NonIndexed r)
                 _ -> (Implicit Unspecified [], Dot e' x)
             where
                 (subExprType, e') = convertSubExpr e
@@ -236,17 +236,17 @@ convertAsgn structs types (lhs, expr) =
                 structTf = Struct p fields
                 fieldType = lookupFieldType fields x
                 r = lookupUnstructRange structTf x
-        convertSubExpr (Range eOuter (rOuter @ (hiO, loO))) =
+        convertSubExpr (Range eOuter m (rOuter @ (hiO, loO))) =
             -- VCS doesn't allow ranges to be cascaded, so we need to combine
             -- nested Ranges into a single range. My understanding of the
             -- semantics are that a range returns a new, zero-indexed sub-range.
             case eOuter' of
-                Range eInner (_, loI) ->
-                    (t, Range eInner (simplify hi, simplify lo))
+                Range eInner NonIndexed (_, loI) ->
+                    (t, Range eInner m (simplify hi, simplify lo))
                     where
                         lo = BinOp Add loI loO
                         hi = BinOp Add loI hiO
-                _ -> (t, Range eOuter' rOuter)
+                _ -> (t, Range eOuter' m rOuter)
             where (t, eOuter') = convertSubExpr eOuter
         convertSubExpr (Concat exprs) =
             (Implicit Unspecified [], Concat $ map (snd . convertSubExpr) exprs)
@@ -257,7 +257,7 @@ convertAsgn structs types (lhs, expr) =
                 (_, e2') = convertSubExpr e2
         convertSubExpr (Bit e i) =
             case e' of
-                Range eInner (_, loI) ->
+                Range eInner NonIndexed (_, loI) ->
                     (t', Bit eInner (simplify $ BinOp Add loI i'))
                 _ -> (t', Bit e' i')
             where

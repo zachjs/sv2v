@@ -167,8 +167,8 @@ convertDescription interfaces modules (Part extern Module lifetime name ports it
                 else orig
         convertLHS its mps (LHSBit   l e) =
             LHSBit l (traverseNestedExprs (convertExpr its mps) e)
-        convertLHS its mps (LHSRange l (e1, e2)) =
-            LHSRange l (traverseNestedExprs (convertExpr its mps) e1, traverseNestedExprs (convertExpr its mps) e2)
+        convertLHS its mps (LHSRange l m (e1, e2)) =
+            LHSRange l m (traverseNestedExprs (convertExpr its mps) e1, traverseNestedExprs (convertExpr its mps) e2)
         convertLHS _ _ other = other
         convertPort :: Identifier -> [Identifier]
         convertPort ident =

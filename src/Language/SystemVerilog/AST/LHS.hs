@@ -13,19 +13,19 @@ import Text.Printf (printf)
 
 import Language.SystemVerilog.AST.ShowHelp (commas)
 import Language.SystemVerilog.AST.Type (Identifier)
-import Language.SystemVerilog.AST.Expr (Expr, Range)
+import Language.SystemVerilog.AST.Expr (Expr, PartSelectMode, Range)
 
 data LHS
     = LHSIdent  Identifier
     | LHSBit    LHS Expr
-    | LHSRange  LHS Range
+    | LHSRange  LHS PartSelectMode Range
     | LHSDot    LHS Identifier
     | LHSConcat [LHS]
     deriving Eq
 
 instance Show LHS where
-    show (LHSIdent   x       ) = x
-    show (LHSBit     l e     ) = printf "%s[%s]"    (show l) (show e)
-    show (LHSRange   l (a, b)) = printf "%s[%s:%s]" (show l) (show a) (show b)
-    show (LHSDot     l x     ) = printf "%s.%s"     (show l) x
-    show (LHSConcat  lhss    ) = printf "{%s}" (commas $ map show lhss)
+    show (LHSIdent x         ) = x
+    show (LHSBit   l e       ) = printf "%s[%s]"     (show l) (show e)
+    show (LHSRange l m (a, b)) = printf "%s[%s%s%s]" (show l) (show a) (show m) (show b)
+    show (LHSDot   l x       ) = printf "%s.%s"      (show l) x
+    show (LHSConcat lhss     ) = printf "{%s}" (commas $ map show lhss)

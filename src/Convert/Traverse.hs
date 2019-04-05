@@ -355,11 +355,11 @@ traverseNestedExprsM mapper = exprMapper
         em (String s) = return $ String s
         em (Number s) = return $ Number s
         em (Ident  i) = return $ Ident  i
-        em (Range e (e1, e2)) = do
+        em (Range e m (e1, e2)) = do
             e' <- exprMapper e
             e1' <- exprMapper e1
             e2' <- exprMapper e2
-            return $ Range e' (e1', e2')
+            return $ Range e' m (e1', e2')
         em (Bit   e1 e2) = do
             e1' <- exprMapper e1
             e2' <- exprMapper e2
@@ -611,11 +611,11 @@ traverseNestedLHSsM :: Monad m => MapperM m LHS -> MapperM m LHS
 traverseNestedLHSsM mapper = fullMapper
     where
         fullMapper lhs = tl lhs >>= mapper
-        tl (LHSIdent  x   ) = return $ LHSIdent x
-        tl (LHSBit    l e ) = fullMapper l >>= \l' -> return $ LHSBit    l' e
-        tl (LHSRange  l r ) = fullMapper l >>= \l' -> return $ LHSRange  l' r
-        tl (LHSDot    l x ) = fullMapper l >>= \l' -> return $ LHSDot    l' x
-        tl (LHSConcat lhss) = mapM fullMapper lhss >>= return . LHSConcat
+        tl (LHSIdent  x    ) = return $ LHSIdent x
+        tl (LHSBit    l e  ) = fullMapper l >>= \l' -> return $ LHSBit    l' e
+        tl (LHSRange  l m r) = fullMapper l >>= \l' -> return $ LHSRange  l' m r
+        tl (LHSDot    l x  ) = fullMapper l >>= \l' -> return $ LHSDot    l' x
+        tl (LHSConcat lhss ) = mapM fullMapper lhss >>= return . LHSConcat
 
 traverseNestedLHSs :: Mapper LHS -> Mapper LHS
 traverseNestedLHSs = unmonad traverseNestedLHSsM
