@@ -101,9 +101,18 @@ showRanges l = " " ++ (concatMap showRange l)
 showRange :: Range -> String
 showRange (h, l) = printf "[%s:%s]" (show h) (show l)
 
+clog2Help :: Int -> Int -> Int
+clog2Help p n = if p >= n then 0 else 1 + clog2Help (p*2) n
+clog2 :: Int -> Int
+clog2 n = if n < 2 then 0 else clog2Help 1 n
+
 -- basic expression simplfication utility to help us generate nicer code in the
 -- common case of ranges like `[FOO-1:0]`
 simplify :: Expr -> Expr
+simplify (orig @ (Call "$clog2" (Args [Just (Number n)] []))) =
+    case readMaybe n :: Maybe Int of
+        Nothing -> orig
+        Just x -> Number $ show $ clog2 x
 simplify (Mux (BinOp Ge c1 c2) e1 e2) =
     case (c1', c2') of
         (Number a, Number b) ->
@@ -124,6 +133,10 @@ simplify (BinOp op e1 e2) =
     case (op, e1', e2') of
         (Add, Number "0", e) -> e
         (Add, e, Number "0") -> e
+        (Mul, _, Number "0") -> Number "0"
+        (Mul, Number "0", _) -> Number "0"
+        (Mul, e, Number "1") -> e
+        (Mul, Number "1", e) -> e
         (Sub, e, Number "0") -> e
         (Add, BinOp Sub e (Number "1"), Number "1") -> e
         (Add, e, BinOp Sub (Number "0") (Number "1")) -> BinOp Sub e (Number "1")
