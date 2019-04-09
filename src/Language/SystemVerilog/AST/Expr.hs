@@ -145,7 +145,10 @@ simplify other = other
 
 rangeSize :: Range -> Expr
 rangeSize (s, e) =
-    simplify $ BinOp Add (BinOp Sub s e) (Number "1")
+    endianCondExpr (s, e) a b
+    where
+        a = simplify $ BinOp Add (BinOp Sub s e) (Number "1")
+        b = simplify $ BinOp Add (BinOp Sub e s) (Number "1")
 
 -- chooses one or the other expression based on the endianness of the given
 -- range; [hi:lo] chooses the first expression

@@ -57,7 +57,7 @@ convertDescription orig =
 
 regIdents :: ModuleItem -> Writer RegIdents ()
 regIdents (AlwaysC _ stmt) =
-    collectStmtLHSsM (collectNestedLHSsM idents) $
+    collectNestedStmtsM (collectStmtLHSsM (collectNestedLHSsM idents)) $
     traverseNestedStmts removeTimings stmt
     where
         idents :: LHS -> Writer RegIdents ()
@@ -66,4 +66,6 @@ regIdents (AlwaysC _ stmt) =
         removeTimings :: Stmt -> Stmt
         removeTimings (Timing _ s) = s
         removeTimings other = other
+regIdents (Initial stmt) =
+    regIdents $ AlwaysC Always stmt
 regIdents _ = return ()

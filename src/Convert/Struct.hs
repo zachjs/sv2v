@@ -101,7 +101,7 @@ convertType :: Structs -> Type -> Type
 convertType structs t1 =
     case Map.lookup tf1 structs of
         Nothing -> t1
-        Just (t2, _) -> tf2 (rs2 ++ rs1)
+        Just (t2, _) -> tf2 (rs1 ++ rs2)
             where (tf2, rs2) = typeRanges t2
     where (tf1, rs1) = typeRanges t1
 
@@ -141,30 +141,46 @@ convertAsgn structs types (lhs, expr) =
                 Nothing -> (Implicit Unspecified [], LHSIdent x)
                 Just t -> (t, LHSIdent x)
         convertLHS (LHSBit l e) =
-            if null rs
-                then (Implicit Unspecified [], LHSBit l' e')
-                else (tf $ tail rs, LHSBit l' e')
-            where
-                (t, l') = convertLHS l
-                (tf, rs) = typeRanges t
-                e' = snd $ convertSubExpr e
-        convertLHS (LHSRange l m rOuterOrig) =
             case l' of
                 LHSRange lInner NonIndexed (_, loI) ->
-                    (t, LHSRange lInner m (simplify hi, simplify lo))
+                    (t', LHSBit lInner (simplify $ BinOp Add loI e'))
+                LHSRange lInner IndexedPlus (baseI, _) ->
+                    (t', LHSBit lInner (simplify $ BinOp Add baseI e'))
+                _ -> (t', LHSBit l' e')
+            where
+                (t, l') = convertLHS l
+                t' = case typeRanges t of
+                    (_, []) -> Implicit Unspecified []
+                    (tf, rs) -> tf $ tail rs
+                e' = snd $ convertSubExpr e
+        convertLHS (LHSRange lOuter NonIndexed rOuterOrig) =
+            case lOuter' of
+                LHSRange lInner NonIndexed (_, loI) ->
+                    (t, LHSRange lInner NonIndexed (simplify hi, simplify lo))
                     where
                         lo = BinOp Add loI loO
                         hi = BinOp Add loI hiO
-                _ -> if null rs
-                        then (Implicit Unspecified [], LHSRange l' m rOuter)
-                        else (tf rs', LHSRange l' m rOuter)
+                LHSRange lInner IndexedPlus (baseI, _) ->
+                    (t, LHSRange lInner IndexedPlus (simplify base, simplify len))
+                    where
+                        base = BinOp Add baseI loO
+                        len = rangeSize rOuter
+                _ -> (t, LHSRange lOuter' NonIndexed rOuter)
             where
-                (t, l') = convertLHS l
-                (tf, rs) = typeRanges t
                 hiO = snd $ convertSubExpr $ fst rOuterOrig
                 loO = snd $ convertSubExpr $ snd rOuterOrig
                 rOuter = (hiO, loO)
-                rs' = rOuter : tail rs
+                (t, lOuter') = convertLHS lOuter
+        convertLHS (LHSRange l m r) =
+            (t', LHSRange l' m r')
+            where
+                hi = snd $ convertSubExpr $ fst r
+                lo = snd $ convertSubExpr $ snd r
+                r' = (hi, lo)
+                (t, l') = convertLHS l
+                t' = case typeRanges t of
+                    (_, []) -> Implicit Unspecified []
+                    (tf, rs) -> tf $ tail rs
         convertLHS (LHSDot    l x ) =
             case t of
                 InterfaceT _ _ _ -> (Implicit Unspecified [], LHSDot l' x)
@@ -236,18 +252,30 @@ convertAsgn structs types (lhs, expr) =
                 structTf = Struct p fields
                 fieldType = lookupFieldType fields x
                 r = lookupUnstructRange structTf x
-        convertSubExpr (Range eOuter m (rOuter @ (hiO, loO))) =
+        convertSubExpr (Range eOuter NonIndexed (rOuter @ (hiO, loO))) =
             -- VCS doesn't allow ranges to be cascaded, so we need to combine
             -- nested Ranges into a single range. My understanding of the
             -- semantics are that a range returns a new, zero-indexed sub-range.
             case eOuter' of
                 Range eInner NonIndexed (_, loI) ->
-                    (t, Range eInner m (simplify hi, simplify lo))
+                    (t, Range eInner NonIndexed (simplify hi, simplify lo))
                     where
                         lo = BinOp Add loI loO
                         hi = BinOp Add loI hiO
-                _ -> (t, Range eOuter' m rOuter)
+                Range eInner IndexedPlus (baseI, _) ->
+                    (t, Range eInner IndexedPlus (simplify base, simplify len))
+                    where
+                        base = BinOp Add baseI loO
+                        len = rangeSize rOuter
+                _ -> (t, Range eOuter' NonIndexed rOuter)
             where (t, eOuter') = convertSubExpr eOuter
+        convertSubExpr (Range e m r) =
+            (t', Range e' m r)
+            where
+                (t, e') = convertSubExpr e
+                t' = case typeRanges t of
+                    (_, []) -> Implicit Unspecified []
+                    (tf, rs) -> tf $ tail rs
         convertSubExpr (Concat exprs) =
             (Implicit Unspecified [], Concat $ map (snd . convertSubExpr) exprs)
         convertSubExpr (BinOp op e1 e2) =
@@ -259,6 +287,8 @@ convertAsgn structs types (lhs, expr) =
             case e' of
                 Range eInner NonIndexed (_, loI) ->
                     (t', Bit eInner (simplify $ BinOp Add loI i'))
+                Range eInner IndexedPlus (baseI, _) ->
+                    (t', Bit eInner (simplify $ BinOp Add baseI i'))
                 _ -> (t', Bit e' i')
             where
                 (t, e') = convertSubExpr e

@@ -60,6 +60,7 @@ module Convert.Traverse
 , traverseNestedModuleItems
 , collectNestedModuleItemsM
 , traverseNestedStmts
+, collectNestedStmtsM
 , traverseNestedExprs
 , collectNestedExprsM
 , traverseNestedLHSsM
@@ -303,7 +304,7 @@ traverseAssertionExprsM mapper = assertionMapper
             return $ Cover e' stmt
 
 traverseStmtLHSsM :: Monad m => MapperM m LHS -> MapperM m Stmt
-traverseStmtLHSsM mapper = traverseNestedStmtsM stmtMapper
+traverseStmtLHSsM mapper = stmtMapper
     where
         fullMapper = mapper
         stmtMapper (Timing (Event sense) stmt) = do
@@ -591,7 +592,7 @@ traverseLHSsM' strat mapper item =
             lhs' <- mapper lhs
             return $ NInputGate kw x lhs' exprs
         traverseModuleItemLHSsM (AssertionItem (mx, a)) = do
-            Assertion a' <- traverseStmtLHSsM mapper (Assertion a)
+            Assertion a' <- traverseNestedStmtsM (traverseStmtLHSsM mapper) (Assertion a)
             return $ AssertionItem (mx, a')
         traverseModuleItemLHSsM other = return other
 
@@ -610,7 +611,7 @@ collectLHSsM = collectLHSsM' IncludeTFs
 traverseNestedLHSsM :: Monad m => MapperM m LHS -> MapperM m LHS
 traverseNestedLHSsM mapper = fullMapper
     where
-        fullMapper lhs = tl lhs >>= mapper
+        fullMapper lhs = mapper lhs >>= tl
         tl (LHSIdent  x    ) = return $ LHSIdent x
         tl (LHSBit    l e  ) = fullMapper l >>= \l' -> return $ LHSBit    l' e
         tl (LHSRange  l m r) = fullMapper l >>= \l' -> return $ LHSRange  l' m r
@@ -792,6 +793,8 @@ collectNestedModuleItemsM = collectify traverseNestedModuleItemsM
 
 traverseNestedStmts :: Mapper Stmt -> Mapper Stmt
 traverseNestedStmts = unmonad traverseNestedStmtsM
+collectNestedStmtsM :: Monad m => CollectorM m Stmt -> CollectorM m Stmt
+collectNestedStmtsM = collectify traverseNestedStmtsM
 
 traverseNestedExprs :: Mapper Expr -> Mapper Expr
 traverseNestedExprs = unmonad traverseNestedExprsM

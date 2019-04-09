@@ -4,9 +4,13 @@
     tag``2 tag``two(.clock(clock), .in(in), .out(tag``two_out)); \
     tag``3 tag``thr(.clock(clock), .in(in), .out(tag``thr_out)); \
     tag``4 tag``fou(.clock(clock), .in(in), .out(tag``fou_out)); \
+    integer tag``i; \
     initial begin \
-        $monitor(`"tag", $time, ": %h %15b %15b %15b %15b", in, \
-            tag``one_out, tag``two_out, tag``thr_out, tag``fou_out); \
+        for (tag``i = 0; tag``i < 20; tag``i++) begin \
+            #2; \
+            $display(`"tag", $time, ": %h %15b %15b %15b %15b", in, \
+                tag``one_out, tag``two_out, tag``thr_out, tag``fou_out); \
+        end \
     end
 
 module top;
@@ -30,5 +34,6 @@ module top;
     `FOO(A)
     `FOO(B)
     `FOO(C)
+    `FOO(D)
 
 endmodule

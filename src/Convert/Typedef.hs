@@ -72,12 +72,12 @@ resolveType types (Alias st rs1) =
     if Map.notMember st types
     then InterfaceT st Nothing rs1
     else case resolveType types $ types Map.! st of
-        (Net           kw    rs2) -> Net           kw    $ rs2 ++ rs1
-        (Implicit         sg rs2) -> Implicit         sg $ rs2 ++ rs1
-        (IntegerVector kw sg rs2) -> IntegerVector kw sg $ rs2 ++ rs1
-        (Enum t v rs2) -> Enum t v $ rs2 ++ rs1
-        (Struct p l rs2) -> Struct p l $ rs2 ++ rs1
-        (InterfaceT x my rs2) -> InterfaceT x my $ rs2 ++ rs1
+        (Net           kw    rs2) -> Net           kw    $ rs1 ++ rs2
+        (Implicit         sg rs2) -> Implicit         sg $ rs1 ++ rs2
+        (IntegerVector kw sg rs2) -> IntegerVector kw sg $ rs1 ++ rs2
+        (Enum            t v rs2) -> Enum            t v $ rs1 ++ rs2
+        (Struct          p l rs2) -> Struct          p l $ rs1 ++ rs2
+        (InterfaceT     x my rs2) -> InterfaceT     x my $ rs1 ++ rs2
         (IntegerAtom   kw _ ) -> error $ "resolveType encountered packed `" ++ (show kw) ++ "` on " ++ st
         (NonInteger    kw   ) -> error $ "resolveType encountered packed `" ++ (show kw) ++ "` on " ++ st
         (Alias    _ _) -> error $ "resolveType invariant failed on " ++ st
