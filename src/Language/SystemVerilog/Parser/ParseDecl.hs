@@ -49,7 +49,7 @@ data DeclToken
     = DTComma
     | DTAsgn     AsgnOp Expr
     | DTAsgnNBlk (Maybe Timing) Expr
-    | DTRange    Range
+    | DTRange    (PartSelectMode, Range)
     | DTIdent    Identifier
     | DTDir      Direction
     | DTType     (Signing -> [Range] -> Type)
@@ -137,8 +137,9 @@ parseDTsAsIntantiations (DTIdent name : tokens) =
             where
                 (inst, toks') = span (DTComma /=) toks
                 (x, mr, p) = case inst of
-                    [DTIdent a, DTRange s, DTInstance b] -> (a, Just s , b)
-                    [DTIdent a,            DTInstance b] -> (a, Nothing, b)
+                    [DTIdent a, DTRange (NonIndexed, s), DTInstance b] ->
+                        (a, Just s , b)
+                    [DTIdent a, DTInstance b] -> (a, Nothing, b)
                     _ -> error $ "unrecognized instantiation: " ++ show inst
                 follow = x `seq` if null toks' then [] else step (tail toks')
         (params, rest) =
@@ -235,7 +236,7 @@ takeLHSStep :: Maybe LHS -> DeclToken -> Maybe LHS
 takeLHSStep (Nothing  ) (DTConcat lhss) = Just $ LHSConcat lhss
 takeLHSStep (Nothing  ) (DTIdent  x   ) = Just $ LHSIdent x
 takeLHSStep (Just curr) (DTBit    e   ) = Just $ LHSBit   curr e
-takeLHSStep (Just curr) (DTRange  r   ) = Just $ LHSRange curr NonIndexed r
+takeLHSStep (Just curr) (DTRange (m,r)) = Just $ LHSRange curr m r
 takeLHSStep (Just curr) (DTDot    x   ) = Just $ LHSDot curr x
 takeLHSStep (maybeCurr) token =
     error $ "unexpected token in LHS: " ++ show (maybeCurr, token)
@@ -323,9 +324,9 @@ takeRanges :: [DeclToken] -> ([Range], [DeclToken])
 takeRanges [] = ([], [])
 takeRanges (token : tokens) =
     case token of
-        DTRange r -> (r         : rs, rest          )
-        DTBit   s -> (asRange s : rs, rest          )
-        _         -> ([]            , token : tokens)
+        DTRange (NonIndexed, r) -> (r         : rs, rest          )
+        DTBit   s               -> (asRange s : rs, rest          )
+        _                       -> ([]            , token : tokens)
     where
         (rs, rest) = takeRanges tokens
         asRange s = (simplify $ BinOp Sub s (Number "1"), Number "0")
@@ -342,7 +343,7 @@ takeAsgn                 rest  = (Nothing, rest)
 takeComma :: [DeclToken] -> (Bool, [DeclToken])
 takeComma [] = (False, [])
 takeComma (DTComma : rest) = (True, rest)
-takeComma _ = error "take comma encountered neither comma nor end of tokens"
+takeComma toks = error $ "expected comma or end of decl, got: " ++ show toks
 
 takeIdent :: [DeclToken] -> (Identifier, [DeclToken])
 takeIdent (DTIdent x : rest) = (x, rest)

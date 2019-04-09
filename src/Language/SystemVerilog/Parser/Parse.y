@@ -402,7 +402,7 @@ DeclOrStmtTokens(delim) :: { [DeclToken] }
   | "<=" opt(DelayOrEventControl) Expr                      delim  { [DTAsgnNBlk $2 $3] }
 DeclOrStmtToken :: { DeclToken }
   : ","            { DTComma }
-  | Range          { DTRange   $1 }
+  | PartSelect     { DTRange   $1 }
   | Identifier     { DTIdent   $1 }
   | Direction      { DTDir     $1 }
   | "[" Expr "]"   { DTBit     $2 }
