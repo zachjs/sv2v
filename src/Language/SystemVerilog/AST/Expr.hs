@@ -106,17 +106,25 @@ clog2Help p n = if p >= n then 0 else 1 + clog2Help (p*2) n
 clog2 :: Int -> Int
 clog2 n = if n < 2 then 0 else clog2Help 1 n
 
+readNumber :: String -> Maybe Int
+readNumber n =
+    readMaybe n' :: Maybe Int
+    where
+        n' = case n of
+            '\'' : 'd' : rest -> rest
+            _ -> n
+
 -- basic expression simplfication utility to help us generate nicer code in the
 -- common case of ranges like `[FOO-1:0]`
 simplify :: Expr -> Expr
 simplify (orig @ (Call "$clog2" (Args [Just (Number n)] []))) =
-    case readMaybe n :: Maybe Int of
+    case readNumber n of
         Nothing -> orig
         Just x -> Number $ show $ clog2 x
 simplify (Mux (BinOp Ge c1 c2) e1 e2) =
     case (c1', c2') of
         (Number a, Number b) ->
-            case (readMaybe a :: Maybe Int, readMaybe b :: Maybe Int) of
+            case (readNumber a, readNumber b) of
                 (Just x, Just y) ->
                     if x >= y
                         then e1
@@ -141,13 +149,15 @@ simplify (BinOp op e1 e2) =
         (Add, BinOp Sub e (Number "1"), Number "1") -> e
         (Add, e, BinOp Sub (Number "0") (Number "1")) -> BinOp Sub e (Number "1")
         (_  , Number a, Number b) ->
-            case (op, readMaybe a :: Maybe Int, readMaybe b :: Maybe Int) of
+            case (op, readNumber a, readNumber b) of
                 (Add, Just x, Just y) -> Number $ show (x + y)
                 (Sub, Just x, Just y) -> Number $ show (x - y)
                 (Mul, Just x, Just y) -> Number $ show (x * y)
+                (Div, Just _, Just 0) -> Number "x"
+                (Div, Just x, Just y) -> Number $ show (x `quot` y)
                 _ -> BinOp op e1' e2'
         (Add, BinOp Add e (Number a), Number b) ->
-            case (readMaybe a :: Maybe Int, readMaybe b :: Maybe Int) of
+            case (readNumber a, readNumber b) of
                 (Just x, Just y) -> BinOp Add e $ Number $ show (x + y)
                 _ -> BinOp op e1' e2'
         _ -> BinOp op e1' e2'
