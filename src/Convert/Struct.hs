@@ -215,38 +215,50 @@ convertAsgn structs types (lhs, expr) =
             convertExpr (Struct (Packed sg) fields rs) e
         convertExpr (Struct (Packed _) fields _) (Pattern [(Just "default", e)]) =
             Concat $ take (length fields) (repeat e)
-        convertExpr (Struct (Packed sg) fields []) (Pattern items) =
-            if Map.notMember structTf structs
-                then Pattern items''
-                else Concat exprs
+        convertExpr (Struct (Packed sg) fields []) (Pattern itemsOrig) =
+            if length items /= length fields then
+                error $ "struct pattern " ++ show items ++
+                    " doesn't have the same # of items as " ++ show structTf
+            else if itemsFieldNames /= fieldNames then
+                error $ "struct pattern " ++ show items ++ " has fields " ++
+                    show itemsFieldNames ++ ", but struct type has fields " ++
+                    show fieldNames
+            else if Map.notMember structTf structs then
+                Pattern items
+            else
+                Concat $ map packItem items
             where
                 subMap = \(Just ident, subExpr) ->
                     (Just ident, convertExpr (lookupFieldType fields ident) subExpr)
                 structTf = Struct (Packed sg) fields
-                items' =
+                itemsNamed =
                     -- if the pattern does not use identifiers, use the
                     -- identifiers from the struct type definition in order
-                    if not (all (isJust . fst) items)
-                        then zip (map (Just. snd) fields) (map snd items)
-                        else items
-                items'' = map subMap items'
+                    if not (all (isJust . fst) itemsOrig)
+                        then zip (map (Just. snd) fields) (map snd itemsOrig)
+                        else itemsOrig
+                items = sortOn itemPosition $ map subMap itemsNamed
                 fieldNames = map snd fields
+                itemsFieldNames = map (fromJust . fst) items
                 itemPosition = \(Just x, _) -> fromJust $ elemIndex x fieldNames
                 packItem (Just x, Number n) =
-                    Number $
-                    case readMaybe unticked :: Maybe Int of
-                        Nothing ->
-                            if unticked == n
-                                then n
-                                else size ++ n
-                        Just num -> size ++ "'d" ++ show num
+                    if size /= show resSize
+                        then error $ "literal " ++ show n ++ " for " ++ show x
+                                ++ " doesn't have struct field size " ++ show size
+                        else Number res
                     where
                         Number size = rangeSize $ lookupUnstructRange structTf x
                         unticked = case n of
                             '\'' : rest -> rest
                             rest -> rest
+                        resSize = (read $ takeWhile (/= '\'') res) :: Int
+                        res = case readMaybe unticked :: Maybe Int of
+                            Nothing ->
+                                if unticked == n
+                                    then n
+                                    else size ++ n
+                            Just num -> size ++ "'d" ++ show num
                 packItem (_, itemExpr) = itemExpr
-                exprs = map packItem $ sortOn itemPosition items''
         convertExpr _ other = other
 
         -- try expression conversion by looking at the *innermost* type first
