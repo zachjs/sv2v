@@ -6,8 +6,8 @@
 
 module Convert.Struct (convert) where
 
-import Data.Maybe (isJust)
-import Data.List (sortOn)
+import Data.Maybe (fromJust, isJust)
+import Data.List (elemIndex, sortOn)
 import Data.Tuple (swap)
 import Control.Monad.Writer
 import qualified Data.Map.Strict as Map
@@ -229,8 +229,9 @@ convertAsgn structs types (lhs, expr) =
                         then zip (map (Just. snd) fields) (map snd items)
                         else items
                 items'' = map subMap items'
-                fieldRange = \(Just x, _) -> lookupUnstructRange structTf x
-                exprs = map snd $ reverse $ sortOn fieldRange items''
+                fieldNames = map snd fields
+                itemPosition = \(Just x, _) -> fromJust $ elemIndex x fieldNames
+                exprs = map snd $ sortOn itemPosition items''
         convertExpr _ other = other
 
         -- try expression conversion by looking at the *innermost* type first
