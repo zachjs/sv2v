@@ -50,7 +50,7 @@ module CacheHelper (
             writeData: `WORD_POISON,
             requestType: CACHE_READ,
             isValid: 1'b1,
-            writeEnable: 4'b0,
+            writeEnable: 0,
             // This is effectively 32-bits wide which is sufficient, but not technically correct. The "compiler" will truncate the bits to the width of 'writeSet'
             writeSet: '0
         };

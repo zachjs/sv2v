@@ -10,6 +10,7 @@ import Data.Maybe (fromJust, isJust)
 import Data.List (elemIndex, sortOn)
 import Data.Tuple (swap)
 import Control.Monad.Writer
+import Text.Read (readMaybe)
 import qualified Data.Map.Strict as Map
 
 import Convert.Traverse
@@ -231,7 +232,21 @@ convertAsgn structs types (lhs, expr) =
                 items'' = map subMap items'
                 fieldNames = map snd fields
                 itemPosition = \(Just x, _) -> fromJust $ elemIndex x fieldNames
-                exprs = map snd $ sortOn itemPosition items''
+                packItem (Just x, Number n) =
+                    Number $
+                    case readMaybe unticked :: Maybe Int of
+                        Nothing ->
+                            if unticked == n
+                                then n
+                                else size ++ n
+                        Just num -> size ++ "'d" ++ show num
+                    where
+                        Number size = rangeSize $ lookupUnstructRange structTf x
+                        unticked = case n of
+                            '\'' : rest -> rest
+                            rest -> rest
+                packItem (_, itemExpr) = itemExpr
+                exprs = map packItem $ sortOn itemPosition items''
         convertExpr _ other = other
 
         -- try expression conversion by looking at the *innermost* type first
