@@ -116,7 +116,7 @@ flattenRanges rs =
         rY = endianCondRange r2 rYY rYN
         rN = endianCondRange r2 rNY rNN
         r = endianCondRange r1 rY rN
-        rs' = (tail $ tail rs) ++ [r]
+        rs' = r : (tail $ tail rs)
 
 flattenRangesHelp :: Range -> Range -> Range
 flattenRangesHelp (s1, e1) (s2, e2) =
@@ -185,6 +185,7 @@ rewriteModuleItem info =
                 x' = ':' : x
                 mode' = mode
                 size = rangeSize dimOuter
+                base = endianCondExpr dimOuter (snd dimOuter) (fst dimOuter)
                 range' =
                     case mode of
                         NonIndexed   ->
@@ -192,8 +193,8 @@ rewriteModuleItem info =
                             where
                                 lo = BinOp Mul size (snd range)
                                 hi = BinOp Sub (BinOp Add lo (BinOp Mul (rangeSize range) size)) (Number "1")
-                        IndexedPlus  -> (BinOp Mul size (fst range), BinOp Mul size (snd range))
-                        IndexedMinus -> (BinOp Mul size (fst range), BinOp Mul size (snd range))
+                        IndexedPlus  -> (BinOp Add (BinOp Mul size (fst range)) base, BinOp Mul size (snd range))
+                        IndexedMinus -> (BinOp Add (BinOp Mul size (fst range)) base, BinOp Mul size (snd range))
         ---- TODO: I'm not sure how these should be handled yet.
         ----rewriteExpr (orig @ (Range (Bit (Ident x) idxInner) modeOuter rangeOuter)) =
         ----    if Map.member x typeDims
