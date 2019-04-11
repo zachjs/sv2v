@@ -6,7 +6,7 @@
 
 module Convert.Interface (convert) where
 
-import Data.Maybe (isJust, mapMaybe)
+import Data.Maybe (mapMaybe)
 import Control.Monad.Writer
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -216,10 +216,10 @@ inlineInterface (ports, items) (instanceName, instancePorts) =
     flip (++) portBindings $
     map (traverseNestedModuleItems removeModport) $
     map (traverseNestedModuleItems removeMIDeclDir) $
-    map (prefixModuleItems prefix) $
-    items
+    itemsPrefixed
     where
         prefix = instanceName ++ "_"
+        itemsPrefixed = map (prefixModuleItems prefix) $ items
         origInstancePortNames = map fst instancePorts
         instancePortExprs = map snd instancePorts
         instancePortNames =
@@ -228,8 +228,7 @@ inlineInterface (ports, items) (instanceName, instancePorts) =
                 then ports
                 else origInstancePortNames
         portBindings =
-            map (\(ident, Just expr) -> Assign Nothing (LHSIdent ident) expr) $
-            filter (isJust . snd) $
+            mapMaybe portBindingItem $
             zip instancePortNames instancePortExprs
 
         removeMIDeclDir :: ModuleItem -> ModuleItem
@@ -240,3 +239,29 @@ inlineInterface (ports, items) (instanceName, instancePorts) =
         removeModport (Modport x _) =
             MIPackageItem $ Comment $ "removed modport " ++ x
         removeModport other = other
+
+        portBindingItem :: PortBinding -> Maybe ModuleItem
+        portBindingItem (ident, Just expr) =
+            Just $ if declDirs Map.! ident == Input
+                then Assign Nothing (LHSIdent ident) expr
+                else Assign Nothing (exprToLHS expr) (Ident ident)
+        portBindingItem (_, Nothing) = Nothing
+
+        declDirs = execWriter $
+            mapM (collectDeclsM collectDeclDir) itemsPrefixed
+        collectDeclDir :: Decl -> Writer (Map.Map Identifier Direction) ()
+        collectDeclDir (Variable dir _ ident _ _) =
+            if dir /= Local
+                then tell $ Map.singleton ident dir
+                else return ()
+        collectDeclDir _ = return ()
+
+        exprToLHS :: Expr -> LHS
+        exprToLHS (Ident   x  ) = LHSIdent x
+        exprToLHS (Bit   l e  ) = LHSBit   (exprToLHS l) e
+        exprToLHS (Range l m r) = LHSRange (exprToLHS l) m r
+        exprToLHS (Dot   l x  ) = LHSDot   (exprToLHS l) x
+        exprToLHS (Concat ls  ) = LHSConcat $ map exprToLHS ls
+        exprToLHS other =
+            error $ "trying to bind (part of) an interface output to " ++
+                show other ++ " but that can't be an LHS"
