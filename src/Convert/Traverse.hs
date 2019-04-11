@@ -103,8 +103,10 @@ maybeDo _ Nothing = return Nothing
 maybeDo fun (Just val) = fun val >>= return . Just
 
 traverseModuleItemsM :: Monad m => MapperM m ModuleItem -> MapperM m Description
-traverseModuleItemsM mapper (Part extern kw lifetime name ports items) =
-    mapM fullMapper items >>= return . Part extern kw lifetime name ports
+traverseModuleItemsM mapper (Part extern kw lifetime name ports items) = do
+    items' <- mapM fullMapper items
+    let items'' = concatMap breakGenerate items'
+    return $ Part extern kw lifetime name ports items''
     where
         fullMapper (Generate [GenBlock Nothing genItems]) =
             mapM fullGenItemMapper genItems >>= mapper . Generate
@@ -118,6 +120,17 @@ traverseModuleItemsM mapper (Part extern kw lifetime name ports items) =
                 Generate subItems -> GenBlock Nothing subItems
                 _ -> GenModuleItem moduleItem'
         genItemMapper other = return other
+        breakGenerate :: ModuleItem -> [ModuleItem]
+        breakGenerate (Generate genItems) =
+            if all isGenModuleItem genItems
+                then map (\(GenModuleItem item) -> item) genItems
+                else [Generate genItems]
+            where
+                isGenModuleItem :: GenItem -> Bool
+                isGenModuleItem (GenModuleItem _) = True
+                isGenModuleItem _ = False
+        breakGenerate other = [other]
+
 traverseModuleItemsM mapper (PackageItem packageItem) = do
     let item = MIPackageItem packageItem
     Part False Module Nothing "DNE" [] [item'] <-
@@ -782,9 +795,11 @@ collectAsgnsM = collectAsgnsM' IncludeTFs
 
 traverseNestedModuleItemsM :: Monad m => MapperM m ModuleItem -> MapperM m ModuleItem
 traverseNestedModuleItemsM mapper item = do
-    Part False Module Nothing "DNE" [] [item'] <-
+    Part False Module Nothing "DNE" [] items' <-
         traverseModuleItemsM mapper (Part False Module Nothing "DNE" [] [item])
-    return item'
+    return $ case items' of
+        [item'] -> item'
+        _ -> Generate $ map GenModuleItem items'
 
 traverseNestedModuleItems :: Mapper ModuleItem -> Mapper ModuleItem
 traverseNestedModuleItems = unmonad traverseNestedModuleItemsM
