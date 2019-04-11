@@ -195,16 +195,31 @@ rewriteModuleItem info =
                                 hi = BinOp Sub (BinOp Add lo (BinOp Mul (rangeSize range) size)) (Number "1")
                         IndexedPlus  -> (BinOp Add (BinOp Mul size (fst range)) base, BinOp Mul size (snd range))
                         IndexedMinus -> (BinOp Add (BinOp Mul size (fst range)) base, BinOp Mul size (snd range))
-        ---- TODO: I'm not sure how these should be handled yet.
-        ----rewriteExpr (orig @ (Range (Bit (Ident x) idxInner) modeOuter rangeOuter)) =
-        ----    if Map.member x typeDims
-        ----        then Range (Ident x') mode' range'
-        ----        else orig
-        ----    where
-        ----        (dimInner, dimOuter) = dims x
-        ----        x' = ':' : x
-        ----        mode' =
-        ----        range' =
+        rewriteExpr (orig @ (Range (Bit (Ident x) idxInner) modeOuter rangeOuter)) =
+            if Map.member x typeDims
+                then Range (Ident x') mode' range'
+                else orig
+            where
+                (dimInner, dimOuter) = dims x
+                x' = ':' : x
+                mode' = IndexedPlus
+                idxInner' = orientIdx dimInner idxInner
+                rangeOuterReverseIndexed =
+                    (BinOp Add (fst rangeOuter) (BinOp Sub (snd rangeOuter)
+                    (Number "1")), snd rangeOuter)
+                (baseOuter, lenOuter) =
+                    case modeOuter of
+                        IndexedPlus ->
+                            endianCondRange dimOuter rangeOuter rangeOuterReverseIndexed
+                        IndexedMinus ->
+                            endianCondRange dimOuter rangeOuterReverseIndexed rangeOuter
+                        NonIndexed ->
+                            (endianCondExpr dimOuter (snd rangeOuter) (fst rangeOuter), rangeSize rangeOuter)
+                idxOuter' = orientIdx dimOuter baseOuter
+                start = BinOp Mul idxInner' (rangeSize dimOuter)
+                base = simplify $ BinOp Add start idxOuter'
+                len = lenOuter
+                range' = (base, len)
         rewriteExpr other = other
 
         rewriteLHS :: LHS -> LHS
