@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 SCRIPT_DIR=`dirname "${BASH_SOURCE[0]}"`
 SV2V="$SCRIPT_DIR/../../bin/sv2v"
