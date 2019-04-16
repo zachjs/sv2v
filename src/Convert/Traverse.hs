@@ -130,11 +130,14 @@ traverseModuleItemsM mapper (Part extern kw lifetime name ports items) = do
                 isGenModuleItem (GenModuleItem _) = True
                 isGenModuleItem _ = False
         breakGenerate other = [other]
-
 traverseModuleItemsM mapper (PackageItem packageItem) = do
     let item = MIPackageItem packageItem
-    Part False Module Nothing "DNE" [] [item'] <-
+    converted <-
         traverseModuleItemsM mapper (Part False Module Nothing "DNE" [] [item])
+    let item' = case converted of
+            Part False Module Nothing "DNE" [] [newItem] -> newItem
+            _ -> error $ "redirected PackageItem traverse failed: "
+                    ++ show converted
     return $ case item' of
         MIPackageItem packageItem' -> PackageItem packageItem'
         other -> error $ "encountered bad package module item: " ++ show other
@@ -605,8 +608,12 @@ traverseLHSsM' strat mapper item =
             lhs' <- mapper lhs
             return $ NInputGate kw x lhs' exprs
         traverseModuleItemLHSsM (AssertionItem (mx, a)) = do
-            Assertion a' <- traverseNestedStmtsM (traverseStmtLHSsM mapper) (Assertion a)
-            return $ AssertionItem (mx, a')
+            converted <-
+                traverseNestedStmtsM (traverseStmtLHSsM mapper) (Assertion a)
+            return $ case converted of
+                Assertion a' -> AssertionItem (mx, a')
+                _ -> error $ "redirected AssertionItem traverse failed: "
+                        ++ show converted
         traverseModuleItemLHSsM other = return other
 
 traverseLHSs' :: TFStrategy -> Mapper LHS -> Mapper ModuleItem
@@ -795,8 +802,12 @@ collectAsgnsM = collectAsgnsM' IncludeTFs
 
 traverseNestedModuleItemsM :: Monad m => MapperM m ModuleItem -> MapperM m ModuleItem
 traverseNestedModuleItemsM mapper item = do
-    Part False Module Nothing "DNE" [] items' <-
+    converted <-
         traverseModuleItemsM mapper (Part False Module Nothing "DNE" [] [item])
+    let items' = case converted of
+            Part False Module Nothing "DNE" [] newItems -> newItems
+            _ -> error $ "redirected NestedModuleItems traverse failed: "
+                    ++ show converted
     return $ case items' of
         [item'] -> item'
         _ -> Generate $ map GenModuleItem items'

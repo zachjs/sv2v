@@ -463,9 +463,13 @@ takeThrough goal = do
 -- pop one character from the input stream
 takeChar :: Alex Char
 takeChar = do
-    (pos, _, _, ch : str) <- alexGetInput
+    (pos, _, _, str) <- alexGetInput
+    (ch, chs) <-
+        if null str
+            then lexicalError "unexpected end of input"
+            else return (head str, tail str)
     let newPos = alexMove pos ch
-    alexSetInput (newPos, ch, [], str)
+    alexSetInput (newPos, ch, [], chs)
     return ch
 
 -- drop spaces in the input until a non-space is reached or EOF
@@ -497,7 +501,8 @@ dropWhitespace = do
     where
         dropChar :: Alex ()
         dropChar = do
-            (pos, _, _, ch : rest) <- alexGetInput
+            (pos, _, _, chs) <- alexGetInput
+            let ch : rest = chs
             alexSetInput (alexMove pos ch, ch, [], rest)
 
 -- removes and returns a quoted string such as <foo.bar> or "foo.bar"
@@ -558,8 +563,11 @@ takeMacroDefinition = do
 takeMacroArguments :: Alex [String]
 takeMacroArguments = do
     dropSpaces
-    '(' <- takeChar
-    argLoop
+    leadCh <- takeChar
+    if leadCh == '('
+        then argLoop
+        else lexicalError $ "expected begining of macro arguments, but found "
+                ++ show leadCh
     where
         argLoop :: Alex [String]
         argLoop = do
