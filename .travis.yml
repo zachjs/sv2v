@@ -1,6 +1,4 @@
-# base on: https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/travis-simple.yml
-
-dist: xenial
+os: osx
 
 language: generic
 
@@ -9,16 +7,11 @@ cache:
     - $HOME/.stack
 
 addons:
-  apt:
+  homebrew:
     packages:
-      - libgmp-dev
+      - haskell-stack
       - shunit2
-      - iverilog
-
-before_install:
-  - mkdir -p ~/.local/bin
-  - export PATH=$HOME/.local/bin:$PATH
-  - travis_retry curl -L https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+      - icarus-verilog
 
 install:
   make
