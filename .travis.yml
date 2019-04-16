@@ -1,17 +1,55 @@
-os: osx
-
 language: generic
+
+matrix:
+  include:
+    - os: linux
+      dist: xenial
+    - os: osx
+      osx_image: xcode10.1
 
 cache:
   directories:
     - $HOME/.stack
+    - $HOME/iverilog
 
 addons:
+  apt:
+    packages:
+      - shunit2
+      # for stack
+      - libgmp-dev
+      # for iverilog
+      - flex
+      - bison
   homebrew:
     packages:
       - haskell-stack
       - shunit2
       - icarus-verilog
+
+before_install:
+  - |
+      set -ex
+      if [ "$TRAVIS_OS_NAME" == "linux" ]; then
+        # install the latest version of stack
+        # based on: https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/travis-simple.yml
+        mkdir -p ~/.local/bin
+        export PATH=$HOME/.local/bin:$PATH
+        travis_retry curl -L https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+        # install iverilog 10.2
+        if [ ! -e "iverilog/verilog-10.2" ]; then
+          mkdir -p iverilog
+          cd iverilog
+          travis_retry curl -L ftp://icarus.com/pub/eda/verilog/v10/verilog-10.2.tar.gz > verilog-10.2.tar.gz
+          tar -xzf verilog-10.2.tar.gz
+          cd verilog-10.2
+          ./configure
+          make
+          cd ../..
+        fi
+        (cd iverilog/verilog-10.2 && sudo make install)
+      fi
+      set +ex
 
 install:
   make
