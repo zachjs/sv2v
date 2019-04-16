@@ -213,8 +213,8 @@ convertAsgn structs types (lhs, expr) =
             where e' = convertExpr (IntegerVector t sg rs) e
         convertExpr (Struct (Packed sg) fields (_:rs)) (Bit e _) =
             convertExpr (Struct (Packed sg) fields rs) e
-        convertExpr (Struct (Packed _) fields _) (Pattern [(Just "default", e)]) =
-            Concat $ take (length fields) (repeat e)
+        convertExpr (t @ (Struct (Packed _) fields _)) (Pattern [(Just "default", e)]) =
+            convertExpr t $ Pattern $ take (length fields) (repeat (Nothing, e))
         convertExpr (Struct (Packed sg) fields []) (Pattern itemsOrig) =
             if length items /= length fields then
                 error $ "struct pattern " ++ show items ++
