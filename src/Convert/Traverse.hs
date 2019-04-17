@@ -332,6 +332,17 @@ traverseStmtLHSsM mapper = stmtMapper
             return $ Asgn (Just $ Event sense') lhs' expr
         stmtMapper (AsgnBlk op lhs expr) = fullMapper lhs >>= \lhs' -> return $ AsgnBlk op lhs' expr
         stmtMapper (Asgn    mt lhs expr) = fullMapper lhs >>= \lhs' -> return $ Asgn    mt lhs' expr
+        stmtMapper (For inits me incrs stmt) = do
+            inits' <- mapM mapInit inits
+            let (lhss, asgnOps, exprs) = unzip3 incrs
+            lhss' <- mapM fullMapper lhss
+            let incrs' = zip3 lhss' asgnOps exprs
+            return $ For inits' me incrs' stmt
+            where
+                mapInit (Left decl) = return $ Left decl
+                mapInit (Right (lhs, expr)) = do
+                    lhs' <- fullMapper lhs
+                    return $ Right (lhs', expr)
         stmtMapper (Assertion a) =
             assertionMapper a >>= return . Assertion
         stmtMapper other = return other
