@@ -70,7 +70,6 @@ convertDescription interfaces modules (Part extern Module lifetime name ports it
                 else return ()
         collectInterface _ = return ()
 
-        -- TODO: We don't yet handle interfaces with parameter bindings.
         mapInterface :: ModuleItem -> ModuleItem
         mapInterface (orig @ (MIDecl (Variable Local t ident _ _))) =
             case Map.lookup ident modports of
@@ -86,8 +85,13 @@ convertDescription interfaces modules (Part extern Module lifetime name ports it
         mapInterface (Instance part params ident Nothing instancePorts) =
             case Map.lookup part interfaces of
                 Just interface ->
-                    Generate $ map GenModuleItem $
-                    inlineInterface interface (ident, expandedPorts)
+                    -- TODO: Add support for interfaces with parameter bindings.
+                    if not $ null params
+                    then error $ "interface instantiations with parameter "
+                            ++ "bindings are not yet supported: "
+                            ++ show (part, params, ident)
+                    else Generate $ map GenModuleItem $
+                            inlineInterface interface (ident, expandedPorts)
                 Nothing -> Instance part params ident Nothing expandedPorts
             where expandedPorts = concatMap (expandPortBinding part) instancePorts
         mapInterface (orig @ (MIPackageItem (Function _ _ _ decls _))) =
@@ -197,8 +201,6 @@ prefixModuleItems prefix =
         prefixLHS (LHSIdent x) = LHSIdent (prefix ++ x)
         prefixLHS other = other
 
--- TODO: this is an incomplete attempt at looking up the type of an expression;
--- there is definitely some overlap here with the Struct conversion
 lookupType :: [ModuleItem] -> Expr -> Type
 lookupType items (Ident ident) =
     head $ mapMaybe findType items
@@ -207,7 +209,10 @@ lookupType items (Ident ident) =
         findType (MIDecl (Variable _ t x [] Nothing)) =
             if x == ident then Just t else Nothing
         findType _ = Nothing
-lookupType _ expr = error $ "lookupType on fancy expr: " ++ show expr
+lookupType _ expr =
+    -- TODO: Add support for non-Ident modport expressions.
+    error $ "interface conversion does not support modport expressions that "
+        ++ " are not identifiers: " ++ show expr
 
 -- convert an interface instantiation into a series of equivalent module items
 inlineInterface :: Interface -> (Identifier, [PortBinding]) -> [ModuleItem]
