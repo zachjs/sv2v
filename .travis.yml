@@ -10,7 +10,7 @@ matrix:
 cache:
   directories:
     - $HOME/.stack
-    - $HOME/iverilog
+    - $HOME/.local
 
 addons:
   apt:
@@ -21,6 +21,8 @@ addons:
       # for iverilog
       - flex
       - bison
+      - autoconf
+      - gperf
   homebrew:
     packages:
       - haskell-stack
@@ -31,25 +33,32 @@ before_install:
   - |
       set -ex
       if [ "$TRAVIS_OS_NAME" == "linux" ]; then
-        # install the latest version of stack
-        # based on: https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/travis-simple.yml
+        orig_pwd=$PWD
         mkdir -p ~/.local/bin
         export PATH=$HOME/.local/bin:$PATH
-        travis_retry curl -L https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
-        # install iverilog 10.2
-        if [ ! -e "iverilog/verilog-10.2" ]; then
-          mkdir -p iverilog
-          cd iverilog
-          travis_retry curl -L ftp://icarus.com/pub/eda/verilog/v10/verilog-10.2.tar.gz > verilog-10.2.tar.gz
-          tar -xzf verilog-10.2.tar.gz
-          cd verilog-10.2
-          ./configure
-          make
-          cd ../..
+        # install the latest version of stack
+        if [ ! -e "$HOME/.local/bin/stack" ]; then
+          # based on: https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/travis-simple.yml
+          travis_retry curl --retry-max-time 60 -L https://get.haskellstack.org/stable/linux-x86_64.tar.gz > stack.tar.gz
+          tar -xzf stack.tar.gz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
         fi
-        (cd iverilog/verilog-10.2 && sudo make install)
+        # install iverilog 10.2
+        if [ ! -e "$HOME/.local/bin/iverilog" ]; then
+          travis_retry curl --retry-max-time 60 -L https://github.com/steveicarus/iverilog/archive/v10_2.tar.gz > v10_2.tar.gz
+          tar -xzf v10_2.tar.gz
+          cd iverilog-10_2
+          autoconf
+          ./configure --prefix=$HOME/.local
+          make
+          make install
+          cd ..
+        fi
+        cd $orig_pwd
       fi
       set +ex
+  - which stack iverilog shunit2
+  - stack --numeric-version
+  - iverilog -V 2> /dev/null | head -n 1
 
 install:
   make
