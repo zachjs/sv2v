@@ -656,28 +656,28 @@ collectNestedLHSsM = collectify traverseNestedLHSsM
 
 traverseDeclsM' :: Monad m => TFStrategy -> MapperM m Decl -> MapperM m ModuleItem
 traverseDeclsM' strat mapper item = do
-    item' <- miMapperA item
-    traverseStmtsM' strat miMapperB item'
+    item' <- miMapper item
+    traverseStmtsM' strat stmtMapper item'
     where
-        miMapperA (MIDecl decl) =
+        miMapper (MIDecl decl) =
             mapper decl >>= return . MIDecl
-        miMapperA (MIPackageItem (Function l t x decls s)) = do
+        miMapper (MIPackageItem (Function l t x decls stmts)) = do
             decls' <-
                 if strat == IncludeTFs
                     then mapM mapper decls
                     else return decls
-            return $ MIPackageItem $ Function l t x decls' s
-        miMapperA (MIPackageItem (Task l x decls s)) = do
+            return $ MIPackageItem $ Function l t x decls' stmts
+        miMapper (MIPackageItem (Task l x decls stmts)) = do
             decls' <-
                 if strat == IncludeTFs
                     then mapM mapper decls
                     else return decls
-            return $ MIPackageItem $ Task l x decls' s
-        miMapperA other = return other
-        miMapperB (Block name decls stmts) = do
+            return $ MIPackageItem $ Task l x decls' stmts
+        miMapper other = return other
+        stmtMapper (Block name decls stmts) = do
             decls' <- mapM mapper decls
             return $ Block name decls' stmts
-        miMapperB other = return other
+        stmtMapper other = return other
 
 traverseDecls' :: TFStrategy -> Mapper Decl -> Mapper ModuleItem
 traverseDecls' strat = unmonad $ traverseDeclsM' strat

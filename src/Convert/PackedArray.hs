@@ -12,11 +12,8 @@
  - the array as appropriate.
  -
  - Note that the ranges being combined may not be of the form [hi:lo], and need
- - not even be the same direction! Because of this, we have to flip arround
- - the indices of certain accesses.
- -
- - TODO: Name conflicts between functions/tasks and the description that
- - contains them likely breaks this conversion.
+ - not even be the same direction! Because of this, we have to flip around the
+ - indices of certain accesses.
  -}
 
 module Convert.PackedArray (convert) where
@@ -24,133 +21,163 @@ module Convert.PackedArray (convert) where
 import Control.Monad.State
 import Data.Tuple (swap)
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type DimMap = Map.Map Identifier (Type, Range)
+type DimMap = Map.Map Identifier [Range]
+type IdentSet = Set.Set Identifier
 
 data Info = Info
     { sTypeDims :: DimMap
+    , sIdents :: IdentSet
     } deriving Show
+
+defaultInfo :: Info
+defaultInfo = Info Map.empty Set.empty
 
 convert :: AST -> AST
 convert = traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription (description @ (Part _ _ _ _ _ _)) =
-    traverseModuleItems (flattenModuleItem info . rewriteModuleItem info) description
+    traverseModuleItems (convertModuleItem info) description
     where
-        -- collect all possible information info our Info structure
-        info =
-            execState (collectModuleItemsM collectDecl description) $
-            execState (collectModuleItemsM collectTF   description) $
-            (Info Map.empty)
+        collector = collectModuleItemsM $ collectDeclsM' ExcludeTFs collectDecl
+        info = execState (collector description) defaultInfo
 convertDescription description = description
 
--- collects port direction and packed-array dimension info into the state
-collectDecl :: ModuleItem -> State Info ()
-collectDecl (MIDecl (Variable _ t ident _ _)) = do
-    let (tf, rs) = typeRanges t
-    if not (typeIsImplicit t) && length rs > 1
-        then
-            let dets = (tf $ tail rs, head rs) in
-            modify $ \s -> s { sTypeDims = Map.insert ident dets (sTypeDims s) }
-        else return ()
+-- collects packed-array dimension and variable existing info into the state
+collectDecl :: Decl -> State Info ()
+collectDecl (Variable _ t ident _ _) = do
+    Info typeDims idents <- get
+    let (_, rs) = typeRanges t
+    let typeDims' =
+            if not (isImplicit t) && length rs > 1
+            then Map.insert ident rs typeDims
+            else typeDims
+    let idents' =
+            if not (isImplicit t)
+            then
+                if Set.member ident idents
+                then error $ "unsupported complex shadowing of " ++ show ident
+                else Set.insert ident idents
+            else idents
+    put $ Info typeDims' idents'
+    where
+        isImplicit :: Type -> Bool
+        isImplicit (Implicit _ _) = True
+        isImplicit _ = False
 collectDecl _ = return ()
 
--- collects task and function info into the state
-collectTF :: ModuleItem -> State Info ()
-collectTF (MIPackageItem (Function _ t x decls _)) = do
-    collectDecl (MIDecl $ Variable Local t x [] Nothing)
-    _ <- mapM collectDecl $ map MIDecl decls
-    return ()
-collectTF (MIPackageItem (Task     _   _ decls _)) = do
-    _ <- mapM collectDecl $ map MIDecl decls
-    return ()
-collectTF _ = return ()
+-- shadows the latter info with the former
+combineInfo :: Info -> Info -> Info
+combineInfo local global =
+    Info typeDims idents
+    where
+        Info globalTypeDims globalIdents = global
+        Info localTypeDims  localIdents  = local
+        idents = Set.union globalIdents localIdents
+        typeDims = Map.union localTypeDims $
+            Map.withoutKeys globalTypeDims localIdents
 
--- rewrite a module item if it contains a declaration to flatten
-flattenModuleItem :: Info -> ModuleItem -> ModuleItem
-flattenModuleItem info (MIPackageItem (Function ml t x decls stmts)) =
-    MIPackageItem $ Function ml t' x decls' stmts
+-- Convert the multi-dimensional packed arrays within the given module item.
+-- This function must ensure that function/task level shadowing is respected.
+convertModuleItem :: Info -> ModuleItem -> ModuleItem
+convertModuleItem globalInfo (orig @ (MIPackageItem (Function ml t x decls stmts))) =
+    rewrite info $
+    MIPackageItem $ Function ml t' x decls stmts
     where
-        MIPackageItem (Task _ _ decls' _) =
-            flattenModuleItem info $ MIPackageItem $ Task ml x decls stmts
-        MIDecl (Variable Local t' _ [] Nothing) =
-            flattenModuleItem info $ MIDecl (Variable Local t x [] Nothing)
-flattenModuleItem info (MIPackageItem (Task     ml   x decls stmts)) =
-    MIPackageItem $ Task ml x decls' stmts
+        localInfo =
+            execState (collectDecl $ Variable Local t x [] Nothing) $
+            execState (collectDeclsM collectDecl orig) $
+            defaultInfo
+        info = combineInfo localInfo globalInfo
+        -- rewrite the return type of this function
+        Variable Local t' _ [] Nothing =
+            flattenDecl info $ Variable Local t x [] Nothing
+convertModuleItem globalInfo (orig @ (MIPackageItem (Task     ml   x decls stmts))) =
+    rewrite info $
+    MIPackageItem $ Task ml x decls stmts
     where
-        decls' = map mapDecl decls
-        mapDecl :: Decl -> Decl
-        mapDecl decl = decl'
-            where MIDecl decl' = flattenModuleItem info $ MIDecl decl
-flattenModuleItem info (origDecl @ (MIDecl (Variable dir t ident a me))) =
+        localInfo =
+            execState (collectDeclsM collectDecl orig) $
+            defaultInfo
+        info = combineInfo localInfo globalInfo
+convertModuleItem info other =
+    rewrite info other
+
+-- combine the leading two packed ranges of a declaration
+flattenDecl :: Info -> Decl -> Decl
+flattenDecl info (origDecl @ (Variable dir t ident a me)) =
     if Map.notMember ident typeDims
         then origDecl
         else flatDecl
     where
-        Info typeDims = info
+        typeDims = sTypeDims info
         (tf, rs) = typeRanges t
-        flatDecl = MIDecl $ Variable dir (tf $ flattenRanges rs) ident a me
-flattenModuleItem _ other = other
+        r1 : r2 : rest = rs
+        rs' = (combineRanges r1 r2) : rest
+        flatDecl = Variable dir (tf rs') ident a me
+flattenDecl _ other = other
 
-typeIsImplicit :: Type -> Bool
-typeIsImplicit (Implicit _ _) = True
-typeIsImplicit _ = False
-
--- combines (flattens) the bottom two ranges in the given list of ranges
-flattenRanges :: [Range] -> [Range]
-flattenRanges rs =
-    if length rs >= 2
-        then rs'
-        else error $ "flattenRanges on too small list: " ++ (show rs)
+-- combines two ranges into one flattened range
+combineRanges :: Range -> Range -> Range
+combineRanges r1 r2 = r
     where
-        r1 = head rs
-        r2 = head $ tail rs
-        rYY = flattenRangesHelp r1 r2
-        rYN = flattenRangesHelp r1 (swap r2)
-        rNY = flattenRangesHelp (swap r1) r2
-        rNN = flattenRangesHelp (swap r1) (swap r2)
+        rYY = combine r1 r2
+        rYN = combine r1 (swap r2)
+        rNY = combine (swap r1) r2
+        rNN = combine (swap r1) (swap r2)
         rY = endianCondRange r2 rYY rYN
         rN = endianCondRange r2 rNY rNN
         r = endianCondRange r1 rY rN
-        rs' = r : (tail $ tail rs)
 
-flattenRangesHelp :: Range -> Range -> Range
-flattenRangesHelp (s1, e1) (s2, e2) =
-    (simplify upper, simplify lower)
-    where
-        size1 = rangeSize (s1, e1)
-        size2 = rangeSize (s2, e2)
-        lower = BinOp Add e2 (BinOp Mul e1 size2)
-        upper = BinOp Add (BinOp Mul size1 size2) (BinOp Sub lower (Number "1"))
+        combine :: Range -> Range -> Range
+        combine (s1, e1) (s2, e2) =
+            (simplify upper, simplify lower)
+            where
+                size1 = rangeSize (s1, e1)
+                size2 = rangeSize (s2, e2)
+                lower = BinOp Add e2 (BinOp Mul e1 size2)
+                upper = BinOp Add (BinOp Mul size1 size2)
+                            (BinOp Sub lower (Number "1"))
 
-rewriteModuleItem :: Info -> ModuleItem -> ModuleItem
-rewriteModuleItem info =
+-- rewrite the declarations, expressions, and lvals in a module item to remove
+-- the packed array dimensions captured in the given info
+rewrite :: Info -> ModuleItem -> ModuleItem
+rewrite info =
+    traverseDecls (flattenDecl info) .
     traverseLHSs  (traverseNestedLHSs  rewriteLHS ) .
     traverseExprs (traverseNestedExprs rewriteExpr)
     where
-        Info typeDims = info
+        typeDims = sTypeDims info
 
         dims :: Identifier -> (Range, Range)
         dims x =
             (dimInner, dimOuter)
             where
-                (t, r) = typeDims Map.! x
-                dimInner = r
-                dimOuter = head $ snd $ typeRanges t
+                dimInner : dimOuter : _ = typeDims Map.! x
 
+        -- if the given range is flipped, the result will flip around the given
+        -- indexing expression
         orientIdx :: Range -> Expr -> Expr
         orientIdx r e =
             endianCondExpr r e eSwapped
             where
                 eSwapped = BinOp Sub (snd r) (BinOp Sub e (fst r))
 
+        -- Converted idents are prefixed with an invalid character to ensure
+        -- that are not converted twice when the traversal steps downward. When
+        -- the prefixed identifier is encountered at the lowest level, it is
+        -- removed.
+
+        tag = ':'
+
         rewriteExpr :: Expr -> Expr
         rewriteExpr (Ident x) =
-            if head x == ':'
+            if head x == tag
                 then Ident $ tail x
                 else Ident x
         rewriteExpr (orig @ (Bit (Bit (Ident x) idxInner) idxOuter)) =
@@ -159,7 +186,7 @@ rewriteModuleItem info =
                 else orig
             where
                 (dimInner, dimOuter) = dims x
-                x' = ':' : x
+                x' = tag : x
                 idxInner' = orientIdx dimInner idxInner
                 idxOuter' = orientIdx dimOuter idxOuter
                 base = BinOp Mul idxInner' (rangeSize dimOuter)
@@ -170,7 +197,7 @@ rewriteModuleItem info =
                 else orig
             where
                 (dimInner, dimOuter) = dims x
-                x' = ':' : x
+                x' = tag : x
                 mode' = IndexedPlus
                 idx' = orientIdx dimInner idx
                 len = rangeSize dimOuter
@@ -182,7 +209,7 @@ rewriteModuleItem info =
                 else orig
             where
                 (_, dimOuter) = dims x
-                x' = ':' : x
+                x' = tag : x
                 mode' = mode
                 size = rangeSize dimOuter
                 base = endianCondExpr dimOuter (snd dimOuter) (fst dimOuter)
@@ -201,7 +228,7 @@ rewriteModuleItem info =
                 else orig
             where
                 (dimInner, dimOuter) = dims x
-                x' = ':' : x
+                x' = tag : x
                 mode' = IndexedPlus
                 idxInner' = orientIdx dimInner idxInner
                 rangeOuterReverseIndexed =
@@ -222,6 +249,9 @@ rewriteModuleItem info =
                 range' = (base, len)
         rewriteExpr other = other
 
+        -- LHSs need to be converted too. Rather than duplicating the
+        -- procedures, we turn the relevant LHSs into expressions temporarily
+        -- and use the expression conversion written above.
         rewriteLHS :: LHS -> LHS
         rewriteLHS (LHSIdent x) =
             LHSIdent x'
