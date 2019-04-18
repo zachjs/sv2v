@@ -21,106 +21,49 @@ module Convert.PackedArray (convert) where
 import Control.Monad.State
 import Data.Tuple (swap)
 import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
 
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
 type DimMap = Map.Map Identifier [Range]
-type IdentSet = Set.Set Identifier
 
 data Info = Info
     { sTypeDims :: DimMap
-    , sIdents :: IdentSet
-    } deriving Show
-
-defaultInfo :: Info
-defaultInfo = Info Map.empty Set.empty
+    } deriving (Eq, Show)
 
 convert :: AST -> AST
 convert = traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription (description @ (Part _ _ _ _ _ _)) =
-    traverseModuleItems (convertModuleItem info) description
+    evalState
+        (initialTraverse description >>= scopedTraverse)
+        (Info Map.empty)
     where
-        collector = collectModuleItemsM $ collectDeclsM' ExcludeTFs collectDecl
-        info = execState (collector description) defaultInfo
+        initialTraverse = traverseModuleItemsM traverseMIDecl
+        scopedTraverse = traverseModuleItemsM $
+            traverseScopesM traverseDeclM traverseModuleItemM traverseStmtM
+        traverseMIDecl :: ModuleItem -> State Info ModuleItem
+        traverseMIDecl (MIDecl decl) =
+            traverseDeclM decl >>= return . MIDecl
+        traverseMIDecl other = return other
 convertDescription description = description
 
--- collects packed-array dimension and variable existing info into the state
-collectDecl :: Decl -> State Info ()
-collectDecl (Variable _ t ident _ _) = do
-    Info typeDims idents <- get
-    let (_, rs) = typeRanges t
-    let typeDims' =
-            if not (isImplicit t) && length rs > 1
-            then Map.insert ident rs typeDims
-            else typeDims
-    let idents' =
-            if not (isImplicit t)
-            then
-                if Set.member ident idents
-                then error $ "unsupported complex shadowing of " ++ show ident
-                else Set.insert ident idents
-            else idents
-    put $ Info typeDims' idents'
-    where
-        isImplicit :: Type -> Bool
-        isImplicit (Implicit _ _) = True
-        isImplicit _ = False
-collectDecl _ = return ()
-
--- shadows the latter info with the former
-combineInfo :: Info -> Info -> Info
-combineInfo local global =
-    Info typeDims idents
-    where
-        Info globalTypeDims globalIdents = global
-        Info localTypeDims  localIdents  = local
-        idents = Set.union globalIdents localIdents
-        typeDims = Map.union localTypeDims $
-            Map.withoutKeys globalTypeDims localIdents
-
--- Convert the multi-dimensional packed arrays within the given module item.
--- This function must ensure that function/task level shadowing is respected.
-convertModuleItem :: Info -> ModuleItem -> ModuleItem
-convertModuleItem globalInfo (orig @ (MIPackageItem (Function ml t x decls stmts))) =
-    rewrite info $
-    MIPackageItem $ Function ml t' x decls stmts
-    where
-        localInfo =
-            execState (collectDecl $ Variable Local t x [] Nothing) $
-            execState (collectDeclsM collectDecl orig) $
-            defaultInfo
-        info = combineInfo localInfo globalInfo
-        -- rewrite the return type of this function
-        Variable Local t' _ [] Nothing =
-            flattenDecl info $ Variable Local t x [] Nothing
-convertModuleItem globalInfo (orig @ (MIPackageItem (Task     ml   x decls stmts))) =
-    rewrite info $
-    MIPackageItem $ Task ml x decls stmts
-    where
-        localInfo =
-            execState (collectDeclsM collectDecl orig) $
-            defaultInfo
-        info = combineInfo localInfo globalInfo
-convertModuleItem info other =
-    rewrite info other
-
--- combine the leading two packed ranges of a declaration
-flattenDecl :: Info -> Decl -> Decl
-flattenDecl info (origDecl @ (Variable dir t ident a me)) =
-    if Map.notMember ident typeDims
-        then origDecl
-        else flatDecl
-    where
-        typeDims = sTypeDims info
-        (tf, rs) = typeRanges t
-        r1 : r2 : rest = rs
-        rs' = (combineRanges r1 r2) : rest
-        flatDecl = Variable dir (tf rs') ident a me
-flattenDecl _ other = other
+-- collects and converts multi-dimensional packed-array declarations
+traverseDeclM :: Decl -> State Info Decl
+traverseDeclM (origDecl @ (Variable dir t ident a me)) = do
+    Info typeDims <- get
+    let (tf, rs) = typeRanges t
+    if length rs <= 1
+        then do
+            put $ Info $ Map.delete ident typeDims
+            return origDecl
+        else do
+            put $ Info $ Map.insert ident rs typeDims
+            let r1 : r2 : rest = rs
+            let rs' = (combineRanges r1 r2) : rest
+            return $ Variable dir (tf rs') ident a me
+traverseDeclM other = return other
 
 -- combines two ranges into one flattened range
 combineRanges :: Range -> Range -> Range
@@ -144,13 +87,25 @@ combineRanges r1 r2 = r
                 upper = BinOp Add (BinOp Mul size1 size2)
                             (BinOp Sub lower (Number "1"))
 
--- rewrite the declarations, expressions, and lvals in a module item to remove
--- the packed array dimensions captured in the given info
-rewrite :: Info -> ModuleItem -> ModuleItem
-rewrite info =
-    traverseDecls (flattenDecl info) .
-    traverseLHSs  (traverseNestedLHSs  rewriteLHS ) .
-    traverseExprs (traverseNestedExprs rewriteExpr)
+traverseModuleItemM :: ModuleItem -> State Info ModuleItem
+traverseModuleItemM item =
+    traverseLHSsM  traverseLHSM  item >>=
+    traverseExprsM traverseExprM
+
+traverseStmtM :: Stmt -> State Info Stmt
+traverseStmtM stmt =
+    traverseStmtLHSsM  traverseLHSM  stmt >>=
+    traverseStmtExprsM traverseExprM
+
+traverseExprM :: Expr -> State Info Expr
+traverseExprM = traverseNestedExprsM $ stately traverseExpr
+
+traverseLHSM :: LHS -> State Info LHS
+traverseLHSM = traverseNestedLHSsM $ stately traverseLHS
+
+traverseExpr :: Info -> Expr -> Expr
+traverseExpr info =
+    rewriteExpr
     where
         typeDims = sTypeDims info
 
@@ -249,9 +204,16 @@ rewrite info =
                 range' = (base, len)
         rewriteExpr other = other
 
-        -- LHSs need to be converted too. Rather than duplicating the
-        -- procedures, we turn the relevant LHSs into expressions temporarily
-        -- and use the expression conversion written above.
+-- LHSs need to be converted too. Rather than duplicating the procedures, we
+-- turn the relevant LHSs into expressions temporarily and use the expression
+-- conversion written above.
+traverseLHS :: Info -> LHS -> LHS
+traverseLHS info =
+    rewriteLHS
+    where
+        typeDims = sTypeDims info
+        rewriteExpr = traverseExpr info
+
         rewriteLHS :: LHS -> LHS
         rewriteLHS (LHSIdent x) =
             LHSIdent x'

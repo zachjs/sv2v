@@ -32,6 +32,9 @@ module Convert.Traverse
 , traverseExprsM'
 , traverseExprs'
 , collectExprsM'
+, traverseStmtExprsM
+, traverseStmtExprs
+, collectStmtExprsM
 , traverseLHSsM
 , traverseLHSs
 , collectLHSsM
@@ -61,11 +64,14 @@ module Convert.Traverse
 , collectNestedModuleItemsM
 , traverseNestedStmts
 , collectNestedStmtsM
+, traverseNestedExprsM
 , traverseNestedExprs
 , collectNestedExprsM
 , traverseNestedLHSsM
 , traverseNestedLHSs
 , collectNestedLHSsM
+, traverseScopesM
+, stately
 ) where
 
 import Control.Monad.State
@@ -188,7 +194,12 @@ collectStmtsM = collectStmtsM' IncludeTFs
 traverseNestedStmtsM :: Monad m => MapperM m Stmt -> MapperM m Stmt
 traverseNestedStmtsM mapper = fullMapper
     where
-        fullMapper stmt = mapper stmt >>= cs
+        fullMapper stmt = mapper stmt >>= traverseSinglyNestedStmtsM fullMapper
+
+-- variant of the above which only traverse one level down
+traverseSinglyNestedStmtsM :: Monad m => MapperM m Stmt -> MapperM m Stmt
+traverseSinglyNestedStmtsM fullMapper = cs
+    where
         cs (StmtAttr a stmt) = fullMapper stmt >>= return . StmtAttr a
         cs (Block name decls stmts) =
             mapM fullMapper stmts >>= return . Block name decls
@@ -430,9 +441,10 @@ traverseNestedExprsM mapper = exprMapper
             exprs <- mapM exprMapper $ map snd l
             return $ Pattern $ zip names exprs
 
-
-traverseExprsM' :: Monad m => TFStrategy -> MapperM m Expr -> MapperM m ModuleItem
-traverseExprsM' strat mapper = moduleItemMapper
+exprMapperHelpers :: Monad m => MapperM m Expr ->
+    (MapperM m Range, MapperM m (Maybe Expr), MapperM m Decl)
+exprMapperHelpers exprMapper =
+    (rangeMapper, maybeExprMapper, declMapper)
     where
 
     rangeMapper (a, b) = do
@@ -453,59 +465,14 @@ traverseExprsM' strat mapper = moduleItemMapper
         me' <- maybeExprMapper me
         return $ Variable d t x a' me'
 
-    exprMapper = mapper
+traverseExprsM' :: Monad m => TFStrategy -> MapperM m Expr -> MapperM m ModuleItem
+traverseExprsM' strat exprMapper = moduleItemMapper
+    where
 
-    caseMapper (exprs, stmt) = do
-        exprs' <- mapM exprMapper exprs
-        return (exprs', stmt)
-    stmtMapper = traverseNestedStmtsM flatStmtMapper
-    flatStmtMapper (StmtAttr attr stmt) =
-        -- note: we exclude expressions in attributes from conversion
-        return $ StmtAttr attr stmt
-    flatStmtMapper (Block name decls stmts) = do
-        decls' <- mapM declMapper decls
-        return $ Block name decls' stmts
-    flatStmtMapper (Case u kw e cases def) = do
-        e' <- exprMapper e
-        cases' <- mapM caseMapper cases
-        return $ Case u kw e' cases' def
-    flatStmtMapper (AsgnBlk op lhs expr) =
-        exprMapper expr >>= return . AsgnBlk op lhs
-    flatStmtMapper (Asgn    mt lhs expr) =
-        exprMapper expr >>= return . Asgn    mt lhs
-    flatStmtMapper (For inits cc asgns stmt) = do
-        inits' <- mapM initMapper inits
-        cc' <- maybeExprMapper cc
-        asgns' <- mapM asgnMapper asgns
-        return $ For inits' cc' asgns' stmt
-    flatStmtMapper (While   e stmt) =
-        exprMapper e >>= \e' -> return $ While   e' stmt
-    flatStmtMapper (RepeatL e stmt) =
-        exprMapper e >>= \e' -> return $ RepeatL e' stmt
-    flatStmtMapper (DoWhile e stmt) =
-        exprMapper e >>= \e' -> return $ DoWhile e' stmt
-    flatStmtMapper (Forever   stmt) = return $ Forever stmt
-    flatStmtMapper (If u cc s1 s2) =
-        exprMapper cc >>= \cc' -> return $ If u cc' s1 s2
-    flatStmtMapper (Timing event stmt) = return $ Timing event stmt
-    flatStmtMapper (Subroutine f (Args l p)) = do
-        l' <- mapM maybeExprMapper l
-        pes <- mapM maybeExprMapper $ map snd p
-        let p' = zip (map fst p) pes
-        return $ Subroutine f (Args l' p')
-    flatStmtMapper (Return expr) =
-        exprMapper expr >>= return . Return
-    flatStmtMapper (Trigger x) = return $ Trigger x
-    flatStmtMapper (Assertion a) = do
-        a' <- traverseAssertionStmtsM stmtMapper a
-        a'' <- traverseAssertionExprsM exprMapper a'
-        return $ Assertion a''
-    flatStmtMapper (Null) = return Null
+    (rangeMapper, maybeExprMapper, declMapper)
+        = exprMapperHelpers exprMapper
 
-    initMapper (Left decl) = declMapper decl >>= return . Left
-    initMapper (Right (l, e)) = exprMapper e >>= \e' -> return $ Right (l, e')
-
-    asgnMapper (l, op, e) = exprMapper e >>= \e' -> return $ (l, op, e')
+    stmtMapper = traverseNestedStmtsM (traverseStmtExprsM exprMapper)
 
     portBindingMapper (p, me) =
         maybeExprMapper me >>= \me' -> return (p, me')
@@ -601,6 +568,70 @@ traverseExprs :: Mapper Expr -> Mapper ModuleItem
 traverseExprs = traverseExprs' IncludeTFs
 collectExprsM :: Monad m => CollectorM m Expr -> CollectorM m ModuleItem
 collectExprsM = collectExprsM' IncludeTFs
+
+traverseStmtExprsM :: Monad m => MapperM m Expr -> MapperM m Stmt
+traverseStmtExprsM exprMapper = flatStmtMapper
+    where
+
+    (_, maybeExprMapper, declMapper)
+        = exprMapperHelpers exprMapper
+
+    caseMapper (exprs, stmt) = do
+        exprs' <- mapM exprMapper exprs
+        return (exprs', stmt)
+    stmtMapper = traverseNestedStmtsM flatStmtMapper
+    flatStmtMapper (StmtAttr attr stmt) =
+        -- note: we exclude expressions in attributes from conversion
+        return $ StmtAttr attr stmt
+    flatStmtMapper (Block name decls stmts) = do
+        decls' <- mapM declMapper decls
+        return $ Block name decls' stmts
+    flatStmtMapper (Case u kw e cases def) = do
+        e' <- exprMapper e
+        cases' <- mapM caseMapper cases
+        return $ Case u kw e' cases' def
+    flatStmtMapper (AsgnBlk op lhs expr) =
+        exprMapper expr >>= return . AsgnBlk op lhs
+    flatStmtMapper (Asgn    mt lhs expr) =
+        exprMapper expr >>= return . Asgn    mt lhs
+    flatStmtMapper (For inits cc asgns stmt) = do
+        inits' <- mapM initMapper inits
+        cc' <- maybeExprMapper cc
+        asgns' <- mapM asgnMapper asgns
+        return $ For inits' cc' asgns' stmt
+    flatStmtMapper (While   e stmt) =
+        exprMapper e >>= \e' -> return $ While   e' stmt
+    flatStmtMapper (RepeatL e stmt) =
+        exprMapper e >>= \e' -> return $ RepeatL e' stmt
+    flatStmtMapper (DoWhile e stmt) =
+        exprMapper e >>= \e' -> return $ DoWhile e' stmt
+    flatStmtMapper (Forever   stmt) = return $ Forever stmt
+    flatStmtMapper (If u cc s1 s2) =
+        exprMapper cc >>= \cc' -> return $ If u cc' s1 s2
+    flatStmtMapper (Timing event stmt) = return $ Timing event stmt
+    flatStmtMapper (Subroutine f (Args l p)) = do
+        l' <- mapM maybeExprMapper l
+        pes <- mapM maybeExprMapper $ map snd p
+        let p' = zip (map fst p) pes
+        return $ Subroutine f (Args l' p')
+    flatStmtMapper (Return expr) =
+        exprMapper expr >>= return . Return
+    flatStmtMapper (Trigger x) = return $ Trigger x
+    flatStmtMapper (Assertion a) = do
+        a' <- traverseAssertionStmtsM stmtMapper a
+        a'' <- traverseAssertionExprsM exprMapper a'
+        return $ Assertion a''
+    flatStmtMapper (Null) = return Null
+
+    initMapper (Left decl) = declMapper decl >>= return . Left
+    initMapper (Right (l, e)) = exprMapper e >>= \e' -> return $ Right (l, e')
+
+    asgnMapper (l, op, e) = exprMapper e >>= \e' -> return $ (l, op, e')
+
+traverseStmtExprs :: Mapper Expr -> Mapper Stmt
+traverseStmtExprs = unmonad traverseStmtExprsM
+collectStmtExprsM :: Monad m => CollectorM m Expr -> CollectorM m Stmt
+collectStmtExprsM = collectify traverseStmtExprsM
 
 traverseLHSsM' :: Monad m => TFStrategy -> MapperM m LHS -> MapperM m ModuleItem
 traverseLHSsM' strat mapper item =
@@ -837,3 +868,68 @@ traverseNestedExprs :: Mapper Expr -> Mapper Expr
 traverseNestedExprs = unmonad traverseNestedExprsM
 collectNestedExprsM :: Monad m => CollectorM m Expr -> CollectorM m Expr
 collectNestedExprsM = collectify traverseNestedExprsM
+
+-- Traverse all the declaration scopes within a ModuleItem. Note that Functions,
+-- Tasks, Always and Initial blocks are all NOT passed through ModuleItem
+-- mapper, and MIDecl ModuleItems are NOT passed through the Decl mapper. The
+-- state is restored to its previous value after each scope is exited. Only the
+-- Decl mapper may modify the state, as we maintain the invariant that all other
+-- functions restore the state on exit. The Stmt mapper must not traverse
+-- statements recursively, as we add a recursive wrapper here.
+traverseScopesM
+    :: (Eq s, Show s)
+    => MapperM (State s) Decl
+    -> MapperM (State s) ModuleItem
+    -> MapperM (State s) Stmt
+    -> MapperM (State s) ModuleItem
+traverseScopesM declMapper moduleItemMapper stmtMapper =
+    fullModuleItemMapper
+    where
+
+        fullStmtMapper stmt = stmtMapper stmt >>= traverseSinglyNestedStmtsM cs
+        cs (Block name decls stmts) = do
+            prevState <- get
+            decls' <- mapM declMapper decls
+            block <- fullStmtMapper $ Block name decls' stmts
+            put prevState
+            return block
+        cs other = fullStmtMapper other
+
+        redirectModuleItem (MIPackageItem (Function ml t x decls stmts)) = do
+            prevState <- get
+            t' <- do
+                res <- declMapper $ Variable Local t x [] Nothing
+                case res of
+                    Variable Local newType _ [] Nothing -> return newType
+                    _ -> error $ "redirected func ret traverse failed: " ++ show res
+            decls' <- mapM declMapper decls
+            stmts' <- mapM fullStmtMapper stmts
+            put prevState
+            return $ MIPackageItem $ Function ml t' x decls' stmts'
+        redirectModuleItem (MIPackageItem (Task     ml   x decls stmts)) = do
+            prevState <- get
+            decls' <- mapM declMapper decls
+            stmts' <- mapM fullStmtMapper stmts
+            put prevState
+            return $ MIPackageItem $ Task     ml    x decls' stmts'
+        redirectModuleItem (AlwaysC kw stmt) =
+            fullStmtMapper stmt >>= return . AlwaysC kw
+        redirectModuleItem (Initial stmt) =
+            fullStmtMapper stmt >>= return . Initial
+        redirectModuleItem item =
+            moduleItemMapper item
+
+        fullModuleItemMapper item = do
+            prevState <- get
+            item' <- redirectModuleItem item
+            currState <- get
+            if prevState == currState
+                then return item'
+                else error $ "illegal scope state modification: "
+                        ++ show (prevState, item, currState, item')
+
+-- convert a basic mapper with an initial argument to a stateful mapper
+stately :: (Eq s, Show s) => (s -> Mapper a) -> MapperM (State s) a
+stately mapper thing = do
+    s <- get
+    return $ mapper s thing
