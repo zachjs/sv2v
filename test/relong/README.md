@@ -3,7 +3,11 @@
 These tests are borrowed from Reid Long's [HDL Examples
 repository](https://bitbucket.org/ReidLong/hdl-examples). That repository was
 intended to provide examples for how the conversions in this project could be
-done.
+done. sv2v does not necessarily convert code as demonstrated in the examples.
+Notably, sv2v does not create `generate` blocks when converted vectors with
+multiple packed dimensions, uses `localparam`s rather than macros for `enum`
+conversion, and converts `struct` literals to concatenations, rather than
+multiple statements.
 
 Each test case (say, "foo") is comprised of the following files:
 

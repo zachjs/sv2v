@@ -31,7 +31,7 @@ defaultJob = Job
     , define = def &= typ "NAME[=VALUE]" &= help "define a macro for preprocessing"
     }
     &= program "sv2v"
-    &= summary "sv2v v0.0.1, (C) Zachary Snow 2019, Tom Hawkins, 2011-2015"
+    &= summary "sv2v v0.0.1, (C) 2019 Zachary Snow, 2011-2015 Tom Hawkins"
     &= details [ "sv2v converts SystemVerilog to Verilog."
                , "More info: https://github.com/zachjs/sv2v" ]
 

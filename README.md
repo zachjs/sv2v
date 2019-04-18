@@ -43,14 +43,16 @@ You must have [Stack] installed to build sv2v.
 [Stack]: https://www.haskellstack.org/
 
 ```
-git clone https://github.com/zachjs/sv2v
+git clone https://github.com/zachjs/sv2v.git
 cd sv2v
-stack setup
 make
 ```
 
-This creates the executable at `./bin/sv2v`. You can install the binary by
-running `stack install`.
+This creates the executable at `./bin/sv2v`. Stack takes care of installing
+exact (compatible) versions of the compiler and sv2v's build dependencies.
+
+You can install the binary to your local bin path (typically `~/.local/bin`) by
+running `stack install`, or copy over the executable manually.
 
 
 ## Usage
@@ -73,6 +75,17 @@ Common flags:
   -V --version              Print version information
      --numeric-version      Print just the version number
 ```
+
+
+## Supported Features
+
+sv2v supports most synthesizable SystemVerilog features. Current notable
+exceptions include `package`/`import`/`export`, interfaces _with parameter
+bindings_, and complex (non-identifier) `modport` expressions. Assertions are
+also supported, but are simply dropped during conversion.
+
+If you find a bug or have a feature request, please create an issue. Preference
+will be given to issues which include examples or test cases.
 
 
 ## SystemVerilog Frontend
