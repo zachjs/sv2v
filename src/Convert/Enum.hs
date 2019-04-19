@@ -7,7 +7,8 @@
  - modules in which that enum type appears. This is not necessarily foolproof,
  - as some tools do allow the use of an enum item even if the actual enum type
  - does not appear in that description. The localparams are explicitly sized to
- - match the size of the converted enum type.
+ - match the size of the converted enum type. This conversion only includes enum
+ - items which are actually used within a given description.
  -
  - SystemVerilog allows for enums to have any number of the items' values
  - specified or unspecified. If the first one is unspecified, it is 0. All other
@@ -21,7 +22,7 @@
 module Convert.Enum (convert) where
 
 import Control.Monad.Writer
-import Data.List (elemIndices, sortOn)
+import Data.List (elemIndices, partition, sortOn)
 import qualified Data.Set as Set
 
 import Convert.Traverse
@@ -29,6 +30,8 @@ import Language.SystemVerilog.AST
 
 type EnumInfo = (Range, [(Identifier, Maybe Expr)])
 type Enums = Set.Set EnumInfo
+type Idents = Set.Set Identifier
+type EnumItem = ((Range, Identifier), Expr)
 
 convert :: AST -> AST
 convert = traverseDescriptions convertDescription
@@ -47,13 +50,33 @@ convertDescription (description @ (Part _ _ _ _ _ _)) =
             traverseModuleItems (traverseExprs $ traverseNestedExprs traverseExpr) $
             description
         -- convert the collected enums into their corresponding localparams
-        itemType r = Implicit Unspecified [r]
-        enumPairs = sortOn snd $ concatMap enumVals $ Set.toList enums
-        enumItems = map toItem enumPairs
-        toItem ((r, x), v) =
-            MIDecl $ Localparam (itemType r) x v'
-            where v' = sizedExpr x r (simplify v)
+        enumPairs = concatMap enumVals $ Set.toList enums
+        enumItems = map toItem $ sortOn snd $ convergeUsage items enumPairs
 convertDescription other = other
+
+-- add only the enums actually used in the given items
+convergeUsage :: [ModuleItem] -> [EnumItem] -> [EnumItem]
+convergeUsage items enums =
+    if null usedEnums
+        then []
+        else usedEnums ++ convergeUsage (enumItems ++ items) unusedEnums
+    where
+        -- determine which of the enum items are actually used here
+        (usedEnums, unusedEnums) = partition isUsed enums
+        enumItems = map toItem usedEnums
+        isUsed ((_, x), _) = Set.member x usedIdents
+        usedIdents = execWriter $
+            mapM (collectExprsM $ collectNestedExprsM collectIdent) $ items
+        collectIdent :: Expr -> Writer Idents ()
+        collectIdent (Ident x) = tell $ Set.singleton x
+        collectIdent _ = return ()
+
+toItem :: EnumItem -> ModuleItem
+toItem ((r, x), v) =
+    MIDecl $ Localparam itemType x v'
+    where
+        v' = sizedExpr x r (simplify v)
+        itemType = Implicit Unspecified [r]
 
 toBaseType :: Maybe Type -> Type
 toBaseType Nothing = defaultType
@@ -83,7 +106,7 @@ traverseExpr :: Expr -> Expr
 traverseExpr (Cast (Left (Enum _ _ _)) e) = e
 traverseExpr other = other
 
-enumVals :: (Range, [(Identifier, Maybe Expr)]) -> [((Range, Identifier), Expr)]
+enumVals :: EnumInfo -> [EnumItem]
 enumVals (r, l) =
     -- check for obviously duplicate values
     if noDuplicates
