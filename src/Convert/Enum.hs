@@ -27,7 +27,7 @@ import qualified Data.Set as Set
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type EnumInfo = ([Range], [(Identifier, Maybe Expr)])
+type EnumInfo = (Range, [(Identifier, Maybe Expr)])
 type Enums = Set.Set EnumInfo
 
 convert :: AST -> AST
@@ -47,9 +47,12 @@ convertDescription (description @ (Part _ _ _ _ _ _)) =
             traverseModuleItems (traverseExprs $ traverseNestedExprs traverseExpr) $
             description
         -- convert the collected enums into their corresponding localparams
-        itemType = Implicit Unspecified
+        itemType r = Implicit Unspecified [r]
         enumPairs = sortOn snd $ concatMap enumVals $ Set.toList enums
-        enumItems = map (\((r, x), v) -> MIDecl $ Localparam (itemType r) x v) enumPairs
+        enumItems = map toItem enumPairs
+        toItem ((r, x), v) =
+            MIDecl $ Localparam (itemType r) x v'
+            where v' = sizedExpr x r (simplify v)
 convertDescription other = other
 
 toBaseType :: Maybe Type -> Type
@@ -66,9 +69,9 @@ toBaseType (Just t) =
 traverseType :: Type -> Writer Enums Type
 traverseType (Enum t v rs) = do
     let baseType = toBaseType t
-    let (tf, r) = typeRanges baseType
-    () <- tell $ Set.singleton (map simplifyRange r, v)
-    return $ tf (r ++ rs)
+    let (tf, [r]) = typeRanges baseType
+    () <- tell $ Set.singleton (simplifyRange r, v)
+    return $ tf (r : rs)
 traverseType other = return other
 
 simplifyRange :: Range -> Range
@@ -80,7 +83,7 @@ traverseExpr :: Expr -> Expr
 traverseExpr (Cast (Left (Enum _ _ _)) e) = e
 traverseExpr other = other
 
-enumVals :: ([Range], [(Identifier, Maybe Expr)]) -> [(([Range], Identifier), Expr)]
+enumVals :: (Range, [(Identifier, Maybe Expr)]) -> [((Range, Identifier), Expr)]
 enumVals (r, l) =
     -- check for obviously duplicate values
     if noDuplicates

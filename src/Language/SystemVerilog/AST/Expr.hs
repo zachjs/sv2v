@@ -16,6 +16,7 @@ module Language.SystemVerilog.AST.Expr
     , rangeSize
     , endianCondExpr
     , endianCondRange
+    , sizedExpr
     ) where
 
 import Data.List (intercalate)
@@ -187,3 +188,24 @@ endianCondRange r r1 r2 =
     ( endianCondExpr r (fst r1) (fst r2)
     , endianCondExpr r (snd r1) (snd r2)
     )
+
+-- attempts to make a number literal have an explicit size
+sizedExpr :: Identifier -> Range -> Expr -> Expr
+sizedExpr x r (Number n) =
+    if size /= show resSize
+        then error $ "literal " ++ show n ++ " for " ++ show x
+                ++ " doesn't have size " ++ show size
+        else Number res
+    where
+        Number size = simplify $ rangeSize r
+        unticked = case n of
+            '\'' : rest -> rest
+            rest -> rest
+        resSize = (read $ takeWhile (/= '\'') res) :: Int
+        res = case readMaybe unticked :: Maybe Int of
+            Nothing ->
+                if unticked == n
+                    then n
+                    else size ++ n
+            Just num -> size ++ "'d" ++ show num
+sizedExpr _ _ e = e

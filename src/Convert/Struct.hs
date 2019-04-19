@@ -10,7 +10,6 @@ import Data.Maybe (fromJust, isJust)
 import Data.List (elemIndex, sortOn)
 import Data.Tuple (swap)
 import Control.Monad.Writer
-import Text.Read (readMaybe)
 import qualified Data.Map.Strict as Map
 
 import Convert.Traverse
@@ -253,23 +252,8 @@ convertAsgn structs types (lhs, expr) =
                 fieldNames = map snd fields
                 itemsFieldNames = map (fromJust . fst) items
                 itemPosition = \(Just x, _) -> fromJust $ elemIndex x fieldNames
-                packItem (Just x, Number n) =
-                    if size /= show resSize
-                        then error $ "literal " ++ show n ++ " for " ++ show x
-                                ++ " doesn't have struct field size " ++ show size
-                        else Number res
-                    where
-                        Number size = rangeSize $ lookupUnstructRange structTf x
-                        unticked = case n of
-                            '\'' : rest -> rest
-                            rest -> rest
-                        resSize = (read $ takeWhile (/= '\'') res) :: Int
-                        res = case readMaybe unticked :: Maybe Int of
-                            Nothing ->
-                                if unticked == n
-                                    then n
-                                    else size ++ n
-                            Just num -> size ++ "'d" ++ show num
+                packItem (Just x, e) = sizedExpr x r e
+                    where r = lookupUnstructRange structTf x
                 packItem (_, itemExpr) = itemExpr
         convertExpr _ other = other
 
