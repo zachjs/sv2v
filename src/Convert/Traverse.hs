@@ -201,6 +201,7 @@ traverseSinglyNestedStmtsM :: Monad m => MapperM m Stmt -> MapperM m Stmt
 traverseSinglyNestedStmtsM fullMapper = cs
     where
         cs (StmtAttr a stmt) = fullMapper stmt >>= return . StmtAttr a
+        cs (Block Nothing [] []) = return Null
         cs (Block name decls stmts) =
             mapM fullMapper stmts >>= return . Block name decls
         cs (Case u kw expr cases def) = do

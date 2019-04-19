@@ -26,7 +26,7 @@ instance Show Decl where
     showList l _ = unlines' $ map show l
     show (Parameter  t x e) = printf  "parameter %s%s = %s;" (showPad t) x (show e)
     show (Localparam t x e) = printf "localparam %s%s = %s;" (showPad t) x (show e)
-    show (Variable d t x a me) = printf "%s%s %s%s%s;" (showPad d) (show t) x (showRanges a) (showAssignment me)
+    show (Variable d t x a me) = printf "%s%s%s%s%s;" (showPad d) (showPad t) x (showRanges a) (showAssignment me)
 
 data Direction
     = Input
