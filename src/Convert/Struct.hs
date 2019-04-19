@@ -213,8 +213,20 @@ convertAsgn structs types (lhs, expr) =
             where e' = convertExpr (IntegerVector t sg rs) e
         convertExpr (Struct (Packed sg) fields (_:rs)) (Bit e _) =
             convertExpr (Struct (Packed sg) fields rs) e
-        convertExpr (t @ (Struct (Packed _) fields _)) (Pattern [(Just "default", e)]) =
-            convertExpr t $ Pattern $ take (length fields) (repeat (Nothing, e))
+        convertExpr (Struct (Packed sg) fields rs) (Pattern [(Just "default", e)]) =
+            if Map.notMember structTf structs then
+                Pattern [(Just "default", e)]
+            else if null rs then
+                expanded
+            else if length rs == 1 then
+                Repeat (rangeSize $ head rs) [expanded]
+            else
+                error $ "default pattern for multi-dimensional struct array "
+                    ++ show structTf ++ " is not allowed"
+            where
+                structTf = Struct (Packed sg) fields
+                expanded = convertExpr (structTf []) $ Pattern $
+                    take (length fields) (repeat (Nothing, e))
         convertExpr (Struct (Packed sg) fields []) (Pattern itemsOrig) =
             if length items /= length fields then
                 error $ "struct pattern " ++ show items ++
