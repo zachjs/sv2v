@@ -35,19 +35,9 @@ convert :: AST -> AST
 convert = traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription (description @ (Part _ _ _ _ _ _)) =
-    evalState
-        (initialTraverse description >>= scopedTraverse)
+convertDescription =
+    scopedConversion traverseDeclM traverseModuleItemM traverseStmtM
         (Info Map.empty)
-    where
-        initialTraverse = traverseModuleItemsM traverseMIDecl
-        scopedTraverse = traverseModuleItemsM $
-            traverseScopesM traverseDeclM traverseModuleItemM traverseStmtM
-        traverseMIDecl :: ModuleItem -> State Info ModuleItem
-        traverseMIDecl (MIDecl decl) =
-            traverseDeclM decl >>= return . MIDecl
-        traverseMIDecl other = return other
-convertDescription description = description
 
 -- collects and converts multi-dimensional packed-array declarations
 traverseDeclM :: Decl -> State Info Decl

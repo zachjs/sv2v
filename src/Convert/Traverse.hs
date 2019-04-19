@@ -71,6 +71,7 @@ module Convert.Traverse
 , traverseNestedLHSs
 , collectNestedLHSsM
 , traverseScopesM
+, scopedConversion
 , stately
 ) where
 
@@ -928,6 +929,26 @@ traverseScopesM declMapper moduleItemMapper stmtMapper =
                 then return item'
                 else error $ "illegal scope state modification: "
                         ++ show (prevState, item, currState, item')
+
+-- applies the given decl conversion across the description, and then performs a
+-- scoped traversal for each ModuleItem in the description
+scopedConversion
+    :: (Eq s, Show s)
+    => MapperM (State s) Decl
+    -> MapperM (State s) ModuleItem
+    -> MapperM (State s) Stmt
+    -> s
+    -> Description
+    -> Description
+scopedConversion traverseDeclM traverseModuleItemM traverseStmtM s description =
+    evalState (initialTraverse description >>= scopedTraverse) s
+    where
+        initialTraverse = traverseModuleItemsM traverseMIDecl
+        scopedTraverse = traverseModuleItemsM $
+            traverseScopesM traverseDeclM traverseModuleItemM traverseStmtM
+        traverseMIDecl (MIDecl decl) =
+            traverseDeclM decl >>= return . MIDecl
+        traverseMIDecl other = return other
 
 -- convert a basic mapper with an initial argument to a stateful mapper
 stately :: (Eq s, Show s) => (s -> Mapper a) -> MapperM (State s) a

@@ -217,11 +217,8 @@ convertAsgn structs types (lhs, expr) =
                 Pattern [(Just "default", e)]
             else if null rs then
                 expanded
-            else if length rs == 1 then
-                Repeat (rangeSize $ head rs) [expanded]
             else
-                error $ "default pattern for multi-dimensional struct array "
-                    ++ show structTf ++ " is not allowed"
+                Repeat (dimensionsSize rs) [expanded]
             where
                 structTf = Struct (Packed sg) fields
                 expanded = convertExpr (structTf []) $ Pattern $

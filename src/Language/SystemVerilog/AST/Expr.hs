@@ -17,6 +17,7 @@ module Language.SystemVerilog.AST.Expr
     , endianCondExpr
     , endianCondRange
     , sizedExpr
+    , dimensionsSize
     ) where
 
 import Data.List (intercalate)
@@ -209,3 +210,10 @@ sizedExpr x r (Number n) =
                     else size ++ n
             Just num -> size ++ "'d" ++ show num
 sizedExpr _ _ e = e
+
+dimensionsSize :: [Range] -> Expr
+dimensionsSize ranges =
+    simplify $
+    foldl (BinOp Mul) (Number "1") $
+    map rangeSize $
+    ranges
