@@ -18,6 +18,7 @@ import qualified Convert.FuncRet
 import qualified Convert.Interface
 import qualified Convert.KWArgs
 import qualified Convert.Logic
+import qualified Convert.NamedBlock
 import qualified Convert.PackedArray
 import qualified Convert.Return
 import qualified Convert.StarPort
@@ -33,6 +34,7 @@ type Phase = AST -> AST
 phases :: [Job.Exclude] -> [Phase]
 phases excludes =
     [ Convert.AsgnOp.convert
+    , Convert.NamedBlock.convert
     , Convert.Assertion.convert
     , Convert.Bits.convert
     , selectExclude (Job.Logic    , Convert.Logic.convert)
