@@ -18,7 +18,18 @@ typedef enum {
     E_1, E_2 = 'h10, E_3, E_4, E_5 = 'b10, E_6
 } EnumE;
 
-`define PRINT(val) $display("%02d", val);
+typedef enum logic {
+    F_1, F_2
+} EnumF;
+
+typedef enum [0:0] {
+    G_1, G_2
+} EnumG;
+
+`define PRINT(name, val) \
+    dummy``name = name``_``val; \
+    $display("%010x %010x %02d %02d", \
+        name``_``val, dummy``name, $bits(name``_``val), $bits(dummy``name));
 
 module top;
     EnumA dummyA;
@@ -26,31 +37,39 @@ module top;
     EnumC dummyC;
     EnumD dummyD;
     EnumE dummyE;
+    EnumF dummyF;
+    EnumG dummyG;
 
     initial begin
 
-        `PRINT(A_1)
-        `PRINT(A_2)
-        `PRINT(A_3)
+        `PRINT(A, 1)
+        `PRINT(A, 2)
+        `PRINT(A, 3)
 
-        `PRINT(B_1)
-        `PRINT(B_2)
-        `PRINT(B_3)
+        `PRINT(B, 1)
+        `PRINT(B, 2)
+        `PRINT(B, 3)
 
-        `PRINT(C_1)
-        `PRINT(C_2)
-        `PRINT(C_3)
+        `PRINT(C, 1)
+        `PRINT(C, 2)
+        `PRINT(C, 3)
 
-        `PRINT(D_1)
-        `PRINT(D_2)
-        `PRINT(D_3)
+        `PRINT(D, 1)
+        `PRINT(D, 2)
+        `PRINT(D, 3)
 
-        `PRINT(E_1)
-        `PRINT(E_2)
-        `PRINT(E_3)
-        `PRINT(E_4)
-        `PRINT(E_5)
-        `PRINT(E_6)
+        `PRINT(E, 1)
+        `PRINT(E, 2)
+        `PRINT(E, 3)
+        `PRINT(E, 4)
+        `PRINT(E, 5)
+        `PRINT(E, 6)
+
+        `PRINT(F, 1)
+        `PRINT(F, 2)
+
+        `PRINT(G, 1)
+        `PRINT(G, 2)
 
     end
 endmodule

@@ -269,13 +269,16 @@ PartialType :: { Signing -> [Range] -> Type }
   | IntegerVectorType                       {                        IntegerVector $1    }
   | IntegerAtomType                         { \sg          -> \[] -> IntegerAtom   $1 sg }
   | NonIntegerType                          { \Unspecified -> \[] -> NonInteger    $1    }
-  | "enum"   opt(Type) "{" EnumItems   "}"  { \Unspecified -> Enum   $2 $4 }
-  | "struct" Packing   "{" StructItems "}"  { \Unspecified -> Struct $2 $4 }
+  | "enum" EnumBaseType "{" EnumItems   "}" { \Unspecified -> Enum   $2 $4 }
+  | "struct" Packing    "{" StructItems "}" { \Unspecified -> Struct $2 $4 }
 CastingType :: { Type }
   : IntegerVectorType { IntegerVector $1 Unspecified [] }
   | IntegerAtomType   { IntegerAtom   $1 Unspecified    }
   | NonIntegerType    { NonInteger    $1                }
   | Signing           { Implicit      $1             [] }
+EnumBaseType :: { Maybe Type }
+  : opt(Type) { $1 }
+  | DimensionsNonEmpty { Just $ Implicit Unspecified $1 }
 
 Signing :: { Signing }
   : "signed"   { Signed   }
