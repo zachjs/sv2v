@@ -67,9 +67,12 @@ traverseType :: Type -> Writer Enums Type
 traverseType (Enum t v rs) = do
     let baseType = toBaseType t
     let (tf, r) = typeRanges baseType
-    () <- tell $ Set.singleton (r, v)
+    () <- tell $ Set.singleton (map simplifyRange r, v)
     return $ tf (r ++ rs)
 traverseType other = return other
+
+simplifyRange :: Range -> Range
+simplifyRange (a, b) = (simplify a, simplify b)
 
 -- drop any enum type casts in favor of implicit conversion from the
 -- converted type

@@ -43,7 +43,7 @@ data Type
 instance Show Type where
     show (Alias         xx    rs) = printf "%s%s"   xx                           (showRanges rs)
     show (Net           kw    rs) = printf "%s%s"   (show kw)                    (showRanges rs)
-    show (Implicit         sg rs) = printf "%s%s"             (show          sg) (showRanges rs)
+    show (Implicit         sg rs) = printf "%s%s"             (showPad       sg) (dropWhile (== ' ') $ showRanges rs)
     show (IntegerVector kw sg rs) = printf "%s%s%s" (show kw) (showPadBefore sg) (showRanges rs)
     show (IntegerAtom   kw sg   ) = printf "%s%s"   (show kw) (showPadBefore sg)
     show (NonInteger    kw      ) = printf "%s"     (show kw)
