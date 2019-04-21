@@ -270,4 +270,19 @@ module top;
         end
     end
 
+
+    function [0:1][0:1] ret;
+        input unused;
+        ret = 4'b1010;
+    endfunction
+    logic [3:0] ret_res;
+    initial begin
+        ret_res = ret(0);
+        $display("ret: ", ret_res);
+        $display("ret[0]: ", ret_res[0]);
+        $display("ret[1]: ", ret_res[1]);
+        $display("ret[2]: ", ret_res[2]);
+        $display("ret[3]: ", ret_res[3]);
+    end
+
 endmodule
