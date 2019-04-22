@@ -100,4 +100,61 @@ module top;
     endtask
     initial foo();
 
+    task bar;
+        input integer i, j, k;
+        input StructE a;
+        input StructF b;
+        input StructA c;
+        input StructB d;
+        input StructC e;
+        input StructD f;
+        $display("E: %1d%1d%1d -> ", i,j,k, a,b,c,d,e,f);
+    endtask
+    initial begin
+        integer i, j, k;
+        for (i = 0; i < 2; i++) begin
+            for (j = 0; j < 2; j++) begin
+                for (k = 0; k < 2; k++) begin
+                    bar(i,j,k
+                        , '{ w:i, x:j, y:k }
+                        , '{ w:i, x:j, y:k }
+                        , '{ w:i, x:j, y:k }
+                        , '{ w:i, x:j, y:k }
+                        , '{ w:i, x:j, y:k }
+                        , '{ w:i, x:j, y:k }
+                    );
+                end
+            end
+        end
+    end
+
+    function baz;
+        input integer i, j, k;
+        input StructF a;
+        input StructA b;
+        input StructB c;
+        input StructC d;
+        input StructD e;
+        input StructE f;
+        $display("F: %1d%1d%1d -> ", i,j,k, a,b,c,d,e,f);
+        baz = 0;
+    endfunction
+    initial begin
+        integer i, j, k;
+        integer unused;
+        for (i = 0; i < 2; i++) begin
+            for (j = 0; j < 2; j++) begin
+                for (k = 0; k < 2; k++) begin
+                    unused = baz(i,j,k
+                        , '{ w:i, x:j, y:k }
+                        , '{ w:i, x:j, y:k }
+                        , '{ w:i, x:j, y:k }
+                        , '{ w:i, x:j, y:k }
+                        , '{ w:i, x:j, y:k }
+                        , '{ w:i, x:j, y:k }
+                    );
+                end
+            end
+        end
+    end
 endmodule

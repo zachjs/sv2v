@@ -44,5 +44,21 @@ module top;
         $display("D: 101 -> 635563");
         $display("D: 110 -> 353656");
         $display("D: 111 -> 777777");
+        $display("E: 000 -> 000000");
+        $display("E: 001 -> 241214");
+        $display("E: 010 -> 422141");
+        $display("E: 011 -> 663355");
+        $display("E: 100 -> 114422");
+        $display("E: 101 -> 355636");
+        $display("E: 110 -> 536563");
+        $display("E: 111 -> 777777");
+        $display("F: 000 -> 000000");
+        $display("F: 001 -> 412142");
+        $display("F: 010 -> 221414");
+        $display("F: 011 -> 633556");
+        $display("F: 100 -> 144221");
+        $display("F: 101 -> 556363");
+        $display("F: 110 -> 365635");
+        $display("F: 111 -> 777777");
     end
 endmodule

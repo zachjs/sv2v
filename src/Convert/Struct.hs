@@ -34,10 +34,11 @@ convertDescription (description @ (Part _ _ _ _ _ _)) =
     where
         description' @ (Part extern kw lifetime name ports items) =
             scopedConversion traverseDeclM traverseModuleItemM traverseStmtM
-                Map.empty description
+                tfArgTypes description
         -- collect information about this description
         structs = execWriter $ collectModuleItemsM
             (collectTypesM collectStructM) description
+        tfArgTypes = execWriter $ collectModuleItemsM collectTFArgsM description
         -- determine which of the packer functions we actually need
         calledFuncs = execWriter $ collectModuleItemsM
             (collectExprsM $ collectNestedExprsM collectCallsM) description'
@@ -51,6 +52,9 @@ convertDescription (description @ (Part _ _ _ _ _ _)) =
             traverseExprsM traverseExprM item >>=
             traverseAsgnsM traverseAsgnM
         traverseStmtM :: Stmt -> State Types Stmt
+        traverseStmtM (Subroutine f args) = do
+            stateTypes <- get
+            return $ uncurry Subroutine $ convertCall structs stateTypes f args
         traverseStmtM stmt =
             traverseStmtExprsM traverseExprM stmt >>=
             traverseStmtAsgnsM traverseAsgnM
@@ -132,6 +136,24 @@ convertType structs t1 =
 collectCallsM :: Expr -> Writer Idents ()
 collectCallsM (Call f _) = tell $ Set.singleton f
 collectCallsM _ = return ()
+
+collectTFArgsM :: ModuleItem -> Writer Types ()
+collectTFArgsM (MIPackageItem item) = do
+    _ <- case item of
+        Function _ t f decls _ -> do
+            tell $ Map.singleton f t
+            mapM (collect f) (zip [0..] decls)
+        Task     _   f decls _ ->
+            mapM (collect f) (zip [0..] decls)
+        _ -> return []
+    return ()
+    where
+        collect :: Identifier -> (Int, Decl) -> Writer Types ()
+        collect f (idx, (Variable _ t x _ _)) = do
+            tell $ Map.singleton (f ++ ":" ++ show idx) t
+            tell $ Map.singleton (f ++ ":" ++ x) t
+        collect _ _ = return ()
+collectTFArgsM _ = return ()
 
 -- write down the types of declarations
 traverseDeclM :: Decl -> State Types Decl
@@ -356,6 +378,12 @@ convertAsgn structs types (lhs, expr) =
                     (_, []) -> Implicit Unspecified []
                     (tf, rs) -> tf $ tail rs
                 (_, i') = convertSubExpr i
+        convertSubExpr (Call f args) =
+            (retType, uncurry Call $ convertCall structs types f args)
+            where
+                retType = case Map.lookup f types of
+                    Nothing -> Implicit Unspecified []
+                    Just t -> t
         -- TODO: There are other expression cases that we probably need to
         -- recurse into. That said, it's not clear to me how much we really
         -- expect to see things like concatenated packed structs, for example.
@@ -371,3 +399,20 @@ convertAsgn structs types (lhs, expr) =
         lookupFieldType :: [(Type, Identifier)] -> Identifier -> Type
         lookupFieldType fields fieldName = fieldMap Map.! fieldName
             where fieldMap = Map.fromList $ map swap fields
+
+-- attempts to convert based on the assignment-like contexts of TF arguments
+convertCall :: Structs -> Types -> Identifier -> Args -> (Identifier, Args)
+convertCall structs types f (Args pnArgs kwArgs) =
+    (f, args)
+    where
+        idxs = map show ([0..] :: [Int])
+        args = Args
+            (map snd $ map convertArg $ zip idxs pnArgs)
+            (map convertArg kwArgs)
+        convertArg :: (Identifier, Maybe Expr) -> (Identifier, Maybe Expr)
+        convertArg (x, Nothing) = (x, Nothing)
+        convertArg (x, Just e ) = (x, Just e')
+            where
+                (_, e') = convertAsgn structs types
+                    (LHSIdent $ f ++ ":" ++ x, e)
+
