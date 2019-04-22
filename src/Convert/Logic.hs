@@ -19,7 +19,7 @@ import qualified Data.Set as Set
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type RegIdents = Set.Set String
+type Idents = Set.Set Identifier
 
 convert :: AST -> AST
 convert = traverseDescriptions convertDescription
@@ -38,6 +38,12 @@ convertDescription orig =
         conversion = traverseDecls convertDecl . convertModuleItem
         idents = execWriter (collectModuleItemsM regIdents orig)
         convertModuleItem :: ModuleItem -> ModuleItem
+        convertModuleItem (Assign Nothing lhs expr) =
+            if Set.null $ Set.intersection usedIdents idents
+                then Assign Nothing lhs expr
+                else AlwaysC AlwaysComb $ AsgnBlk AsgnOpEq lhs expr
+            where
+                usedIdents = execWriter $ collectNestedLHSsM lhsIdents lhs
         convertModuleItem (MIDecl (Variable dir (IntegerVector TLogic sg mr) ident a me)) =
             MIDecl $ Variable dir (t mr) ident a me
             where
@@ -55,17 +61,18 @@ convertDescription orig =
             Variable d (IntegerVector TReg sg rs) x a me
         convertDecl other = other
 
-regIdents :: ModuleItem -> Writer RegIdents ()
+regIdents :: ModuleItem -> Writer Idents ()
 regIdents (AlwaysC _ stmt) =
-    collectNestedStmtsM (collectStmtLHSsM (collectNestedLHSsM idents)) $
+    collectNestedStmtsM (collectStmtLHSsM (collectNestedLHSsM lhsIdents)) $
     traverseNestedStmts removeTimings stmt
     where
-        idents :: LHS -> Writer RegIdents ()
-        idents (LHSIdent  vx  ) = tell $ Set.singleton vx
-        idents _ = return () -- the collector recurses for us
         removeTimings :: Stmt -> Stmt
         removeTimings (Timing _ s) = s
         removeTimings other = other
 regIdents (Initial stmt) =
     regIdents $ AlwaysC Always stmt
 regIdents _ = return ()
+
+lhsIdents :: LHS -> Writer Idents ()
+lhsIdents (LHSIdent  vx  ) = tell $ Set.singleton vx
+lhsIdents _ = return () -- the collector recurses for us
