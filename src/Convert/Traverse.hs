@@ -59,6 +59,9 @@ module Convert.Traverse
 , traverseAsgnsM'
 , traverseAsgns'
 , collectAsgnsM'
+, traverseStmtAsgnsM
+, traverseStmtAsgns
+, collectStmtAsgnsM
 , traverseNestedModuleItemsM
 , traverseNestedModuleItems
 , collectNestedModuleItemsM
@@ -824,13 +827,7 @@ traverseAsgnsM' strat mapper = moduleItemMapper
         miMapperA other = return other
 
         miMapperB = traverseStmtsM' strat stmtMapper
-        stmtMapper (AsgnBlk op lhs expr) = do
-            (lhs', expr') <- mapper (lhs, expr)
-            return $ AsgnBlk op lhs' expr'
-        stmtMapper (Asgn    mt lhs expr) = do
-            (lhs', expr') <- mapper (lhs, expr)
-            return $ Asgn    mt lhs' expr'
-        stmtMapper other = return other
+        stmtMapper = traverseStmtAsgnsM mapper
 
 traverseAsgns' :: TFStrategy -> Mapper (LHS, Expr) -> Mapper ModuleItem
 traverseAsgns' strat = unmonad $ traverseAsgnsM' strat
@@ -843,6 +840,22 @@ traverseAsgns :: Mapper (LHS, Expr) -> Mapper ModuleItem
 traverseAsgns = traverseAsgns' IncludeTFs
 collectAsgnsM :: Monad m => CollectorM m (LHS, Expr) -> CollectorM m ModuleItem
 collectAsgnsM = collectAsgnsM' IncludeTFs
+
+traverseStmtAsgnsM :: Monad m => MapperM m (LHS, Expr) -> MapperM m Stmt
+traverseStmtAsgnsM mapper = stmtMapper
+    where
+        stmtMapper (AsgnBlk op lhs expr) = do
+            (lhs', expr') <- mapper (lhs, expr)
+            return $ AsgnBlk op lhs' expr'
+        stmtMapper (Asgn    mt lhs expr) = do
+            (lhs', expr') <- mapper (lhs, expr)
+            return $ Asgn    mt lhs' expr'
+        stmtMapper other = return other
+
+traverseStmtAsgns :: Mapper (LHS, Expr) -> Mapper Stmt
+traverseStmtAsgns = unmonad traverseStmtAsgnsM
+collectStmtAsgnsM :: Monad m => CollectorM m (LHS, Expr) -> CollectorM m Stmt
+collectStmtAsgnsM = collectify traverseStmtAsgnsM
 
 traverseNestedModuleItemsM :: Monad m => MapperM m ModuleItem -> MapperM m ModuleItem
 traverseNestedModuleItemsM mapper item = do
@@ -888,14 +901,15 @@ traverseScopesM declMapper moduleItemMapper stmtMapper =
     fullModuleItemMapper
     where
 
-        fullStmtMapper stmt = stmtMapper stmt >>= traverseSinglyNestedStmtsM cs
-        cs (Block name decls stmts) = do
+        nestedStmtMapper stmt =
+            stmtMapper stmt >>= traverseSinglyNestedStmtsM fullStmtMapper
+        fullStmtMapper (Block name decls stmts) = do
             prevState <- get
             decls' <- mapM declMapper decls
-            block <- fullStmtMapper $ Block name decls' stmts
+            block <- nestedStmtMapper $ Block name decls' stmts
             put prevState
             return block
-        cs other = fullStmtMapper other
+        fullStmtMapper other = nestedStmtMapper other
 
         redirectModuleItem (MIPackageItem (Function ml t x decls stmts)) = do
             prevState <- get

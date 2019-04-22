@@ -1,7 +1,7 @@
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
- - Conversion for `packed struct`
+ - Conversion for `struct packed`
  -}
 
 module Convert.Struct (convert) where
@@ -10,6 +10,7 @@ import Data.Hashable (hash)
 import Data.Maybe (fromJust, isJust)
 import Data.List (elemIndex, sortOn)
 import Data.Tuple (swap)
+import Control.Monad.State
 import Control.Monad.Writer
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -28,21 +29,15 @@ convert = traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription (description @ (Part _ _ _ _ _ _)) =
+    traverseModuleItems (traverseTypes $ convertType structs) $
     Part extern kw lifetime name ports (items ++ funcs)
     where
         description' @ (Part extern kw lifetime name ports items) =
-            traverseModuleItems (traverseExprs $ traverseNestedExprs $ convertOnlyExpr structs types) $
-            traverseModuleItems (traverseTypes $ convertType structs) $
-            traverseModuleItems (traverseAsgns $ convertAsgn structs types) $
-            description
+            scopedConversion traverseDeclM traverseModuleItemM traverseStmtM
+                Map.empty description
         -- collect information about this description
         structs = execWriter $ collectModuleItemsM
             (collectTypesM collectType) description
-        typesA = execWriter $ collectModuleItemsM
-            (collectDeclsM collectDecl) description
-        typesB = execWriter $ collectModuleItemsM
-            collectFunction description
-        types = Map.union typesA typesB
         -- determine which of the packer functions we actually need
         calledFuncs = execWriter $ collectModuleItemsM
             (collectExprsM $ collectNestedExprsM collectCalls) description'
@@ -51,6 +46,17 @@ convertDescription (description @ (Part _ _ _ _ _ _)) =
         funcs = map packerFn usedStructs
         usedStructs = filter (isNeeded . fst) $ Map.toList structs
         isNeeded tf = Set.member (packerFnName tf) calledPackedFuncs
+        -- helpers for the scoped traversal
+        traverseModuleItemM :: ModuleItem -> State Types ModuleItem
+        traverseModuleItemM item =
+            traverseExprsM traverseExprM item >>=
+            traverseAsgnsM traverseAsgnM
+        traverseStmtM :: Stmt -> State Types Stmt
+        traverseStmtM stmt =
+            traverseStmtExprsM traverseExprM stmt >>=
+            traverseStmtAsgnsM traverseAsgnM
+        traverseExprM = traverseNestedExprsM $ stately $ convertOnlyExpr structs
+        traverseAsgnM = stately $ convertAsgn structs
 convertDescription other = other
 
 -- writes down the names of called functions
@@ -137,22 +143,14 @@ convertType structs t1 =
     where (tf1, rs1) = typeRanges t1
 
 
--- write down the type a declarations
-collectDecl :: Decl -> Writer Types ()
-collectDecl (Variable _ (Implicit _ []) _ _ _) = return ()
-collectDecl (Variable _ t x a _) =
-    -- We add the unpacked dimensions to the type so that our type traversal can
-    -- correctly match-off the dimensions whenever we see a `Bit` or `Range`
-    -- expression.
-    tell $ Map.singleton x (tf $ rs ++ a)
-    where (tf, rs) = typeRanges t
-collectDecl (Parameter  t x _) = tell $ Map.singleton x t
-collectDecl (Localparam t x _) = tell $ Map.singleton x t
-
--- write down the return type of a function
-collectFunction :: ModuleItem -> Writer Types ()
-collectFunction (MIPackageItem (Function _ t f _ _)) = tell $ Map.singleton f t
-collectFunction _ = return ()
+-- write down the types of declarations
+traverseDeclM :: Decl -> State Types Decl
+traverseDeclM origDecl = do
+    case origDecl of
+        Variable _ t x _ _ -> modify $ Map.insert x t
+        Parameter  t x _   -> modify $ Map.insert x t
+        Localparam t x _   -> modify $ Map.insert x t
+    return origDecl
 
 -- returns a "unique" name for the packer for a given struct type
 packerFnName :: TypeFunc -> Identifier
