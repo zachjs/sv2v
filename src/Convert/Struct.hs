@@ -27,22 +27,10 @@ convert :: AST -> AST
 convert = traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription description =
-    case description' of
-        Part extern kw lifetime name ports items ->
-            Part extern kw lifetime name ports (items ++ funcs)
-            where
-                funcs = map packerFn usedStructs
-                usedStructs = filter (isNeeded . fst) $ Map.toList structs
-                isNeeded tf = Set.member (packerFnName tf) calledPackedFuncs
-        other ->
-            if Set.null calledPackedFuncs
-                then other
-                -- TODO: Add support for top-level TFs which use struct literals
-                else error $ "top-level TF cannot use a struct literal, yet: "
-                        ++ show other
+convertDescription (description @ (Part _ _ _ _ _ _)) =
+    Part extern kw lifetime name ports (items ++ funcs)
     where
-        description' =
+        description' @ (Part extern kw lifetime name ports items) =
             traverseModuleItems (traverseExprs $ traverseNestedExprs $ convertOnlyExpr structs types) $
             traverseModuleItems (traverseTypes $ convertType structs) $
             traverseModuleItems (traverseAsgns $ convertAsgn structs types) $
@@ -60,6 +48,10 @@ convertDescription description =
             (collectExprsM $ collectNestedExprsM collectCalls) description'
         packerFuncs = Set.map packerFnName $ Map.keysSet structs
         calledPackedFuncs = Set.intersection calledFuncs packerFuncs
+        funcs = map packerFn usedStructs
+        usedStructs = filter (isNeeded . fst) $ Map.toList structs
+        isNeeded tf = Set.member (packerFnName tf) calledPackedFuncs
+convertDescription other = other
 
 -- writes down the names of called functions
 collectCalls :: Expr -> Writer Idents ()
