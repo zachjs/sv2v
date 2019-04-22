@@ -6,6 +6,7 @@
 
 module Convert.Struct (convert) where
 
+import Data.Hashable (hash)
 import Data.Maybe (fromJust, isJust)
 import Data.List (elemIndex, sortOn)
 import Data.Tuple (swap)
@@ -28,7 +29,7 @@ convertDescription description =
     traverseModuleItems (traverseExprs $ traverseNestedExprs $ convertOnlyExpr structs types) $
     traverseModuleItems (traverseTypes $ convertType structs) $
     traverseModuleItems (traverseAsgns $ convertAsgn structs types) $
-    description
+    description'
     where
         structs = execWriter $ collectModuleItemsM
             (collectTypesM collectType) description
@@ -37,7 +38,24 @@ convertDescription description =
         typesB = execWriter $ collectModuleItemsM
             collectFunction description
         types = Map.union typesA typesB
+        description' =
+            case description of
+                Part extern kw lifetime name ports items ->
+                    Part extern kw lifetime name ports (items ++ funcs)
+                    where funcs = map packerFn $ Map.keys structs
+                other -> other
 
+-- produces a function
+packerFn :: TypeFunc -> ModuleItem
+packerFn structTf =
+    MIPackageItem $
+    Function Nothing (structTf []) fnName decls [retStmt]
+    where
+        Struct (Packed _) fields [] = structTf []
+        toInput (t, x) = Variable Input t x [] Nothing
+        decls = map toInput fields
+        retStmt = Return $ Concat $ map (Ident . snd) fields
+        fnName = packerFnName structTf
 
 -- write down unstructured versions of a packed struct type
 collectType :: Type -> Writer Structs ()
@@ -122,6 +140,14 @@ collectDecl (Localparam t x _) = tell $ Map.singleton x t
 collectFunction :: ModuleItem -> Writer Types ()
 collectFunction (MIPackageItem (Function _ t f _ _)) = tell $ Map.singleton f t
 collectFunction _ = return ()
+
+-- returns a "unique" name for the packer for a given struct type
+packerFnName :: TypeFunc -> Identifier
+packerFnName structTf =
+    "sv2v_pack_struct_" ++ str
+    where
+        val = hash $ show structTf
+        str = tail $ show val
 
 convertOnlyExpr :: Structs -> Types -> Expr -> Expr
 convertOnlyExpr structs types expr =
@@ -234,7 +260,7 @@ convertAsgn structs types (lhs, expr) =
             else if Map.notMember structTf structs then
                 Pattern items
             else
-                Concat $ map packItem items
+                Call fnName $ Args (map (Just . snd) items) []
             where
                 subMap = \(Just ident, subExpr) ->
                     (Just ident, convertExpr (lookupFieldType fields ident) subExpr)
@@ -249,9 +275,7 @@ convertAsgn structs types (lhs, expr) =
                 fieldNames = map snd fields
                 itemsFieldNames = map (fromJust . fst) items
                 itemPosition = \(Just x, _) -> fromJust $ elemIndex x fieldNames
-                packItem (Just x, e) = sizedExpr x r e
-                    where r = lookupUnstructRange structTf x
-                packItem (_, itemExpr) = itemExpr
+                fnName = packerFnName structTf
         convertExpr _ other = other
 
         -- try expression conversion by looking at the *innermost* type first

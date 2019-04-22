@@ -29,6 +29,7 @@ executable sv2v
     containers,
     directory,
     filepath,
+    hashable,
     mtl
   other-modules:
     -- SystemVerilog modules
