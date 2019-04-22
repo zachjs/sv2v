@@ -12,6 +12,7 @@ import Data.List (elemIndex, sortOn)
 import Data.Tuple (swap)
 import Control.Monad.Writer
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 
 import Convert.Traverse
 import Language.SystemVerilog.AST
@@ -20,17 +21,33 @@ type TypeFunc = [Range] -> Type
 type StructInfo = (Type, Map.Map Identifier (Range, Expr))
 type Structs = Map.Map TypeFunc StructInfo
 type Types = Map.Map Identifier Type
+type Idents = Set.Set Identifier
 
 convert :: AST -> AST
 convert = traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription description =
-    traverseModuleItems (traverseExprs $ traverseNestedExprs $ convertOnlyExpr structs types) $
-    traverseModuleItems (traverseTypes $ convertType structs) $
-    traverseModuleItems (traverseAsgns $ convertAsgn structs types) $
-    description'
+    case description' of
+        Part extern kw lifetime name ports items ->
+            Part extern kw lifetime name ports (items ++ funcs)
+            where
+                funcs = map packerFn usedStructs
+                usedStructs = filter (isNeeded . fst) $ Map.toList structs
+                isNeeded tf = Set.member (packerFnName tf) calledPackedFuncs
+        other ->
+            if Set.null calledPackedFuncs
+                then other
+                -- TODO: Add support for top-level TFs which use struct literals
+                else error $ "top-level TF cannot use a struct literal, yet: "
+                        ++ show other
     where
+        description' =
+            traverseModuleItems (traverseExprs $ traverseNestedExprs $ convertOnlyExpr structs types) $
+            traverseModuleItems (traverseTypes $ convertType structs) $
+            traverseModuleItems (traverseAsgns $ convertAsgn structs types) $
+            description
+        -- collect information about this description
         structs = execWriter $ collectModuleItemsM
             (collectTypesM collectType) description
         typesA = execWriter $ collectModuleItemsM
@@ -38,18 +55,22 @@ convertDescription description =
         typesB = execWriter $ collectModuleItemsM
             collectFunction description
         types = Map.union typesA typesB
-        description' =
-            case description of
-                Part extern kw lifetime name ports items ->
-                    Part extern kw lifetime name ports (items ++ funcs)
-                    where funcs = map packerFn $ Map.keys structs
-                other -> other
+        -- determine which of the packer functions we actually need
+        calledFuncs = execWriter $ collectModuleItemsM
+            (collectExprsM $ collectNestedExprsM collectCalls) description'
+        packerFuncs = Set.map packerFnName $ Map.keysSet structs
+        calledPackedFuncs = Set.intersection calledFuncs packerFuncs
 
--- produces a function
-packerFn :: TypeFunc -> ModuleItem
-packerFn structTf =
+-- writes down the names of called functions
+collectCalls :: Expr -> Writer Idents ()
+collectCalls (Call f _) = tell $ Set.singleton f
+collectCalls _ = return ()
+
+-- produces a function which packs the components of a struct literal
+packerFn :: (TypeFunc, StructInfo) -> ModuleItem
+packerFn (structTf, (flatType, _)) =
     MIPackageItem $
-    Function Nothing (structTf []) fnName decls [retStmt]
+    Function Nothing flatType fnName decls [retStmt]
     where
         Struct (Packed _) fields [] = structTf []
         toInput (t, x) = Variable Input t x [] Nothing
