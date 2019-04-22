@@ -6,12 +6,12 @@
 
 module Convert.Struct (convert) where
 
-import Data.Hashable (hash)
-import Data.Maybe (fromJust, isJust)
-import Data.List (elemIndex, sortOn)
-import Data.Tuple (swap)
 import Control.Monad.State
 import Control.Monad.Writer
+import Data.Hashable (hash)
+import Data.List (elemIndex, sortOn)
+import Data.Maybe (fromJust, isJust)
+import Data.Tuple (swap)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
@@ -37,14 +37,13 @@ convertDescription (description @ (Part _ _ _ _ _ _)) =
                 Map.empty description
         -- collect information about this description
         structs = execWriter $ collectModuleItemsM
-            (collectTypesM collectType) description
+            (collectTypesM collectStructM) description
         -- determine which of the packer functions we actually need
         calledFuncs = execWriter $ collectModuleItemsM
-            (collectExprsM $ collectNestedExprsM collectCalls) description'
+            (collectExprsM $ collectNestedExprsM collectCallsM) description'
         packerFuncs = Set.map packerFnName $ Map.keysSet structs
         calledPackedFuncs = Set.intersection calledFuncs packerFuncs
-        funcs = map packerFn usedStructs
-        usedStructs = filter (isNeeded . fst) $ Map.toList structs
+        funcs = map packerFn $ filter isNeeded $ Map.keys structs
         isNeeded tf = Set.member (packerFnName tf) calledPackedFuncs
         -- helpers for the scoped traversal
         traverseModuleItemM :: ModuleItem -> State Types ModuleItem
@@ -55,30 +54,18 @@ convertDescription (description @ (Part _ _ _ _ _ _)) =
         traverseStmtM stmt =
             traverseStmtExprsM traverseExprM stmt >>=
             traverseStmtAsgnsM traverseAsgnM
-        traverseExprM = traverseNestedExprsM $ stately $ convertOnlyExpr structs
+        traverseExprM =
+            traverseNestedExprsM $ stately converter
+            where
+                converter :: Types -> Expr -> Expr
+                converter types expr =
+                    snd $ convertAsgn structs types (LHSIdent "", expr)
         traverseAsgnM = stately $ convertAsgn structs
 convertDescription other = other
 
--- writes down the names of called functions
-collectCalls :: Expr -> Writer Idents ()
-collectCalls (Call f _) = tell $ Set.singleton f
-collectCalls _ = return ()
-
--- produces a function which packs the components of a struct literal
-packerFn :: (TypeFunc, StructInfo) -> ModuleItem
-packerFn (structTf, (flatType, _)) =
-    MIPackageItem $
-    Function Nothing flatType fnName decls [retStmt]
-    where
-        Struct (Packed _) fields [] = structTf []
-        toInput (t, x) = Variable Input t x [] Nothing
-        decls = map toInput fields
-        retStmt = Return $ Concat $ map (Ident . snd) fields
-        fnName = packerFnName structTf
-
--- write down unstructured versions of a packed struct type
-collectType :: Type -> Writer Structs ()
-collectType (Struct (Packed sg) fields _) = do
+-- write down unstructured versions of packed struct types
+collectStructM :: Type -> Writer Structs ()
+collectStructM (Struct (Packed sg) fields _) = do
     -- TODO: How should we combine the structs Signing with that of the types it
     -- contains?
     if canUnstructure
@@ -130,8 +117,7 @@ collectType (Struct (Packed sg) fields _) = do
             all (head fieldClasses ==) fieldClasses &&
             not (any isComplex fieldTypes)
 
-collectType _ = return ()
-
+collectStructM _ = return ()
 
 -- convert a struct type to its unstructured equivalent
 convertType :: Structs -> Type -> Type
@@ -142,6 +128,10 @@ convertType structs t1 =
             where (tf2, rs2) = typeRanges t2
     where (tf1, rs1) = typeRanges t1
 
+-- writes down the names of called functions
+collectCallsM :: Expr -> Writer Idents ()
+collectCallsM (Call f _) = tell $ Set.singleton f
+collectCallsM _ = return ()
 
 -- write down the types of declarations
 traverseDeclM :: Decl -> State Types Decl
@@ -152,6 +142,18 @@ traverseDeclM origDecl = do
         Localparam t x _   -> modify $ Map.insert x t
     return origDecl
 
+-- produces a function which packs the components of a struct literal
+packerFn :: TypeFunc -> ModuleItem
+packerFn structTf =
+    MIPackageItem $
+    Function Nothing (structTf []) fnName decls [retStmt]
+    where
+        Struct (Packed _) fields [] = structTf []
+        toInput (t, x) = Variable Input t x [] Nothing
+        decls = map toInput fields
+        retStmt = Return $ Concat $ map (Ident . snd) fields
+        fnName = packerFnName structTf
+
 -- returns a "unique" name for the packer for a given struct type
 packerFnName :: TypeFunc -> Identifier
 packerFnName structTf =
@@ -160,10 +162,12 @@ packerFnName structTf =
         val = hash $ show structTf
         str = tail $ show val
 
-convertOnlyExpr :: Structs -> Types -> Expr -> Expr
-convertOnlyExpr structs types expr =
-    snd $ convertAsgn structs types (LHSIdent "", expr)
-
+-- This is where the magic happens. This is responsible for convertign struct
+-- accesses, assignments, and literals, given appropriate information about the
+-- structs and the current declaration context. The general strategy involves
+-- looking at the innermost type of a node to convert outer uses of fields, and
+-- then using the outermost type to figure out the corresping struct definition
+-- for struct literals that are encountered.
 convertAsgn :: Structs -> Types -> (LHS, Expr) -> (LHS, Expr)
 convertAsgn structs types (lhs, expr) =
     (lhs', expr')
