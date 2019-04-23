@@ -6,7 +6,7 @@
 
 module Convert.Interface (convert) where
 
-import Data.Maybe (mapMaybe)
+import Data.Maybe (fromJust, mapMaybe)
 import Control.Monad.Writer
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -79,9 +79,9 @@ convertDescription interfaces modules (Part extern Module lifetime name ports it
             where
                 InterfaceT interfaceName (Just _) [] = t
                 interfaceItems = snd $ interfaces Map.! interfaceName
-                mapper = \(dir, port, Just expr) ->
-                    Variable dir (lookupType interfaceItems expr)
-                    (ident ++ "_" ++ port) [] Nothing
+                mapper (dir, port, expr) =
+                    Variable dir mpt (ident ++ "_" ++ port) mprs Nothing
+                    where (mpt, mprs) = lookupType interfaceItems (fromJust expr)
         mapInterface (Instance part params ident Nothing instancePorts) =
             case Map.lookup part interfaces of
                 Just interface ->
@@ -201,13 +201,15 @@ prefixModuleItems prefix =
         prefixLHS (LHSIdent x) = LHSIdent (prefix ++ x)
         prefixLHS other = other
 
-lookupType :: [ModuleItem] -> Expr -> Type
+lookupType :: [ModuleItem] -> Expr -> (Type, [Range])
 lookupType items (Ident ident) =
-    head $ mapMaybe findType items
+    case mapMaybe findType items of
+        [] -> error $ "unable to locate type of " ++ ident
+        ts -> head ts
     where
-        findType :: ModuleItem -> Maybe Type
-        findType (MIDecl (Variable _ t x [] Nothing)) =
-            if x == ident then Just t else Nothing
+        findType :: ModuleItem -> Maybe (Type, [Range])
+        findType (MIDecl (Variable _ t x rs Nothing)) =
+            if x == ident then Just (t, rs) else Nothing
         findType _ = Nothing
 lookupType _ expr =
     -- TODO: Add support for non-Ident modport expressions.
