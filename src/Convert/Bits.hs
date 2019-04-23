@@ -32,10 +32,12 @@ convertDescription =
     scopedConversion traverseDeclM traverseModuleItemM traverseStmtM Map.empty
 
 traverseDeclM :: Decl -> State Info Decl
-traverseDeclM (origDecl @ (Variable _ t ident a _)) = do
-    modify $ Map.insert ident (t, a)
-    return origDecl
-traverseDeclM other = return other
+traverseDeclM decl = do
+    case decl of
+        Variable _ t ident a _ -> modify $ Map.insert ident (t, a)
+        Parameter  t ident   _ -> modify $ Map.insert ident (t, [])
+        Localparam t ident   _ -> modify $ Map.insert ident (t, [])
+    return decl
 
 traverseModuleItemM :: ModuleItem -> State Info ModuleItem
 traverseModuleItemM item = traverseExprsM traverseExprM item
