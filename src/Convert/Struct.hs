@@ -206,17 +206,16 @@ convertAsgn structs types (lhs, expr) =
         convertLHS (LHSBit l e) =
             case l' of
                 LHSRange lInner NonIndexed (_, loI) ->
-                    (t', LHSBit lInner (simplify $ BinOp Add loI e'))
+                    (t', LHSBit lInner (simplify $ BinOp Add loI e))
                 LHSRange lInner IndexedPlus (baseI, _) ->
-                    (t', LHSBit lInner (simplify $ BinOp Add baseI e'))
-                _ -> (t', LHSBit l' e')
+                    (t', LHSBit lInner (simplify $ BinOp Add baseI e))
+                _ -> (t', LHSBit l' e)
             where
                 (t, l') = convertLHS l
                 t' = case typeRanges t of
                     (_, []) -> Implicit Unspecified []
                     (tf, rs) -> tf $ tail rs
-                e' = snd $ convertSubExpr e
-        convertLHS (LHSRange lOuter NonIndexed rOuterOrig) =
+        convertLHS (LHSRange lOuter NonIndexed rOuter) =
             case lOuter' of
                 LHSRange lInner NonIndexed (_, loI) ->
                     (t, LHSRange lInner NonIndexed (simplify hi, simplify lo))
@@ -230,16 +229,11 @@ convertAsgn structs types (lhs, expr) =
                         len = rangeSize rOuter
                 _ -> (t, LHSRange lOuter' NonIndexed rOuter)
             where
-                hiO = snd $ convertSubExpr $ fst rOuterOrig
-                loO = snd $ convertSubExpr $ snd rOuterOrig
-                rOuter = (hiO, loO)
+                (hiO, loO) = rOuter
                 (t, lOuter') = convertLHS lOuter
         convertLHS (LHSRange l m r) =
-            (t', LHSRange l' m r')
+            (t', LHSRange l' m r)
             where
-                hi = snd $ convertSubExpr $ fst r
-                lo = snd $ convertSubExpr $ snd r
-                r' = (hi, lo)
                 (t, l') = convertLHS l
                 t' = case typeRanges t of
                     (_, []) -> Implicit Unspecified []

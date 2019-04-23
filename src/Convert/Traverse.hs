@@ -200,7 +200,7 @@ traverseNestedStmtsM mapper = fullMapper
     where
         fullMapper stmt = mapper stmt >>= traverseSinglyNestedStmtsM fullMapper
 
--- variant of the above which only traverse one level down
+-- variant of the above which only traverses one level down
 traverseSinglyNestedStmtsM :: Monad m => MapperM m Stmt -> MapperM m Stmt
 traverseSinglyNestedStmtsM fullMapper = cs
     where
@@ -447,9 +447,9 @@ traverseNestedExprsM mapper = exprMapper
             return $ Pattern $ zip names exprs
 
 exprMapperHelpers :: Monad m => MapperM m Expr ->
-    (MapperM m Range, MapperM m (Maybe Expr), MapperM m Decl)
+    (MapperM m Range, MapperM m (Maybe Expr), MapperM m Decl, MapperM m LHS)
 exprMapperHelpers exprMapper =
-    (rangeMapper, maybeExprMapper, declMapper)
+    (rangeMapper, maybeExprMapper, declMapper, traverseNestedLHSsM lhsMapper)
     where
 
     rangeMapper (a, b) = do
@@ -473,11 +473,17 @@ exprMapperHelpers exprMapper =
         me' <- maybeExprMapper me
         return $ Variable d t' x a' me'
 
+    lhsMapper (LHSRange l m r) =
+        rangeMapper r >>= return . LHSRange l m
+    lhsMapper (LHSBit l e) =
+        exprMapper e >>= return . LHSBit l
+    lhsMapper other = return other
+
 traverseExprsM' :: Monad m => TFStrategy -> MapperM m Expr -> MapperM m ModuleItem
 traverseExprsM' strat exprMapper = moduleItemMapper
     where
 
-    (rangeMapper, maybeExprMapper, declMapper)
+    (rangeMapper, maybeExprMapper, declMapper, lhsMapper)
         = exprMapperHelpers exprMapper
 
     stmtMapper = traverseNestedStmtsM (traverseStmtExprsM exprMapper)
@@ -490,16 +496,19 @@ traverseExprsM' strat exprMapper = moduleItemMapper
         return $ MIAttr attr mi
     moduleItemMapper (MIDecl decl) =
         declMapper decl >>= return . MIDecl
-    moduleItemMapper (Defparam lhs expr) =
-        exprMapper expr >>= return . Defparam lhs
+    moduleItemMapper (Defparam lhs expr) = do
+        lhs' <- lhsMapper lhs
+        expr' <- exprMapper expr
+        return $ Defparam lhs' expr'
     moduleItemMapper (AlwaysC kw stmt) =
         stmtMapper stmt >>= return . AlwaysC kw
     moduleItemMapper (Initial stmt) =
         stmtMapper stmt >>= return . Initial
     moduleItemMapper (Assign delay lhs expr) = do
         delay' <- maybeExprMapper delay
+        lhs' <- lhsMapper lhs
         expr' <- exprMapper expr
-        return $ Assign delay' lhs expr'
+        return $ Assign delay' lhs' expr'
     moduleItemMapper (MIPackageItem (Function lifetime ret f decls stmts)) = do
         decls' <-
             if strat == IncludeTFs
@@ -529,9 +538,12 @@ traverseExprsM' strat exprMapper = moduleItemMapper
         mapM modportDeclMapper l >>= return . Modport x
     moduleItemMapper (NInputGate  kw x lhs exprs) = do
         exprs' <- mapM exprMapper exprs
-        return $ NInputGate kw x lhs exprs'
-    moduleItemMapper (NOutputGate kw x lhss expr) =
-        exprMapper expr >>= return . NOutputGate kw x lhss
+        lhs' <- lhsMapper lhs
+        return $ NInputGate kw x lhs' exprs'
+    moduleItemMapper (NOutputGate kw x lhss expr) = do
+        lhss' <- mapM lhsMapper lhss
+        expr' <- exprMapper expr
+        return $ NOutputGate kw x lhss' expr'
     moduleItemMapper (Genvar   x) = return $ Genvar   x
     moduleItemMapper (Generate items) = do
         items' <- mapM (traverseNestedGenItemsM genItemMapper) items
@@ -581,7 +593,7 @@ traverseStmtExprsM :: Monad m => MapperM m Expr -> MapperM m Stmt
 traverseStmtExprsM exprMapper = flatStmtMapper
     where
 
-    (_, maybeExprMapper, declMapper)
+    (_, maybeExprMapper, declMapper, lhsMapper)
         = exprMapperHelpers exprMapper
 
     caseMapper (exprs, stmt) = do
@@ -598,10 +610,14 @@ traverseStmtExprsM exprMapper = flatStmtMapper
         e' <- exprMapper e
         cases' <- mapM caseMapper cases
         return $ Case u kw e' cases' def
-    flatStmtMapper (AsgnBlk op lhs expr) =
-        exprMapper expr >>= return . AsgnBlk op lhs
-    flatStmtMapper (Asgn    mt lhs expr) =
-        exprMapper expr >>= return . Asgn    mt lhs
+    flatStmtMapper (AsgnBlk op lhs expr) = do
+        lhs' <- lhsMapper lhs
+        expr' <- exprMapper expr
+        return $ AsgnBlk op lhs' expr'
+    flatStmtMapper (Asgn    mt lhs expr) = do
+        lhs' <- lhsMapper lhs
+        expr' <- exprMapper expr
+        return $ Asgn    mt lhs' expr'
     flatStmtMapper (For inits cc asgns stmt) = do
         inits' <- mapM initMapper inits
         cc' <- maybeExprMapper cc
@@ -793,7 +809,12 @@ collectGenItemsM = collectify traverseGenItemsM
 traverseNestedGenItemsM :: Monad m => MapperM m GenItem -> MapperM m GenItem
 traverseNestedGenItemsM mapper = fullMapper
     where
-        fullMapper genItem = gim genItem >>= mapper
+        fullMapper stmt =
+            mapper stmt >>= traverseSinglyNestedGenItemsM fullMapper
+
+traverseSinglyNestedGenItemsM :: Monad m => MapperM m GenItem -> MapperM m GenItem
+traverseSinglyNestedGenItemsM fullMapper = gim
+    where
         gim (GenBlock x subItems) = do
             subItems' <- mapM fullMapper subItems
             return $ GenBlock x (concatMap flattenBlocks subItems')
