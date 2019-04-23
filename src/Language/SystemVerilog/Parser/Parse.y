@@ -432,6 +432,11 @@ ModuleItems :: { [ModuleItem] }
   | ModuleItems ";"        { $1 }
 
 ModuleItem :: { [ModuleItem] }
+  : NonGenerateModuleItem { $1 }
+  | ConditionalGenerateConstruct      { [Generate [$1]] }
+  | LoopGenerateConstruct             { [Generate [$1]] }
+  | "generate" GenItems "endgenerate" { [Generate $2] }
+NonGenerateModuleItem :: { [ModuleItem] }
   -- This item covers module instantiations and all declarations
   : DeclTokens(";")  { parseDTsAsModuleItems $1 }
   | ParameterDecl(ParameterDeclKW, ";")  { map MIDecl $1 }
@@ -440,7 +445,6 @@ ModuleItem :: { [ModuleItem] }
   | AlwaysKW Stmt                        { [AlwaysC $1 $2] }
   | "initial" Stmt                       { [Initial $2] }
   | "genvar" Identifiers ";"             { map Genvar $2 }
-  | "generate" GenItems "endgenerate"    { [Generate $2] }
   | "modport" ModportItems ";"           { map (uncurry Modport) $2 }
   | PackageItem                          { [MIPackageItem $1] }
   | NInputGateKW  NInputGates  ";"       { map (\(a, b, c) -> NInputGate  $1 a b c) $2 }
@@ -859,12 +863,16 @@ GenItems :: { [GenItem] }
   | GenItems GenItem { $1 ++ [$2] }
 
 GenItem :: { GenItem }
+  : GenBlock              { uncurry GenBlock $1 }
+  | NonGenerateModuleItem { genItemsToGenItem $ map GenModuleItem $1 }
+  | ConditionalGenerateConstruct { $1 }
+  | LoopGenerateConstruct        { $1 }
+ConditionalGenerateConstruct :: { GenItem }
   : "if" "(" Expr ")" GenItemOrNull "else" GenItemOrNull { GenIf $3 $5 $7      }
   | "if" "(" Expr ")" GenItemOrNull %prec NoElse         { GenIf $3 $5 GenNull }
-  | GenBlock                                             { uncurry GenBlock $1 }
   | "case" "(" Expr ")" GenCases opt(GenCaseDefault) "endcase" { GenCase $3 $5 $6 }
-  | "for" "(" Identifier "=" Expr ";" Expr ";" GenvarIteration ")" GenBlock { (uncurry $ GenFor ($3, $5) $7 $9) $11  }
-  | ModuleItem { genItemsToGenItem $ map GenModuleItem $1 }
+LoopGenerateConstruct :: { GenItem }
+  : "for" "(" GenvarInitialization ";" Expr ";" GenvarIteration ")" GenBlock { (uncurry $ GenFor $3 $5 $7) $9 }
 
 GenBlock :: { (Maybe Identifier, [GenItem]) }
   : "begin" opt(Tag) GenItems "end" opt(Tag) { (combineTags $2 $5, $3) }
@@ -878,6 +886,10 @@ GenCase :: { GenCase }
 
 GenCaseDefault :: { GenItem }
   : "default" opt(":") GenItemOrNull { $3 }
+
+GenvarInitialization :: { (Bool, Identifier, Expr) }
+  : "genvar" Identifier "=" Expr { (True , $2, $4) }
+  |          Identifier "=" Expr { (False, $1, $3) }
 
 GenvarIteration :: { (Identifier, AsgnOp, Expr) }
   : Identifier AsgnOp Expr { ($1, $2, $3) }

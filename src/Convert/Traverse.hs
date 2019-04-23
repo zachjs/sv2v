@@ -557,11 +557,11 @@ traverseExprsM' strat exprMapper = moduleItemMapper
         a'' <- traverseAssertionExprsM exprMapper a'
         return $ AssertionItem (mx, a'')
 
-    genItemMapper (GenFor (x1, e1) cc (x2, op2, e2) mn subItems) = do
+    genItemMapper (GenFor (n1, x1, e1) cc (x2, op2, e2) mn subItems) = do
         e1' <- exprMapper e1
         e2' <- exprMapper e2
         cc' <- exprMapper cc
-        return $ GenFor (x1, e1') cc' (x2, op2, e2') mn subItems
+        return $ GenFor (n1, x1, e1') cc' (x2, op2, e2') mn subItems
     genItemMapper (GenIf e i1 i2) = do
         e' <- exprMapper e
         return $ GenIf e' i1 i2
