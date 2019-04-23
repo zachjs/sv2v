@@ -64,6 +64,7 @@ convertDescription ports orig =
             Part _ Interface _ _ _ _ -> False
             Part _ Module _ _ _ _ -> True
             PackageItem _ -> True
+            Package _ _ _ -> False
             Directive _ -> False
         conversion = traverseDecls convertDecl . convertModuleItem
         idents = execWriter (collectModuleItemsM regIdents orig)

@@ -151,6 +151,14 @@ traverseModuleItemsM mapper (PackageItem packageItem) = do
     return $ case item' of
         MIPackageItem packageItem' -> PackageItem packageItem'
         other -> error $ "encountered bad package module item: " ++ show other
+traverseModuleItemsM mapper (Package lifetime name items) = do
+    converted <-
+        traverseModuleItemsM mapper (Part False Module Nothing "DNE" [] items)
+    let items' = case converted of
+            Part False Module Nothing "DNE" [] newItems -> newItems
+            _ -> error $ "redirected Package traverse failed: "
+                    ++ show converted
+    return $ Package lifetime name items'
 traverseModuleItemsM _ (Directive str) = return $ Directive str
 
 traverseModuleItems :: Mapper ModuleItem -> Mapper Description
@@ -399,6 +407,7 @@ traverseNestedExprsM mapper = exprMapper
         em (String s) = return $ String s
         em (Number s) = return $ Number s
         em (Ident  i) = return $ Ident  i
+        em (PSIdent x y) = return $ PSIdent x y
         em (Range e m (e1, e2)) = do
             e' <- exprMapper e
             e1' <- exprMapper e1
@@ -552,6 +561,8 @@ traverseExprsM' strat exprMapper = moduleItemMapper
         return $ MIPackageItem $ Typedef t x
     moduleItemMapper (MIPackageItem (Comment c)) =
         return $ MIPackageItem $ Comment c
+    moduleItemMapper (MIPackageItem (Import imports)) =
+        return $ MIPackageItem $ Import imports
     moduleItemMapper (AssertionItem (mx, a)) = do
         a' <- traverseAssertionStmtsM stmtMapper a
         a'' <- traverseAssertionExprsM exprMapper a'

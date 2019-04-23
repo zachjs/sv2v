@@ -55,8 +55,10 @@ import Language.SystemVerilog.Parser.Tokens
 "endgenerate"      { Token KW_endgenerate  _ _ }
 "endinterface"     { Token KW_endinterface _ _ }
 "endmodule"        { Token KW_endmodule    _ _ }
+"endpackage"       { Token KW_endpackage   _ _ }
 "endtask"          { Token KW_endtask      _ _ }
 "enum"             { Token KW_enum         _ _ }
+"export"           { Token KW_export       _ _ }
 "extern"           { Token KW_extern       _ _ }
 "first_match"      { Token KW_first_match  _ _ }
 "for"              { Token KW_for          _ _ }
@@ -66,6 +68,7 @@ import Language.SystemVerilog.Parser.Tokens
 "genvar"           { Token KW_genvar       _ _ }
 "if"               { Token KW_if           _ _ }
 "iff"              { Token KW_iff          _ _ }
+"import"           { Token KW_import       _ _ }
 "initial"          { Token KW_initial      _ _ }
 "inout"            { Token KW_inout        _ _ }
 "input"            { Token KW_input        _ _ }
@@ -84,6 +87,7 @@ import Language.SystemVerilog.Parser.Tokens
 "not"              { Token KW_not          _ _ }
 "or"               { Token KW_or           _ _ }
 "output"           { Token KW_output       _ _ }
+"package"          { Token KW_package      _ _ }
 "packed"           { Token KW_packed       _ _ }
 "parameter"        { Token KW_parameter    _ _ }
 "posedge"          { Token KW_posedge      _ _ }
@@ -258,6 +262,7 @@ Description :: { Description }
   : Part(ModuleKW   , "endmodule"   ) { $1 }
   | Part(InterfaceKW, "endinterface") { $1 }
   | PackageItem { PackageItem $1 }
+  | PackageDeclaration { $1 }
 
 Type :: { Type }
   : TypeNonIdent { $1 }
@@ -337,6 +342,9 @@ ModuleKW :: { PartKW }
   : "module" { Module }
 InterfaceKW :: { PartKW }
   : "interface" { Interface }
+
+PackageDeclaration :: { Description }
+  : "package" opt(Lifetime) Identifier ";" ModuleItems "endpackage" opt(Tag) { Package $2 $3 $5 }
 
 Tag :: { Identifier }
   : ":" Identifier { $2 }
@@ -560,6 +568,14 @@ PackageItem :: { PackageItem }
   : "typedef" Type Identifier ";" { Typedef $2 $3 }
   | "function" opt(Lifetime) FuncRetAndName TFItems DeclsAndStmts "endfunction" opt(Tag) { Function $2 (fst $3) (snd $3) (map defaultFuncInput $ (map makeInput $4) ++ fst $5) (snd $5) }
   | "task" opt(Lifetime) Identifier TFItems DeclsAndStmts "endtask" opt(Tag) { Task $2 $3 (map defaultFuncInput $ $4 ++ fst $5) (snd $5) }
+  | "import" PackageImportItems ";" { Import $2 }
+
+PackageImportItems :: { [(Identifier, Maybe Identifier)] }
+  : PackageImportItem                        { [$1] }
+  | PackageImportItems "," PackageImportItem { $1 ++ [$3] }
+PackageImportItem :: { (Identifier, Maybe Identifier) }
+  : Identifier "::" Identifier { ($1, Just $3) }
+  | Identifier "::" "*"        { ($1, Nothing) }
 
 FuncRetAndName :: { (Type, Identifier) }
   : Type                       Identifier { ($1                     , $2) }
@@ -791,6 +807,7 @@ Expr :: { Expr }
   | Identifier "(" CallArgs ")" { Call $1 $3 }
   | "$bits"    "(" BitsArg  ")" { Bits $3 }
   | Identifier                  { Ident $1 }
+  | Identifier "::" Identifier  { PSIdent $1 $3 }
   | Expr PartSelect             { Range $1 (fst $2) (snd $2) }
   | Expr "[" Expr "]"           { Bit   $1 $3 }
   | "{" Expr "{" Exprs "}" "}"  { Repeat $2 $4 }

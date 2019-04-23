@@ -134,8 +134,10 @@ tokens :-
     "endgenerate"      { tok KW_endgenerate  }
     "endinterface"     { tok KW_endinterface }
     "endmodule"        { tok KW_endmodule    }
+    "endpackage"       { tok KW_endpackage   }
     "endtask"          { tok KW_endtask      }
     "enum"             { tok KW_enum         }
+    "export"           { tok KW_export       }
     "extern"           { tok KW_extern       }
     "first_match"      { tok KW_first_match  }
     "for"              { tok KW_for          }
@@ -145,6 +147,7 @@ tokens :-
     "genvar"           { tok KW_genvar       }
     "if"               { tok KW_if           }
     "iff"              { tok KW_iff          }
+    "import"           { tok KW_import       }
     "initial"          { tok KW_initial      }
     "inout"            { tok KW_inout        }
     "input"            { tok KW_input        }
@@ -163,6 +166,7 @@ tokens :-
     "not"              { tok KW_not          }
     "or"               { tok KW_or           }
     "output"           { tok KW_output       }
+    "package"          { tok KW_package      }
     "packed"           { tok KW_packed       }
     "parameter"        { tok KW_parameter    }
     "posedge"          { tok KW_posedge      }

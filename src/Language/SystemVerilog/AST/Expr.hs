@@ -34,6 +34,7 @@ data Expr
     = String  String
     | Number  String
     | Ident   Identifier
+    | PSIdent Identifier Identifier
     | Range   Expr PartSelectMode Range
     | Bit     Expr Expr
     | Repeat  Expr [Expr]
@@ -51,6 +52,7 @@ data Expr
 instance Show Expr where
     show (Number  str  ) = str
     show (Ident   str  ) = str
+    show (PSIdent   x y) = printf "%s::%s" x y
     show (String  str  ) = printf "\"%s\"" str
     show (Bit     e b  ) = printf "%s[%s]"     (show e) (show b)
     show (Range   e m r) = printf "%s[%s%s%s]" (show e) (show $ fst r) (show m) (show $ snd r)

@@ -12,6 +12,7 @@ module Language.SystemVerilog.AST.Description
     , Lifetime    (..)
     ) where
 
+import Data.Maybe (fromMaybe)
 import Data.List (intercalate)
 import Text.Printf (printf)
 
@@ -25,6 +26,7 @@ import {-# SOURCE #-} Language.SystemVerilog.AST.ModuleItem (ModuleItem)
 data Description
     = Part Bool PartKW (Maybe Lifetime) Identifier [Identifier] [ModuleItem]
     | PackageItem PackageItem
+    | Package (Maybe Lifetime) Identifier [ModuleItem]
     | Directive String -- currently unused
     deriving Eq
 
@@ -42,6 +44,11 @@ instance Show Description where
                 then ""
                 else " " ++ indentedParenList ports
             bodyStr = indent $ unlines' $ map show items
+    show (Package lifetime name items) =
+        printf "package %s%s;\n%s\nendpackage"
+            (showLifetime lifetime) name bodyStr
+        where
+            bodyStr = indent $ unlines' $ map show items
     show (PackageItem i) = show i
     show (Directive str) = str
 
@@ -49,6 +56,7 @@ data PackageItem
     = Typedef Type Identifier
     | Function (Maybe Lifetime) Type Identifier [Decl] [Stmt]
     | Task     (Maybe Lifetime)      Identifier [Decl] [Stmt]
+    | Import [(Identifier, Maybe Identifier)]
     | Comment String
     deriving Eq
 
@@ -62,6 +70,11 @@ instance Show PackageItem where
         printf "task %s%s;\n%s\n%s\nendtask"
             (showLifetime ml) x (indent $ show i)
             (indent $ unlines' $ map show b)
+    show (Import imports) =
+        printf "import %s;"
+            (commas $ map showImport imports)
+        where
+            showImport (x, y) = printf "%s::%s" x (fromMaybe "*" y)
     show (Comment c) =
         if elem '\n' c
             then "// " ++ show c
