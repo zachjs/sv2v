@@ -159,7 +159,9 @@ collectTFArgsM _ = return ()
 traverseDeclM :: Decl -> State Types Decl
 traverseDeclM origDecl = do
     case origDecl of
-        Variable _ t x _ _ -> modify $ Map.insert x t
+        Variable _ t x a _ -> do
+            let (tf, rs) = typeRanges t
+            modify $ Map.insert x (tf $ a ++ rs)
         Parameter  t x _   -> modify $ Map.insert x t
         Localparam t x _   -> modify $ Map.insert x t
     return origDecl
