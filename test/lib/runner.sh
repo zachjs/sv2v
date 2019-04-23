@@ -36,11 +36,20 @@ simulate() {
 
 assertConverts() {
     ac_file="$1"
-    ac_temp="$SHUNIT_TMPDIR/ac-conv-temp.v"
-    $SV2V "$ac_file" 2> /dev/null > "$ac_temp"
+    ac_tmpa="$SHUNIT_TMPDIR/ac-conv-tmpa.v"
+    ac_tmpb="$SHUNIT_TMPDIR/ac-conv-tmpb.v"
+    ac_tmpc="$SHUNIT_TMPDIR/ac-conv-tmpc.v"
+    $SV2V "$ac_file" 2> /dev/null > "$ac_tmpa"
     assertTrue "1st conversion of $ac_file failed" $?
-    $SV2V "$ac_temp" 2> /dev/null > /dev/null
+    $SV2V "$ac_tmpa" 2> /dev/null > "$ac_tmpb"
     assertTrue "2nd conversion of $ac_file failed" $?
+    $SV2V "$ac_tmpb" 2> /dev/null > "$ac_tmpc"
+    assertTrue "3rd conversion of $ac_file failed" $?
+    diff "$ac_tmpb" "$ac_tmpc" > /dev/null
+    assertTrue "conversion of $ac_file not stable after the second iteration" $?
+    # using sed to remove quoted strings because "$bits" may be printed
+    sed -E 's/"([^"]|\")+"//g' "$ac_tmpa" | grep "\$bits" > /dev/null
+    assertFalse "conversion of $ac_file still contains \$bits" $?
 }
 
 simpleTest() {
