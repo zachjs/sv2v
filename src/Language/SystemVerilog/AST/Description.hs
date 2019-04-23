@@ -26,7 +26,7 @@ import {-# SOURCE #-} Language.SystemVerilog.AST.ModuleItem (ModuleItem)
 data Description
     = Part Bool PartKW (Maybe Lifetime) Identifier [Identifier] [ModuleItem]
     | PackageItem PackageItem
-    | Package (Maybe Lifetime) Identifier [ModuleItem]
+    | Package (Maybe Lifetime) Identifier [PackageItem]
     | Directive String -- currently unused
     deriving Eq
 
@@ -57,6 +57,7 @@ data PackageItem
     | Function (Maybe Lifetime) Type Identifier [Decl] [Stmt]
     | Task     (Maybe Lifetime)      Identifier [Decl] [Stmt]
     | Import [(Identifier, Maybe Identifier)]
+    | Decl Decl
     | Comment String
     deriving Eq
 
@@ -75,6 +76,7 @@ instance Show PackageItem where
             (commas $ map showImport imports)
         where
             showImport (x, y) = printf "%s::%s" x (fromMaybe "*" y)
+    show (Decl decl) = show decl
     show (Comment c) =
         if elem '\n' c
             then "// " ++ show c

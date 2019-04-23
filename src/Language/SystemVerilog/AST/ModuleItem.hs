@@ -21,7 +21,7 @@ import Text.Printf (printf)
 import Language.SystemVerilog.AST.ShowHelp
 
 import Language.SystemVerilog.AST.Attr (Attr)
-import Language.SystemVerilog.AST.Decl (Decl, Direction)
+import Language.SystemVerilog.AST.Decl (Direction)
 import Language.SystemVerilog.AST.Description (PackageItem)
 import Language.SystemVerilog.AST.Expr (Expr(Ident), Range, showRanges)
 import Language.SystemVerilog.AST.GenItem (GenItem)
@@ -31,7 +31,6 @@ import Language.SystemVerilog.AST.Type (Identifier)
 
 data ModuleItem
     = MIAttr     Attr ModuleItem
-    | MIDecl     Decl
     | AlwaysC    AlwaysKW Stmt
     | Assign     (Maybe Expr) LHS Expr
     | Defparam   LHS Expr
@@ -47,7 +46,6 @@ data ModuleItem
     deriving Eq
 
 instance Show ModuleItem where
-    show (MIDecl     nest) = show nest
     show (MIPackageItem i) = show i
     show (MIAttr attr mi ) = printf "%s %s" (show attr) (show mi)
     show (AlwaysC     k b) = printf "%s %s" (show k) (show b)

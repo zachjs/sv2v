@@ -84,7 +84,7 @@ parseDTsAsPortDecls pieces =
     forbidNonEqAsgn pieces $
     if isSimpleList
         then (simpleIdents, [])
-        else (portNames declarations, map MIDecl declarations)
+        else (portNames declarations, map (MIPackageItem . Decl) declarations)
     where
         commaIdxs = findIndices isComma pieces
         identIdxs = findIndices isIdent pieces
@@ -116,7 +116,7 @@ parseDTsAsModuleItems tokens =
     forbidNonEqAsgn tokens $
     if any isInstance tokens
         then parseDTsAsIntantiations tokens
-        else map MIDecl $ parseDTsAsDecl tokens
+        else map (MIPackageItem . Decl) $ parseDTsAsDecl tokens
     where
         isInstance :: DeclToken -> Bool
         isInstance (DTInstance _) = True

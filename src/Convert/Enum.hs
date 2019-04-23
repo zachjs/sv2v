@@ -73,7 +73,7 @@ convergeUsage items enums =
 
 toItem :: EnumItem -> ModuleItem
 toItem ((r, x), v) =
-    MIDecl $ Localparam itemType x v'
+    MIPackageItem $ Decl $ Localparam itemType x v'
     where
         v' = sizedExpr x r (simplify v)
         itemType = Implicit Unspecified [r]

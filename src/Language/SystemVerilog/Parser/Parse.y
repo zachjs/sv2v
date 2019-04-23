@@ -256,13 +256,13 @@ opt(p) :: { Maybe a }
 Descriptions :: { [Description] }
   : {- empty -}              { [] }
   | Descriptions ";"         { $1 }
-  | Descriptions Description { $1 ++ [$2] }
+  | Descriptions Description { $1 ++ $2 }
 
-Description :: { Description }
-  : Part(ModuleKW   , "endmodule"   ) { $1 }
-  | Part(InterfaceKW, "endinterface") { $1 }
-  | PackageItem { PackageItem $1 }
-  | PackageDeclaration { $1 }
+Description :: { [Description] }
+  : Part(ModuleKW   , "endmodule"   ) { [$1] }
+  | Part(InterfaceKW, "endinterface") { [$1] }
+  | PackageDeclaration                { [$1] }
+  | PackageItem { map PackageItem $1 }
 
 Type :: { Type }
   : TypeNonIdent { $1 }
@@ -344,7 +344,7 @@ InterfaceKW :: { PartKW }
   : "interface" { Interface }
 
 PackageDeclaration :: { Description }
-  : "package" opt(Lifetime) Identifier ";" ModuleItems "endpackage" opt(Tag) { Package $2 $3 $5 }
+  : "package" opt(Lifetime) Identifier ";" PackageItems "endpackage" opt(Tag) { Package $2 $3 $5 }
 
 Tag :: { Identifier }
   : ":" Identifier { $2 }
@@ -356,7 +356,7 @@ ParamDecls :: { [ModuleItem] }
   : ParamDecl(")")            { $1 }
   | ParamDecl(",") ParamDecls { $1 ++ $2 }
 ParamDecl(delim) :: { [ModuleItem] }
-  : ParameterDecl(OnlyParamKW, delim) { map MIDecl $1 }
+  : ParameterDecl(OnlyParamKW, delim) { map (MIPackageItem . Decl) $1 }
 OnlyParamKW :: { Type -> Identifier -> Expr -> Decl }
   : "parameter" { Parameter }
 
@@ -447,14 +447,14 @@ ModuleItem :: { [ModuleItem] }
 NonGenerateModuleItem :: { [ModuleItem] }
   -- This item covers module instantiations and all declarations
   : DeclTokens(";")  { parseDTsAsModuleItems $1 }
-  | ParameterDecl(ParameterDeclKW, ";")  { map MIDecl $1 }
+  | ParameterDecl(ParameterDeclKW, ";")  { map (MIPackageItem . Decl) $1 }
   | "defparam" DefparamAsgns ";"         { map (uncurry Defparam) $2 }
   | "assign" opt(DelayControl) LHS "=" Expr ";" { [Assign $2 $3 $5] }
   | AlwaysKW Stmt                        { [AlwaysC $1 $2] }
   | "initial" Stmt                       { [Initial $2] }
   | "genvar" Identifiers ";"             { map Genvar $2 }
   | "modport" ModportItems ";"           { map (uncurry Modport) $2 }
-  | PackageItem                          { [MIPackageItem $1] }
+  | NonDeclPackageItem                   { [MIPackageItem $1] }
   | NInputGateKW  NInputGates  ";"       { map (\(a, b, c) -> NInputGate  $1 a b c) $2 }
   | NOutputGateKW NOutputGates ";"       { map (\(a, b, c) -> NOutputGate $1 a b c) $2 }
   | AttributeInstance ModuleItem         { map (MIAttr $1) $2 }
@@ -564,7 +564,14 @@ DefparamAsgns :: { [(LHS, Expr)] }
 DefparamAsgn :: { (LHS, Expr) }
   : LHS "=" Expr { ($1, $3) }
 
-PackageItem :: { PackageItem }
+PackageItems :: { [PackageItem] }
+  : PackageItem              { $1 }
+  | PackageItems PackageItem { $1 ++ $2 }
+PackageItem :: { [PackageItem] }
+  : DeclTokens(";")                     { map Decl $ parseDTsAsDecls $1 }
+  | ParameterDecl(ParameterDeclKW, ";") { map Decl $1 }
+  | NonDeclPackageItem                  { [$1] }
+NonDeclPackageItem :: { PackageItem }
   : "typedef" Type Identifier ";" { Typedef $2 $3 }
   | "function" opt(Lifetime) FuncRetAndName TFItems DeclsAndStmts "endfunction" opt(Tag) { Function $2 (fst $3) (snd $3) (map defaultFuncInput $ (map makeInput $4) ++ fst $5) (snd $5) }
   | "task" opt(Lifetime) Identifier TFItems DeclsAndStmts "endtask" opt(Tag) { Task $2 $3 (map defaultFuncInput $ $4 ++ fst $5) (snd $5) }

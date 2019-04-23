@@ -43,7 +43,7 @@ convert ast =
             collectModuleItemsM collectPortDirsM orig
             where
                 collectPortDirsM :: ModuleItem -> Writer Ports ()
-                collectPortDirsM (MIDecl (Variable dir _ ident _ _)) =
+                collectPortDirsM (MIPackageItem (Decl (Variable dir _ ident _ _))) =
                     if dir == Local then
                         return ()
                     else if elem ident portNames then
@@ -100,7 +100,7 @@ convertDescription ports orig =
                         tmpExpr = Ident tmp
                         t = Net TWire [(Bits $ Right expr, Number "1")]
                         items =
-                            [ MIDecl $ Variable Local t tmp [] Nothing
+                            [ MIPackageItem $ Decl $ Variable Local t tmp [] Nothing
                             , AlwaysC AlwaysComb $ AsgnBlk AsgnOpEq lhs tmpExpr]
                         lhs = case exprToLHS expr of
                             Just l -> l
@@ -110,8 +110,8 @@ convertDescription ports orig =
                                     ++ portName ++ " of " ++ instanceName
                 fixBinding other = (other, [])
         -- rewrite variable declarations to have the correct type
-        convertModuleItem (MIDecl (Variable dir (IntegerVector TLogic sg mr) ident a me)) =
-            MIDecl $ Variable dir (t mr) ident a me
+        convertModuleItem (MIPackageItem (Decl (Variable dir (IntegerVector TLogic sg mr) ident a me))) =
+            MIPackageItem $ Decl $ Variable dir (t mr) ident a me
             where
                 t = if sg /= Unspecified || Set.member ident idents
                     then IntegerVector TReg sg

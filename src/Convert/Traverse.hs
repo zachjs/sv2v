@@ -151,14 +151,15 @@ traverseModuleItemsM mapper (PackageItem packageItem) = do
     return $ case item' of
         MIPackageItem packageItem' -> PackageItem packageItem'
         other -> error $ "encountered bad package module item: " ++ show other
-traverseModuleItemsM mapper (Package lifetime name items) = do
+traverseModuleItemsM mapper (Package lifetime name packageItems) = do
+    let items = map MIPackageItem packageItems
     converted <-
         traverseModuleItemsM mapper (Part False Module Nothing "DNE" [] items)
     let items' = case converted of
             Part False Module Nothing "DNE" [] newItems -> newItems
             _ -> error $ "redirected Package traverse failed: "
                     ++ show converted
-    return $ Package lifetime name items'
+    return $ Package lifetime name $ map (\(MIPackageItem item) -> item) items'
 traverseModuleItemsM _ (Directive str) = return $ Directive str
 
 traverseModuleItems :: Mapper ModuleItem -> Mapper Description
@@ -503,8 +504,8 @@ traverseExprsM' strat exprMapper = moduleItemMapper
     moduleItemMapper (MIAttr attr mi) =
         -- note: we exclude expressions in attributes from conversion
         return $ MIAttr attr mi
-    moduleItemMapper (MIDecl decl) =
-        declMapper decl >>= return . MIDecl
+    moduleItemMapper (MIPackageItem (Decl decl)) =
+        declMapper decl >>= return . MIPackageItem . Decl
     moduleItemMapper (Defparam lhs expr) = do
         lhs' <- lhsMapper lhs
         expr' <- exprMapper expr
@@ -725,8 +726,8 @@ traverseDeclsM' strat mapper item = do
     item' <- miMapper item
     traverseStmtsM' strat stmtMapper item'
     where
-        miMapper (MIDecl decl) =
-            mapper decl >>= return . MIDecl
+        miMapper (MIPackageItem (Decl decl)) =
+            mapper decl >>= return . MIPackageItem . Decl
         miMapper (MIPackageItem (Function l t x decls stmts)) = do
             decls' <-
                 if strat == IncludeTFs
@@ -921,7 +922,7 @@ collectNestedExprsM = collectify traverseNestedExprsM
 
 -- Traverse all the declaration scopes within a ModuleItem. Note that Functions,
 -- Tasks, Always and Initial blocks are all NOT passed through ModuleItem
--- mapper, and MIDecl ModuleItems are NOT passed through the Decl mapper. The
+-- mapper, and Decl ModuleItems are NOT passed through the Decl mapper. The
 -- state is restored to its previous value after each scope is exited. Only the
 -- Decl mapper may modify the state, as we maintain the invariant that all other
 -- functions restore the state on exit. The Stmt mapper must not traverse
@@ -992,12 +993,12 @@ scopedConversion
 scopedConversion traverseDeclM traverseModuleItemM traverseStmtM s description =
     evalState (initialTraverse description >>= scopedTraverse) s
     where
-        initialTraverse = traverseModuleItemsM traverseMIDecl
+        initialTraverse = traverseModuleItemsM traverseMIPackageItemDecl
         scopedTraverse = traverseModuleItemsM $
             traverseScopesM traverseDeclM traverseModuleItemM traverseStmtM
-        traverseMIDecl (MIDecl decl) =
-            traverseDeclM decl >>= return . MIDecl
-        traverseMIDecl other = return other
+        traverseMIPackageItemDecl (MIPackageItem (Decl decl)) =
+            traverseDeclM decl >>= return . MIPackageItem . Decl
+        traverseMIPackageItemDecl other = return other
 
 -- convert a basic mapper with an initial argument to a stateful mapper
 stately :: (Eq s, Show s) => (s -> Mapper a) -> MapperM (State s) a

@@ -58,7 +58,7 @@ convertDescription interfaces modules (Part extern Module lifetime name ports it
         (instances, modports) = execWriter $ mapM
             (collectNestedModuleItemsM collectInterface) items
         collectInterface :: ModuleItem -> Writer (Instances, Modports)  ()
-        collectInterface (MIDecl (Variable _ t ident _ _)) =
+        collectInterface (MIPackageItem (Decl (Variable _ t ident _ _))) =
             case t of
                 InterfaceT interfaceName (Just modportName) [] ->
                     tell (Map.empty, Map.singleton ident modportDecls)
@@ -71,10 +71,11 @@ convertDescription interfaces modules (Part extern Module lifetime name ports it
         collectInterface _ = return ()
 
         mapInterface :: ModuleItem -> ModuleItem
-        mapInterface (orig @ (MIDecl (Variable Local t ident _ _))) =
+        mapInterface (orig @ (MIPackageItem (Decl (Variable Local t ident _ _)))) =
             case Map.lookup ident modports of
                 Just modportDecls -> Generate $
-                    map (GenModuleItem . MIDecl . mapper) modportDecls
+                    map (GenModuleItem . MIPackageItem . Decl . mapper)
+                    modportDecls
                 Nothing -> orig
             where
                 InterfaceT interfaceName (Just _) [] = t
@@ -208,7 +209,7 @@ lookupType items (Ident ident) =
         ts -> head ts
     where
         findType :: ModuleItem -> Maybe (Type, [Range])
-        findType (MIDecl (Variable _ t x rs Nothing)) =
+        findType (MIPackageItem (Decl (Variable _ t x rs Nothing))) =
             if x == ident then Just (t, rs) else Nothing
         findType _ = Nothing
 lookupType _ expr =
@@ -222,7 +223,7 @@ inlineInterface (ports, items) (instanceName, instancePorts) =
     (:) (MIPackageItem $ Comment $ "expanded instance: " ++ instanceName) $
     flip (++) portBindings $
     map (traverseNestedModuleItems removeModport) $
-    map (traverseNestedModuleItems removeMIDeclDir) $
+    map (traverseNestedModuleItems removeDeclDir) $
     itemsPrefixed
     where
         prefix = instanceName ++ "_"
@@ -238,10 +239,10 @@ inlineInterface (ports, items) (instanceName, instancePorts) =
             mapMaybe portBindingItem $
             zip instancePortNames instancePortExprs
 
-        removeMIDeclDir :: ModuleItem -> ModuleItem
-        removeMIDeclDir (MIDecl (Variable _ t x a me)) =
-            MIDecl $ Variable Local t x a me
-        removeMIDeclDir other = other
+        removeDeclDir :: ModuleItem -> ModuleItem
+        removeDeclDir (MIPackageItem (Decl (Variable _ t x a me))) =
+            MIPackageItem $ Decl $ Variable Local t x a me
+        removeDeclDir other = other
         removeModport :: ModuleItem -> ModuleItem
         removeModport (Modport x _) =
             MIPackageItem $ Comment $ "removed modport " ++ x
