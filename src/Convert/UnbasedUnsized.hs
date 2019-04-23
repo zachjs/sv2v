@@ -5,7 +5,7 @@
  -
  - Maintaining the unsized-ness of the literals is critical, but those digits
  - are all equivalent regardless of base. We simply convert them to all use a
- - binary base for compatability with Verilog-2005.
+ - binary base for compatibility with Verilog-2005.
  -}
 
 module Convert.UnbasedUnsized (convert) where

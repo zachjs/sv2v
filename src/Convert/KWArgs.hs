@@ -2,6 +2,9 @@
  - Author: Zachary Snow <zach@zachjs.com>
  -
  - Conversion for named function and task arguments
+ -
+ - This conversion takes the named arguments and moves them into their
+ - corresponding position in the argument list, with names removed.
  -}
 
 module Convert.KWArgs (convert) where

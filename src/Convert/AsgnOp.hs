@@ -1,9 +1,9 @@
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
- - Conversion for binary assignment operators, which appear in standard and
- - generate for loops and as a special case of blocking assignment statements.
- - We simply elaborate them in the obvious manner.
+ - Conversion for binary assignment operators, which can appear in for loops and
+ - as a special case of blocking assignment statements. We simply elaborate them
+ - in the obvious manner: a += b -> a = a + b.
  -}
 
 module Convert.AsgnOp (convert) where

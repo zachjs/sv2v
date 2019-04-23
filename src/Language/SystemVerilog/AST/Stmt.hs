@@ -192,7 +192,7 @@ instance Show Assertion where
     show (Cover  e a) = printf  "cover %s%s" (showAssertionExpr e) (show a)
 
 showAssertionExpr :: AssertionExpr -> String
-showAssertionExpr (Left e) = printf "property (%s)" (show e)
+showAssertionExpr (Left e) = printf "property (%s\n)" (show e)
 showAssertionExpr (Right e) = printf "(%s)" (show e)
 
 data PropertySpec
@@ -200,14 +200,14 @@ data PropertySpec
     deriving Eq
 instance Show PropertySpec where
     show (PropertySpec ms me pe) =
-        printf "%s%s%s" msStr meStr (show pe)
+        printf "%s%s\n\t%s" msStr meStr (show pe)
         where
             msStr = case ms of
                 Nothing -> ""
                 Just s -> printf "@(%s) " (show s)
             meStr = case me of
                 Nothing -> ""
-                Just e -> printf "disable iff (%s) " (show e)
+                Just e -> printf "disable iff (%s)" (show e)
 
 data UniquePriority
     = Unique

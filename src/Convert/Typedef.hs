@@ -3,8 +3,8 @@
  -
  - Conversion for `typedef`
  -
- - Aliased types can (probably) appear in all item declarations, including
- - modules, blocks, and function parameters.
+ - Aliased types can appear in all data declarations, including modules, blocks,
+ - and function parameters. They are also found in type cast expressions.
  -}
 
 module Convert.Typedef (convert) where
@@ -61,8 +61,8 @@ resolveType _ (Implicit         sg rs) = Implicit         sg rs
 resolveType _ (IntegerVector kw sg rs) = IntegerVector kw sg rs
 resolveType _ (IntegerAtom   kw sg   ) = IntegerAtom   kw sg
 resolveType _ (NonInteger    kw      ) = NonInteger    kw
-resolveType _ (InterfaceT x my rs) = InterfaceT x my rs
-resolveType _ (Enum Nothing vals rs) = Enum Nothing vals rs
+resolveType _ (InterfaceT     x my rs) = InterfaceT     x my rs
+resolveType _ (Enum Nothing   vals rs) = Enum Nothing   vals rs
 resolveType types (Enum (Just t) vals rs) = Enum (Just $ resolveType types t) vals rs
 resolveType types (Struct p items rs) = Struct p items' rs
     where

@@ -28,7 +28,6 @@ import qualified Convert.Struct
 import qualified Convert.Typedef
 import qualified Convert.UnbasedUnsized
 import qualified Convert.Unique
-import qualified Convert.HoistPortDecls
 
 type Phase = AST -> AST
 
@@ -41,7 +40,6 @@ phases excludes =
     , selectExclude (Job.Logic    , Convert.Logic.convert)
     , Convert.FuncRet.convert
     , Convert.Enum.convert
-    , Convert.HoistPortDecls.convert
     , Convert.KWArgs.convert
     , Convert.PackedArray.convert
     , Convert.StarPort.convert

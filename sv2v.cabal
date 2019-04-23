@@ -59,7 +59,6 @@ executable sv2v
     Convert.Bits
     Convert.Enum
     Convert.FuncRet
-    Convert.HoistPortDecls
     Convert.Interface
     Convert.KWArgs
     Convert.Logic

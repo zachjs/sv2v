@@ -2,6 +2,9 @@
  - Author: Zachary Snow <zach@zachjs.com>
  -
  - Conversion which makes function `logic` and `reg` return types implicit
+ -
+ - Verilog-2005 restricts function return types to `integer`, `real`,
+ - `realtime`, `time`, and implicit signed/dimensioned types.
  -}
 
 module Convert.FuncRet (convert) where

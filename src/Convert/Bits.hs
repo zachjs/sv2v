@@ -1,7 +1,17 @@
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
- - Elaboration of `$bits`, where possible
+ - Elaboration of `$bits` expressions.
+ -
+ - Some tools support $bits in Verilog, but it is not part of the specification,
+ - so we have to convert it ourselves.
+ -
+ - `$bits(t)`, where `t` is a type, is trivially elaborated to the product of
+ - the sizes of its dimensions once `t` is resolved to a primitive base type.
+ -
+ - `$bits(e)`, where `e` is an expression, requires a scoped traversal to
+ - determine the underlying type of expression. The conversion recursively
+ - breaks the expression into its subtypes, finding their sizes instead.
  -}
 
 module Convert.Bits (convert) where
@@ -21,7 +31,6 @@ convertDescription :: Description -> Description
 convertDescription =
     scopedConversion traverseDeclM traverseModuleItemM traverseStmtM Map.empty
 
--- collects and converts multi-dimensional packed-array declarations
 traverseDeclM :: Decl -> State Info Decl
 traverseDeclM (origDecl @ (Variable _ t ident a _)) = do
     modify $ Map.insert ident (t, a)
@@ -37,6 +46,7 @@ traverseStmtM stmt = traverseStmtExprsM traverseExprM stmt
 traverseExprM :: Expr -> State Info Expr
 traverseExprM = traverseNestedExprsM $ stately convertExpr
 
+-- simplify a bits expression given scoped type information
 convertExpr :: Info -> Expr -> Expr
 convertExpr _ (Bits (Left t)) =
     case t of
@@ -74,6 +84,8 @@ convertExpr info (Bits (Right e)) =
         _ -> Bits $ Right e
 convertExpr _ other = other
 
+-- combines the given type and dimensions and returns a new type with the
+-- innermost range removed
 popRange :: Type -> [Range] -> Type
 popRange t rs =
     tf $ tail rsCombined

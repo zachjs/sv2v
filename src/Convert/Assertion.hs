@@ -1,7 +1,7 @@
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
- - Conversion which simply removes assertions
+ - Conversion for removing assertions. Assertions items are "commented out."
  -}
 
 module Convert.Assertion (convert) where
@@ -13,8 +13,11 @@ convert :: AST -> AST
 convert = traverseDescriptions $ traverseModuleItems convertModuleItem
 
 convertModuleItem :: ModuleItem -> ModuleItem
-convertModuleItem (AssertionItem _) =
-    MIPackageItem $ Comment "removed an assertion item"
+convertModuleItem (AssertionItem item) =
+    Generate $
+    map (GenModuleItem . MIPackageItem . Comment) $
+        "removed an assertion item" :
+        (lines $ show $ AssertionItem item)
 convertModuleItem other = traverseStmts convertStmt other
 
 convertStmt :: Stmt -> Stmt
