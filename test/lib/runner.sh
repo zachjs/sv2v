@@ -17,14 +17,20 @@ simulate() {
     sim_top="$1"; shift
     # compile the files
     sim_prog="$SHUNIT_TMPDIR/simprog.exe"
-    iverilog \
+    iv_output=`iverilog \
+        -Wall \
+        -Wno-select-range \
         -o "$sim_prog" \
         -g2005 \
         -DTEST_VCD="\"$sim_vcd\"" \
         -DTEST_TOP=$sim_top \
         "$SCRIPT_DIR/tb_dumper.v" \
-        "$@"
+        "$@" 2>&1`
     assertTrue "iverilog on $1 failed" $?
+    assertNull "iverilog emitted warnings:" "$iv_output"
+    if [ "$iv_output" != "" ]; then
+        echo "$iv_output"
+    fi
     # run the simulation
     $sim_prog > $sim_log
     assertTrue "simulating $1 failed" $?
