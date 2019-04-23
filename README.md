@@ -108,8 +108,8 @@ The current test suite is limited. Tests can be run with `make test`.
 ## Acknowledgements
 
 This project was originally forked from [Tom Hawkin's Verilog parser]. While the
-front end has changed substantially in adding SystemVerilog support, his project
-was as a great starting point.
+front end has changed substantially to parse a different language, his project
+was a great starting point.
 
 [Tom Hawkin's Verilog parser]: https://github.com/tomahawkins/verilog
 
@@ -123,4 +123,4 @@ no prior experience, and has also helped with test cases.
 
 ## License
 
-See the LICENSE file for copyright and licensing information.
+See the [LICENSE file](LICENSE) for copyright and licensing information.
