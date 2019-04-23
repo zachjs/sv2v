@@ -12,11 +12,11 @@ import qualified Data.Map.Strict as Map
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-convert :: AST -> AST
-convert descriptions =
-    traverseDescriptions (traverseModuleItems mapInstance) descriptions
+convert :: [AST] -> [AST]
+convert asts =
+    map (traverseDescriptions $ traverseModuleItems mapInstance) asts
     where
-        modulePorts = execWriter $ collectDescriptionsM getPorts descriptions
+        modulePorts = execWriter $ collectDescriptionsM getPorts $ concat asts
         getPorts :: Description -> Writer (Map.Map Identifier [Identifier]) ()
         getPorts (Part _ _ _ name ports _) = tell $ Map.singleton name ports
         getPorts _ = return ()

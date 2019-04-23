@@ -56,7 +56,7 @@ data PackageItem
     = Typedef Type Identifier
     | Function (Maybe Lifetime) Type Identifier [Decl] [Stmt]
     | Task     (Maybe Lifetime)      Identifier [Decl] [Stmt]
-    | Import [(Identifier, Maybe Identifier)]
+    | Import Identifier (Maybe Identifier)
     | Decl Decl
     | Comment String
     deriving Eq
@@ -71,11 +71,7 @@ instance Show PackageItem where
         printf "task %s%s;\n%s\n%s\nendtask"
             (showLifetime ml) x (indent $ show i)
             (indent $ unlines' $ map show b)
-    show (Import imports) =
-        printf "import %s;"
-            (commas $ map showImport imports)
-        where
-            showImport (x, y) = printf "%s::%s" x (fromMaybe "*" y)
+    show (Import x y) = printf "import %s::%s;" x (fromMaybe "*" y)
     show (Decl decl) = show decl
     show (Comment c) =
         if elem '\n' c

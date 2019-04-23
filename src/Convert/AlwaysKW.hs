@@ -12,8 +12,8 @@ module Convert.AlwaysKW (convert) where
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-convert :: AST -> AST
-convert = traverseDescriptions $ traverseModuleItems replaceAlwaysKW
+convert :: [AST] -> [AST]
+convert = map $ traverseDescriptions $ traverseModuleItems replaceAlwaysKW
 
 replaceAlwaysKW :: ModuleItem -> ModuleItem
 replaceAlwaysKW (AlwaysC AlwaysComb stmt) =

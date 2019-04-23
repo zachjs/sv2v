@@ -25,9 +25,8 @@ main = do
     let includePaths = incdir job
     let defines = map splitDefine $ define job
     asts <- mapM (parseFile includePaths defines) (files job)
-    let ast = concat asts
     -- convert the file
-    let ast' = convert (exclude job) ast
+    let asts' = convert (exclude job) asts
     -- print the converted file out
-    hPrint stdout ast'
+    hPrint stdout $ concat asts'
     exitSuccess

@@ -19,8 +19,8 @@ import Language.SystemVerilog.AST
 
 type TFs = Map.Map Identifier [Identifier]
 
-convert :: AST -> AST
-convert = traverseDescriptions convertDescription
+convert :: [AST] -> [AST]
+convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription description =

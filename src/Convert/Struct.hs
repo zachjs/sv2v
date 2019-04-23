@@ -24,8 +24,8 @@ type Structs = Map.Map TypeFunc StructInfo
 type Types = Map.Map Identifier Type
 type Idents = Set.Set Identifier
 
-convert :: AST -> AST
-convert = traverseDescriptions convertDescription
+convert :: [AST] -> [AST]
+convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription (description @ (Part _ _ _ _ _ _)) =

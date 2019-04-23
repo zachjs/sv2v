@@ -24,8 +24,8 @@ import Language.SystemVerilog.AST
 
 type Info = Map.Map Identifier (Type, [Range])
 
-convert :: AST -> AST
-convert = traverseDescriptions convertDescription
+convert :: [AST] -> [AST]
+convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription =

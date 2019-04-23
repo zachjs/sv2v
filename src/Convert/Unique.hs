@@ -13,8 +13,9 @@ module Convert.Unique (convert) where
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-convert :: AST -> AST
-convert = traverseDescriptions $ traverseModuleItems $ traverseStmts convertStmt
+convert :: [AST] -> [AST]
+convert =
+    map $ traverseDescriptions $ traverseModuleItems $ traverseStmts convertStmt
 
 convertStmt :: Stmt -> Stmt
 convertStmt (If (Just _) cc s1 s2) =

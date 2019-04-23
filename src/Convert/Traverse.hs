@@ -562,8 +562,8 @@ traverseExprsM' strat exprMapper = moduleItemMapper
         return $ MIPackageItem $ Typedef t x
     moduleItemMapper (MIPackageItem (Comment c)) =
         return $ MIPackageItem $ Comment c
-    moduleItemMapper (MIPackageItem (Import imports)) =
-        return $ MIPackageItem $ Import imports
+    moduleItemMapper (MIPackageItem (Import x y)) =
+        return $ MIPackageItem $ Import x y
     moduleItemMapper (AssertionItem (mx, a)) = do
         a' <- traverseAssertionStmtsM stmtMapper a
         a'' <- traverseAssertionExprsM exprMapper a'
@@ -792,6 +792,8 @@ traverseTypesM mapper item =
             fullMapper t >>= \t' -> return $ Localparam t' x   e
         declMapper (Variable d t x a me) =
             fullMapper t >>= \t' -> return $ Variable d t' x a me
+        miMapper (MIPackageItem (Typedef t x)) =
+            fullMapper t >>= \t' -> return $ MIPackageItem $ Typedef t' x
         miMapper (MIPackageItem (Function l t x d s)) =
             fullMapper t >>= \t' -> return $ MIPackageItem $ Function l t' x d s
         miMapper (MIPackageItem (other @ (Task _ _ _ _))) =

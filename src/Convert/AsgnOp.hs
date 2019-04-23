@@ -11,9 +11,9 @@ module Convert.AsgnOp (convert) where
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-convert :: AST -> AST
+convert :: [AST] -> [AST]
 convert =
-    traverseDescriptions $ traverseModuleItems $
+    map $ traverseDescriptions $ traverseModuleItems $
     ( traverseStmts    convertStmt
     . traverseGenItems convertGenItem
     )

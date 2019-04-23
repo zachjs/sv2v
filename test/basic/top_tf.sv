@@ -9,7 +9,9 @@ function baz;
     input [2:0] n;
     baz = n * 2;
 endfunction
+localparam PARAM = 37;
 module top;
     initial foo();
     initial $display("bar(0) = %d", bar(0));
+    initial $display("PARAM = %d", PARAM);
 endmodule

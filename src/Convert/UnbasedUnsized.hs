@@ -13,8 +13,9 @@ module Convert.UnbasedUnsized (convert) where
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-convert :: AST -> AST
+convert :: [AST] -> [AST]
 convert =
+    map $
     traverseDescriptions $ traverseModuleItems $
     traverseExprs $ traverseNestedExprs convertExpr
 

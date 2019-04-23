@@ -18,12 +18,12 @@ import Language.SystemVerilog.AST
 
 type Idents = Set.Set Identifier
 
-convert :: AST -> AST
-convert ast =
+convert :: [AST] -> [AST]
+convert asts =
     -- we collect all the existing blocks in the first pass to make sure we
     -- don't generate conflicting names on repeated passes of this conversion
-    evalState (runner collectStmtM ast >>= runner traverseStmtM) Set.empty
-    where runner = traverseDescriptionsM . traverseModuleItemsM . traverseStmtsM
+    evalState (runner collectStmtM asts >>= runner traverseStmtM) Set.empty
+    where runner = mapM . traverseDescriptionsM . traverseModuleItemsM . traverseStmtsM
 
 collectStmtM :: Stmt -> State Idents Stmt
 collectStmtM (Block (Just x) decls stmts) = do

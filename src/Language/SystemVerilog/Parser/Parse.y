@@ -454,7 +454,7 @@ NonGenerateModuleItem :: { [ModuleItem] }
   | "initial" Stmt                       { [Initial $2] }
   | "genvar" Identifiers ";"             { map Genvar $2 }
   | "modport" ModportItems ";"           { map (uncurry Modport) $2 }
-  | NonDeclPackageItem                   { [MIPackageItem $1] }
+  | NonDeclPackageItem                   { map MIPackageItem $1 }
   | NInputGateKW  NInputGates  ";"       { map (\(a, b, c) -> NInputGate  $1 a b c) $2 }
   | NOutputGateKW NOutputGates ";"       { map (\(a, b, c) -> NOutputGate $1 a b c) $2 }
   | AttributeInstance ModuleItem         { map (MIAttr $1) $2 }
@@ -570,12 +570,12 @@ PackageItems :: { [PackageItem] }
 PackageItem :: { [PackageItem] }
   : DeclTokens(";")                     { map Decl $ parseDTsAsDecls $1 }
   | ParameterDecl(ParameterDeclKW, ";") { map Decl $1 }
-  | NonDeclPackageItem                  { [$1] }
-NonDeclPackageItem :: { PackageItem }
-  : "typedef" Type Identifier ";" { Typedef $2 $3 }
-  | "function" opt(Lifetime) FuncRetAndName TFItems DeclsAndStmts "endfunction" opt(Tag) { Function $2 (fst $3) (snd $3) (map defaultFuncInput $ (map makeInput $4) ++ fst $5) (snd $5) }
-  | "task" opt(Lifetime) Identifier TFItems DeclsAndStmts "endtask" opt(Tag) { Task $2 $3 (map defaultFuncInput $ $4 ++ fst $5) (snd $5) }
-  | "import" PackageImportItems ";" { Import $2 }
+  | NonDeclPackageItem                  { $1 }
+NonDeclPackageItem :: { [PackageItem] }
+  : "typedef" Type Identifier ";" { [Typedef $2 $3] }
+  | "function" opt(Lifetime) FuncRetAndName TFItems DeclsAndStmts "endfunction" opt(Tag) { [Function $2 (fst $3) (snd $3) (map defaultFuncInput $ (map makeInput $4) ++ fst $5) (snd $5)] }
+  | "task" opt(Lifetime) Identifier TFItems DeclsAndStmts "endtask" opt(Tag) { [Task $2 $3 (map defaultFuncInput $ $4 ++ fst $5) (snd $5)] }
+  | "import" PackageImportItems ";" { map (uncurry Import) $2 }
 
 PackageImportItems :: { [(Identifier, Maybe Identifier)] }
   : PackageImportItem                        { [$1] }

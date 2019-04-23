@@ -17,8 +17,11 @@ import Language.SystemVerilog.AST
 
 type Types = Map.Map Identifier Type
 
-convert :: AST -> AST
-convert descriptions =
+convert :: [AST] -> [AST]
+convert = map convertFile
+
+convertFile :: AST -> AST
+convertFile descriptions =
     traverseDescriptions removeTypedef $
     traverseDescriptions (convertDescription types) $
     descriptions

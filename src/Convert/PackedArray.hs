@@ -31,8 +31,8 @@ data Info = Info
     { sTypeDims :: DimMap
     } deriving (Eq, Show)
 
-convert :: AST -> AST
-convert = traverseDescriptions convertDescription
+convert :: [AST] -> [AST]
+convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription =

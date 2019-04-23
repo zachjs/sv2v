@@ -19,7 +19,7 @@ import qualified Convert.Interface
 import qualified Convert.KWArgs
 import qualified Convert.Logic
 import qualified Convert.NamedBlock
-import qualified Convert.NestTF
+import qualified Convert.NestPI
 import qualified Convert.PackedArray
 import qualified Convert.Return
 import qualified Convert.StarPort
@@ -29,7 +29,7 @@ import qualified Convert.Typedef
 import qualified Convert.UnbasedUnsized
 import qualified Convert.Unique
 
-type Phase = AST -> AST
+type Phase = [AST] -> [AST]
 
 phases :: [Job.Exclude] -> [Phase]
 phases excludes =
@@ -49,9 +49,9 @@ phases excludes =
     , Convert.Typedef.convert
     , Convert.UnbasedUnsized.convert
     , Convert.Unique.convert
+    , Convert.NestPI.convert
     , selectExclude (Job.Interface, Convert.Interface.convert)
     , selectExclude (Job.Always   , Convert.AlwaysKW.convert)
-    , Convert.NestTF.convert
     ]
     where
         selectExclude :: (Job.Exclude, Phase) -> Phase

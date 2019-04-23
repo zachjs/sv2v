@@ -9,8 +9,8 @@ module Convert.Assertion (convert) where
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-convert :: AST -> AST
-convert = traverseDescriptions $ traverseModuleItems convertModuleItem
+convert :: [AST] -> [AST]
+convert = map $ traverseDescriptions $ traverseModuleItems convertModuleItem
 
 convertModuleItem :: ModuleItem -> ModuleItem
 convertModuleItem (AssertionItem item) =

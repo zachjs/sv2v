@@ -33,8 +33,8 @@ type Enums = Set.Set EnumInfo
 type Idents = Set.Set Identifier
 type EnumItem = ((Range, Identifier), Expr)
 
-convert :: AST -> AST
-convert = traverseDescriptions convertDescription
+convert :: [AST] -> [AST]
+convert = map $ traverseDescriptions convertDescription
 
 defaultType :: Type
 defaultType = IntegerVector TLogic Unspecified [(Number "31", Number "0")]

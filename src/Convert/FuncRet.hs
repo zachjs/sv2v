@@ -12,8 +12,8 @@ module Convert.FuncRet (convert) where
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-convert :: AST -> AST
-convert = traverseDescriptions $ traverseModuleItems convertFunction
+convert :: [AST] -> [AST]
+convert = map $ traverseDescriptions $ traverseModuleItems convertFunction
 
 convertFunction :: ModuleItem -> ModuleItem
 convertFunction (MIPackageItem (Function ml t f decls stmts)) =
