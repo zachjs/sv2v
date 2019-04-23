@@ -25,6 +25,7 @@ module Language.SystemVerilog.AST
     , module Op
     , module Stmt
     , module Type
+    , exprToLHS
     ) where
 
 import Language.SystemVerilog.AST.Attr as Attr
@@ -39,3 +40,19 @@ import Language.SystemVerilog.AST.Stmt as Stmt
 import Language.SystemVerilog.AST.Type as Type
 
 type AST = [Description]
+
+exprToLHS :: Expr -> Maybe LHS
+exprToLHS (Ident   x  ) = Just $ LHSIdent x
+exprToLHS (Bit   l e  ) = do
+    l' <- exprToLHS l
+    Just $ LHSBit   l' e
+exprToLHS (Range l m r) = do
+    l' <- exprToLHS l
+    Just $ LHSRange l' m r
+exprToLHS (Dot   l x  ) = do
+    l' <- exprToLHS l
+    Just $ LHSDot   l' x
+exprToLHS (Concat ls  ) = do
+    ls' <- mapM exprToLHS ls
+    Just $ LHSConcat ls'
+exprToLHS _ = Nothing

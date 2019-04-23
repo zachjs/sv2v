@@ -533,7 +533,7 @@ NOutputGate :: { (Maybe Identifier, [LHS], Expr) }
   : opt(Identifier) "(" NOutputGateItems { ($1, fst $3, snd $3) }
 NOutputGateItems :: { ([LHS], Expr) }
   : Expr ")" { ([], $1) }
-  | Expr "," NOutputGateItems { (fst $3 ++ [exprToLHS $1], snd $3) }
+  | Expr "," NOutputGateItems { (fst $3 ++ [toLHS $1], snd $3) }
 
 NInputGateKW :: { NInputGateKW }
   : "and"  { GateAnd  }
@@ -938,12 +938,10 @@ combineTags (Just a) (Just b) =
 combineTags Nothing other = other
 combineTags other   _     = other
 
-exprToLHS :: Expr -> LHS
-exprToLHS (Ident   x  ) = LHSIdent x
-exprToLHS (Bit   e b  ) = LHSBit   (exprToLHS e) b
-exprToLHS (Range e m r) = LHSRange (exprToLHS e) m r
-exprToLHS (Dot   e x  ) = LHSDot   (exprToLHS e) x
-exprToLHS (Concat es  ) = LHSConcat (map exprToLHS es)
-exprToLHS other =
-  error $ "Parse error: cannot convert expression to LHS: " ++ show other
+toLHS :: Expr -> LHS
+toLHS expr =
+  case exprToLHS expr of
+    Just lhs -> lhs
+    Nothing -> error $ "Parse error: cannot convert expression to LHS: "
+                ++ show expr
 }

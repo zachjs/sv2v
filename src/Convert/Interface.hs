@@ -249,7 +249,7 @@ inlineInterface (ports, items) (instanceName, instancePorts) =
         portBindingItem (ident, Just expr) =
             Just $ if declDirs Map.! ident == Input
                 then Assign Nothing (LHSIdent ident) expr
-                else Assign Nothing (exprToLHS expr) (Ident ident)
+                else Assign Nothing (toLHS expr) (Ident ident)
         portBindingItem (_, Nothing) = Nothing
 
         declDirs = execWriter $
@@ -261,12 +261,9 @@ inlineInterface (ports, items) (instanceName, instancePorts) =
                 else return ()
         collectDeclDir _ = return ()
 
-        exprToLHS :: Expr -> LHS
-        exprToLHS (Ident   x  ) = LHSIdent x
-        exprToLHS (Bit   l e  ) = LHSBit   (exprToLHS l) e
-        exprToLHS (Range l m r) = LHSRange (exprToLHS l) m r
-        exprToLHS (Dot   l x  ) = LHSDot   (exprToLHS l) x
-        exprToLHS (Concat ls  ) = LHSConcat $ map exprToLHS ls
-        exprToLHS other =
-            error $ "trying to bind (part of) an interface output to " ++
-                show other ++ " but that can't be an LHS"
+        toLHS :: Expr -> LHS
+        toLHS expr =
+            case exprToLHS expr of
+                Just lhs -> lhs
+                Nothing  -> error $ "trying to bind an interface output to " ++
+                                show expr ++ " but that can't be an LHS"

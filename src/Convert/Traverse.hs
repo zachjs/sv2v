@@ -466,9 +466,12 @@ exprMapperHelpers exprMapper =
     declMapper (Localparam t x e) =
         exprMapper e >>= return . Localparam t x
     declMapper (Variable d t x a me) = do
+        let (tf, rs) = typeRanges t
+        rs' <- mapM rangeMapper rs
+        let t' = tf rs'
         a' <- mapM rangeMapper a
         me' <- maybeExprMapper me
-        return $ Variable d t x a' me'
+        return $ Variable d t' x a' me'
 
 traverseExprsM' :: Monad m => TFStrategy -> MapperM m Expr -> MapperM m ModuleItem
 traverseExprsM' strat exprMapper = moduleItemMapper
