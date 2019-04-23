@@ -9,10 +9,10 @@ with an emphasis on supporting synthesizable language constructs.
 The primary goal of this project is to create a completely free and open-source
 tool for converting SystemVerilog to Verilog. While methods for performing this
 conversion already exist, they generally either rely on commercial tools, or are
-pretty incomplete.
+limited in scope.
 
 This project was originally developed to target [Yosys], and so allows for
-disabling the conversion of those [SystemVerilog features which Yosys supports].
+disabling the conversion of (passing through) those [SystemVerilog features which Yosys supports].
 
 [Yosys]: http://www.clifford.at/yosys/
 [SystemVerilog features which Yosys supports]: https://github.com/YosysHQ/yosys#supported-features-from-systemverilog
@@ -38,7 +38,7 @@ We plan on releasing pre-built binaries in the future.
 
 ### Building from source
 
-You must have [Stack] installed to build sv2v.
+You must have [Stack] installed to build sv2v.  Then you can:
 
 [Stack]: https://www.haskellstack.org/
 
@@ -58,7 +58,7 @@ running `stack install`, or copy over the executable manually.
 ## Usage
 
 sv2v takes in a list of files and prints the converted Verilog to `stdout`.
-Users may specify include search paths, define macros during preprocessing, and
+Users may specify `include` search paths, define macros during preprocessing, and
 exclude some of the conversion.
 
 Below is the current usage printout. This interface is subject to change.
@@ -88,7 +88,7 @@ If you find a bug or have a feature request, please create an issue. Preference
 will be given to issues which include examples or test cases.
 
 
-## SystemVerilog Frontend
+## SystemVerilog Front end
 
 This project contains a preprocessor and lexer, a parser, and an abstract syntax
 tree representation for a subset of the SystemVerilog specification. The parser
@@ -96,7 +96,7 @@ is not very strict. The AST allows for the representation of syntactically (and
 semantically) invalid Verilog. The goal is to be more general in the
 representation to enable more standardized and straightforward conversion
 procedures. This could be extended into an independent and more fully-featured
-frontend if there is significant interest.
+front end if there is significant interest.
 
 
 ## Testing
