@@ -8,6 +8,7 @@ module Convert.NestPI (convert) where
 
 import Control.Monad.State
 import Control.Monad.Writer
+import Data.List (isPrefixOf)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
@@ -42,6 +43,10 @@ traverseDescriptionM (PackageItem item) = do
     return $ PackageItem item
 traverseDescriptionM (orig @ (Part extern kw lifetime name ports items)) = do
     tfs <- get
+    let neededPIs = Set.difference
+            (Set.union usedPIs $
+                Set.filter (isPrefixOf "import ") $ Map.keysSet tfs)
+            existingPIs
     let newItems = map MIPackageItem $ Map.elems $
             Map.restrictKeys tfs neededPIs
     return $ Part extern kw lifetime name ports (items ++ newItems)
@@ -53,7 +58,6 @@ traverseDescriptionM (orig @ (Part extern kw lifetime name ports items)) = do
             , collectTypesM collectTypenamesM
             , collectExprsM $ collectNestedExprsM collectIdentsM
             ]
-        neededPIs = Set.difference usedPIs existingPIs
 traverseDescriptionM other = return other
 
 -- writes down the names of package items
@@ -92,5 +96,5 @@ piName (Typedef    _ ident    ) = Just ident
 piName (Decl (Variable _ _ ident _ _)) = Just ident
 piName (Decl (Parameter  _ ident   _)) = Just ident
 piName (Decl (Localparam _ ident   _)) = Just ident
-piName (Import _ _) = Nothing
+piName (Import x y) = Just $ show $ Import x y
 piName (Comment  _) = Nothing

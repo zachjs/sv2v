@@ -20,6 +20,7 @@ import qualified Convert.KWArgs
 import qualified Convert.Logic
 import qualified Convert.NamedBlock
 import qualified Convert.NestPI
+import qualified Convert.Package
 import qualified Convert.PackedArray
 import qualified Convert.Return
 import qualified Convert.StarPort
@@ -49,6 +50,7 @@ phases excludes =
     , Convert.Typedef.convert
     , Convert.UnbasedUnsized.convert
     , Convert.Unique.convert
+    , Convert.Package.convert
     , Convert.NestPI.convert
     , selectExclude (Job.Interface, Convert.Interface.convert)
     , selectExclude (Job.Always   , Convert.AlwaysKW.convert)

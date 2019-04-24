@@ -64,6 +64,7 @@ executable sv2v
     Convert.Logic
     Convert.NamedBlock
     Convert.NestPI
+    Convert.Package
     Convert.PackedArray
     Convert.Return
     Convert.StarPort
