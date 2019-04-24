@@ -2,10 +2,6 @@
  - Author: Zachary Snow <zach@zachjs.com>
  -
  - Conversion for packages and imports
- -
- - TODO FIXME: This package conversion does not yet handle package-scoped
- - identifiers for task/function names or type names, as the AST and parser
- - doesn't support them yet. This won't be too difficult.
  -}
 
 module Convert.Package (convert) where
@@ -64,8 +60,11 @@ prefixPackageItem packageName idents item =
             other -> other
         convertExpr (Ident x) = Ident $ prefix x
         convertExpr other = other
+        convertLHS (LHSIdent x) = LHSIdent $ prefix x
+        convertLHS other = other
         converter =
-            (traverseExprs $ traverseNestedExprs convertExpr)
+            (traverseExprs $ traverseNestedExprs convertExpr) .
+            (traverseLHSs  $ traverseNestedLHSs  convertLHS )
         MIPackageItem item'' = converter $ MIPackageItem item'
 
 collectDescriptionM :: Description -> Writer Packages ()
@@ -102,11 +101,26 @@ traverseModuleItem packages (MIPackageItem (Import x y)) =
         items = map snd $ filter (filterer . fst) $ Map.toList packageItems
 traverseModuleItem _ item =
     (traverseExprs $ traverseNestedExprs traverseExpr) $
+    (traverseStmts traverseStmt) $
+    (traverseTypes traverseType) $
     item
+    where
 
-traverseExpr :: Expr -> Expr
-traverseExpr (PSIdent x y) = Ident $ x ++ "_" ++ y
-traverseExpr other = other
+        traverseExpr :: Expr -> Expr
+        traverseExpr (PSIdent x y) = Ident $ x ++ "_" ++ y
+        traverseExpr (Call (Just ps) f args) =
+            Call Nothing (ps ++ "_" ++ f) args
+        traverseExpr other = other
+
+        traverseStmt :: Stmt -> Stmt
+        traverseStmt (Subroutine (Just ps) f args) =
+            Subroutine Nothing (ps ++ "_" ++ f) args
+        traverseStmt other = other
+
+        traverseType :: Type -> Type
+        traverseType (Alias (Just ps) xx rs) =
+            Alias Nothing (ps ++ "_" ++ xx) rs
+        traverseType other = other
 
 -- returns the "name" of a package item, if it has one
 piName :: PackageItem -> Maybe Identifier

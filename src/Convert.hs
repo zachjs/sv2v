@@ -46,12 +46,12 @@ phases excludes =
     , Convert.StarPort.convert
     , Convert.StmtBlock.convert
     , Convert.Struct.convert
-    , Convert.Return.convert
     , Convert.Typedef.convert
     , Convert.UnbasedUnsized.convert
     , Convert.Unique.convert
     , Convert.Package.convert
     , Convert.NestPI.convert
+    , Convert.Return.convert
     , selectExclude (Job.Interface, Convert.Interface.convert)
     , selectExclude (Job.Always   , Convert.AlwaysKW.convert)
     ]
