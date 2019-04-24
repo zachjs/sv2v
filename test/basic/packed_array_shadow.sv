@@ -1,5 +1,8 @@
 module top;
 
+    logic [6:0][3:0] arr;
+    initial arr = 28'h9fba7d;
+
     function parity;
         input [3:0] arr;
         parity = arr[2] ^ arr[2] ^ arr[1] ^ arr[0];
@@ -34,9 +37,6 @@ module top;
             end
         end
     endtask
-
-    logic [6:0][3:0] arr;
-    initial arr = 28'h9fba7d;
 
     integer i;
     initial begin
