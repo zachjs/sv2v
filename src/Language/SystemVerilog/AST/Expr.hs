@@ -39,7 +39,7 @@ data Expr
     | Bit     Expr Expr
     | Repeat  Expr [Expr]
     | Concat  [Expr]
-    | Call    Identifier Args
+    | Call    (Maybe Identifier) Identifier Args
     | UniOp   UniOp Expr
     | BinOp   BinOp Expr Expr
     | Mux     Expr Expr Expr
@@ -52,7 +52,7 @@ data Expr
 instance Show Expr where
     show (Number  str  ) = str
     show (Ident   str  ) = str
-    show (PSIdent   x y) = printf "%s::%s" x y
+    show (PSIdent x y  ) = printf "%s::%s" x y
     show (String  str  ) = printf "\"%s\"" str
     show (Bit     e b  ) = printf "%s[%s]"     (show e) (show b)
     show (Range   e m r) = printf "%s[%s%s%s]" (show e) (show $ fst r) (show m) (show $ snd r)
@@ -62,7 +62,7 @@ instance Show Expr where
     show (BinOp   o a b) = printf "(%s %s %s)" (show a) (show o) (show b)
     show (Dot     e n  ) = printf "%s.%s"      (show e) n
     show (Mux     c a b) = printf "(%s ? %s : %s)" (show c) (show a) (show b)
-    show (Call    f l  ) = printf "%s(%s)" f (show l)
+    show (Call   ps f l) = printf "%s%s(%s)" (maybe "" (++ "::") ps) f (show l)
     show (Cast tore e  ) = printf "%s'(%s)" (showEither tore) (show e)
     show (Bits tore    ) = printf "$bits(%s)" (showEither tore)
     show (Pattern l    ) =
@@ -121,7 +121,7 @@ readNumber n =
 -- basic expression simplfication utility to help us generate nicer code in the
 -- common case of ranges like `[FOO-1:0]`
 simplify :: Expr -> Expr
-simplify (orig @ (Call "$clog2" (Args [Just (Number n)] []))) =
+simplify (orig @ (Call Nothing "$clog2" (Args [Just (Number n)] []))) =
     case readNumber n of
         Nothing -> orig
         Just x -> Number $ show $ clog2 x

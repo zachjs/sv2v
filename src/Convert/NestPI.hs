@@ -70,18 +70,18 @@ collectPIsM _ = return ()
 
 -- writes down the names of subroutine invocations
 collectSubroutinesM :: Stmt -> Writer Idents ()
-collectSubroutinesM (Subroutine f _) = tell $ Set.singleton f
+collectSubroutinesM (Subroutine Nothing f _) = tell $ Set.singleton f
 collectSubroutinesM _ = return ()
 
 -- writes down the names of function calls and identifiers
 collectIdentsM :: Expr -> Writer Idents ()
-collectIdentsM (Call    x _) = tell $ Set.singleton x
-collectIdentsM (Ident   x  ) = tell $ Set.singleton x
+collectIdentsM (Call Nothing x _) = tell $ Set.singleton x
+collectIdentsM (Ident x)          = tell $ Set.singleton x
 collectIdentsM _ = return ()
 
 -- writes down aliased typenames
 collectTypenamesM :: Type -> Writer Idents ()
-collectTypenamesM (Alias x _) = tell $ Set.singleton x
+collectTypenamesM (Alias _ x _) = tell $ Set.singleton x
 collectTypenamesM (Enum (Just t) _ _) = collectTypenamesM t
 collectTypenamesM (Struct _ fields _) = do
     _ <- mapM collectTypenamesM $ map fst fields

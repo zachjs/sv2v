@@ -245,7 +245,7 @@ string             { Token Lit_string      _ _ }
 %left  "*" "/" "%"
 %left  "**"
 %right REDUCE_OP "!" "~" "++" "--"
-%left  "(" ")" "[" "]" "." "'"
+%left  "(" ")" "[" "]" "." "'" "::"
 
 %%
 
@@ -266,7 +266,8 @@ Description :: { [Description] }
 
 Type :: { Type }
   : TypeNonIdent { $1 }
-  | Identifier Dimensions { Alias $1 $2 }
+  |                 Identifier Dimensions { Alias (Nothing) $1 $2 }
+  | Identifier "::" Identifier Dimensions { Alias (Just $1) $3 $4 }
 TypeNonIdent :: { Type }
   : PartialType OptSigning Dimensions { $1 $2 $3 }
 PartialType :: { Signing -> [Range] -> Type }
@@ -421,6 +422,7 @@ DeclOrStmtToken :: { DeclToken }
   | PartialType    { DTType    $1 }
   | "." Identifier { DTDot     $2 }
   | Signing        { DTSigning $1 }
+  | Identifier "::" Identifier { DTPSIdent $1 $3 }
 
 VariablePortIdentifiers :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifier                             { [$1] }
@@ -670,7 +672,8 @@ Stmts :: { [Stmt] }
 Stmt :: { Stmt }
   : StmtNonAsgn         { $1 }
   | LHS AsgnOp Expr ";" { AsgnBlk $2 $1 $3 }
-  | Identifier      ";" { Subroutine $1 (Args [] []) }
+  |                 Identifier ";" { Subroutine (Nothing) $1 (Args [] []) }
+  | Identifier "::" Identifier ";" { Subroutine (Just $1) $3 (Args [] []) }
   | LHS "<=" opt(DelayOrEventControl) Expr ";" { Asgn $3 $1 $4 }
   | LHS IncOrDecOperator ";" { AsgnBlk (AsgnOp $2) $1 (Number "1") }
   | IncOrDecOperator LHS ";" { AsgnBlk (AsgnOp $1) $2 (Number "1") }
@@ -681,9 +684,10 @@ StmtNonAsgn :: { Stmt }
   | Unique "if" "(" Expr ")" Stmt %prec NoElse        { If $1 $4 $6 Null      }
   | "for" "(" DeclTokens(";") opt(Expr) ";" ForStep ")" Stmt { For (parseDTsAsDeclsAndAsgns $3) $4 $6 $8 }
   | Unique CaseKW "(" Expr ")" Cases opt(CaseDefault) "endcase" { Case $1 $2 $4 $6 $7 }
+  |                 Identifier "(" CallArgs ")" ";" { Subroutine (Nothing) $1 $3 }
+  | Identifier "::" Identifier "(" CallArgs ")" ";" { Subroutine (Just $1) $3 $5 }
   | TimingControl Stmt                         { Timing $1 $2 }
   | "return" Expr ";"                          { Return $2 }
-  | Identifier "(" CallArgs ")" ";"            { Subroutine $1 $3 }
   | "while"  "(" Expr ")" Stmt                 { While   $3 $5 }
   | "repeat" "(" Expr ")" Stmt                 { RepeatL $3 $5 }
   | "do"      Stmt "while" "(" Expr ")" ";"    { DoWhile $5 $2 }
@@ -718,9 +722,10 @@ DeclOrStmt :: { ([Decl], [Stmt]) }
   | ParameterDecl(ParameterDeclKW, ";") { ($1, []) }
 
 ParameterDecl(kw, delim) :: { [Decl] }
-  : kw            DeclAsgns delim { map (uncurry $ $1 (Implicit Unspecified [])) $2 }
-  | kw ParamType  DeclAsgns delim { map (uncurry $ $1 ($2                     )) $3 }
-  | kw Identifier DeclAsgns delim { map (uncurry $ $1 (Alias    $2          [])) $3 }
+  : kw                            DeclAsgns delim { map (uncurry $ $1 (Implicit Unspecified [])) $2 }
+  | kw                 ParamType  DeclAsgns delim { map (uncurry $ $1 ($2                     )) $3 }
+  | kw                 Identifier DeclAsgns delim { map (uncurry $ $1 (Alias (Nothing)   $2 [])) $3 }
+  | kw Identifier "::" Identifier DeclAsgns delim { map (uncurry $ $1 (Alias (Just $2)   $4 [])) $5 }
 ParameterDeclKW :: { Type -> Identifier -> Expr -> Decl }
   : "parameter"  { Parameter  }
   | "localparam" { Localparam }
@@ -811,7 +816,8 @@ Expr :: { Expr }
   : "(" Expr ")"                { $2 }
   | String                      { String $1 }
   | Number                      { Number $1 }
-  | Identifier "(" CallArgs ")" { Call $1 $3 }
+  |                 Identifier "(" CallArgs ")" { Call (Nothing) $1 $3 }
+  | Identifier "::" Identifier "(" CallArgs ")" { Call (Just $1) $3 $5 }
   | "$bits"    "(" BitsArg  ")" { Bits $3 }
   | Identifier                  { Ident $1 }
   | Identifier "::" Identifier  { PSIdent $1 $3 }
@@ -821,8 +827,9 @@ Expr :: { Expr }
   | "{" Exprs "}"               { Concat $2 }
   | Expr "?" Expr ":" Expr      { Mux $1 $3 $5 }
   | CastingType "'" "(" Expr ")" { Cast (Left            $1) $4 }
-  | Identifier  "'" "(" Expr ")" { Cast (Left $ Alias $1 []) $4 }
   | Number      "'" "(" Expr ")" { Cast (Right $ Number  $1) $4 }
+  |                 Identifier  "'" "(" Expr ")" { Cast (Left $ Alias (Nothing) $1 []) $4 }
+  | Identifier "::" Identifier  "'" "(" Expr ")" { Cast (Left $ Alias (Just $1) $3 []) $6 }
   | Expr "." Identifier         { Dot $1 $3 }
   | "'" "{" PatternItems "}"    { Pattern $3 }
   -- binary expressions

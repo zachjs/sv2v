@@ -54,7 +54,7 @@ convertDescription globalTypes description =
         convertExpr :: Expr -> Expr
         convertExpr (Bits (Right (Ident x))) =
             if Map.member x types
-                then Bits $ Left $ resolveType types (Alias x [])
+                then Bits $ Left $ resolveType types (Alias Nothing x [])
                 else Bits $ Right $ Ident x
         convertExpr other = other
 
@@ -66,12 +66,13 @@ resolveType _ (IntegerAtom   kw sg   ) = IntegerAtom   kw sg
 resolveType _ (NonInteger    kw      ) = NonInteger    kw
 resolveType _ (InterfaceT     x my rs) = InterfaceT     x my rs
 resolveType _ (Enum Nothing   vals rs) = Enum Nothing   vals rs
+resolveType _ (Alias (Just ps)  st rs) = Alias (Just ps)  st rs
 resolveType types (Enum (Just t) vals rs) = Enum (Just $ resolveType types t) vals rs
 resolveType types (Struct p items rs) = Struct p items' rs
     where
         items' = map resolveItem items
         resolveItem (t, x) = (resolveType types t, x)
-resolveType types (Alias st rs1) =
+resolveType types (Alias Nothing st rs1) =
     if Map.notMember st types
     then InterfaceT st Nothing rs1
     else case resolveType types $ types Map.! st of
@@ -83,4 +84,4 @@ resolveType types (Alias st rs1) =
         (InterfaceT     x my rs2) -> InterfaceT     x my $ rs1 ++ rs2
         (IntegerAtom   kw _ ) -> error $ "resolveType encountered packed `" ++ (show kw) ++ "` on " ++ st
         (NonInteger    kw   ) -> error $ "resolveType encountered packed `" ++ (show kw) ++ "` on " ++ st
-        (Alias    _ _) -> error $ "resolveType invariant failed on " ++ st
+        (Alias  _ _ _) -> error $ "resolveType invariant failed on " ++ st

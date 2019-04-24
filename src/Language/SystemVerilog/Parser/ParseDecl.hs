@@ -51,6 +51,7 @@ data DeclToken
     | DTAsgnNBlk (Maybe Timing) Expr
     | DTRange    (PartSelectMode, Range)
     | DTIdent    Identifier
+    | DTPSIdent  Identifier Identifier
     | DTDir      Direction
     | DTType     (Signing -> [Range] -> Type)
     | DTParams   [PortBinding]
@@ -179,7 +180,8 @@ parseDTsAsDecl tokens =
 -- [PUBLIC]: parser for single block item declarations or assign or arg-less
 -- subroutine call statetments
 parseDTsAsDeclOrAsgn :: [DeclToken] -> ([Decl], [Stmt])
-parseDTsAsDeclOrAsgn [DTIdent f] = ([], [Subroutine f (Args [] [])])
+parseDTsAsDeclOrAsgn [DTIdent     f] = ([], [Subroutine (Nothing) f (Args [] [])])
+parseDTsAsDeclOrAsgn [DTPSIdent p f] = ([], [Subroutine (Just  p) f (Args [] [])])
 parseDTsAsDeclOrAsgn tokens =
     if any isAsgnToken tokens || tripLookahead tokens
         then ([], [constructor lhs expr])
@@ -317,7 +319,8 @@ takeType (DTType  tf                : rest) = (tf       Unspecified,            
 takeType (DTSigning sg              : rest) = (Implicit sg         ,                        rest)
 takeType (DTIdent tn : DTComma      : rest) = (Implicit Unspecified, DTIdent tn : DTComma : rest)
 takeType (DTIdent tn                : [  ]) = (Implicit Unspecified, DTIdent tn           : [  ])
-takeType (DTIdent tn                : rest) = (Alias tn            ,                        rest)
+takeType (DTIdent tn                : rest) = (Alias (Nothing) tn  ,                        rest)
+takeType (DTPSIdent ps tn           : rest) = (Alias (Just ps) tn  ,                        rest)
 takeType                              rest  = (Implicit Unspecified,                        rest)
 
 takeRanges :: [DeclToken] -> ([Range], [DeclToken])

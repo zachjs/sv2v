@@ -34,14 +34,14 @@ data Type
     | NonInteger    NonIntegerType
     | Net           NetType                    [Range]
     | Implicit                         Signing [Range]
-    | Alias                 Identifier         [Range]
+    | Alias    (Maybe Identifier) Identifier   [Range]
     | Enum     (Maybe Type) [Item]             [Range]
     | Struct   Packing      [Field]            [Range]
     | InterfaceT Identifier (Maybe Identifier) [Range]
     deriving (Eq, Ord)
 
 instance Show Type where
-    show (Alias         xx    rs) = printf "%s%s"   xx                           (showRanges rs)
+    show (Alias      ps xx    rs) = printf "%s%s%s" (maybe "" (++ "::") ps)  xx  (showRanges rs)
     show (Net           kw    rs) = printf "%s%s"   (show kw)                    (showRanges rs)
     show (Implicit         sg rs) = printf "%s%s"             (showPad       sg) (dropWhile (== ' ') $ showRanges rs)
     show (IntegerVector kw sg rs) = printf "%s%s%s" (show kw) (showPadBefore sg) (showRanges rs)
@@ -74,7 +74,7 @@ instance Ord (Signing -> [Range] -> Type) where
     compare tf1 tf2 = compare (tf1 Unspecified) (tf2 Unspecified)
 
 typeRanges :: Type -> ([Range] -> Type, [Range])
-typeRanges (Alias         xx    rs) = (Alias         xx   , rs)
+typeRanges (Alias      ps xx    rs) = (Alias      ps xx   , rs)
 typeRanges (Net           kw    rs) = (Net           kw   , rs)
 typeRanges (Implicit         sg rs) = (Implicit         sg, rs)
 typeRanges (IntegerVector kw sg rs) = (IntegerVector kw sg, rs)

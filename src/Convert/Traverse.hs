@@ -235,7 +235,7 @@ traverseSinglyNestedStmtsM fullMapper = cs
             return $ If u e s1' s2'
         cs (Timing event stmt) = fullMapper stmt >>= return . Timing event
         cs (Return expr) = return $ Return expr
-        cs (Subroutine f exprs) = return $ Subroutine f exprs
+        cs (Subroutine ps f exprs) = return $ Subroutine ps f exprs
         cs (Trigger x) = return $ Trigger x
         cs (Assertion a) =
             traverseAssertionStmtsM fullMapper a >>= return . Assertion
@@ -424,11 +424,11 @@ traverseNestedExprsM mapper = exprMapper
             return $ Repeat e' l'
         em (Concat     l) =
             mapM exprMapper l >>= return . Concat
-        em (Call       f (Args l p)) = do
+        em (Call    ps f (Args l p)) = do
             l' <- mapM maybeExprMapper l
             pes <- mapM maybeExprMapper $ map snd p
             let p' = zip (map fst p) pes
-            return $ Call f (Args l' p')
+            return $ Call ps f (Args l' p')
         em (UniOp      o e) =
             exprMapper e >>= return . UniOp o
         em (BinOp      o e1 e2) = do
@@ -645,11 +645,11 @@ traverseStmtExprsM exprMapper = flatStmtMapper
     flatStmtMapper (If u cc s1 s2) =
         exprMapper cc >>= \cc' -> return $ If u cc' s1 s2
     flatStmtMapper (Timing event stmt) = return $ Timing event stmt
-    flatStmtMapper (Subroutine f (Args l p)) = do
+    flatStmtMapper (Subroutine ps f (Args l p)) = do
         l' <- mapM maybeExprMapper l
         pes <- mapM maybeExprMapper $ map snd p
         let p' = zip (map fst p) pes
-        return $ Subroutine f (Args l' p')
+        return $ Subroutine ps f (Args l' p')
     flatStmtMapper (Return expr) =
         exprMapper expr >>= return . Return
     flatStmtMapper (Trigger x) = return $ Trigger x
@@ -765,7 +765,7 @@ traverseTypesM mapper item =
     traverseExprsM (traverseNestedExprsM exprMapper)
     where
         fullMapper t = tm t >>= mapper
-        tm (Alias         xx    rs) = return $ Alias         xx    rs
+        tm (Alias      ps xx    rs) = return $ Alias      ps xx    rs
         tm (Net           kw    rs) = return $ Net           kw    rs
         tm (Implicit         sg rs) = return $ Implicit         sg rs
         tm (IntegerVector kw sg rs) = return $ IntegerVector kw sg rs
