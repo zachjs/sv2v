@@ -7,6 +7,8 @@
  - initial block. Other module-level logics become wires. All other logics
  - (i.e., in a function) become regs.
  -
+ - Parameters and localparams with integer vector types become implicit.
+ -
  - The struct conversion and Verilog-2005's lack of permissive net vs. variable
  - resolution leads to some interesting special cases for this conversion, as
  - parts of a struct may be used as a variable, while other parts may be used as
@@ -110,7 +112,7 @@ convertDescription ports orig =
                                     ++ portName ++ " of " ++ instanceName
                 fixBinding other = (other, [])
         -- rewrite variable declarations to have the correct type
-        convertModuleItem (MIPackageItem (Decl (Variable dir (IntegerVector TLogic sg mr) ident a me))) =
+        convertModuleItem (MIPackageItem (Decl (Variable dir (IntegerVector _ sg mr) ident a me))) =
             MIPackageItem $ Decl $ Variable dir (t mr) ident a me
             where
                 t = if sg /= Unspecified || Set.member ident idents
@@ -119,9 +121,9 @@ convertDescription ports orig =
         convertModuleItem other = other
         -- all other logics (i.e. inside of functions) become regs
         convertDecl :: Decl -> Decl
-        convertDecl (Parameter  (IntegerVector TLogic sg rs) x e) =
+        convertDecl (Parameter  (IntegerVector _ sg rs) x e) =
             Parameter  (Implicit sg rs) x e
-        convertDecl (Localparam (IntegerVector TLogic sg rs) x e) =
+        convertDecl (Localparam (IntegerVector _ sg rs) x e) =
             Localparam (Implicit sg rs) x e
         convertDecl (Variable d (IntegerVector TLogic sg rs) x a me) =
             Variable d (IntegerVector TReg sg rs) x a me
