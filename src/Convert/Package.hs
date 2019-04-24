@@ -2,6 +2,10 @@
  - Author: Zachary Snow <zach@zachjs.com>
  -
  - Conversion for packages and imports
+ -
+ - TODO FIXME: This package conversion does not yet handle package-scoped
+ - identifiers for task/function names or type names, as the AST and parser
+ - doesn't support them yet. This won't be too difficult.
  -}
 
 module Convert.Package (convert) where
