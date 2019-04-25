@@ -53,9 +53,14 @@ assertConverts() {
     assertTrue "3rd conversion of $ac_file failed" $?
     diff "$ac_tmpb" "$ac_tmpc" > /dev/null
     assertTrue "conversion of $ac_file not stable after the second iteration" $?
-    # using sed to remove quoted strings because "$bits" may be printed
-    sed -E 's/"([^"]|\")+"//g' "$ac_tmpa" | grep "\$bits" > /dev/null
+    # using sed to remove quoted strings
+    filtered=`sed -E 's/"([^"]|\")+"//g' "$ac_tmpa"`
+    echo "$filtered" | grep "\$bits" > /dev/null
     assertFalse "conversion of $ac_file still contains \$bits" $?
+    echo "$filtered" | grep "\]\[" > /dev/null
+    assertFalse "conversion of $ac_file still contains multi-dim arrays" $?
+    echo "$filtered" | egrep "\s(int\|bit\|logic\|byte\|struct\|enum\|longint\|shortint)\s"
+    assertFalse "conversion of $ac_file still contains SV types" $?
 }
 
 simpleTest() {
