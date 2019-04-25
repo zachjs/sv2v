@@ -1,5 +1,5 @@
 `define PRINT(name, val) \
-    $display("%010x %010x %02d %02d", \
+    $display("%h %h %0d %0d", \
         val, val, $bits(dummy``name), $bits(dummy``name));
 
 module top;
@@ -9,7 +9,7 @@ module top;
     reg [31:0] dummyC;
     reg [31:0] dummyD;
     reg [31:0] dummyE;
-    reg dummyF;
+    reg [0:0] dummyF;
     reg [0:0] dummyG;
 
     initial begin
@@ -45,11 +45,11 @@ module top;
         `PRINT(E, 2)
         `PRINT(E, 3)
 
-        `PRINT(F, 0)
-        `PRINT(F, 1)
+        `PRINT(F, 1'b0)
+        `PRINT(F, 1'b1)
 
-        `PRINT(G, 0)
-        `PRINT(G, 1)
+        `PRINT(G, 1'b0)
+        `PRINT(G, 1'b1)
 
     end
 endmodule

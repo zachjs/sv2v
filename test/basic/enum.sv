@@ -28,7 +28,7 @@ typedef enum [0:0] {
 
 `define PRINT(name, val) \
     dummy``name = name``_``val; \
-    $display("%010x %010x %02d %02d", \
+    $display("%h %h %0d %0d", \
         name``_``val, dummy``name, $bits(name``_``val), $bits(dummy``name));
 
 module top;
