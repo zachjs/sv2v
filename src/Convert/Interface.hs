@@ -21,14 +21,12 @@ type Modports = Map.Map Identifier [ModportDecl]
 type Modules = Map.Map (Identifier, Identifier) Type
 
 convert :: [AST] -> [AST]
-convert descriptions =
-    map (
-        filter (not . isInterface) .
-        traverseDescriptions (convertDescription interfaces modules)
-    ) descriptions
+convert =
+    traverseFiles (collectDescriptionsM collectDesc) converter
     where
-        (interfaces, modules) =
-            execWriter $ collectDescriptionsM collectDesc $ concat descriptions
+        converter (interfaces, modules) =
+            filter (not . isInterface) .
+            map (convertDescription interfaces modules)
         -- we can only collect/map non-extern interfaces
         collectDesc :: Description -> Writer (Interfaces, Modules) ()
         collectDesc (orig @ (Part False kw _ name ports items)) = do

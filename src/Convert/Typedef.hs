@@ -18,15 +18,11 @@ import Language.SystemVerilog.AST
 type Types = Map.Map Identifier Type
 
 convert :: [AST] -> [AST]
-convert = map convertFile
-
-convertFile :: AST -> AST
-convertFile descriptions =
-    traverseDescriptions removeTypedef $
-    traverseDescriptions (convertDescription types) $
-    descriptions
+convert =
+    traverseFiles
+        (collectDescriptionsM getTypedef)
+        (\a -> traverseDescriptions $ removeTypedef . convertDescription a)
     where
-        types = execWriter $ collectDescriptionsM getTypedef descriptions
         getTypedef :: Description -> Writer Types ()
         getTypedef (PackageItem (Typedef a b)) = tell $ Map.singleton b a
         getTypedef _ = return ()

@@ -76,9 +76,11 @@ module Convert.Traverse
 , traverseScopesM
 , scopedConversion
 , stately
+, traverseFiles
 ) where
 
 import Control.Monad.State
+import Control.Monad.Writer
 import Language.SystemVerilog.AST
 
 type MapperM m t = t -> m t
@@ -1009,3 +1011,27 @@ stately :: (Eq s, Show s) => (s -> Mapper a) -> MapperM (State s) a
 stately mapper thing = do
     s <- get
     return $ mapper s thing
+
+-- In many conversions, we want to resolve items locally first, and then fall
+-- back to looking at other source files, if necessary. This helper captures
+-- this behavior, allowing a conversion to fall back to arbitrary global
+-- collected item, if one exists. While this isn't foolproof (we could
+-- inadvertently resolve a name that doesn't exist in the given file), many
+-- projects rely on their toolchain to locate their modules, interfaces,
+-- packages, or typenames in other files. Global resolution of modules and
+-- interfaces is more commonly expected than global resolution of typenames and
+-- packages.
+traverseFiles
+    :: Monoid w
+    => CollectorM (Writer w) AST
+    -> (w -> Mapper AST)
+    -> Mapper [AST]
+traverseFiles fileCollectorM fileMapper files =
+    map traverseFile files
+    where
+        globalNotes = execWriter $ mapM fileCollectorM files
+        traverseFile file =
+            fileMapper notes file
+            where
+                localNotes = execWriter $ fileCollectorM file
+                notes = localNotes <> globalNotes

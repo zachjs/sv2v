@@ -36,10 +36,11 @@ type Idents = Set.Set Identifier
 type Ports = Map.Map (Identifier, Identifier) Direction
 
 convert :: [AST] -> [AST]
-convert asts =
-    map (traverseDescriptions $ convertDescription ports) asts
+convert =
+    traverseFiles
+        (collectDescriptionsM collectPortsM)
+        (traverseDescriptions . convertDescription)
     where
-        ports = execWriter $ collectDescriptionsM collectPortsM $ concat asts
         collectPortsM :: Description -> Writer Ports ()
         collectPortsM (orig @ (Part _ _ _ name portNames _)) =
             collectModuleItemsM collectPortDirsM orig

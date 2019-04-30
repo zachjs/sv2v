@@ -21,12 +21,6 @@
  - * If there is an explicit import of that identifier, the identifier refers to
  -   the imported declaration.
  - * Usages of conflicting wildcard imports are not allowed.
- -
- - If a package cannot be found within a file that references it (including
- - through files it imports), we fall back to an arbitrary package with the
- - given name, if it exists. While this isn't foolproof, some projects do rely
- - on their toolchain to locate their packages in other files, much like modules
- - or interfaces.
  -}
 
 module Convert.Package (convert) where
@@ -43,8 +37,7 @@ type PackageItems = Map.Map Identifier PackageItem
 type Idents = Set.Set Identifier
 
 convert :: [AST] -> [AST]
-convert asts =
-    step asts
+convert = step
     where
         step :: [AST] -> [AST]
         step curr =
@@ -52,12 +45,12 @@ convert asts =
                 then curr
                 else step next
             where
-                packages = execWriter $
-                    collectDescriptionsM collectDescriptionM $ concat curr
-                next = map (convertFile packages) curr
+                next = traverseFiles
+                    (collectDescriptionsM collectDescriptionM)
+                    convertFile curr
 
 convertFile :: Packages -> AST -> AST
-convertFile globalPackages ast =
+convertFile packages ast =
     (++) globalItems $
     filter (not . isCollected) $
     traverseDescriptions (traverseDescription packages) $
@@ -65,11 +58,8 @@ convertFile globalPackages ast =
     where
         globalItems = map PackageItem $
              concatMap (uncurry globalPackageItems) $ Map.toList packages
-        localPackages = execWriter $
-             collectDescriptionsM collectDescriptionM ast
-        packages = Map.union localPackages globalPackages
         isCollected :: Description -> Bool
-        isCollected (Package _ name _) = Map.member name localPackages
+        isCollected (Package _ name _) = Map.member name packages
         isCollected _ = False
 
 globalPackageItems :: Identifier -> PackageItems -> [PackageItem]
