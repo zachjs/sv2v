@@ -49,7 +49,7 @@ traverseDescriptionM (orig @ (Part extern kw lifetime name ports items)) = do
             existingPIs
     let newItems = map MIPackageItem $ Map.elems $
             Map.restrictKeys tfs neededPIs
-    return $ Part extern kw lifetime name ports (items ++ newItems)
+    return $ Part extern kw lifetime name ports (newItems ++ items)
     where
         existingPIs = execWriter $ collectModuleItemsM collectPIsM orig
         runner f = execWriter $ collectModuleItemsM f orig
@@ -97,4 +97,5 @@ piName (Decl (Variable _ _ ident _ _)) = Just ident
 piName (Decl (Parameter  _ ident   _)) = Just ident
 piName (Decl (Localparam _ ident   _)) = Just ident
 piName (Import x y) = Just $ show $ Import x y
+piName (Export   _) = Nothing
 piName (Comment  _) = Nothing

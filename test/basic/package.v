@@ -25,4 +25,20 @@ module top;
         $display("%d", E_pack(0));
         $display("%d", E_pack(1));
     end
+    initial begin
+        $display("imported MAGIC %d", -42);
+        $display("imported MAGIC %d", -42);
+        $display("local MAGIC %d", +42);
+        $display("imported MAGIC %d", -42);
+        $display("imported MAGIC %d", -42);
+        $display("imported MAGIC %d", -42);
+    end
+    initial begin
+        $display("local PIZZAZZ %d", -6);
+        $display("imported PIZZAZZ %d", -5);
+        $display("shadowed local PIZZAZZ %d", -7);
+        $display("imported PIZZAZZ %d", -5);
+        $display("local PIZZAZZ %d", -6);
+        $display("imported PIZZAZZ %d", -5);
+    end
 endmodule

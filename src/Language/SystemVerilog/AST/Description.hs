@@ -57,6 +57,7 @@ data PackageItem
     | Function (Maybe Lifetime) Type Identifier [Decl] [Stmt]
     | Task     (Maybe Lifetime)      Identifier [Decl] [Stmt]
     | Import Identifier (Maybe Identifier)
+    | Export (Maybe (Identifier, Maybe Identifier))
     | Decl Decl
     | Comment String
     deriving Eq
@@ -72,6 +73,8 @@ instance Show PackageItem where
             (showLifetime ml) x (indent $ show i)
             (indent $ unlines' $ map show b)
     show (Import x y) = printf "import %s::%s;" x (fromMaybe "*" y)
+    show (Export Nothing) = "export *::*";
+    show (Export (Just (x, y))) = printf "export %s::%s;" x (fromMaybe "*" y)
     show (Decl decl) = show decl
     show (Comment c) =
         if elem '\n' c

@@ -1,7 +1,32 @@
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
- - Conversion for packages and imports
+ - Conversion for packages, exports, and imports
+ -
+ - TODO: We do not yet handle exports.
+ - TODO: The scoping rules are not being entirely followed yet.
+ - TODO: Explicit imports may introduce name conflicts because of carried items.
+ -
+ - The SystemVerilog scoping rules for exports and imports are not entirely
+ - trivial. We do not explicitly handle the "error" scenarios detailed Table
+ - 26-1 of Section 26-3 of IEEE 1800-2017. Users generally shouldn't be relying
+ - on this tool to catch and report such wild naming conflicts that are outlined
+ - there.
+ -
+ - Summary:
+ - * In scopes which have a local declaration of an identifier, that identifier
+ -   refers to that local declaration.
+ - * If there is no local declaration, the identifier refers to the imported
+ -   declaration.
+ - * If there is an explicit import of that identifier, the identifier refers to
+ -   the imported declaration.
+ - * Usages of conflicting wildcard imports are not allowed.
+ -
+ - If a package cannot be found within a file that references it (including
+ - through files it imports), we fall back to an arbitrary package with the
+ - given name, if it exists. While this isn't foolproof, some projects do rely
+ - on their toolchain to locate their packages in other files, much like modules
+ - or interfaces.
  -}
 
 module Convert.Package (convert) where
@@ -29,13 +54,23 @@ convert asts =
             where
                 packages = execWriter $
                     collectDescriptionsM collectDescriptionM $ concat curr
-                globalItems = map PackageItem $
-                    concatMap (uncurry globalPackageItems) $ Map.toList packages
-                next = map ((++) globalItems) $ map (filter shouldntRemove) $ map
-                    (traverseDescriptions $ traverseDescription packages) curr
-                shouldntRemove :: Description -> Bool
-                shouldntRemove (Package _ name _) = Map.notMember name packages
-                shouldntRemove _ = True
+                next = map (convertFile packages) curr
+
+convertFile :: Packages -> AST -> AST
+convertFile globalPackages ast =
+    (++) globalItems $
+    filter (not . isCollected) $
+    traverseDescriptions (traverseDescription packages) $
+    ast
+    where
+        globalItems = map PackageItem $
+             concatMap (uncurry globalPackageItems) $ Map.toList packages
+        localPackages = execWriter $
+             collectDescriptionsM collectDescriptionM ast
+        packages = Map.union localPackages globalPackages
+        isCollected :: Description -> Bool
+        isCollected (Package _ name _) = Map.member name localPackages
+        isCollected _ = False
 
 globalPackageItems :: Identifier -> PackageItems -> [PackageItem]
 globalPackageItems name items =
@@ -86,20 +121,30 @@ collectDescriptionM _ = return ()
 
 traverseDescription :: Packages -> Description -> Description
 traverseDescription packages description =
-    traverseModuleItems (traverseModuleItem packages) description
+    traverseModuleItems (traverseModuleItem existingItemNames packages)
+    description
+    where
+        existingItemNames = execWriter $
+            collectModuleItemsM writePIName description
+        writePIName :: ModuleItem -> Writer Idents ()
+        writePIName (MIPackageItem item) =
+            case piName item of
+                Nothing -> return ()
+                Just x -> tell $ Set.singleton x
+        writePIName _ = return ()
 
-traverseModuleItem :: Packages -> ModuleItem -> ModuleItem
-traverseModuleItem packages (MIPackageItem (Import x y)) =
+traverseModuleItem :: Idents -> Packages -> ModuleItem -> ModuleItem
+traverseModuleItem existingItemNames packages (MIPackageItem (Import x y)) =
     if Map.member x packages
         then Generate $ map (GenModuleItem . MIPackageItem) items
         else MIPackageItem $ Import x y
     where
         packageItems = packages Map.! x
-        filterer = case y of
-                Nothing -> \_ -> True
-                Just ident -> (==) ident
+        filterer itemName = case y of
+                Nothing -> Set.notMember itemName existingItemNames
+                Just ident -> ident == itemName
         items = map snd $ filter (filterer . fst) $ Map.toList packageItems
-traverseModuleItem _ item =
+traverseModuleItem _ _ item =
     (traverseExprs $ traverseNestedExprs traverseExpr) $
     (traverseStmts traverseStmt) $
     (traverseTypes traverseType) $
@@ -131,4 +176,5 @@ piName (Decl (Variable _ _ ident _ _)) = Just ident
 piName (Decl (Parameter  _ ident   _)) = Just ident
 piName (Decl (Localparam _ ident   _)) = Just ident
 piName (Import _ _) = Nothing
+piName (Export   _) = Nothing
 piName (Comment  _) = Nothing

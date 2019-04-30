@@ -564,6 +564,8 @@ traverseExprsM' strat exprMapper = moduleItemMapper
         return $ MIPackageItem $ Comment c
     moduleItemMapper (MIPackageItem (Import x y)) =
         return $ MIPackageItem $ Import x y
+    moduleItemMapper (MIPackageItem (Export x)) =
+        return $ MIPackageItem $ Export x
     moduleItemMapper (AssertionItem (mx, a)) = do
         a' <- traverseAssertionStmtsM stmtMapper a
         a'' <- traverseAssertionExprsM exprMapper a'
