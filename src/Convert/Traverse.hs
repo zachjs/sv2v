@@ -977,14 +977,15 @@ traverseScopesM declMapper moduleItemMapper stmtMapper =
         redirectModuleItem item =
             moduleItemMapper item
 
+        -- This previously checked the invariant that the module item mappers
+        -- should not modify the state. Now we simply "enforce" it but resetting
+        -- the state to its previous value. Comparing the state, as we did
+        -- previously, incurs a noticeable performance hit.
         fullModuleItemMapper item = do
             prevState <- get
             item' <- redirectModuleItem item
-            currState <- get
-            if prevState == currState
-                then return item'
-                else error $ "illegal scope state modification: "
-                        ++ show (prevState, item, currState, item')
+            put prevState
+            return item'
 
 -- applies the given decl conversion across the description, and then performs a
 -- scoped traversal for each ModuleItem in the description
