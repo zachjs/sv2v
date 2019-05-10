@@ -71,8 +71,6 @@ convertDescription other = other
 -- write down unstructured versions of packed struct types
 collectStructM :: Type -> Writer Structs ()
 collectStructM (Struct (Packed sg) fields _) = do
-    -- TODO: How should we combine the structs Signing with that of the types it
-    -- contains?
     if canUnstructure
         then tell $ Map.singleton
             (Struct (Packed sg) fields)
@@ -102,25 +100,19 @@ collectStructM (Struct (Packed sg) fields _) = do
         vals = zip unstructRanges unstructOffsets
         unstructFields = Map.fromList $ zip keys vals
 
-        -- create the unstructured type
-        tf = fst $ typeRanges $ head fieldTypes
+        -- create the unstructured type; result type takes on the signing of the
+        -- struct itself to preserve behavior of operations on the whole struct
         structSize = foldl1 (BinOp Add) fieldSizes
         packedRange = (simplify $ BinOp Sub structSize (Number "1"), zero)
-        unstructType = tf [packedRange]
+        unstructType = IntegerVector TLogic sg [packedRange]
 
-        -- TODO: For now, we only convert packed structs which contain fields
-        -- with all the same base type. We might be able to get away with
-        -- converting everything to a Logic type. This should work in cases of
-        -- mixed `wire`/`logic` or `reg`/`logic`.
-        fieldClasses = map (show . fst . typeRanges) fieldTypes
-        isComplex :: Type -> Bool
-        isComplex (Struct _ _ _) = True
-        isComplex (Enum   _ _ _) = True
-        isComplex (Alias  _ _ _) = True
-        isComplex _ = False
-        canUnstructure =
-            all (head fieldClasses ==) fieldClasses &&
-            not (any isComplex fieldTypes)
+        -- check if this struct can be packed into an integer vector; integer
+        -- atoms and non-integers do not have a definitive size, and so cannot
+        -- be packed; net types are not permitted as struct fields
+        isIntVec :: Type -> Bool
+        isIntVec (IntegerVector _ _ _) = True
+        isIntVec _ = False
+        canUnstructure = all isIntVec fieldTypes
 
 collectStructM _ = return ()
 

@@ -1,9 +1,9 @@
-typedef struct packed { logic w, x, y; } StructA;
-typedef struct packed { logic w, y, x; } StructB;
-typedef struct packed { logic x, w, y; } StructC;
-typedef struct packed { logic y, w, x; } StructD;
-typedef struct packed { logic x, y, w; } StructE;
-typedef struct packed { logic y, x, w; } StructF;
+typedef struct packed { reg w; bit x; logic y; } StructA;
+typedef struct packed { reg w; logic y; bit x; } StructB;
+typedef struct packed { bit x; reg w; logic y; } StructC;
+typedef struct packed { logic y; reg w; bit x; } StructD;
+typedef struct packed { bit x; logic y; reg w; } StructE;
+typedef struct packed { logic y; bit x; reg w; } StructF;
 
 module top;
 

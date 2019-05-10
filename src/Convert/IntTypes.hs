@@ -1,7 +1,7 @@
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
- - Conversion for `int`, `shortint`, `longint`, and `byte`
+ - Conversion for `bit`, `int`, `shortint`, `longint`, and `byte`
  -}
 
 module Convert.IntTypes (convert) where
@@ -21,6 +21,7 @@ convertType (IntegerAtom TInt      sg) = baseType sg Signed      32
 convertType (IntegerAtom TShortint sg) = baseType sg Signed      16
 convertType (IntegerAtom TLongint  sg) = baseType sg Signed      64
 convertType (IntegerAtom TByte     sg) = baseType sg Unspecified  8
+convertType (IntegerVector TBit sg rs) = IntegerVector TLogic sg rs
 convertType other = other
 
 -- makes a integer "compatible" type with the given signing, base signing and
