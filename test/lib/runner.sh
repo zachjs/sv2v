@@ -66,15 +66,17 @@ assertConverts() {
 simpleTest() {
     sv="$1"
     ve="$2"
-    if [ -z ${NO_SEPARATE_TBS} ]; then
-        tb="$3"
-    else
-        tb="$SCRIPT_DIR/empty.v"
-    fi
+    tb="$3"
 
     assertNotNull "SystemVerilog file not specified" $sv
     assertNotNull "Verilog file not specified" $ve
     assertNotNull "Testbench not specified" $tb
+
+    # some tests don't have a separate testbench, instead having the top-level
+    # module defined in both of the input files
+    if [ ! -f "$tb" ]; then
+        tb="$SCRIPT_DIR/empty.v"
+    fi
 
     assertExists $sv
     assertExists $ve
