@@ -179,12 +179,12 @@ packerFnName structTf =
         val = hash $ show structTf
         str = tail $ show val
 
--- This is where the magic happens. This is responsible for convertign struct
+-- This is where the magic happens. This is responsible for converting struct
 -- accesses, assignments, and literals, given appropriate information about the
 -- structs and the current declaration context. The general strategy involves
 -- looking at the innermost type of a node to convert outer uses of fields, and
--- then using the outermost type to figure out the corresping struct definition
--- for struct literals that are encountered.
+-- then using the outermost type to figure out the corresponding struct
+-- definition for struct literals that are encountered.
 convertAsgn :: Structs -> Types -> (LHS, Expr) -> (LHS, Expr)
 convertAsgn structs types (lhs, expr) =
     (lhs', expr')

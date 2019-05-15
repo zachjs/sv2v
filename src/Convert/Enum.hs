@@ -7,7 +7,7 @@
  - modules in which that enum type appears. This is not necessarily foolproof,
  - as some tools do allow the use of an enum item even if the actual enum type
  - does not appear in that description. The localparams are explicitly sized to
- - match the size of the converted enum type. This conversion only includes enum
+ - match the size of the converted enum type. This conversion includes only enum
  - items which are actually used within a given description.
  -
  - SystemVerilog allows for enums to have any number of the items' values
