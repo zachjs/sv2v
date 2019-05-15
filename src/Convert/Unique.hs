@@ -3,9 +3,9 @@
  -
  - Conversion for `unique`, `unique0`, and `priority`
  -
- - This conversion simply drops the keywords, as it is only used for
- - optimization. There is no way to force toolchains which don't support the
- - keyword to perform such optimization.
+ - This conversion simply drops the keywords, as it is used only for
+ - optimization. There is no way to force toolchains which don't support
+ - the keyword to perform such optimization.
  -}
 
 module Convert.Unique (convert) where

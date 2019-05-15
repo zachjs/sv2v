@@ -4,7 +4,7 @@
  - Conversion for unnamed blocks with contain data declarations
  -
  - SystemVerilog allows data declarations to appear in all blocks, but Verilog
- - only allows them to appear in blocks that are named. This conversion gives
+ - allows them to appear only in blocks that are named. This conversion gives
  - such blocks a unique name to placate strict Verilog frontends.
  -}
 
