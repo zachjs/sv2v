@@ -373,10 +373,38 @@ convertAsgn structs types (lhs, expr) =
                 retType = case Map.lookup f types of
                     Nothing -> Implicit Unspecified []
                     Just t -> t
-        -- TODO: There are other expression cases that we probably need to
-        -- recurse into. That said, it's not clear to me how much we really
-        -- expect to see things like concatenated packed structs, for example.
-        convertSubExpr other = (Implicit Unspecified [], other)
+        convertSubExpr (Call (Just x) f args) =
+            (Implicit Unspecified [], Call (Just x) f args)
+        convertSubExpr (String s) = (Implicit Unspecified [], String s)
+        convertSubExpr (Number n) = (Implicit Unspecified [], Number n)
+        convertSubExpr (PSIdent x y) = (Implicit Unspecified [], PSIdent x y)
+        convertSubExpr (Repeat e es) =
+            (Implicit Unspecified [], Repeat e' es')
+            where
+                (_, e') = convertSubExpr e
+                es' = map (snd . convertSubExpr) es
+        convertSubExpr (UniOp op e) =
+            (Implicit Unspecified [], UniOp op e')
+            where (_, e') = convertSubExpr e
+        convertSubExpr (Mux a b c) =
+            (t, Mux a' b' c')
+            where
+                (_, a') = convertSubExpr a
+                (t, b') = convertSubExpr b
+                (_, c') = convertSubExpr c
+        convertSubExpr (Cast (Left t) sub) =
+            (t, Cast (Left t) (snd $ convertSubExpr sub))
+        convertSubExpr (Cast (Right e) sub) =
+            (Implicit Unspecified [], Cast (Right e) (snd $ convertSubExpr sub))
+        convertSubExpr (Bits (Left t)) = (Implicit Unspecified [], Bits (Left t))
+        convertSubExpr (Bits (Right e)) =
+            (Implicit Unspecified [], Bits (Right e'))
+            where e' = snd $ convertSubExpr e
+        convertSubExpr (Pattern items) =
+            (Implicit Unspecified [], Pattern items')
+            where
+                items' = map mapItem items
+                mapItem (mx, e) = (mx, snd $ convertSubExpr e)
 
         -- lookup the range of a field in its unstructured type
         lookupUnstructRange :: TypeFunc -> Identifier -> Range
