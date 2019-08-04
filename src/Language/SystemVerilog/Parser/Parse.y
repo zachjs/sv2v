@@ -336,8 +336,8 @@ Packing :: { Packing }
   | {- empty -}         { Unpacked }
 
 Part(begin, end) :: { Description }
-  :          begin opt(Lifetime) Identifier Params PortDecls ";" ModuleItems end opt(Tag) { Part False $1 $2 $3 (fst $5) ($4 ++ (snd $5) ++ $7) }
-  | "extern" begin opt(Lifetime) Identifier Params PortDecls ";"                          { Part True  $2 $3 $4 (fst $6) ($5 ++ (snd $6)      ) }
+  :          begin opt(Lifetime) Identifier PackageImportDeclarations Params PortDecls ";" ModuleItems end opt(Tag) { Part False $1 $2 $3 (fst $6) ($4 ++ $5 ++ (snd $6) ++ $8) }
+  | "extern" begin opt(Lifetime) Identifier PackageImportDeclarations Params PortDecls ";"                          { Part True  $2 $3 $4 (fst $7) ($5 ++ $6 ++ (snd $7)      ) }
 
 ModuleKW :: { PartKW }
   : "module" { Module }
@@ -349,6 +349,13 @@ PackageDeclaration :: { Description }
 
 Tag :: { Identifier }
   : ":" Identifier { $2 }
+
+PackageImportDeclarations :: { [ModuleItem] }
+  : PackageImportDeclaration PackageImportDeclarations { $1 ++ $2 }
+  | {- empty -}                                        { [] }
+
+PackageImportDeclaration :: { [ModuleItem] }
+  : "import" PackageImportItems ";" { map (MIPackageItem . uncurry Import) $2 }
 
 Params :: { [ModuleItem] }
   : {- empty -}        { [] }
