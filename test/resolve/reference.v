@@ -1,6 +1,6 @@
 `define FANCY_SEEING_YOU 1337
 module top;
-    parameter width = 5;
+    localparam width = 5;
     input [width-1:0] i;
     output [width-1:0] o;
     assign o = i + 1'b1;

@@ -358,15 +358,11 @@ PackageImportDeclaration :: { [ModuleItem] }
   : "import" PackageImportItems ";" { map (MIPackageItem . uncurry Import) $2 }
 
 Params :: { [ModuleItem] }
-  : {- empty -}        { [] }
-  | "#" "(" ParamDecls { $3 }
-ParamDecls :: { [ModuleItem] }
-  : ParamDecl(")")            { $1 }
-  | ParamDecl(",") ParamDecls { $1 ++ $2 }
-ParamDecl(delim) :: { [ModuleItem] }
-  : ParameterDecl(OnlyParamKW, delim) { map (MIPackageItem . Decl) $1 }
-OnlyParamKW :: { Type -> Identifier -> Expr -> Decl }
-  : "parameter" { Parameter }
+  : {- empty -}          { [] }
+  | "#" "(" ParamsFollow { map (MIPackageItem . Decl) $3 }
+ParamsFollow :: { [Decl] }
+  : ParameterDecl(")")              { $1 }
+  | ParameterDecl(",") ParamsFollow { $1 ++ $2 }
 
 PortDecls :: { ([Identifier], [ModuleItem]) }
   : "(" DeclTokens(")") { parseDTsAsPortDecls $2 }
@@ -455,8 +451,8 @@ ModuleItem :: { [ModuleItem] }
   | "generate" GenItems "endgenerate" { [Generate $2] }
 NonGenerateModuleItem :: { [ModuleItem] }
   -- This item covers module instantiations and all declarations
-  : DeclTokens(";")  { parseDTsAsModuleItems $1 }
-  | ParameterDecl(ParameterDeclKW, ";")  { map (MIPackageItem . Decl) $1 }
+  : DeclTokens(";")                      { parseDTsAsModuleItems $1 }
+  | ParameterDecl(";")                   { map (MIPackageItem . Decl) $1 }
   | "defparam" DefparamAsgns ";"         { map (uncurry Defparam) $2 }
   | "assign" opt(DelayControl) LHS "=" Expr ";" { [Assign $2 $3 $5] }
   | AlwaysKW Stmt                        { [AlwaysC $1 $2] }
@@ -577,9 +573,9 @@ PackageItems :: { [PackageItem] }
   : PackageItem              { $1 }
   | PackageItems PackageItem { $1 ++ $2 }
 PackageItem :: { [PackageItem] }
-  : DeclTokens(";")                     { map Decl $ parseDTsAsDecls $1 }
-  | ParameterDecl(ParameterDeclKW, ";") { map Decl $1 }
-  | NonDeclPackageItem                  { $1 }
+  : DeclTokens(";")    { map Decl $ parseDTsAsDecls $1 }
+  | ParameterDecl(";") { map Decl $1 }
+  | NonDeclPackageItem { $1 }
 NonDeclPackageItem :: { [PackageItem] }
   : "typedef" Type Identifier ";" { [Typedef $2 $3] }
   | "function" opt(Lifetime) FuncRetAndName TFItems DeclsAndStmts "endfunction" opt(Tag) { [Function $2 (fst $3) (snd $3) (map defaultFuncInput $ (map makeInput $4) ++ fst $5) (snd $5)] }
@@ -728,13 +724,13 @@ DeclsAndStmts :: { ([Decl], [Stmt]) }
   | {- empty -}              { ([], []) }
 DeclOrStmt :: { ([Decl], [Stmt]) }
   : DeclOrStmtTokens(";") { parseDTsAsDeclOrAsgn $1 }
-  | ParameterDecl(ParameterDeclKW, ";") { ($1, []) }
+  | ParameterDecl(";")    { ($1, []) }
 
-ParameterDecl(kw, delim) :: { [Decl] }
-  : kw                            DeclAsgns delim { map (uncurry $ $1 (Implicit Unspecified [])) $2 }
-  | kw                 ParamType  DeclAsgns delim { map (uncurry $ $1 ($2                     )) $3 }
-  | kw                 Identifier DeclAsgns delim { map (uncurry $ $1 (Alias (Nothing)   $2 [])) $3 }
-  | kw Identifier "::" Identifier DeclAsgns delim { map (uncurry $ $1 (Alias (Just $2)   $4 [])) $5 }
+ParameterDecl(delim) :: { [Decl] }
+  : ParameterDeclKW                            DeclAsgns delim { map (uncurry $ $1 (Implicit Unspecified [])) $2 }
+  | ParameterDeclKW                 ParamType  DeclAsgns delim { map (uncurry $ $1 ($2                     )) $3 }
+  | ParameterDeclKW                 Identifier DeclAsgns delim { map (uncurry $ $1 (Alias (Nothing)   $2 [])) $3 }
+  | ParameterDeclKW Identifier "::" Identifier DeclAsgns delim { map (uncurry $ $1 (Alias (Just $2)   $4 [])) $5 }
 ParameterDeclKW :: { Type -> Identifier -> Expr -> Decl }
   : "parameter"  { Parameter  }
   | "localparam" { Localparam }
