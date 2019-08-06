@@ -20,6 +20,7 @@ data Job = Job
     , files :: [FilePath]
     , incdir :: [FilePath]
     , define :: [String]
+    , oneunit :: Bool
     } deriving (Show, Typeable, Data)
 
 defaultJob :: Job
@@ -29,6 +30,7 @@ defaultJob = Job
     , files = def &= args &= typ "FILES"
     , incdir = def &= typDir &= help "add directory to include search path"
     , define = def &= typ "NAME[=VALUE]" &= help "define a macro for preprocessing"
+    , oneunit = False &= help "compile all files in one compilation unit"
     }
     &= program "sv2v"
     &= summary "sv2v v0.0.1, (C) 2019 Zachary Snow, 2011-2015 Tom Hawkins"

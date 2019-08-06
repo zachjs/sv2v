@@ -8,9 +8,9 @@ import System.IO
 import System.Exit
 
 import Data.List (elemIndex)
-import Job (readJob, files, exclude, incdir, define)
+import Job (readJob, files, exclude, incdir, define, oneunit)
 import Convert (convert)
-import Language.SystemVerilog.Parser
+import Language.SystemVerilog.Parser (parseFiles)
 
 splitDefine :: String -> (String, String)
 splitDefine str =
@@ -21,12 +21,17 @@ splitDefine str =
 main :: IO ()
 main = do
     job <- readJob
-    -- parse the input file
+    -- parse the input files
     let includePaths = incdir job
     let defines = map splitDefine $ define job
-    asts <- mapM (parseFile includePaths defines) (files job)
-    -- convert the file
+    let singleton = \x -> [x]
+    let toFileLists = if oneunit job then singleton else map singleton
+    astLists <- mapM
+        (parseFiles includePaths defines)
+        (toFileLists $ files job)
+    let asts = concat astLists
+    -- convert the files
     let asts' = convert (exclude job) asts
-    -- print the converted file out
+    -- print the converted files out
     hPrint stdout $ concat asts'
     exitSuccess

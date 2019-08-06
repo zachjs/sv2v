@@ -20,7 +20,10 @@
 -- been fixed on their development branch, so this can be removed once they roll
 -- a new release. (no new release as of 3/29/2018)
 
-module Language.SystemVerilog.Parser.Lex (lexFile) where
+module Language.SystemVerilog.Parser.Lex
+    ( lexFile
+    , Env
+    ) where
 
 import System.FilePath (dropFileName)
 import System.Directory (findFile)
@@ -322,11 +325,14 @@ data Cond
     | NeverTrue
     deriving (Eq, Show)
 
+-- map from macro to definition, plus arguments
+type Env = Map.Map String (String, [(String, Maybe String)])
+
 -- our custom lexer state
 data AlexUserState = LS
     { lsToks         :: [Token] -- tokens read so far, *in reverse order* for efficiency
     , lsCurrFile     :: FilePath -- currently active filename
-    , lsEnv          :: Map.Map String (String, [(String, Maybe String)]) -- active macro definitions
+    , lsEnv          :: Env -- active macro definitions
     , lsCondStack    :: [Cond] -- if-else cascade state
     , lsIncludePaths :: [FilePath] -- folders to search for includes
     } deriving (Eq, Show)
@@ -338,7 +344,7 @@ alexInitUserState :: AlexUserState
 alexInitUserState = LS [] "" Map.empty [] []
 
 -- public-facing lexer entrypoint
-lexFile :: [String] -> [(String, String)] -> FilePath -> IO [Token]
+lexFile :: [String] -> Env -> FilePath -> IO ([Token], Env)
 lexFile includePaths env path = do
     str <- readFile path
     let result = runAlex str $ setEnv >> alexMonadScan >> get
@@ -346,16 +352,15 @@ lexFile includePaths env path = do
         Left msg -> error $ "Lexical Error: " ++ msg
         Right finalState ->
             if null $ lsCondStack finalState
-                then reverse $ lsToks finalState
+                then (reverse $ lsToks finalState, lsEnv finalState)
                 else error $ "unfinished conditional directives: " ++
                         (show $ length $ lsCondStack finalState)
     where
-        initialEnv = Map.map (\a -> (a, [])) $ Map.fromList env
         setEnv = do
             -- standardize the file path format
             path' <- includeSearch path
             modify $ \s -> s
-                { lsEnv = initialEnv
+                { lsEnv = env
                 , lsIncludePaths = includePaths
                 , lsCurrFile = path'
                 }

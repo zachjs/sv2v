@@ -5,5 +5,6 @@ module top
     assign o = i + 1'b1;
     initial begin
         $display(width);
+        $display(`FANCY_SEEING_YOU);
     end
 endmodule
