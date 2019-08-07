@@ -727,10 +727,10 @@ DeclOrStmt :: { ([Decl], [Stmt]) }
   | ParameterDecl(";")    { ($1, []) }
 
 ParameterDecl(delim) :: { [Decl] }
-  : ParameterDeclKW                            DeclAsgns delim { map (uncurry $ $1 (Implicit Unspecified [])) $2 }
-  | ParameterDeclKW                 ParamType  DeclAsgns delim { map (uncurry $ $1 ($2                     )) $3 }
-  | ParameterDeclKW                 Identifier DeclAsgns delim { map (uncurry $ $1 (Alias (Nothing)   $2 [])) $3 }
-  | ParameterDeclKW Identifier "::" Identifier DeclAsgns delim { map (uncurry $ $1 (Alias (Just $2)   $4 [])) $5 }
+  : ParameterDeclKW                                       DeclAsgns delim { map (uncurry $ $1 (Implicit Unspecified [])) $2 }
+  | ParameterDeclKW                             ParamType DeclAsgns delim { map (uncurry $ $1 ($2                     )) $3 }
+  | ParameterDeclKW                 Identifier Dimensions DeclAsgns delim { map (uncurry $ $1 (Alias (Nothing)   $2 $3)) $4 }
+  | ParameterDeclKW Identifier "::" Identifier Dimensions DeclAsgns delim { map (uncurry $ $1 (Alias (Just $2)   $4 $5)) $6 }
 ParameterDeclKW :: { Type -> Identifier -> Expr -> Decl }
   : "parameter"  { Parameter  }
   | "localparam" { Localparam }

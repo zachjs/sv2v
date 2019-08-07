@@ -33,8 +33,8 @@ convertDescription (description @ (Part _ _ _ _ _ _)) =
     Part extern kw lifetime name ports (items ++ funcs)
     where
         description' @ (Part extern kw lifetime name ports items) =
-            scopedConversion traverseDeclM traverseModuleItemM traverseStmtM
-                tfArgTypes description
+            scopedConversion (traverseDeclM structs) traverseModuleItemM
+                traverseStmtM tfArgTypes description
         -- collect information about this description
         structs = execWriter $ collectModuleItemsM
             (collectTypesM collectStructM) description
@@ -149,15 +149,31 @@ collectTFArgsM (MIPackageItem item) = do
 collectTFArgsM _ = return ()
 
 -- write down the types of declarations
-traverseDeclM :: Decl -> State Types Decl
-traverseDeclM origDecl = do
+traverseDeclM :: Structs -> Decl -> State Types Decl
+traverseDeclM structs origDecl = do
     case origDecl of
-        Variable _ t x a _ -> do
+        Variable d t x a me -> do
             let (tf, rs) = typeRanges t
             modify $ Map.insert x (tf $ a ++ rs)
-        Parameter  t x _   -> modify $ Map.insert x t
-        Localparam t x _   -> modify $ Map.insert x t
-    return origDecl
+            case me of
+                Nothing -> return origDecl
+                Just e -> do
+                    e' <- convertDeclExpr x e
+                    return $ Variable d t x a (Just e')
+        Parameter  t x e   -> do
+            modify $ Map.insert x t
+            e' <- convertDeclExpr x e
+            return $ Parameter t x e'
+        Localparam t x e   -> do
+            modify $ Map.insert x t
+            e' <- convertDeclExpr x e
+            return $ Localparam t x e'
+    where
+        convertDeclExpr :: Identifier -> Expr -> State Types Expr
+        convertDeclExpr x e = do
+            types <- get
+            let (LHSIdent _, e') = convertAsgn structs types (LHSIdent x, e)
+            return e'
 
 -- produces a function which packs the components of a struct literal
 packerFn :: TypeFunc -> ModuleItem
@@ -262,6 +278,8 @@ convertAsgn structs types (lhs, expr) =
         convertExpr (IntegerVector t sg (r:rs)) (Pattern [(Just "default", e)]) =
             Repeat (rangeSize r) [e']
             where e' = convertExpr (IntegerVector t sg rs) e
+        convertExpr (Struct (Packed sg) fields (_:rs)) (Concat exprs) =
+            Concat $ map (convertExpr (Struct (Packed sg) fields rs)) exprs
         convertExpr (Struct (Packed sg) fields (_:rs)) (Bit e _) =
             convertExpr (Struct (Packed sg) fields rs) e
         convertExpr (Struct (Packed sg) fields rs) (Pattern [(Just "default", e)]) =

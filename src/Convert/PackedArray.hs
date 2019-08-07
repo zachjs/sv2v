@@ -41,19 +41,29 @@ convertDescription =
 
 -- collects and converts multi-dimensional packed-array declarations
 traverseDeclM :: Decl -> State Info Decl
-traverseDeclM (origDecl @ (Variable dir t ident a me)) = do
+traverseDeclM (Variable dir t ident a me) = do
+    t' <- traverseDeclM' t ident
+    return $ Variable dir t' ident a me
+traverseDeclM (Parameter t ident e) = do
+    t' <- traverseDeclM' t ident
+    return $ Parameter t' ident e
+traverseDeclM (Localparam t ident e) = do
+    t' <- traverseDeclM' t ident
+    return $ Localparam t' ident e
+
+traverseDeclM' :: Type -> Identifier -> State Info Type
+traverseDeclM' t ident = do
     Info typeDims <- get
     let (tf, rs) = typeRanges t
     if length rs <= 1
         then do
             put $ Info $ Map.delete ident typeDims
-            return origDecl
+            return t
         else do
             put $ Info $ Map.insert ident rs typeDims
             let r1 : r2 : rest = rs
             let rs' = (combineRanges r1 r2) : rest
-            return $ Variable dir (tf rs') ident a me
-traverseDeclM other = return other
+            return $ tf rs'
 
 -- combines two ranges into one flattened range
 combineRanges :: Range -> Range -> Range
