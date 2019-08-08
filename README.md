@@ -69,9 +69,11 @@ sv2v [OPTIONS] [FILES]
 
 Common flags:
   -e --exclude=CONV         exclude a particular conversion (always,
-                            interface, logic)
+                            interface, or logic)
   -i --incdir=DIR           add directory to include search path
   -d --define=NAME[=VALUE]  define a macro for preprocessing
+  -o --oneunit              put all files in one compilation unit, so macros
+                            from earlier files remain defined in later files
   -? --help                 Display help message
   -V --version              Print version information
      --numeric-version      Print just the version number

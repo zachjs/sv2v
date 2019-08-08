@@ -26,11 +26,13 @@ data Job = Job
 defaultJob :: Job
 defaultJob = Job
     { exclude = [] &= typ "CONV"
-        &= help "exclude a particular conversion (always, interface, logic)"
+        &= help "exclude a particular conversion (always, interface, or logic)"
     , files = def &= args &= typ "FILES"
     , incdir = def &= typDir &= help "add directory to include search path"
-    , define = def &= typ "NAME[=VALUE]" &= help "define a macro for preprocessing"
-    , oneunit = False &= help "compile all files in one compilation unit"
+    , define = def &= typ "NAME[=VALUE]" &= help ("define a macro for"
+        ++ " preprocessing")
+    , oneunit = False &= help ("put all files in one compilation unit, so"
+        ++ " macros from earlier files remain defined in later files")
     }
     &= program "sv2v"
     &= summary "sv2v v0.0.1, (C) 2019 Zachary Snow, 2011-2015 Tom Hawkins"
