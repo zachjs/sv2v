@@ -570,7 +570,7 @@ DefparamAsgn :: { (LHS, Expr) }
   : LHS "=" Expr { ($1, $3) }
 
 PackageItems :: { [PackageItem] }
-  : PackageItem              { $1 }
+  : {- empty -}              { [] }
   | PackageItems PackageItem { $1 ++ $2 }
 PackageItem :: { [PackageItem] }
   : DeclTokens(";")    { map Decl $ parseDTsAsDecls $1 }
