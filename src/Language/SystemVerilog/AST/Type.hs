@@ -8,6 +8,7 @@
 
 module Language.SystemVerilog.AST.Type
     ( Identifier
+    , Field
     , Type    (..)
     , Signing (..)
     , Packing (..)

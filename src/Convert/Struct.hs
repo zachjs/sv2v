@@ -1,7 +1,7 @@
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
- - Conversion for `struct packed`
+ - Conversion for `struct packed` and `union packed`
  -}
 
 module Convert.Struct (convert) where
@@ -70,10 +70,19 @@ convertDescription other = other
 
 -- write down unstructured versions of packed struct types
 collectStructM :: Type -> Writer Structs ()
-collectStructM (Struct (Packed sg) fields _) = do
+collectStructM (Struct (Packed sg) fields _) =
+    collectStructM' Struct True  sg fields
+collectStructM (Union  (Packed sg) fields _) =
+    collectStructM' Union  False sg fields
+collectStructM _ = return ()
+
+collectStructM'
+    :: (Packing -> [Field] -> [Range] -> Type)
+    -> Bool -> Signing -> [Field] -> Writer Structs ()
+collectStructM' constructor isStruct sg fields = do
     if canUnstructure
         then tell $ Map.singleton
-            (Struct (Packed sg) fields)
+            (constructor (Packed sg) fields)
             (unstructType, unstructFields)
         else return ()
     where
@@ -90,8 +99,14 @@ collectStructM (Struct (Packed sg) fields _) = do
 
         -- layout the fields into the unstructured type; note that `scanr` is
         -- used here because SystemVerilog structs are laid out backwards
-        fieldLos = map simplify $ tail $ scanr (BinOp Add) (Number  "0") fieldSizes
-        fieldHis = map simplify $ init $ scanr (BinOp Add) (Number "-1") fieldSizes
+        fieldLos =
+            if isStruct
+                then map simplify $ tail $ scanr (BinOp Add) (Number  "0") fieldSizes
+                else map simplify $ repeat (Number "0")
+        fieldHis =
+            if isStruct
+                then map simplify $ init $ scanr (BinOp Add) (Number "-1") fieldSizes
+                else map simplify $ map (BinOp Add (Number "-1")) fieldSizes
 
         -- create the mapping structure for the unstructured fields
         unstructOffsets = map simplify $ map snd fieldRanges
@@ -102,7 +117,10 @@ collectStructM (Struct (Packed sg) fields _) = do
 
         -- create the unstructured type; result type takes on the signing of the
         -- struct itself to preserve behavior of operations on the whole struct
-        structSize = foldl1 (BinOp Add) fieldSizes
+        structSize =
+            if isStruct
+                then foldl1 (BinOp Add) fieldSizes
+                else head fieldSizes
         packedRange = (simplify $ BinOp Sub structSize (Number "1"), zero)
         unstructType = IntegerVector TLogic sg [packedRange]
 
@@ -114,7 +132,6 @@ collectStructM (Struct (Packed sg) fields _) = do
         isIntVec _ = False
         canUnstructure = all isIntVec fieldTypes
 
-collectStructM _ = return ()
 
 -- convert a struct type to its unstructured equivalent
 convertType :: Structs -> Type -> Type
@@ -252,7 +269,13 @@ convertAsgn structs types (lhs, expr) =
         convertLHS (LHSDot    l x ) =
             case t of
                 InterfaceT _ _ _ -> (Implicit Unspecified [], LHSDot l' x)
-                Struct _ _ _ -> case Map.lookup structTf structs of
+                Struct p fields [] -> undot (Struct p fields) fields
+                Union  p fields [] -> undot (Union  p fields) fields
+                Implicit sg _ -> (Implicit sg [], LHSDot l' x)
+                _ -> error $ "convertLHS encountered dot for bad type: " ++ show (t, l, x)
+            where
+                (t, l') = convertLHS l
+                undot structTf fields = case Map.lookup structTf structs of
                     Nothing -> (fieldType, LHSDot l' x)
                     Just (structT, m) -> (tf [tr], LHSRange l' NonIndexed r)
                         where
@@ -261,13 +284,8 @@ convertAsgn structs types (lhs, expr) =
                             hi' = BinOp Add base $ BinOp Sub hi lo
                             lo' = base
                             tr = (simplify hi', simplify lo')
-                Implicit sg _ -> (Implicit sg [], LHSDot l' x)
-                _ -> error $ "convertLHS encountered dot for bad type: " ++ show (t, l, x)
-            where
-                (t, l') = convertLHS l
-                Struct p fields [] = t
-                structTf = Struct p fields
-                fieldType = lookupFieldType fields x
+                    where
+                        fieldType = lookupFieldType fields x
         convertLHS (LHSConcat lhss) =
             (Implicit Unspecified [], LHSConcat $ map (snd . convertLHS) lhss)
 
@@ -330,17 +348,18 @@ convertAsgn structs types (lhs, expr) =
                 Just t -> (t, Ident x)
         convertSubExpr (Dot e x) =
             case subExprType of
-                Struct _ _ _ ->
-                    if Map.notMember structTf structs
-                        then (fieldType, Dot e' x)
-                        else (fieldType, Range  e' NonIndexed r)
+                Struct p fields [] -> undot (Struct p fields) fields
+                Union  p fields [] -> undot (Union  p fields) fields
                 _ -> (Implicit Unspecified [], Dot e' x)
             where
                 (subExprType, e') = convertSubExpr e
-                Struct p fields [] = subExprType
-                structTf = Struct p fields
-                fieldType = lookupFieldType fields x
-                r = lookupUnstructRange structTf x
+                undot structTf fields =
+                    if Map.notMember structTf structs
+                        then (fieldType, Dot e' x)
+                        else (fieldType, Range  e' NonIndexed r)
+                    where
+                        fieldType = lookupFieldType fields x
+                        r = lookupUnstructRange structTf x
         convertSubExpr (Range eOuter NonIndexed (rOuter @ (hiO, loO))) =
             -- VCS doesn't allow ranges to be cascaded, so we need to combine
             -- nested Ranges into a single range. My understanding of the
