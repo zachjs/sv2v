@@ -115,6 +115,7 @@ import Language.SystemVerilog.Parser.Tokens
 "trior"            { Token KW_trior        _ _ }
 "trireg"           { Token KW_trireg       _ _ }
 "typedef"          { Token KW_typedef      _ _ }
+"union"            { Token KW_union        _ _ }
 "unique"           { Token KW_unique       _ _ }
 "unique0"          { Token KW_unique0      _ _ }
 "unsigned"         { Token KW_unsigned     _ _ }
@@ -277,6 +278,7 @@ PartialType :: { Signing -> [Range] -> Type }
   | NonIntegerType                          { \Unspecified -> \[] -> NonInteger    $1    }
   | "enum" EnumBaseType "{" EnumItems   "}" { \Unspecified -> Enum   $2 $4 }
   | "struct" Packing    "{" StructItems "}" { \Unspecified -> Struct $2 $4 }
+  | "union"  Packing    "{" StructItems "}" { \Unspecified -> Union  $2 $4 }
 CastingType :: { Type }
   : IntegerVectorType { IntegerVector $1 Unspecified [] }
   | IntegerAtomType   { IntegerAtom   $1 Unspecified    }

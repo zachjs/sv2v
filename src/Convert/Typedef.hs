@@ -54,6 +54,9 @@ convertDescription globalTypes description =
                 else Bits $ Right $ Ident x
         convertExpr other = other
 
+resolveItem :: Types -> (Type, Identifier) -> (Type, Identifier)
+resolveItem types (t, x) = (resolveType types t, x)
+
 resolveType :: Types -> Type -> Type
 resolveType _ (Net           kw    rs) = Net           kw    rs
 resolveType _ (Implicit         sg rs) = Implicit         sg rs
@@ -64,10 +67,8 @@ resolveType _ (InterfaceT     x my rs) = InterfaceT     x my rs
 resolveType _ (Enum Nothing   vals rs) = Enum Nothing   vals rs
 resolveType _ (Alias (Just ps)  st rs) = Alias (Just ps)  st rs
 resolveType types (Enum (Just t) vals rs) = Enum (Just $ resolveType types t) vals rs
-resolveType types (Struct p items rs) = Struct p items' rs
-    where
-        items' = map resolveItem items
-        resolveItem (t, x) = (resolveType types t, x)
+resolveType types (Struct p items rs) = Struct p (map (resolveItem types) items) rs
+resolveType types (Union  p items rs) = Union  p (map (resolveItem types) items) rs
 resolveType types (Alias Nothing st rs1) =
     if Map.notMember st types
     then InterfaceT st Nothing rs1
@@ -77,6 +78,7 @@ resolveType types (Alias Nothing st rs1) =
         (IntegerVector kw sg rs2) -> IntegerVector kw sg $ rs1 ++ rs2
         (Enum            t v rs2) -> Enum            t v $ rs1 ++ rs2
         (Struct          p l rs2) -> Struct          p l $ rs1 ++ rs2
+        (Union           p l rs2) -> Union           p l $ rs1 ++ rs2
         (InterfaceT     x my rs2) -> InterfaceT     x my $ rs1 ++ rs2
         (IntegerAtom   kw _ ) -> error $ "resolveType encountered packed `" ++ (show kw) ++ "` on " ++ st
         (NonInteger    kw   ) -> error $ "resolveType encountered packed `" ++ (show kw) ++ "` on " ++ st

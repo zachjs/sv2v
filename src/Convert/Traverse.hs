@@ -785,6 +785,10 @@ traverseTypesM mapper item =
             types <- mapM fullMapper $ map fst fields
             let idents = map snd fields
             return $ Struct p (zip types idents) r
+        tm (Union p fields r) = do
+            types <- mapM fullMapper $ map fst fields
+            let idents = map snd fields
+            return $ Union p (zip types idents) r
         exprMapper (Cast (Left t) e) =
             fullMapper t >>= \t' -> return $ Cast (Left t') e
         exprMapper (Bits (Left t)) =

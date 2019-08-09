@@ -197,6 +197,7 @@ tokens :-
     "trior"            { tok KW_trior        }
     "trireg"           { tok KW_trireg       }
     "typedef"          { tok KW_typedef      }
+    "union"            { tok KW_union        }
     "unique"           { tok KW_unique       }
     "unique0"          { tok KW_unique0      }
     "unsigned"         { tok KW_unsigned     }

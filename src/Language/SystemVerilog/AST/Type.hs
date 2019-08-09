@@ -37,6 +37,7 @@ data Type
     | Alias    (Maybe Identifier) Identifier   [Range]
     | Enum     (Maybe Type) [Item]             [Range]
     | Struct   Packing      [Field]            [Range]
+    | Union    Packing      [Field]            [Range]
     | InterfaceT Identifier (Maybe Identifier) [Range]
     deriving (Eq, Ord)
 
@@ -54,10 +55,14 @@ instance Show Type where
             tStr = maybe "" showPad mt
             showVal :: (Identifier, Maybe Expr) -> String
             showVal (x, e) = x ++ (showAssignment e)
-    show (Struct p items r) = printf "struct %s{\n%s\n}%s" (showPad p) itemsStr (showRanges r)
-        where
-            itemsStr = indent $ unlines' $ map showItem items
-            showItem (t, x) = printf "%s %s;" (show t) x
+    show (Struct p items r) = printf "struct %s{\n%s\n}%s" (showPad p) (showFields items) (showRanges r)
+    show (Union  p items r) = printf  "union %s{\n%s\n}%s" (showPad p) (showFields items) (showRanges r)
+
+showFields :: [Field] -> String
+showFields items = itemsStr
+    where
+        itemsStr = indent $ unlines' $ map showItem items
+        showItem (t, x) = printf "%s %s;" (show t) x
 
 instance Show ([Range] -> Type) where
     show tf = show (tf [])
@@ -82,6 +87,7 @@ typeRanges (IntegerAtom   kw sg   ) = (\[] -> IntegerAtom   kw sg, [])
 typeRanges (NonInteger    kw      ) = (\[] -> NonInteger    kw   , [])
 typeRanges (Enum   t v r) = (Enum   t v, r)
 typeRanges (Struct p l r) = (Struct p l, r)
+typeRanges (Union  p l r) = (Union  p l, r)
 typeRanges (InterfaceT x my r) = (InterfaceT x my, r)
 
 data Signing
