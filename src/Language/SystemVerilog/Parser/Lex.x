@@ -485,35 +485,29 @@ takeChar = do
 -- drop spaces in the input until a non-space is reached or EOF
 dropSpaces :: Alex ()
 dropSpaces = do
-    (_, _, _, str) <- alexGetInput
-    if null str || head str /= ' '
-        then return ()
-        else dropSpace >> dropSpaces
-    where
-        dropSpace :: Alex ()
-        dropSpace = do
-            (pos, _, _, str) <- alexGetInput
-            case str of
-                [] -> return ()
-                ' ' : rest -> alexSetInput (alexMove pos ' ', ' ', [], rest)
-                ch : _ -> lexicalError $ "expected ' ', but found: " ++ show ch
+    (pos, _, _, str) <- alexGetInput
+    case str of
+        ' ' : rest -> do
+            alexSetInput (alexMove pos ' ', ' ', [], rest)
+            dropSpaces
+        [] -> return ()
+        _ -> return ()
 
 isWhitespaceChar :: Char -> Bool
 isWhitespaceChar ch = elem ch [' ', '\t', '\n']
 
--- drop leading whitespace in the input
+-- drop all leading whitespace in the input
 dropWhitespace :: Alex ()
 dropWhitespace = do
-    (_, _, _, str) <- alexGetInput
-    if null str || not (isWhitespaceChar $ head str)
-        then return ()
-        else dropChar >> dropWhitespace
-    where
-        dropChar :: Alex ()
-        dropChar = do
-            (pos, _, _, chs) <- alexGetInput
-            let ch : rest = chs
-            alexSetInput (alexMove pos ch, ch, [], rest)
+    (pos, _, _, str) <- alexGetInput
+    case str of
+        ch : chs ->
+            if isWhitespaceChar ch
+                then do
+                    alexSetInput (alexMove pos ch, ch, [], chs)
+                    dropWhitespace
+                else return()
+        [] -> return ()
 
 -- removes and returns a quoted string such as <foo.bar> or "foo.bar"
 takeQuotedString :: Alex String
@@ -572,7 +566,7 @@ takeMacroDefinition = do
 -- "", except to delimit arguments or end the list of arguments; see 22.5.1
 takeMacroArguments :: Alex [String]
 takeMacroArguments = do
-    dropSpaces
+    dropWhitespace
     leadCh <- takeChar
     if leadCh == '('
         then argLoop
