@@ -47,6 +47,9 @@ module Convert.Traverse
 , traverseDeclsM'
 , traverseDecls'
 , collectDeclsM'
+, traverseNestedTypesM
+, traverseNestedTypes
+, collectNestedTypesM
 , traverseTypesM
 , traverseTypes
 , collectTypesM
@@ -795,6 +798,11 @@ traverseNestedTypesM mapper = fullMapper
             types <- mapM fullMapper $ map fst fields
             let idents = map snd fields
             return $ Union p (zip types idents) r
+
+traverseNestedTypes :: Mapper Type -> Mapper Type
+traverseNestedTypes = unmonad traverseNestedTypesM
+collectNestedTypesM :: Monad m => CollectorM m Type -> CollectorM m Type
+collectNestedTypesM = collectify traverseNestedTypesM
 
 traverseTypesM :: Monad m => MapperM m Type -> MapperM m ModuleItem
 traverseTypesM mapper item =

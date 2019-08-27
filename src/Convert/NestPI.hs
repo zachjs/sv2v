@@ -55,7 +55,7 @@ traverseDescriptionM (orig @ (Part extern kw lifetime name ports items)) = do
         runner f = execWriter $ collectModuleItemsM f orig
         usedPIs = Set.unions $ map runner $
             [ collectStmtsM collectSubroutinesM
-            , collectTypesM collectTypenamesM
+            , collectTypesM $ collectNestedTypesM collectTypenamesM
             , collectExprsM $ collectNestedExprsM collectIdentsM
             ]
 traverseDescriptionM other = return other
@@ -82,10 +82,6 @@ collectIdentsM _ = return ()
 -- writes down aliased typenames
 collectTypenamesM :: Type -> Writer Idents ()
 collectTypenamesM (Alias _ x _) = tell $ Set.singleton x
-collectTypenamesM (Enum (Just t) _ _) = collectTypenamesM t
-collectTypenamesM (Struct _ fields _) = do
-    _ <- mapM collectTypenamesM $ map fst fields
-    return ()
 collectTypenamesM _ = return ()
 
 -- returns the "name" of a package item, if it has one
