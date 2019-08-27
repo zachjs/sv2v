@@ -446,7 +446,10 @@ convertAsgn structs types (lhs, expr) =
         -- lookup the range of a field in its unstructured type
         lookupUnstructRange :: TypeFunc -> Identifier -> Range
         lookupUnstructRange structTf fieldName =
-            fieldRangeMap Map.! fieldName
+            case Map.lookup fieldName fieldRangeMap of
+                Nothing -> error $ "field '" ++ fieldName ++
+                    "' not found in struct: " ++ show structTf
+                Just r -> r
             where fieldRangeMap = Map.map fst $ snd $ structs Map.! structTf
 
         -- lookup the type of a field in the given field list
