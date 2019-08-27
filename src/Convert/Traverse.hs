@@ -459,9 +459,9 @@ traverseNestedExprsM mapper = exprMapper
             return $ Pattern $ zip names exprs
 
 exprMapperHelpers :: Monad m => MapperM m Expr ->
-    (MapperM m Range, MapperM m (Maybe Expr), MapperM m Decl, MapperM m LHS)
+    (MapperM m Range, MapperM m (Maybe Expr), MapperM m Decl, MapperM m LHS, MapperM m Type)
 exprMapperHelpers exprMapper =
-    (rangeMapper, maybeExprMapper, declMapper, traverseNestedLHSsM lhsMapper)
+    (rangeMapper, maybeExprMapper, declMapper, traverseNestedLHSsM lhsMapper, typeMapper)
     where
 
     rangeMapper (a, b) = do
@@ -473,14 +473,22 @@ exprMapperHelpers exprMapper =
     maybeExprMapper (Just e) =
         exprMapper e >>= return . Just
 
-    declMapper (Parameter  t x e) =
-        exprMapper e >>= return . Parameter  t x
-    declMapper (Localparam t x e) =
-        exprMapper e >>= return . Localparam t x
-    declMapper (Variable d t x a me) = do
+    typeMapper' t = do
         let (tf, rs) = typeRanges t
         rs' <- mapM rangeMapper rs
-        let t' = tf rs'
+        return $ tf rs'
+    typeMapper = traverseNestedTypesM typeMapper'
+
+    declMapper (Parameter  t x e) = do
+        t' <- typeMapper t
+        e' <- exprMapper e
+        return $ Parameter  t' x e'
+    declMapper (Localparam t x e) = do
+        t' <- typeMapper t
+        e' <- exprMapper e
+        return $ Localparam t' x e'
+    declMapper (Variable d t x a me) = do
+        t' <- typeMapper t
         a' <- mapM rangeMapper a
         me' <- maybeExprMapper me
         return $ Variable d t' x a' me'
@@ -495,7 +503,7 @@ traverseExprsM' :: Monad m => TFStrategy -> MapperM m Expr -> MapperM m ModuleIt
 traverseExprsM' strat exprMapper = moduleItemMapper
     where
 
-    (rangeMapper, maybeExprMapper, declMapper, lhsMapper)
+    (rangeMapper, maybeExprMapper, declMapper, lhsMapper, typeMapper)
         = exprMapperHelpers exprMapper
 
     stmtMapper = traverseNestedStmtsM (traverseStmtExprsM exprMapper)
@@ -506,6 +514,9 @@ traverseExprsM' strat exprMapper = moduleItemMapper
     moduleItemMapper (MIAttr attr mi) =
         -- note: we exclude expressions in attributes from conversion
         return $ MIAttr attr mi
+    moduleItemMapper (MIPackageItem (Typedef t x)) = do
+        t' <- typeMapper t
+        return $ MIPackageItem $ Typedef t' x
     moduleItemMapper (MIPackageItem (Decl decl)) =
         declMapper decl >>= return . MIPackageItem . Decl
     moduleItemMapper (Defparam lhs expr) = do
@@ -560,8 +571,6 @@ traverseExprsM' strat exprMapper = moduleItemMapper
     moduleItemMapper (Generate items) = do
         items' <- mapM (traverseNestedGenItemsM genItemMapper) items
         return $ Generate items'
-    moduleItemMapper (MIPackageItem (Typedef t x)) =
-        return $ MIPackageItem $ Typedef t x
     moduleItemMapper (MIPackageItem (Comment c)) =
         return $ MIPackageItem $ Comment c
     moduleItemMapper (MIPackageItem (Import x y)) =
@@ -609,7 +618,7 @@ traverseStmtExprsM :: Monad m => MapperM m Expr -> MapperM m Stmt
 traverseStmtExprsM exprMapper = flatStmtMapper
     where
 
-    (_, maybeExprMapper, declMapper, lhsMapper)
+    (_, maybeExprMapper, declMapper, lhsMapper, _)
         = exprMapperHelpers exprMapper
 
     caseMapper (exprs, stmt) = do
@@ -762,11 +771,8 @@ traverseDecls = traverseDecls' IncludeTFs
 collectDeclsM :: Monad m => CollectorM m Decl -> CollectorM m ModuleItem
 collectDeclsM = collectDeclsM' IncludeTFs
 
-traverseTypesM :: Monad m => MapperM m Type -> MapperM m ModuleItem
-traverseTypesM mapper item =
-    miMapper item >>=
-    traverseDeclsM declMapper >>=
-    traverseExprsM (traverseNestedExprsM exprMapper)
+traverseNestedTypesM :: Monad m => MapperM m Type -> MapperM m Type
+traverseNestedTypesM mapper = fullMapper
     where
         fullMapper t = tm t >>= mapper
         tm (Alias      ps xx    rs) = return $ Alias      ps xx    rs
@@ -789,6 +795,14 @@ traverseTypesM mapper item =
             types <- mapM fullMapper $ map fst fields
             let idents = map snd fields
             return $ Union p (zip types idents) r
+
+traverseTypesM :: Monad m => MapperM m Type -> MapperM m ModuleItem
+traverseTypesM mapper item =
+    miMapper item >>=
+    traverseDeclsM declMapper >>=
+    traverseExprsM (traverseNestedExprsM exprMapper)
+    where
+        fullMapper = traverseNestedTypesM mapper
         exprMapper (Cast (Left t) e) =
             fullMapper t >>= \t' -> return $ Cast (Left t') e
         exprMapper (Bits (Left t)) =
