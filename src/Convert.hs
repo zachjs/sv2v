@@ -23,6 +23,7 @@ import qualified Convert.NamedBlock
 import qualified Convert.NestPI
 import qualified Convert.Package
 import qualified Convert.PackedArray
+import qualified Convert.RemoveComments
 import qualified Convert.Return
 import qualified Convert.StarPort
 import qualified Convert.StmtBlock
@@ -56,6 +57,7 @@ phases excludes =
     , Convert.Return.convert
     , selectExclude (Job.Interface, Convert.Interface.convert)
     , selectExclude (Job.Always   , Convert.AlwaysKW.convert)
+    , selectExclude (Job.Succinct , Convert.RemoveComments.convert)
     ]
     where
         selectExclude :: (Job.Exclude, Phase) -> Phase

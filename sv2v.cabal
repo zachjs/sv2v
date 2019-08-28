@@ -67,6 +67,7 @@ executable sv2v
     Convert.NestPI
     Convert.Package
     Convert.PackedArray
+    Convert.RemoveComments
     Convert.Return
     Convert.StarPort
     Convert.StmtBlock

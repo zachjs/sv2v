@@ -13,6 +13,7 @@ data Exclude
     = Always
     | Interface
     | Logic
+    | Succinct
     deriving (Show, Typeable, Data, Eq)
 
 data Job = Job
@@ -21,6 +22,7 @@ data Job = Job
     , incdir :: [FilePath]
     , define :: [String]
     , oneunit :: Bool
+    , verbose :: Bool
     } deriving (Show, Typeable, Data)
 
 defaultJob :: Job
@@ -33,6 +35,7 @@ defaultJob = Job
         ++ " preprocessing")
     , oneunit = False &= help ("put all files in one compilation unit, so"
         ++ " macros from earlier files remain defined in later files")
+    , verbose = False &= help "retain certain conversion artifacts"
     }
     &= program "sv2v"
     &= summary "sv2v v0.0.1, (C) 2019 Zachary Snow, 2011-2015 Tom Hawkins"
@@ -40,4 +43,8 @@ defaultJob = Job
                , "More info: https://github.com/zachjs/sv2v" ]
 
 readJob :: IO Job
-readJob = cmdArgs defaultJob
+readJob = do
+    job <- cmdArgs defaultJob
+    return $ if verbose job
+        then job { exclude = Succinct : exclude job }
+        else job
