@@ -64,7 +64,18 @@ convertFile packages ast =
 
 globalPackageItems :: Identifier -> PackageItems -> [PackageItem]
 globalPackageItems name items =
-    map (prefixPackageItem name (Map.keysSet items)) (Map.elems items)
+    map (prefixPackageItem name (packageItemIdents items)) (Map.elems items)
+
+packageItemIdents :: PackageItems -> Idents
+packageItemIdents items =
+    Set.union
+        (Map.keysSet items)
+        (Set.unions $ map packageItemSubIdents $ Map.elems items)
+    where
+        packageItemSubIdents :: PackageItem -> Idents
+        packageItemSubIdents (Typedef (Enum _ enumItems _) _) =
+            Set.fromList $ map fst enumItems
+        packageItemSubIdents _ = Set.empty
 
 prefixPackageItem :: Identifier -> Idents -> PackageItem -> PackageItem
 prefixPackageItem packageName idents item =
@@ -84,6 +95,10 @@ prefixPackageItem packageName idents item =
             Decl (Localparam a x   b) -> Decl (Localparam a (prefix x)   b)
             other -> other
         convertType (Alias Nothing x rs) = Alias Nothing (prefix x) rs
+        convertType (Enum mt items rs) = Enum mt items' rs
+            where
+                items' = map prefixItem items
+                prefixItem (x, me) = (prefix x, me)
         convertType other = other
         convertExpr (Ident x) = Ident $ prefix x
         convertExpr other = other
