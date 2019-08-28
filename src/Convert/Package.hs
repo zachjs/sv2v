@@ -83,11 +83,14 @@ prefixPackageItem packageName idents item =
             Decl (Parameter  a x   b) -> Decl (Parameter  a (prefix x)   b)
             Decl (Localparam a x   b) -> Decl (Localparam a (prefix x)   b)
             other -> other
+        convertType (Alias Nothing x rs) = Alias Nothing (prefix x) rs
+        convertType other = other
         convertExpr (Ident x) = Ident $ prefix x
         convertExpr other = other
         convertLHS (LHSIdent x) = LHSIdent $ prefix x
         convertLHS other = other
         converter =
+            (traverseTypes $ traverseNestedTypes convertType) .
             (traverseExprs $ traverseNestedExprs convertExpr) .
             (traverseLHSs  $ traverseNestedLHSs  convertLHS )
         MIPackageItem item'' = converter $ MIPackageItem item'
@@ -137,7 +140,7 @@ traverseModuleItem existingItemNames packages (MIPackageItem (Import x y)) =
 traverseModuleItem _ _ item =
     (traverseExprs $ traverseNestedExprs traverseExpr) $
     (traverseStmts traverseStmt) $
-    (traverseTypes traverseType) $
+    (traverseTypes $ traverseNestedTypes traverseType) $
     item
     where
 
