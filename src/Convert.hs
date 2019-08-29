@@ -20,6 +20,7 @@ import qualified Convert.Interface
 import qualified Convert.IntTypes
 import qualified Convert.KWArgs
 import qualified Convert.Logic
+import qualified Convert.Mux
 import qualified Convert.NamedBlock
 import qualified Convert.NestPI
 import qualified Convert.Package
@@ -47,6 +48,7 @@ phases excludes =
     , Convert.Enum.convert
     , Convert.IntTypes.convert
     , Convert.KWArgs.convert
+    , Convert.Mux.convert
     , Convert.PackedArray.convert
     , Convert.StarPort.convert
     , Convert.StmtBlock.convert

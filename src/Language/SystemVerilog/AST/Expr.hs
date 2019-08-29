@@ -125,6 +125,7 @@ simplify (orig @ (Call Nothing "$clog2" (Args [Just (Number n)] []))) =
     case readNumber n of
         Nothing -> orig
         Just x -> Number $ show $ clog2 x
+simplify (Mux (Number "0") e _) = e
 simplify (Mux (BinOp Ge c1 c2) e1 e2) =
     case (c1', c2') of
         (Number a, Number b) ->
