@@ -615,6 +615,7 @@ ModuleInstantiation :: { [PortBinding] }
 
 TFItems :: { [Decl] }
   : "(" DeclTokens(")") ";" { parseDTsAsDecls $2 }
+  | "("            ")"  ";" { [] }
   |                     ";" { [] }
 
 ParamType :: { Type }

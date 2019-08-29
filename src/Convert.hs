@@ -13,6 +13,7 @@ import qualified Convert.AlwaysKW
 import qualified Convert.AsgnOp
 import qualified Convert.Assertion
 import qualified Convert.Bits
+import qualified Convert.EmptyArgs
 import qualified Convert.Enum
 import qualified Convert.FuncRet
 import qualified Convert.Interface
@@ -42,6 +43,7 @@ phases excludes =
     , Convert.Bits.convert
     , selectExclude (Job.Logic    , Convert.Logic.convert)
     , Convert.FuncRet.convert
+    , Convert.EmptyArgs.convert
     , Convert.Enum.convert
     , Convert.IntTypes.convert
     , Convert.KWArgs.convert

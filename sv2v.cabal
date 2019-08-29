@@ -57,6 +57,7 @@ executable sv2v
     Convert.AsgnOp
     Convert.Assertion
     Convert.Bits
+    Convert.EmptyArgs
     Convert.Enum
     Convert.FuncRet
     Convert.Interface
