@@ -15,6 +15,7 @@ import qualified Convert.Assertion
 import qualified Convert.Bits
 import qualified Convert.EmptyArgs
 import qualified Convert.Enum
+import qualified Convert.ForDecl
 import qualified Convert.FuncRet
 import qualified Convert.Interface
 import qualified Convert.IntTypes
@@ -43,6 +44,7 @@ phases excludes =
     , Convert.Assertion.convert
     , Convert.Bits.convert
     , selectExclude (Job.Logic    , Convert.Logic.convert)
+    , Convert.ForDecl.convert
     , Convert.FuncRet.convert
     , Convert.EmptyArgs.convert
     , Convert.Enum.convert

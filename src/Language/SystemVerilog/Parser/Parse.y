@@ -691,6 +691,7 @@ StmtNonAsgn :: { Stmt }
   | "begin" opt(Tag) DeclsAndStmts "end" opt(Tag) { Block (combineTags $2 $5) (fst $3) (snd $3) }
   | Unique "if" "(" Expr ")" Stmt "else" Stmt         { If $1 $4 $6 $8        }
   | Unique "if" "(" Expr ")" Stmt %prec NoElse        { If $1 $4 $6 Null      }
+  | "for" "("            ";"  opt(Expr) ";" ForStep ")" Stmt { For []                           $4 $6 $8 }
   | "for" "(" DeclTokens(";") opt(Expr) ";" ForStep ")" Stmt { For (parseDTsAsDeclsAndAsgns $3) $4 $6 $8 }
   | Unique CaseKW "(" Expr ")" Cases opt(CaseDefault) "endcase" { Case $1 $2 $4 $6 $7 }
   |                 Identifier "(" CallArgs ")" ";" { Subroutine (Nothing) $1 $3 }
