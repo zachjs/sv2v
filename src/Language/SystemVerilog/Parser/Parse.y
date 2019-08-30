@@ -633,11 +633,12 @@ Dimension :: { Range }
   : Range        { $1 }
   | "[" Expr "]" { (simplify $  BinOp Sub $2 (Number "1"), Number "0") }
 
-DeclAsgns :: { [(Identifier, Expr)] }
+DeclAsgns :: { [(Identifier, Expr, [Range])] }
   : DeclAsgn               { [$1] }
   | DeclAsgns "," DeclAsgn { $1 ++ [$3] }
-DeclAsgn :: { (Identifier, Expr) }
-  : Identifier "=" Expr { ($1, $3) }
+DeclAsgn :: { (Identifier, Expr, [Range]) }
+  : Identifier                    "=" Expr { ($1, $3, []) }
+  | Identifier DimensionsNonEmpty "=" Expr { ($1, $4, $2) }
 
 Range :: { Range }
   : "[" Expr ":"  Expr "]" { ($2, $4) }
@@ -730,10 +731,10 @@ DeclOrStmt :: { ([Decl], [Stmt]) }
   | ParameterDecl(";")    { ($1, []) }
 
 ParameterDecl(delim) :: { [Decl] }
-  : ParameterDeclKW                                       DeclAsgns delim { map (uncurry $ $1 (Implicit Unspecified [])) $2 }
-  | ParameterDeclKW                             ParamType DeclAsgns delim { map (uncurry $ $1 ($2                     )) $3 }
-  | ParameterDeclKW                 Identifier Dimensions DeclAsgns delim { map (uncurry $ $1 (Alias (Nothing)   $2 $3)) $4 }
-  | ParameterDeclKW Identifier "::" Identifier Dimensions DeclAsgns delim { map (uncurry $ $1 (Alias (Just $2)   $4 $5)) $6 }
+  : ParameterDeclKW                                       DeclAsgns delim { makeParamDecls $1 (Implicit Unspecified []) $2 }
+  | ParameterDeclKW                             ParamType DeclAsgns delim { makeParamDecls $1 ($2                     ) $3 }
+  | ParameterDeclKW                 Identifier Dimensions DeclAsgns delim { makeParamDecls $1 (Alias (Nothing)   $2 $3) $4 }
+  | ParameterDeclKW Identifier "::" Identifier Dimensions DeclAsgns delim { makeParamDecls $1 (Alias (Just $2)   $4 $5) $6 }
 ParameterDeclKW :: { Type -> Identifier -> Expr -> Decl }
   : "parameter"  { Parameter  }
   | "localparam" { Localparam }
@@ -995,4 +996,16 @@ toLHS expr =
     Just lhs -> lhs
     Nothing -> error $ "Parse error: cannot convert expression to LHS: "
                 ++ show expr
+
+makeParamDecls
+  :: (Type -> Identifier -> Expr -> Decl)
+  -> Type
+  -> [(Identifier, Expr, [Range])]
+  -> [Decl]
+makeParamDecls kw t items =
+  map mapper items
+  where
+    (tf, rs) = typeRanges t
+    mapper (x, e, a) = kw (tf $ a ++ rs) x e
+
 }
