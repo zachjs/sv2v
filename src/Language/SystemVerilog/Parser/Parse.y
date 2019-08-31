@@ -419,14 +419,15 @@ DeclOrStmtTokens(delim) :: { [DeclToken] }
   | "<=" opt(DelayOrEventControl) Expr                      delim  { [DTAsgnNBlk $2 $3] }
 DeclOrStmtToken :: { DeclToken }
   : ","            { DTComma }
-  | PartSelect     { DTRange   $1 }
-  | Identifier     { DTIdent   $1 }
-  | Direction      { DTDir     $1 }
-  | "[" Expr "]"   { DTBit     $2 }
-  | "{" LHSs "}"   { DTConcat  $2 }
-  | PartialType    { DTType    $1 }
-  | "." Identifier { DTDot     $2 }
-  | Signing        { DTSigning $1 }
+  | PartSelect     { DTRange    $1 }
+  | Identifier     { DTIdent    $1 }
+  | Direction      { DTDir      $1 }
+  | "[" Expr "]"   { DTBit      $2 }
+  | "{" LHSs "}"   { DTConcat   $2 }
+  | PartialType    { DTType     $1 }
+  | "." Identifier { DTDot      $2 }
+  | Signing        { DTSigning  $1 }
+  | Lifetime       { DTLifetime $1 }
   | Identifier "::" Identifier { DTPSIdent $1 $3 }
 
 VariablePortIdentifiers :: { [(Identifier, Maybe Expr)] }

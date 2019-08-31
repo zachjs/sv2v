@@ -22,11 +22,10 @@
  - increasingly convoluted grammars, this became more and more untenable as I
  - added support for more SystemVerilog constructs.
  -
- - Because of how liberal this parser is, the parser will accept some
- - syntactically invalid files. In the future, we may add some basic
- - type-checking to complain about malformed input files. However, we generally
- - assume that users have tested their code with commercial simulator before
- - running it through our tool.
+ - This parser is very liberal, and so accepts some syntactically invalid files.
+ - In the future, we may add some basic type-checking to complain about
+ - malformed input files. However, we generally assume that users have tested
+ - their code with a commercial simulator before running it through our tool.
  -}
 
 module Language.SystemVerilog.Parser.ParseDecl
@@ -60,6 +59,7 @@ data DeclToken
     | DTConcat   [LHS]
     | DTDot      Identifier
     | DTSigning  Signing
+    | DTLifetime Lifetime
     deriving (Show, Eq)
 
 
@@ -263,12 +263,15 @@ parseDTsAsComponents tokens =
 parseDTsAsComponent :: [DeclToken] -> (Component, [DeclToken])
 parseDTsAsComponent [] = error "parseDTsAsComponent unexpected end of tokens"
 parseDTsAsComponent l0 =
-    (component, l4)
+    if l /= Nothing && l /= Just Automatic
+        then error $ "unexpected non-automatic lifetime: " ++ show l0
+        else (component, l5)
     where
-        (dir, l1) = takeDir    l0
-        (tf , l2) = takeType   l1
-        (rs , l3) = takeRanges l2
-        (tps, l4) = takeTrips  l3 True
+        (dir, l1) = takeDir      l0
+        (l  , l2) = takeLifetime l1
+        (tf , l3) = takeType     l2
+        (rs , l4) = takeRanges   l3
+        (tps, l5) = takeTrips    l4 True
         component = (dir, tf rs, tps)
 
 
@@ -311,6 +314,10 @@ tripLookahead l0 =
 takeDir :: [DeclToken] -> (Direction, [DeclToken])
 takeDir (DTDir dir : rest) = (dir  , rest)
 takeDir              rest  = (Local, rest)
+
+takeLifetime :: [DeclToken] -> (Maybe Lifetime, [DeclToken])
+takeLifetime (DTLifetime l : rest) = (Just  l, rest)
+takeLifetime                 rest  = (Nothing, rest)
 
 takeType :: [DeclToken] -> ([Range] -> Type, [DeclToken])
 takeType (DTIdent a  : DTDot b      : rest) = (InterfaceT a (Just b),                       rest)
