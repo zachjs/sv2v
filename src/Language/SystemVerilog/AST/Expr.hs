@@ -142,6 +142,18 @@ simplify (Mux (BinOp Ge c1 c2) e1 e2) =
         e1' = simplify e1
         e2' = simplify e2
         nochange = Mux (BinOp Ge c1' c2') e1' e2'
+simplify (BinOp Sub (Number n1) (BinOp Sub (Number n2) e)) =
+    simplify $ BinOp Add (BinOp Sub (Number n1) (Number n2)) e
+simplify (BinOp Sub (Number n1) (BinOp Sub e (Number n2))) =
+    simplify $ BinOp Sub (BinOp Add (Number n1) (Number n2)) e
+simplify (BinOp Add (BinOp Sub (Number n1) e) (Number n2)) =
+    case (readNumber n1, readNumber n2) of
+        (Just x, Just y) ->
+            simplify $ BinOp Sub (Number $ show (x + y)) e'
+        _ -> nochange
+    where
+        e' = simplify e
+        nochange = BinOp Add (BinOp Sub (Number n1) e') (Number n2)
 simplify (BinOp op e1 e2) =
     case (op, e1', e2') of
         (Add, Number "0", e) -> e
