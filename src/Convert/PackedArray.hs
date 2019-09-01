@@ -41,14 +41,16 @@ convertDescription =
 
 -- collects and converts multi-dimensional packed-array declarations
 traverseDeclM :: Decl -> State Info Decl
-traverseDeclM (Variable Local t ident a me) = do
-    t' <- traverseDeclM' t ident
-    return $ Variable Local t' ident a me
 traverseDeclM (Variable dir t ident a me) = do
     let (tf, rs) = typeRanges t
-    let t' = tf $ a ++ rs
-    t'' <- traverseDeclM' t' ident
-    return $ Variable dir t'' ident [] me
+    if dir /= Local || (rs /= [] && a /= [])
+        then do
+            let t' = tf $ a ++ rs
+            t'' <- traverseDeclM' t' ident
+            return $ Variable dir t'' ident [] me
+        else do
+            t' <- traverseDeclM' t ident
+            return $ Variable dir t' ident a me
 traverseDeclM (Parameter t ident e) = do
     t' <- traverseDeclM' t ident
     return $ Parameter t' ident e
