@@ -183,8 +183,8 @@ parseDTsAsDeclOrAsgn :: [DeclToken] -> ([Decl], [Stmt])
 parseDTsAsDeclOrAsgn [DTIdent     f] = ([], [Subroutine (Nothing) f (Args [] [])])
 parseDTsAsDeclOrAsgn [DTPSIdent p f] = ([], [Subroutine (Just  p) f (Args [] [])])
 parseDTsAsDeclOrAsgn tokens =
-    if any isAsgnToken tokens || tripLookahead tokens
-        then ([], [constructor lhs expr])
+    if (any isAsgnToken tokens || tripLookahead tokens) && lhs /= Nothing
+        then ([], [constructor (fromJust lhs) expr])
         else (parseDTsAsDecl tokens, [])
     where
         (constructor, expr) = case last tokens of
@@ -201,7 +201,10 @@ parseDTsAsDeclsAndAsgns tokens =
     if hasLeadingAsgn || tripLookahead tokens
         then
             let (lhsToks, l0) = break isDTAsgn tokens
-                lhs = takeLHS lhsToks
+                lhs = case takeLHS lhsToks of
+                    Nothing ->
+                        error $ "could not parse as LHS: " ++ show lhsToks
+                    Just l -> l
                 DTAsgn AsgnOpEq expr : l1 = l0
                 asgn = Right (lhs, expr)
             in case l1 of
@@ -231,17 +234,21 @@ isAsgnToken (DTAsgnNBlk      _ _) = True
 isAsgnToken (DTAsgn (AsgnOp _) _) = True
 isAsgnToken _ = False
 
-takeLHS :: [DeclToken] -> LHS
-takeLHS tokens = fromJust $ foldl takeLHSStep Nothing tokens
+takeLHS :: [DeclToken] -> Maybe LHS
+takeLHS [] = Nothing
+takeLHS (t : ts) =
+    foldl takeLHSStep (takeLHSStart t) ts
+
+takeLHSStart :: DeclToken -> Maybe LHS
+takeLHSStart (DTConcat lhss) = Just $ LHSConcat lhss
+takeLHSStart (DTIdent  x   ) = Just $ LHSIdent x
+takeLHSStart _ = Nothing
 
 takeLHSStep :: Maybe LHS -> DeclToken -> Maybe LHS
-takeLHSStep (Nothing  ) (DTConcat lhss) = Just $ LHSConcat lhss
-takeLHSStep (Nothing  ) (DTIdent  x   ) = Just $ LHSIdent x
 takeLHSStep (Just curr) (DTBit    e   ) = Just $ LHSBit   curr e
 takeLHSStep (Just curr) (DTRange (m,r)) = Just $ LHSRange curr m r
 takeLHSStep (Just curr) (DTDot    x   ) = Just $ LHSDot curr x
-takeLHSStep (maybeCurr) token =
-    error $ "unexpected token in LHS: " ++ show (maybeCurr, token)
+takeLHSStep _ _ = Nothing
 
 
 -- batches together seperate declaration lists
