@@ -834,8 +834,8 @@ Expr :: { Expr }
   | Identifier "::" Identifier  { PSIdent $1 $3 }
   | Expr PartSelect             { Range $1 (fst $2) (snd $2) }
   | Expr "[" Expr "]"           { Bit   $1 $3 }
-  | "{" Expr "{" Exprs "}" "}"  { Repeat $2 $4 }
-  | "{" Exprs "}"               { Concat $2 }
+  | "{" Expr Concat "}"         { Repeat $2 $3 }
+  | Concat                      { Concat $1 }
   | Expr "?" Expr ":" Expr      { Mux $1 $3 $5 }
   | CastingType "'" "(" Expr ")" { Cast (Left            $1) $4 }
   | Number      "'" "(" Expr ")" { Cast (Right $ Number  $1) $4 }
@@ -843,6 +843,8 @@ Expr :: { Expr }
   | Identifier "::" Identifier  "'" "(" Expr ")" { Cast (Left $ Alias (Just $1) $3 []) $6 }
   | Expr "." Identifier         { Dot $1 $3 }
   | "'" "{" PatternItems "}"    { Pattern $3 }
+  | "{" StreamOp StreamSize Concat "}" { Stream $2 $3           $4 }
+  | "{" StreamOp            Concat "}" { Stream $2 (Number "1") $3 }
   -- binary expressions
   | Expr "||"  Expr { BinOp LogOr  $1 $3 }
   | Expr "&&"  Expr { BinOp LogAnd $1 $3 }
@@ -895,6 +897,16 @@ PatternNamedItem :: { (Identifier, Expr) }
   | "default"  ":" Expr { (tokenString $1, $3) }
 PatternUnnamedItems :: { [Expr] }
   : Exprs { $1 }
+
+Concat :: { [Expr] }
+  : "{" Exprs "}" { $2 }
+
+StreamOp :: { StreamOp }
+  : "<<" { StreamL }
+  | ">>" { StreamR }
+StreamSize :: { Expr }
+  : TypeNonIdent { Bits $ Left $1 }
+  | Expr         { $1 }
 
 GenItemOrNull :: { GenItem }
   : GenItem { $1 }

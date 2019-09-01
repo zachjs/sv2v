@@ -429,6 +429,10 @@ traverseNestedExprsM mapper = exprMapper
             return $ Repeat e' l'
         em (Concat     l) =
             mapM exprMapper l >>= return . Concat
+        em (Stream o e l) = do
+            e' <- exprMapper e
+            l' <- mapM exprMapper l
+            return $ Stream o e' l'
         em (Call    ps f (Args l p)) = do
             l' <- mapM maybeExprMapper l
             pes <- mapM maybeExprMapper $ map snd p

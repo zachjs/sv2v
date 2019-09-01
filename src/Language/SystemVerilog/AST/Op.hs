@@ -2,13 +2,14 @@
  - Author: Zachary Snow <zach@zachjs.com>
  - Initial Verilog AST Author: Tom Hawkins <tomahawkins@gmail.com>
  -
- - SystemVerilog operators (unary, binary, and assignment)
+ - SystemVerilog operators (unary, binary, assignment, and stream)
  -}
 
 module Language.SystemVerilog.AST.Op
-    ( UniOp  (..)
-    , BinOp  (..)
-    , AsgnOp (..)
+    ( UniOp    (..)
+    , BinOp    (..)
+    , AsgnOp   (..)
+    , StreamOp (..)
     ) where
 
 data UniOp
@@ -101,3 +102,12 @@ data AsgnOp
 instance Show AsgnOp where
     show AsgnOpEq = "="
     show (AsgnOp op) = (show op) ++ "="
+
+data StreamOp
+    = StreamL
+    | StreamR
+    deriving (Eq, Ord)
+
+instance Show StreamOp where
+    show StreamL  = "<<"
+    show StreamR  = ">>"

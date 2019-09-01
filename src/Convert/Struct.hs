@@ -386,6 +386,11 @@ convertAsgn structs types (lhs, expr) =
                     (tf, rs) -> tf $ tail rs
         convertSubExpr (Concat exprs) =
             (Implicit Unspecified [], Concat $ map (snd . convertSubExpr) exprs)
+        convertSubExpr (Stream o e exprs) =
+            (Implicit Unspecified [], Stream o e' exprs')
+            where
+                e' = (snd . convertSubExpr) e
+                exprs' = map (snd . convertSubExpr) exprs
         convertSubExpr (BinOp op e1 e2) =
             (Implicit Unspecified [], BinOp op e1' e2')
             where

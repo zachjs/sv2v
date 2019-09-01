@@ -39,6 +39,7 @@ data Expr
     | Bit     Expr Expr
     | Repeat  Expr [Expr]
     | Concat  [Expr]
+    | Stream  StreamOp Expr [Expr]
     | Call    (Maybe Identifier) Identifier Args
     | UniOp   UniOp Expr
     | BinOp   BinOp Expr Expr
@@ -58,6 +59,7 @@ instance Show Expr where
     show (Range   e m r) = printf "%s[%s%s%s]" (show e) (show $ fst r) (show m) (show $ snd r)
     show (Repeat  e l  ) = printf "{%s {%s}}"  (show e) (commas $ map show l)
     show (Concat  l    ) = printf "{%s}"                (commas $ map show l)
+    show (Stream  o e l) = printf "{%s %s%s}"  (show o) (show e) (show $ Concat l)
     show (UniOp   a b  ) = printf "(%s %s)"    (show a) (show b)
     show (BinOp   o a b) = printf "(%s %s %s)" (show a) (show o) (show b)
     show (Dot     e n  ) = printf "%s.%s"      (show e) n
