@@ -42,4 +42,17 @@ module top;
                 $display("5: ", ~a[j * 8 + k] + 11);
     end
 
+    initial begin : foo_6
+        integer i;
+        for (i = 0; i < 32; i = i + 1)
+            $display("6: ", ~a[i]);
+    end
+
+    initial begin : foo_7
+        integer j, k;
+        for (j = 0; j < 4; j++)
+            for (k = 0; k < 8; k++)
+                $display("7: ", ~a[j * 8 + k] + 11);
+    end
+
 endmodule

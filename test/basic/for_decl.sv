@@ -34,4 +34,19 @@ module top;
         end
     end
 
+    initial begin
+        integer i = 0;
+        for (; i < 32; i++)
+            $display("6: ", ~a[i]);
+    end
+
+    initial begin
+        integer j = 0, k;
+        for (; j < 4; j++) begin
+            k = 0;
+            for (; k < 8; k++)
+                $display("7: ", ~a[j * 8 + k] + 11);
+        end
+    end
+
 endmodule
