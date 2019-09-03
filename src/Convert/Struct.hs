@@ -445,7 +445,9 @@ convertAsgn structs types (lhs, expr) =
             (Implicit Unspecified [], Bits (Right e'))
             where e' = snd $ convertSubExpr e
         convertSubExpr (Pattern items) =
-            (Implicit Unspecified [], Pattern items')
+            if all (== Nothing) $ map fst items'
+                then (Implicit Unspecified [], Concat $ map snd items')
+                else (Implicit Unspecified [], Pattern items')
             where
                 items' = map mapItem items
                 mapItem (mx, e) = (mx, snd $ convertSubExpr e)
