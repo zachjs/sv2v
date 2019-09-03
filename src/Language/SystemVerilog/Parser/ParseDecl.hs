@@ -184,7 +184,7 @@ parseDTsAsDeclOrAsgn :: [DeclToken] -> ([Decl], [Stmt])
 parseDTsAsDeclOrAsgn [DTIdent     f] = ([], [Subroutine (Nothing) f (Args [] [])])
 parseDTsAsDeclOrAsgn [DTPSIdent p f] = ([], [Subroutine (Just  p) f (Args [] [])])
 parseDTsAsDeclOrAsgn tokens =
-    if (any isAsgnToken tokens || tripLookahead tokens) && lhs /= Nothing
+    if (isAsgn (last tokens) || tripLookahead tokens) && lhs /= Nothing
         then ([], [constructor (fromJust lhs) expr])
         else (parseDTsAsDecl tokens, [])
     where
@@ -193,6 +193,10 @@ parseDTsAsDeclOrAsgn tokens =
             DTAsgnNBlk mt e -> (Asgn    mt, e)
             _ -> error $ "invalid block item decl or stmt: " ++ (show tokens)
         lhs = takeLHS $ init tokens
+        isAsgn :: DeclToken -> Bool
+        isAsgn (DTAsgnNBlk      _ _) = True
+        isAsgn (DTAsgn _ _) = True
+        isAsgn _ = False
 
 -- [PUBLIC]: parser for mixed comma-separated declaration and assignment lists;
 -- the main use case is for `for` loop initialization lists
