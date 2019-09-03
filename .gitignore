@@ -2,3 +2,4 @@
 dist/
 bin/
 .stack-work/
+stack*.yaml.lock
