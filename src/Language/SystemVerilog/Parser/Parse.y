@@ -423,12 +423,14 @@ DeclOrStmtToken :: { DeclToken }
   | Identifier     { DTIdent    $1 }
   | Direction      { DTDir      $1 }
   | "[" Expr "]"   { DTBit      $2 }
-  | "{" LHSs "}"   { DTConcat   $2 }
+  | LHSConcat      { DTConcat   $1 }
   | PartialType    { DTType     $1 }
   | "." Identifier { DTDot      $2 }
   | Signing        { DTSigning  $1 }
   | Lifetime       { DTLifetime $1 }
   | Identifier "::" Identifier { DTPSIdent $1 $3 }
+  | "{" StreamOp StreamSize Concat "}" { DTStream $2 $3           (map toLHS $4) }
+  | "{" StreamOp            Concat "}" { DTStream $2 (Number "1") (map toLHS $3) }
 
 VariablePortIdentifiers :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifier                             { [$1] }
@@ -654,8 +656,12 @@ LHS :: { LHS }
   | LHS PartSelect     { LHSRange  $1 (fst $2) (snd $2) }
   | LHS "[" Expr "]"   { LHSBit    $1 $3 }
   | LHS "." Identifier { LHSDot    $1 $3 }
-  | "{" LHSs "}"       { LHSConcat $2    }
+  | LHSConcat          { LHSConcat $1    }
+  | "{" StreamOp StreamSize Concat "}" { LHSStream $2 $3           (map toLHS $4) }
+  | "{" StreamOp            Concat "}" { LHSStream $2 (Number "1") (map toLHS $3) }
 
+LHSConcat :: { [LHS] }
+  : "{" LHSs "}" { $2 }
 LHSs :: { [LHS] }
   : LHS           { [$1] }
   | LHSs "," LHS  { $1 ++ [$3] }

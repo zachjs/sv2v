@@ -504,6 +504,9 @@ exprMapperHelpers exprMapper =
         rangeMapper r >>= return . LHSRange l m
     lhsMapper (LHSBit l e) =
         exprMapper e >>= return . LHSBit l
+    lhsMapper (LHSStream o e ls) = do
+        e' <- exprMapper e
+        return $ LHSStream o e' ls
     lhsMapper other = return other
 
 traverseExprsM' :: Monad m => TFStrategy -> MapperM m Expr -> MapperM m ModuleItem
@@ -730,11 +733,12 @@ traverseNestedLHSsM :: Monad m => MapperM m LHS -> MapperM m LHS
 traverseNestedLHSsM mapper = fullMapper
     where
         fullMapper lhs = mapper lhs >>= tl
-        tl (LHSIdent  x    ) = return $ LHSIdent x
-        tl (LHSBit    l e  ) = fullMapper l >>= \l' -> return $ LHSBit    l' e
-        tl (LHSRange  l m r) = fullMapper l >>= \l' -> return $ LHSRange  l' m r
-        tl (LHSDot    l x  ) = fullMapper l >>= \l' -> return $ LHSDot    l' x
-        tl (LHSConcat lhss ) = mapM fullMapper lhss >>= return . LHSConcat
+        tl (LHSIdent  x       ) = return $ LHSIdent x
+        tl (LHSBit    l e     ) = fullMapper l >>= \l' -> return $ LHSBit    l' e
+        tl (LHSRange  l m r   ) = fullMapper l >>= \l' -> return $ LHSRange  l' m r
+        tl (LHSDot    l x     ) = fullMapper l >>= \l' -> return $ LHSDot    l' x
+        tl (LHSConcat     lhss) = mapM fullMapper lhss >>= return . LHSConcat
+        tl (LHSStream o e lhss) = mapM fullMapper lhss >>= return . LHSStream o e
 
 traverseNestedLHSs :: Mapper LHS -> Mapper LHS
 traverseNestedLHSs = unmonad traverseNestedLHSsM

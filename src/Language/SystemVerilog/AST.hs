@@ -55,4 +55,7 @@ exprToLHS (Dot   l x  ) = do
 exprToLHS (Concat ls  ) = do
     ls' <- mapM exprToLHS ls
     Just $ LHSConcat ls'
+exprToLHS (Stream o e ls) = do
+    ls' <- mapM exprToLHS ls
+    Just $ LHSStream o e ls'
 exprToLHS _ = Nothing

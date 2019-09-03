@@ -288,6 +288,8 @@ convertAsgn structs types (lhs, expr) =
                         fieldType = lookupFieldType fields x
         convertLHS (LHSConcat lhss) =
             (Implicit Unspecified [], LHSConcat $ map (snd . convertLHS) lhss)
+        convertLHS (LHSStream o e lhss) =
+            (Implicit Unspecified [], LHSStream o e $ map (snd . convertLHS) lhss)
 
         -- try expression conversion by looking at the *outermost* type first
         convertExpr :: Type -> Expr -> Expr

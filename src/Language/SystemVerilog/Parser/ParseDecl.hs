@@ -57,6 +57,7 @@ data DeclToken
     | DTInstance [PortBinding]
     | DTBit      Expr
     | DTConcat   [LHS]
+    | DTStream   StreamOp Expr [LHS]
     | DTDot      Identifier
     | DTSigning  Signing
     | DTLifetime Lifetime
@@ -229,6 +230,7 @@ parseDTsAsDeclsAndAsgns tokens =
 isAsgnToken :: DeclToken -> Bool
 isAsgnToken (DTBit             _) = True
 isAsgnToken (DTConcat          _) = True
+isAsgnToken (DTStream      _ _ _) = True
 isAsgnToken (DTDot             _) = True
 isAsgnToken (DTAsgnNBlk      _ _) = True
 isAsgnToken (DTAsgn (AsgnOp _) _) = True
@@ -240,8 +242,9 @@ takeLHS (t : ts) =
     foldl takeLHSStep (takeLHSStart t) ts
 
 takeLHSStart :: DeclToken -> Maybe LHS
-takeLHSStart (DTConcat lhss) = Just $ LHSConcat lhss
-takeLHSStart (DTIdent  x   ) = Just $ LHSIdent x
+takeLHSStart (DTConcat     lhss) = Just $ LHSConcat lhss
+takeLHSStart (DTStream o e lhss) = Just $ LHSStream o e lhss
+takeLHSStart (DTIdent  x       ) = Just $ LHSIdent x
 takeLHSStart _ = Nothing
 
 takeLHSStep :: Maybe LHS -> DeclToken -> Maybe LHS
