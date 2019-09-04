@@ -17,6 +17,7 @@
 module Convert.Bits (convert) where
 
 import Control.Monad.State
+import Data.List (elemIndex)
 import qualified Data.Map.Strict as Map
 
 import Convert.Traverse
@@ -37,7 +38,9 @@ traverseDeclM decl = do
         Variable _ t ident a _ -> modify $ Map.insert ident (t, a)
         Parameter  t ident   _ -> modify $ Map.insert ident (t, [])
         Localparam t ident   _ -> modify $ Map.insert ident (t, [])
-    return decl
+    item <- traverseModuleItemM (MIPackageItem $ Decl decl)
+    let MIPackageItem (Decl decl') = item
+    return decl'
 
 traverseModuleItemM :: ModuleItem -> State Info ModuleItem
 traverseModuleItemM item = traverseExprsM traverseExprM item
@@ -46,7 +49,8 @@ traverseStmtM :: Stmt -> State Info Stmt
 traverseStmtM stmt = traverseStmtExprsM traverseExprM stmt
 
 traverseExprM :: Expr -> State Info Expr
-traverseExprM = traverseNestedExprsM $ stately convertExpr
+traverseExprM = traverseNestedExprsM $ stately converter
+    where converter a b = simplify $ (traverseNestedExprs (convertExpr a) b)
 
 -- simplify a bits expression given scoped type information
 convertExpr :: Info -> Expr -> Expr
@@ -83,6 +87,11 @@ convertExpr info (Bits (Right e)) =
                 Just (t, rs) ->
                     convertExpr info $ Bits $ Left t'
                     where t' = popRange t rs
+        Stream _ _ exprs -> convertExpr info $ Bits $ Right $ Concat exprs
+        Number n ->
+            case elemIndex '\'' n of
+                Nothing -> Bits $ Right $ Number n
+                Just idx -> Number $ take idx n
         _ -> Bits $ Right e
 convertExpr _ other = other
 

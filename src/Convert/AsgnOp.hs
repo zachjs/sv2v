@@ -35,11 +35,3 @@ convertStmt (For inits cc asgns stmt) =
 convertStmt (AsgnBlk (AsgnOp op) lhs expr) =
     AsgnBlk AsgnOpEq lhs (BinOp op (lhsToExpr lhs) expr)
 convertStmt other = other
-
-lhsToExpr :: LHS -> Expr
-lhsToExpr (LHSIdent    x   ) = Ident x
-lhsToExpr (LHSBit    l e   ) = Bit   (lhsToExpr l) e
-lhsToExpr (LHSRange  l m r ) = Range (lhsToExpr l) m r
-lhsToExpr (LHSDot    l x   ) = Dot   (lhsToExpr l) x
-lhsToExpr (LHSConcat     ls) = Concat $ map lhsToExpr ls
-lhsToExpr (LHSStream o e ls) = Stream o e $ map lhsToExpr ls

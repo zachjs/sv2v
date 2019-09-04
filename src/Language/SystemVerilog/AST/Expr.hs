@@ -123,6 +123,10 @@ readNumber n =
 -- basic expression simplfication utility to help us generate nicer code in the
 -- common case of ranges like `[FOO-1:0]`
 simplify :: Expr -> Expr
+simplify (Repeat (Number "0") _) = Concat []
+simplify (Concat [expr]) = expr
+simplify (Concat exprs) =
+    Concat $ filter (/= Concat []) exprs
 simplify (orig @ (Call Nothing "$clog2" (Args [Just (Number n)] []))) =
     case readNumber n of
         Nothing -> orig

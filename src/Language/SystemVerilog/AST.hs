@@ -26,6 +26,7 @@ module Language.SystemVerilog.AST
     , module Stmt
     , module Type
     , exprToLHS
+    , lhsToExpr
     ) where
 
 import Language.SystemVerilog.AST.Attr as Attr
@@ -59,3 +60,11 @@ exprToLHS (Stream o e ls) = do
     ls' <- mapM exprToLHS ls
     Just $ LHSStream o e ls'
 exprToLHS _ = Nothing
+
+lhsToExpr :: LHS -> Expr
+lhsToExpr (LHSIdent    x   ) = Ident x
+lhsToExpr (LHSBit    l e   ) = Bit   (lhsToExpr l) e
+lhsToExpr (LHSRange  l m r ) = Range (lhsToExpr l) m r
+lhsToExpr (LHSDot    l x   ) = Dot   (lhsToExpr l) x
+lhsToExpr (LHSConcat     ls) = Concat $ map lhsToExpr ls
+lhsToExpr (LHSStream o e ls) = Stream o e $ map lhsToExpr ls

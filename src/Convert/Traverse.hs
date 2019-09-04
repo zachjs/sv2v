@@ -543,6 +543,7 @@ traverseExprsM' strat exprMapper = moduleItemMapper
         expr' <- exprMapper expr
         return $ Assign delay' lhs' expr'
     moduleItemMapper (MIPackageItem (Function lifetime ret f decls stmts)) = do
+        ret' <- typeMapper ret
         decls' <-
             if strat == IncludeTFs
                 then mapM declMapper decls
@@ -551,7 +552,7 @@ traverseExprsM' strat exprMapper = moduleItemMapper
             if strat == IncludeTFs
                 then mapM stmtMapper stmts
                 else return stmts
-        return $ MIPackageItem $ Function lifetime ret f decls' stmts'
+        return $ MIPackageItem $ Function lifetime ret' f decls' stmts'
     moduleItemMapper (MIPackageItem (Task lifetime f decls stmts)) = do
         decls' <-
             if strat == IncludeTFs

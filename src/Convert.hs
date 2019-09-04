@@ -31,6 +31,7 @@ import qualified Convert.RemoveComments
 import qualified Convert.Return
 import qualified Convert.StarPort
 import qualified Convert.StmtBlock
+import qualified Convert.Stream
 import qualified Convert.Struct
 import qualified Convert.Typedef
 import qualified Convert.UnbasedUnsized
@@ -56,6 +57,7 @@ phases excludes =
     , Convert.PackedArray.convert
     , Convert.StarPort.convert
     , Convert.StmtBlock.convert
+    , Convert.Stream.convert
     , Convert.Struct.convert
     , Convert.Typedef.convert
     , Convert.UnbasedUnsized.convert
