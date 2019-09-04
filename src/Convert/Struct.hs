@@ -8,7 +8,6 @@ module Convert.Struct (convert) where
 
 import Control.Monad.State
 import Control.Monad.Writer
-import Data.Hashable (hash)
 import Data.List (elemIndex, sortOn)
 import Data.Maybe (fromJust, isJust)
 import Data.Tuple (swap)
@@ -207,10 +206,7 @@ packerFn structTf =
 -- returns a "unique" name for the packer for a given struct type
 packerFnName :: TypeFunc -> Identifier
 packerFnName structTf =
-    "sv2v_pack_struct_" ++ str
-    where
-        val = hash $ show structTf
-        str = tail $ show val
+    "sv2v_struct_" ++ shortHash structTf
 
 -- This is where the magic happens. This is responsible for converting struct
 -- accesses, assignments, and literals, given appropriate information about the

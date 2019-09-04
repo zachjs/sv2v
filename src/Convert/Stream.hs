@@ -70,10 +70,7 @@ streamerBlock chunk size asgn output input =
 
 streamerBlockName :: Expr -> Expr -> Identifier
 streamerBlockName chunk size =
-    "_sv2v_strm_" ++ take 5 str
-    where
-        val = hash $ show (chunk, size)
-        str = tail $ show val
+    "_sv2v_strm_" ++ shortHash (chunk, size)
 
 traverseStmtM :: Stmt -> Writer Funcs Stmt
 traverseStmtM (AsgnBlk op lhs expr) =

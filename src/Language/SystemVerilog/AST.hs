@@ -27,7 +27,11 @@ module Language.SystemVerilog.AST
     , module Type
     , exprToLHS
     , lhsToExpr
+    , shortHash
     ) where
+
+import Text.Printf (printf)
+import Data.Hashable (hash)
 
 import Language.SystemVerilog.AST.Attr as Attr
 import Language.SystemVerilog.AST.Decl as Decl
@@ -68,3 +72,8 @@ lhsToExpr (LHSRange  l m r ) = Range (lhsToExpr l) m r
 lhsToExpr (LHSDot    l x   ) = Dot   (lhsToExpr l) x
 lhsToExpr (LHSConcat     ls) = Concat $ map lhsToExpr ls
 lhsToExpr (LHSStream o e ls) = Stream o e $ map lhsToExpr ls
+
+shortHash :: (Show a) => a -> String
+shortHash x =
+    take 5 $ printf "%05X" val
+    where val = hash $ show x
