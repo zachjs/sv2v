@@ -28,10 +28,10 @@ import qualified Data.Set as Set
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type EnumInfo = (Range, [(Identifier, Maybe Expr)])
+type EnumInfo = (Maybe Range, [(Identifier, Maybe Expr)])
 type Enums = Set.Set EnumInfo
 type Idents = Set.Set Identifier
-type EnumItem = ((Range, Identifier), Expr)
+type EnumItem = ((Maybe Range, Identifier), Expr)
 
 convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
@@ -90,11 +90,19 @@ convergeUsage items enums =
         collectIdent _ = return ()
 
 toItem :: EnumItem -> PackageItem
-toItem ((r, x), v) =
+toItem ((mr, x), v) =
     Decl $ Localparam itemType x v'
     where
-        v' = sizedExpr x r (simplify v)
-        itemType = Implicit Unspecified [r]
+        v' = if mr == Nothing
+                then simplify v
+                else sizedExpr x r (simplify v)
+        rs = maybe [] (\a -> [a]) mr
+        r = defaultRange mr
+        itemType = Implicit Unspecified rs
+
+defaultRange :: Maybe Range -> Range
+defaultRange Nothing = (Number "0", Number "0")
+defaultRange (Just r) = r
 
 toBaseType :: Maybe Type -> Type
 toBaseType Nothing = defaultType
@@ -110,9 +118,14 @@ toBaseType (Just t) =
 traverseType :: Type -> Writer Enums Type
 traverseType (Enum t v rs) = do
     let baseType = toBaseType t
-    let (tf, [r]) = typeRanges baseType
-    () <- tell $ Set.singleton (simplifyRange r, v)
-    return $ tf (r : rs)
+    let (tf, rl) = typeRanges baseType
+    mr <- return $ case rl of
+        [] -> Nothing
+        [r] -> Just r
+        _ -> error $ "unexpected multi-dim enum type: "
+                    ++ show (Enum t v rs)
+    () <- tell $ Set.singleton (fmap simplifyRange mr, v)
+    return $ tf (rl ++ rs)
 traverseType other = return other
 
 simplifyRange :: Range -> Range
@@ -126,7 +139,7 @@ traverseExpr (Cast (Left (Enum _ _ _)) e) = e
 traverseExpr other = other
 
 enumVals :: EnumInfo -> [EnumItem]
-enumVals (r, l) =
+enumVals (mr, l) =
     -- check for obviously duplicate values
     if noDuplicates
         then res
@@ -135,7 +148,7 @@ enumVals (r, l) =
     where
         keys = map fst l
         vals = tail $ scanl step (Number "-1") (map snd l)
-        res = zip (zip (repeat r) keys) vals
+        res = zip (zip (repeat mr) keys) vals
         noDuplicates = all (null . tail . flip elemIndices vals) vals
         step :: Expr -> Maybe Expr -> Expr
         step _ (Just expr) = expr

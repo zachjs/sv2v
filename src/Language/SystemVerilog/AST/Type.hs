@@ -84,12 +84,18 @@ typeRanges (Alias      ps xx    rs) = (Alias      ps xx   , rs)
 typeRanges (Net           kw    rs) = (Net           kw   , rs)
 typeRanges (Implicit         sg rs) = (Implicit         sg, rs)
 typeRanges (IntegerVector kw sg rs) = (IntegerVector kw sg, rs)
-typeRanges (IntegerAtom   kw sg   ) = (\[] -> IntegerAtom   kw sg, [])
-typeRanges (NonInteger    kw      ) = (\[] -> NonInteger    kw   , [])
+typeRanges (IntegerAtom   kw sg   ) = (nullRange $ IntegerAtom kw sg, [])
+typeRanges (NonInteger    kw      ) = (nullRange $ NonInteger  kw   , [])
 typeRanges (Enum   t v r) = (Enum   t v, r)
 typeRanges (Struct p l r) = (Struct p l, r)
 typeRanges (Union  p l r) = (Union  p l, r)
 typeRanges (InterfaceT x my r) = (InterfaceT x my, r)
+
+nullRange :: Type -> ([Range] -> Type)
+nullRange t [] = t
+nullRange t [(Number "0", Number "0")] = t
+nullRange t other =
+    error $ "non vector type " ++ show t ++ " cannot have a range"
 
 data Signing
     = Unspecified
