@@ -7,7 +7,6 @@
 module Convert.Stream (convert) where
 
 import Control.Monad.Writer
-import Data.Hashable (hash)
 
 import Convert.Traverse
 import Language.SystemVerilog.AST
