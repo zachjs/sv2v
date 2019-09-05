@@ -388,7 +388,7 @@ string             { Token Lit_string      _ _ }
 %left  "^" "^~" "~^"
 %left  "&" "~&"
 %left  "==" "!=" "===" "!==" "==?" "!=?"
-%left  "<" "<=" ">" ">="
+%left  "<" "<=" ">" ">=" "inside" "dist"
 %left  "<<" ">>" "<<<" ">>>"
 %left  "+" "-"
 %left  "*" "/" "%"
@@ -999,6 +999,7 @@ Expr :: { Expr }
   | "'" "{" PatternItems "}"    { Pattern $3 }
   | "{" StreamOp StreamSize Concat "}" { Stream $2 $3           $4 }
   | "{" StreamOp            Concat "}" { Stream $2 (Number "1") $3 }
+  | Expr "inside" Concat        { foldl1 (BinOp LogOr) $ map (BinOp Eq $1) $3 }
   -- binary expressions
   | Expr "||"  Expr { BinOp LogOr  $1 $3 }
   | Expr "&&"  Expr { BinOp LogAnd $1 $3 }
