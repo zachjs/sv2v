@@ -736,6 +736,11 @@ NonDeclPackageItem :: { [PackageItem] }
   | "import" PackageImportItems ";" { map (uncurry Import) $2 }
   | "export" PackageImportItems ";" { map (Export .  Just) $2 }
   | "export" "*" "::" "*" ";"       { [Export Nothing] } -- "Nothing" being no restrictions
+  | ForwardTypedef ";"              { $1 }
+ForwardTypedef :: { [PackageItem] }
+  : "typedef" "enum"   Identifier { [] }
+  | "typedef" "struct" Identifier { [] }
+  | "typedef" "union"  Identifier { [] }
 
 PackageImportItems :: { [(Identifier, Maybe Identifier)] }
   : PackageImportItem                        { [$1] }
