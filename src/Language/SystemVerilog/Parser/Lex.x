@@ -109,6 +109,8 @@ $decimalDigit = [0-9]
 tokens :-
 
     "$bits"            { tok KW_dollar_bits  }
+    "accept_on"        { tok KW_accept_on    }
+    "alias"            { tok KW_alias        }
     "always"           { tok KW_always       }
     "always_comb"      { tok KW_always_comb  }
     "always_ff"        { tok KW_always_ff    }
@@ -118,93 +120,239 @@ tokens :-
     "assign"           { tok KW_assign       }
     "assume"           { tok KW_assume       }
     "automatic"        { tok KW_automatic    }
+    "before"           { tok KW_before       }
     "begin"            { tok KW_begin        }
+    "bind"             { tok KW_bind         }
+    "bins"             { tok KW_bins         }
+    "binsof"           { tok KW_binsof       }
     "bit"              { tok KW_bit          }
+    "break"            { tok KW_break        }
     "buf"              { tok KW_buf          }
+    "bufif0"           { tok KW_bufif0       }
+    "bufif1"           { tok KW_bufif1       }
     "byte"             { tok KW_byte         }
     "case"             { tok KW_case         }
     "casex"            { tok KW_casex        }
     "casez"            { tok KW_casez        }
+    "cell"             { tok KW_cell         }
+    "chandle"          { tok KW_chandle      }
+    "checker"          { tok KW_checker      }
+    "class"            { tok KW_class        }
+    "clocking"         { tok KW_clocking     }
+    "cmos"             { tok KW_cmos         }
+    "config"           { tok KW_config       }
+    "const"            { tok KW_const        }
+    "constraint"       { tok KW_constraint   }
+    "context"          { tok KW_context      }
+    "continue"         { tok KW_continue     }
     "cover"            { tok KW_cover        }
+    "covergroup"       { tok KW_covergroup   }
+    "coverpoint"       { tok KW_coverpoint   }
+    "cross"            { tok KW_cross        }
+    "deassign"         { tok KW_deassign     }
     "default"          { tok KW_default      }
     "defparam"         { tok KW_defparam     }
+    "design"           { tok KW_design       }
     "disable"          { tok KW_disable      }
+    "dist"             { tok KW_dist         }
     "do"               { tok KW_do           }
+    "edge"             { tok KW_edge         }
     "else"             { tok KW_else         }
     "end"              { tok KW_end          }
     "endcase"          { tok KW_endcase      }
+    "endchecker"       { tok KW_endchecker   }
+    "endclass"         { tok KW_endclass     }
+    "endclocking"      { tok KW_endclocking  }
+    "endconfig"        { tok KW_endconfig    }
     "endfunction"      { tok KW_endfunction  }
     "endgenerate"      { tok KW_endgenerate  }
+    "endgroup"         { tok KW_endgroup     }
     "endinterface"     { tok KW_endinterface }
     "endmodule"        { tok KW_endmodule    }
     "endpackage"       { tok KW_endpackage   }
+    "endprimitive"     { tok KW_endprimitive }
+    "endprogram"       { tok KW_endprogram   }
+    "endproperty"      { tok KW_endproperty  }
+    "endspecify"       { tok KW_endspecify   }
+    "endsequence"      { tok KW_endsequence  }
+    "endtable"         { tok KW_endtable     }
     "endtask"          { tok KW_endtask      }
     "enum"             { tok KW_enum         }
+    "event"            { tok KW_event        }
+    "eventually"       { tok KW_eventually   }
+    "expect"           { tok KW_expect       }
     "export"           { tok KW_export       }
+    "extends"          { tok KW_extends      }
     "extern"           { tok KW_extern       }
+    "final"            { tok KW_final        }
     "first_match"      { tok KW_first_match  }
     "for"              { tok KW_for          }
+    "force"            { tok KW_force        }
+    "foreach"          { tok KW_foreach      }
     "forever"          { tok KW_forever      }
+    "fork"             { tok KW_fork         }
+    "forkjoin"         { tok KW_forkjoin     }
     "function"         { tok KW_function     }
     "generate"         { tok KW_generate     }
     "genvar"           { tok KW_genvar       }
+    "global"           { tok KW_global       }
+    "highz0"           { tok KW_highz0       }
+    "highz1"           { tok KW_highz1       }
     "if"               { tok KW_if           }
     "iff"              { tok KW_iff          }
+    "ifnone"           { tok KW_ifnone       }
+    "ignore_bins"      { tok KW_ignore_bins  }
+    "illegal_bins"     { tok KW_illegal_bins }
+    "implements"       { tok KW_implements   }
+    "implies"          { tok KW_implies      }
     "import"           { tok KW_import       }
+    "incdir"           { tok KW_incdir       }
+    "include"          { tok KW_include      }
     "initial"          { tok KW_initial      }
     "inout"            { tok KW_inout        }
     "input"            { tok KW_input        }
+    "inside"           { tok KW_inside       }
+    "instance"         { tok KW_instance     }
     "int"              { tok KW_int          }
     "integer"          { tok KW_integer      }
+    "interconnect"     { tok KW_interconnect }
     "interface"        { tok KW_interface    }
     "intersect"        { tok KW_intersect    }
+    "join"             { tok KW_join         }
+    "join_any"         { tok KW_join_any     }
+    "join_none"        { tok KW_join_none    }
+    "large"            { tok KW_large        }
+    "let"              { tok KW_let          }
+    "liblist"          { tok KW_liblist      }
+    "library"          { tok KW_library      }
+    "local"            { tok KW_local        }
     "localparam"       { tok KW_localparam   }
     "logic"            { tok KW_logic        }
     "longint"          { tok KW_longint      }
+    "macromodule"      { tok KW_macromodule  }
+    "matches"          { tok KW_matches      }
+    "medium"           { tok KW_medium       }
     "modport"          { tok KW_modport      }
     "module"           { tok KW_module       }
     "nand"             { tok KW_nand         }
     "negedge"          { tok KW_negedge      }
+    "nettype"          { tok KW_nettype      }
+    "new"              { tok KW_new          }
+    "nexttime"         { tok KW_nexttime     }
+    "nmos"             { tok KW_nmos         }
     "nor"              { tok KW_nor          }
+    "noshowcancelled"  { tok KW_noshowcancelled }
     "not"              { tok KW_not          }
+    "notif0"           { tok KW_notif0       }
+    "notif1"           { tok KW_notif1       }
+    "null"             { tok KW_null         }
     "or"               { tok KW_or           }
     "output"           { tok KW_output       }
     "package"          { tok KW_package      }
     "packed"           { tok KW_packed       }
     "parameter"        { tok KW_parameter    }
+    "pmos"             { tok KW_pmos         }
     "posedge"          { tok KW_posedge      }
+    "primitive"        { tok KW_primitive    }
     "priority"         { tok KW_priority     }
+    "program"          { tok KW_program      }
     "property"         { tok KW_property     }
+    "protected"        { tok KW_protected    }
+    "pull0"            { tok KW_pull0        }
+    "pull1"            { tok KW_pull1        }
+    "pulldown"         { tok KW_pulldown     }
+    "pullup"           { tok KW_pullup       }
+    "pulsestyle_ondetect" { tok KW_pulsestyle_ondetect }
+    "pulsestyle_onevent"  { tok KW_pulsestyle_onevent }
+    "pure"             { tok KW_pure         }
+    "rand"             { tok KW_rand         }
+    "randc"            { tok KW_randc        }
+    "randcase"         { tok KW_randcase     }
+    "randsequence"     { tok KW_randsequence }
+    "rcmos"            { tok KW_rcmos        }
     "real"             { tok KW_real         }
     "realtime"         { tok KW_realtime     }
+    "ref"              { tok KW_ref          }
     "reg"              { tok KW_reg          }
+    "reject_on"        { tok KW_reject_on    }
+    "release"          { tok KW_release      }
     "repeat"           { tok KW_repeat       }
+    "restrict"         { tok KW_restrict     }
     "return"           { tok KW_return       }
+    "rnmos"            { tok KW_rnmos        }
+    "rpmos"            { tok KW_rpmos        }
+    "rtran"            { tok KW_rtran        }
+    "rtranif0"         { tok KW_rtranif0     }
+    "rtranif1"         { tok KW_rtranif1     }
+    "s_always"         { tok KW_s_always     }
+    "s_eventually"     { tok KW_s_eventually }
+    "s_nexttime"       { tok KW_s_nexttime   }
+    "s_until"          { tok KW_s_until      }
+    "s_until_with"     { tok KW_s_until_with }
+    "scalared"         { tok KW_scalared     }
+    "sequence"         { tok KW_sequence     }
     "shortint"         { tok KW_shortint     }
     "shortreal"        { tok KW_shortreal    }
+    "showcancelled"    { tok KW_showcancelled }
     "signed"           { tok KW_signed       }
+    "small"            { tok KW_small        }
+    "soft"             { tok KW_soft         }
+    "solve"            { tok KW_solve        }
+    "specify"          { tok KW_specify      }
+    "specparam"        { tok KW_specparam    }
     "static"           { tok KW_static       }
+    "string"           { tok KW_string       }
+    "strong"           { tok KW_strong       }
+    "strong0"          { tok KW_strong0      }
+    "strong1"          { tok KW_strong1      }
     "struct"           { tok KW_struct       }
+    "super"            { tok KW_super        }
     "supply0"          { tok KW_supply0      }
     "supply1"          { tok KW_supply1      }
+    "sync_accept_on"   { tok KW_sync_accept_on }
+    "sync_reject_on"   { tok KW_sync_reject_on }
+    "table"            { tok KW_table        }
+    "tagged"           { tok KW_tagged       }
     "task"             { tok KW_task         }
+    "this"             { tok KW_this         }
     "throughout"       { tok KW_throughout   }
     "time"             { tok KW_time         }
+    "timeprecision"    { tok KW_timeprecision }
+    "timeunit"         { tok KW_timeunit     }
+    "tran"             { tok KW_tran         }
+    "tranif0"          { tok KW_tranif0      }
+    "tranif1"          { tok KW_tranif1      }
     "tri"              { tok KW_tri          }
     "tri0"             { tok KW_tri0         }
     "tri1"             { tok KW_tri1         }
     "triand"           { tok KW_triand       }
     "trior"            { tok KW_trior        }
     "trireg"           { tok KW_trireg       }
+    "type"             { tok KW_type         }
     "typedef"          { tok KW_typedef      }
     "union"            { tok KW_union        }
     "unique"           { tok KW_unique       }
     "unique0"          { tok KW_unique0      }
     "unsigned"         { tok KW_unsigned     }
+    "until"            { tok KW_until        }
+    "until_with"       { tok KW_until_with   }
+    "untyped"          { tok KW_untyped      }
+    "use"              { tok KW_use          }
     "uwire"            { tok KW_uwire        }
+    "var"              { tok KW_var          }
+    "vectored"         { tok KW_vectored     }
+    "virtual"          { tok KW_virtual      }
+    "void"             { tok KW_void         }
+    "wait"             { tok KW_wait         }
+    "wait_order"       { tok KW_wait_order   }
     "wand"             { tok KW_wand         }
+    "weak"             { tok KW_weak         }
+    "weak0"            { tok KW_weak0        }
+    "weak1"            { tok KW_weak1        }
     "while"            { tok KW_while        }
+    "wildcard"         { tok KW_wildcard     }
     "wire"             { tok KW_wire         }
+    "with"             { tok KW_with         }
     "within"           { tok KW_within       }
     "wor"              { tok KW_wor          }
     "xnor"             { tok KW_xnor         }

@@ -29,7 +29,9 @@ data Token
     deriving (Show, Eq)
 
 data TokenName
-    = KW_alias
+    = KW_dollar_bits
+    | KW_accept_on
+    | KW_alias
     | KW_always
     | KW_always_comb
     | KW_always_ff
@@ -55,6 +57,7 @@ data TokenName
     | KW_casez
     | KW_cell
     | KW_chandle
+    | KW_checker
     | KW_class
     | KW_clocking
     | KW_cmos
@@ -74,11 +77,11 @@ data TokenName
     | KW_disable
     | KW_dist
     | KW_do
-    | KW_dollar_bits
     | KW_edge
     | KW_else
     | KW_end
     | KW_endcase
+    | KW_endchecker
     | KW_endclass
     | KW_endclocking
     | KW_endconfig
@@ -97,6 +100,7 @@ data TokenName
     | KW_endtask
     | KW_enum
     | KW_event
+    | KW_eventually
     | KW_expect
     | KW_export
     | KW_extends
@@ -110,9 +114,9 @@ data TokenName
     | KW_fork
     | KW_forkjoin
     | KW_function
-    | KW_function_prototype
     | KW_generate
     | KW_genvar
+    | KW_global
     | KW_highz0
     | KW_highz1
     | KW_if
@@ -120,6 +124,8 @@ data TokenName
     | KW_ifnone
     | KW_ignore_bins
     | KW_illegal_bins
+    | KW_implements
+    | KW_implies
     | KW_import
     | KW_incdir
     | KW_include
@@ -130,12 +136,14 @@ data TokenName
     | KW_instance
     | KW_int
     | KW_integer
+    | KW_interconnect
     | KW_interface
     | KW_intersect
     | KW_join
     | KW_join_any
     | KW_join_none
     | KW_large
+    | KW_let
     | KW_liblist
     | KW_library
     | KW_local
@@ -149,7 +157,9 @@ data TokenName
     | KW_module
     | KW_nand
     | KW_negedge
+    | KW_nettype
     | KW_new
+    | KW_nexttime
     | KW_nmos
     | KW_nor
     | KW_noshowcancelled
@@ -157,13 +167,11 @@ data TokenName
     | KW_notif0
     | KW_notif1
     | KW_null
-    | KW_option
     | KW_or
     | KW_output
     | KW_package
     | KW_packed
     | KW_parameter
-    | KW_pathpulse_dollar
     | KW_pmos
     | KW_posedge
     | KW_primitive
@@ -175,8 +183,8 @@ data TokenName
     | KW_pull1
     | KW_pulldown
     | KW_pullup
-    | KW_pulsestyle_onevent
     | KW_pulsestyle_ondetect
+    | KW_pulsestyle_onevent
     | KW_pure
     | KW_rand
     | KW_randc
@@ -187,14 +195,21 @@ data TokenName
     | KW_realtime
     | KW_ref
     | KW_reg
+    | KW_reject_on
     | KW_release
     | KW_repeat
+    | KW_restrict
     | KW_return
     | KW_rnmos
     | KW_rpmos
     | KW_rtran
     | KW_rtranif0
     | KW_rtranif1
+    | KW_s_always
+    | KW_s_eventually
+    | KW_s_nexttime
+    | KW_s_until
+    | KW_s_until_with
     | KW_scalared
     | KW_sequence
     | KW_shortint
@@ -202,19 +217,21 @@ data TokenName
     | KW_showcancelled
     | KW_signed
     | KW_small
+    | KW_soft
     | KW_solve
     | KW_specify
     | KW_specparam
     | KW_static
-    | KW_strength0
-    | KW_strength1
     | KW_string
+    | KW_strong
     | KW_strong0
     | KW_strong1
     | KW_struct
     | KW_super
     | KW_supply0
     | KW_supply1
+    | KW_sync_accept_on
+    | KW_sync_reject_on
     | KW_table
     | KW_tagged
     | KW_task
@@ -234,11 +251,13 @@ data TokenName
     | KW_trireg
     | KW_type
     | KW_typedef
-    | KW_type_option
     | KW_union
     | KW_unique
     | KW_unique0
     | KW_unsigned
+    | KW_until
+    | KW_until_with
+    | KW_untyped
     | KW_use
     | KW_uwire
     | KW_var
@@ -248,6 +267,7 @@ data TokenName
     | KW_wait
     | KW_wait_order
     | KW_wand
+    | KW_weak
     | KW_weak0
     | KW_weak1
     | KW_while
