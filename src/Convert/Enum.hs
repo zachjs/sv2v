@@ -44,15 +44,33 @@ convertDescription (description @ (Part _ _ _ _ _ _)) =
     Part extern kw lifetime name ports (enumItems ++ items)
     where
         -- replace and collect the enum types in this description
-        (Part extern kw lifetime name ports items, enums) =
+        (Part extern kw lifetime name ports items, enumPairs) =
+            convertDescription' description
+        -- convert the collected enums into their corresponding localparams
+        enumItems = map MIPackageItem $ map toItem $ sortOn snd $ convergeUsage items enumPairs
+convertDescription (description @ (Package _ _ _)) =
+    Package ml name (items ++ enumItems)
+    where
+        -- replace and collect the enum types in this description
+        (Package ml name items, enumPairs) =
+            convertDescription' description
+        -- convert the collected enums into their corresponding localparams
+        enumItems = map toItem $ sortOn snd $ enumPairs
+convertDescription other = other
+
+-- replace and collect the enum types in a description
+convertDescription' :: Description -> (Description, [EnumItem])
+convertDescription' description =
+    (description', enumPairs)
+    where
+        -- replace and collect the enum types in this description
+        (description', enums) =
             runWriter $
             traverseModuleItemsM (traverseTypesM traverseType) $
             traverseModuleItems (traverseExprs $ traverseNestedExprs traverseExpr) $
             description
         -- convert the collected enums into their corresponding localparams
         enumPairs = concatMap enumVals $ Set.toList enums
-        enumItems = map toItem $ sortOn snd $ convergeUsage items enumPairs
-convertDescription other = other
 
 -- add only the enums actually used in the given items
 convergeUsage :: [ModuleItem] -> [EnumItem] -> [EnumItem]
@@ -63,7 +81,7 @@ convergeUsage items enums =
     where
         -- determine which of the enum items are actually used here
         (usedEnums, unusedEnums) = partition isUsed enums
-        enumItems = map toItem usedEnums
+        enumItems = map MIPackageItem $ map toItem usedEnums
         isUsed ((_, x), _) = Set.member x usedIdents
         usedIdents = execWriter $
             mapM (collectExprsM $ collectNestedExprsM collectIdent) $ items
@@ -71,9 +89,9 @@ convergeUsage items enums =
         collectIdent (Ident x) = tell $ Set.singleton x
         collectIdent _ = return ()
 
-toItem :: EnumItem -> ModuleItem
+toItem :: EnumItem -> PackageItem
 toItem ((r, x), v) =
-    MIPackageItem $ Decl $ Localparam itemType x v'
+    Decl $ Localparam itemType x v'
     where
         v' = sizedExpr x r (simplify v)
         itemType = Implicit Unspecified [r]
@@ -103,6 +121,7 @@ simplifyRange (a, b) = (simplify a, simplify b)
 -- drop any enum type casts in favor of implicit conversion from the
 -- converted type
 traverseExpr :: Expr -> Expr
+traverseExpr (Cast (Left (IntegerVector _ _ _)) e) = e
 traverseExpr (Cast (Left (Enum _ _ _)) e) = e
 traverseExpr other = other
 

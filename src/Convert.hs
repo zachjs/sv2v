@@ -50,7 +50,6 @@ phases excludes =
     , Convert.ForDecl.convert
     , Convert.FuncRet.convert
     , Convert.EmptyArgs.convert
-    , Convert.Enum.convert
     , Convert.IntTypes.convert
     , Convert.KWArgs.convert
     , Convert.Mux.convert
@@ -63,6 +62,7 @@ phases excludes =
     , Convert.UnbasedUnsized.convert
     , Convert.Unique.convert
     , Convert.Package.convert
+    , Convert.Enum.convert
     , Convert.NestPI.convert
     , Convert.Return.convert
     , selectExclude (Job.Interface, Convert.Interface.convert)
