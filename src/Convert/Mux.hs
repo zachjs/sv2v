@@ -34,7 +34,7 @@ convertDescription =
 traverseDeclM :: Decl -> State Info Decl
 traverseDeclM decl = do
     case decl of
-        Localparam _ x e -> modify $ Map.insert x e
+        Param Localparam _ x e -> modify $ Map.insert x e
         _ -> return ()
     return decl
 

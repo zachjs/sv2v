@@ -896,9 +896,17 @@ ParameterDecl(delim) :: { [Decl] }
   | ParameterDeclKW                             ParamType DeclAsgns delim { makeParamDecls $1 ($2                     ) $3 }
   | ParameterDeclKW                 Identifier Dimensions DeclAsgns delim { makeParamDecls $1 (Alias (Nothing)   $2 $3) $4 }
   | ParameterDeclKW Identifier "::" Identifier Dimensions DeclAsgns delim { makeParamDecls $1 (Alias (Just $2)   $4 $5) $6 }
-ParameterDeclKW :: { Type -> Identifier -> Expr -> Decl }
+  | ParameterDeclKW "type"                                TypeAsgns delim { map (uncurry $ ParamType $1) $3 }
+ParameterDeclKW :: { ParamScope }
   : "parameter"  { Parameter  }
   | "localparam" { Localparam }
+
+TypeAsgns :: { [(Identifier, Maybe Type)] }
+  : TypeAsgn               { [$1] }
+  | TypeAsgns "," TypeAsgn { $1 ++ [$3] }
+TypeAsgn :: { (Identifier, Maybe Type) }
+  : Identifier "=" Type { ($1, Just $3) }
+  | Identifier          { ($1, Nothing) }
 
 -- TODO: This does not allow for @identifier
 ClockingEvent :: { Sense }
@@ -1172,14 +1180,14 @@ toLHS expr =
                 ++ show expr
 
 makeParamDecls
-  :: (Type -> Identifier -> Expr -> Decl)
+  :: ParamScope
   -> Type
   -> [(Identifier, Expr, [Range])]
   -> [Decl]
-makeParamDecls kw t items =
+makeParamDecls s t items =
   map mapper items
   where
     (tf, rs) = typeRanges t
-    mapper (x, e, a) = kw (tf $ a ++ rs) x e
+    mapper (x, e, a) = Param s (tf $ a ++ rs) x e
 
 }

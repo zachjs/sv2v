@@ -176,14 +176,12 @@ traverseDeclM structs origDecl = do
                 Just e -> do
                     e' <- convertDeclExpr x e
                     return $ Variable d t x a (Just e')
-        Parameter  t x e   -> do
+        Param s t x e -> do
             modify $ Map.insert x t
             e' <- convertDeclExpr x e
-            return $ Parameter t x e'
-        Localparam t x e   -> do
-            modify $ Map.insert x t
-            e' <- convertDeclExpr x e
-            return $ Localparam t x e'
+            return $ Param s t x e'
+        ParamType s x mt ->
+            return $ ParamType s x mt
     where
         convertDeclExpr :: Identifier -> Expr -> State Types Expr
         convertDeclExpr x e = do

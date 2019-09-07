@@ -96,7 +96,7 @@ instance Show PartSelectMode where
     show IndexedPlus  = "+:"
     show IndexedMinus = "-:"
 
-showAssignment :: Maybe Expr -> String
+showAssignment :: Show a => Maybe a -> String
 showAssignment Nothing = ""
 showAssignment (Just val) = " = " ++ show val
 

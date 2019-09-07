@@ -36,8 +36,8 @@ traverseDeclM :: Decl -> State Info Decl
 traverseDeclM decl = do
     case decl of
         Variable _ t ident a _ -> modify $ Map.insert ident (t, a)
-        Parameter  t ident   _ -> modify $ Map.insert ident (t, [])
-        Localparam t ident   _ -> modify $ Map.insert ident (t, [])
+        Param    _ t ident   _ -> modify $ Map.insert ident (t, [])
+        ParamType    _     _ _ -> return ()
     item <- traverseModuleItemM (MIPackageItem $ Decl decl)
     let MIPackageItem (Decl decl') = item
     return decl'

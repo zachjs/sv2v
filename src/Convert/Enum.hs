@@ -91,7 +91,7 @@ convergeUsage items enums =
 
 toItem :: EnumItem -> PackageItem
 toItem ((mr, x), v) =
-    Decl $ Localparam itemType x v'
+    Decl $ Param Localparam itemType x v'
     where
         v' = if mr == Nothing
                 then simplify v

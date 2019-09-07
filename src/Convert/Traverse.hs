@@ -486,14 +486,17 @@ exprMapperHelpers exprMapper =
         return $ tf rs'
     typeMapper = traverseNestedTypesM typeMapper'
 
-    declMapper (Parameter  t x e) = do
+    maybeTypeMapper Nothing = return Nothing
+    maybeTypeMapper (Just t) =
+        typeMapper t >>= return . Just
+
+    declMapper (Param s t x e) = do
         t' <- typeMapper t
         e' <- exprMapper e
-        return $ Parameter  t' x e'
-    declMapper (Localparam t x e) = do
-        t' <- typeMapper t
-        e' <- exprMapper e
-        return $ Localparam t' x e'
+        return $ Param s t' x e'
+    declMapper (ParamType s x mt) = do
+        mt' <- maybeTypeMapper mt
+        return $ ParamType s x mt'
     declMapper (Variable d t x a me) = do
         t' <- typeMapper t
         a' <- mapM rangeMapper a
@@ -820,15 +823,17 @@ traverseTypesM mapper item =
     traverseExprsM (traverseNestedExprsM exprMapper)
     where
         fullMapper = traverseNestedTypesM mapper
+        maybeMapper Nothing = return Nothing
+        maybeMapper (Just t) = fullMapper t >>= return . Just
         exprMapper (Cast (Left t) e) =
             fullMapper t >>= \t' -> return $ Cast (Left t') e
         exprMapper (Bits (Left t)) =
             fullMapper t >>= return . Bits . Left
         exprMapper other = return other
-        declMapper (Parameter  t x    e) =
-            fullMapper t >>= \t' -> return $ Parameter  t' x   e
-        declMapper (Localparam t x    e) =
-            fullMapper t >>= \t' -> return $ Localparam t' x   e
+        declMapper (Param s t x e) =
+            fullMapper t >>= \t' -> return $ Param s t' x e
+        declMapper (ParamType s x mt) =
+            maybeMapper mt >>= \mt' -> return $ ParamType s x mt'
         declMapper (Variable d t x a me) =
             fullMapper t >>= \t' -> return $ Variable d t' x a me
         miMapper (MIPackageItem (Typedef t x)) =

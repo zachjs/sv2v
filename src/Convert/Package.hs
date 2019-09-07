@@ -91,8 +91,8 @@ prefixPackageItem packageName idents item =
             Task           a   x c d  -> Task           a   (prefix x) c d
             Typedef          a x      -> Typedef          a (prefix x)
             Decl (Variable a b x c d) -> Decl (Variable a b (prefix x) c d)
-            Decl (Parameter  a x   b) -> Decl (Parameter  a (prefix x)   b)
-            Decl (Localparam a x   b) -> Decl (Localparam a (prefix x)   b)
+            Decl (Param    a b x c  ) -> Decl (Param    a b (prefix x) c  )
+            Decl (ParamType  a x b  ) -> Decl (ParamType  a (prefix x) b  )
             other -> other
         convertType (Alias Nothing x rs) = Alias Nothing (prefix x) rs
         convertType (Enum mt items rs) = Enum mt items' rs
@@ -181,8 +181,8 @@ piName (Function _ _ ident _ _) = Just ident
 piName (Task     _   ident _ _) = Just ident
 piName (Typedef    _ ident    ) = Just ident
 piName (Decl (Variable _ _ ident _ _)) = Just ident
-piName (Decl (Parameter  _ ident   _)) = Just ident
-piName (Decl (Localparam _ ident   _)) = Just ident
+piName (Decl (Param    _ _ ident   _)) = Just ident
+piName (Decl (ParamType  _ ident   _)) = Just ident
 piName (Import _ _) = Nothing
 piName (Export   _) = Nothing
 piName (Comment  _) = Nothing

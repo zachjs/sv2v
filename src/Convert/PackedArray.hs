@@ -51,12 +51,11 @@ traverseDeclM (Variable dir t ident a me) = do
         else do
             t' <- traverseDeclM' t ident
             return $ Variable dir t' ident a me
-traverseDeclM (Parameter t ident e) = do
+traverseDeclM (Param s t ident e) = do
     t' <- traverseDeclM' t ident
-    return $ Parameter t' ident e
-traverseDeclM (Localparam t ident e) = do
-    t' <- traverseDeclM' t ident
-    return $ Localparam t' ident e
+    return $ Param s t' ident e
+traverseDeclM (ParamType s ident mt) =
+    return $ ParamType s ident mt
 
 traverseDeclM' :: Type -> Identifier -> State Info Type
 traverseDeclM' t ident = do

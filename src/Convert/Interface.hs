@@ -192,8 +192,8 @@ prefixModuleItems prefix =
     where
         prefixDecl :: Decl -> Decl
         prefixDecl (Variable d t x a me) = Variable d t (prefix ++ x) a me
-        prefixDecl (Parameter  t x e) = Parameter  t (prefix ++ x) e
-        prefixDecl (Localparam t x e) = Localparam t (prefix ++ x) e
+        prefixDecl (Param    s t x    e) = Param    s t (prefix ++ x)    e
+        prefixDecl (ParamType  s x   mt) = ParamType  s (prefix ++ x)   mt
         prefixExpr :: Expr -> Expr
         prefixExpr (Ident x) = Ident (prefix ++ x)
         prefixExpr other = other

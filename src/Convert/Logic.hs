@@ -122,10 +122,8 @@ convertDescription ports orig =
         convertModuleItem other = other
         -- all other logics (i.e. inside of functions) become regs
         convertDecl :: Decl -> Decl
-        convertDecl (Parameter  (IntegerVector _ sg rs) x e) =
-            Parameter  (Implicit sg rs) x e
-        convertDecl (Localparam (IntegerVector _ sg rs) x e) =
-            Localparam (Implicit sg rs) x e
+        convertDecl (Param s (IntegerVector _ sg rs) x e) =
+            Param s (Implicit sg rs) x e
         convertDecl (Variable d (IntegerVector TLogic sg rs) x a me) =
             Variable d (IntegerVector TReg sg rs) x a me
         convertDecl other = other
