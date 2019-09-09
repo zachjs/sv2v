@@ -25,6 +25,8 @@ convert =
     where
         getTypedef :: Description -> Writer Types ()
         getTypedef (PackageItem (Typedef a b)) = tell $ Map.singleton b a
+        getTypedef (Part _ Interface _ x _ _) =
+            tell $ Map.singleton x (InterfaceT x Nothing [])
         getTypedef _ = return ()
         removeTypedef :: Description -> Description
         removeTypedef (PackageItem (Typedef _ x)) =
@@ -71,7 +73,7 @@ resolveType types (Struct p items rs) = Struct p (map (resolveItem types) items)
 resolveType types (Union  p items rs) = Union  p (map (resolveItem types) items) rs
 resolveType types (Alias Nothing st rs1) =
     if Map.notMember st types
-    then InterfaceT st Nothing rs1
+    then Alias Nothing st rs1
     else case resolveType types $ types Map.! st of
         (Net           kw    rs2) -> Net           kw    $ rs1 ++ rs2
         (Implicit         sg rs2) -> Implicit         sg $ rs1 ++ rs2
