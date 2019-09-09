@@ -8,6 +8,7 @@
 module Language.SystemVerilog.AST.ModuleItem
     ( ModuleItem    (..)
     , PortBinding
+    , ParamBinding
     , ModportDecl
     , AlwaysKW      (..)
     , NInputGateKW  (..)
@@ -16,6 +17,7 @@ module Language.SystemVerilog.AST.ModuleItem
 
 import Data.List (intercalate)
 import Data.Maybe (maybe, fromJust, isJust)
+import Data.Either (either)
 import Text.Printf (printf)
 
 import Language.SystemVerilog.AST.ShowHelp
@@ -23,7 +25,7 @@ import Language.SystemVerilog.AST.ShowHelp
 import Language.SystemVerilog.AST.Attr (Attr)
 import Language.SystemVerilog.AST.Decl (Direction)
 import Language.SystemVerilog.AST.Description (PackageItem)
-import Language.SystemVerilog.AST.Expr (Expr(Ident), Range, showRanges)
+import Language.SystemVerilog.AST.Expr (Expr(Ident, Nil), Range, TypeOrExpr, showRanges)
 import Language.SystemVerilog.AST.GenItem (GenItem)
 import Language.SystemVerilog.AST.LHS (LHS)
 import Language.SystemVerilog.AST.Stmt (Stmt, AssertionItem)
@@ -34,7 +36,7 @@ data ModuleItem
     | AlwaysC    AlwaysKW Stmt
     | Assign     (Maybe Expr) LHS Expr
     | Defparam   LHS Expr
-    | Instance   Identifier [PortBinding] Identifier (Maybe Range) [PortBinding]
+    | Instance   Identifier [ParamBinding] Identifier (Maybe Range) [PortBinding]
     | Genvar     Identifier
     | Generate   [GenItem]
     | Modport    Identifier [ModportDecl]
@@ -65,8 +67,8 @@ instance Show ModuleItem where
             else printf "%s : %s" (fromJust mx) (show a)
     show (Instance   m params i r ports) =
         if null params
-            then printf "%s %s%s%s;"     m                    i rStr (showPorts ports)
-            else printf "%s #%s %s%s%s;" m (showPorts params) i rStr (showPorts ports)
+            then printf "%s %s%s%s;"     m                     i rStr (showPorts ports)
+            else printf "%s #%s %s%s%s;" m (showParams params) i rStr (showPorts ports)
         where rStr = maybe "" (\a -> showRanges [a] ++ " ") r
 
 showPorts :: [PortBinding] -> String
@@ -79,6 +81,15 @@ showPort (i, arg) =
         then show (fromJust arg)
         else printf ".%s(%s)" i (if isJust arg then show $ fromJust arg else "")
 
+showParams :: [ParamBinding] -> String
+showParams params = indentedParenList $ map showParam params
+
+showParam :: ParamBinding -> String
+showParam ("*", Right Nil) = ".*"
+showParam (i, arg) =
+    printf fmt i (either show show arg)
+    where fmt = if i == "" then "%s%s" else ".%s(%s)"
+
 showModportDecl :: ModportDecl -> String
 showModportDecl (dir, ident, me) =
     if me == Just (Ident ident)
@@ -86,6 +97,8 @@ showModportDecl (dir, ident, me) =
         else printf "%s .%s(%s)" (show dir) ident (maybe "" show me)
 
 type PortBinding = (Identifier, Maybe Expr)
+
+type ParamBinding = (Identifier, TypeOrExpr)
 
 type ModportDecl = (Direction, Identifier, Maybe Expr)
 

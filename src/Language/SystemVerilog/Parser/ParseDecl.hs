@@ -53,7 +53,7 @@ data DeclToken
     | DTPSIdent  Identifier Identifier
     | DTDir      Direction
     | DTType     (Signing -> [Range] -> Type)
-    | DTParams   [PortBinding]
+    | DTParams   [ParamBinding]
     | DTInstance [PortBinding]
     | DTBit      Expr
     | DTConcat   [LHS]

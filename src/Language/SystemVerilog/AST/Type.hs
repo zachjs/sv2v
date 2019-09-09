@@ -95,7 +95,8 @@ nullRange :: Type -> ([Range] -> Type)
 nullRange t [] = t
 nullRange t [(Number "0", Number "0")] = t
 nullRange t other =
-    error $ "non vector type " ++ show t ++ " cannot have a range"
+    error $ "non vector type " ++ show t ++
+        " cannot have a range: " ++ show other
 
 data Signing
     = Unspecified

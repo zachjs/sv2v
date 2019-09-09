@@ -554,9 +554,9 @@ DeclTokens(delim) :: { [DeclToken] }
   | AsgnOp Expr "," DeclTokens(delim) { [DTAsgn $1 $2, DTComma] ++ $4 }
   | AsgnOp Expr                delim  { [DTAsgn $1 $2] }
 DeclToken :: { DeclToken }
-  : DeclOrStmtToken     { $1 }
-  | ParameterBindings   { DTParams   $1 }
-  | ModuleInstantiation { DTInstance $1 }
+  : DeclOrStmtToken   { $1 }
+  | ParameterBindings { DTParams   $1 }
+  | PortBindings      { DTInstance $1 }
 
 DeclOrStmtTokens(delim) :: { [DeclToken] }
   : DeclOrStmtToken                  delim  { [$1] }
@@ -766,9 +766,6 @@ Lifetime :: { Lifetime }
   : "static"    { Static    }
   | "automatic" { Automatic }
 
-ModuleInstantiation :: { [PortBinding] }
-  : "(" Bindings ")" { $2 }
-
 TFItems :: { [Decl] }
   : "(" DeclTokens(")") ";" { parseDTsAsDecls $2 }
   | "("            ")"  ";" { [] }
@@ -819,6 +816,28 @@ LHSs :: { [LHS] }
   : LHS           { [$1] }
   | LHSs "," LHS  { $1 ++ [$3] }
 
+PortBindings :: { [PortBinding] }
+  : "("                    ")" { [] }
+  | "(" PortBindingsInside ")" { $2 }
+PortBindingsInside :: { [PortBinding] }
+  : PortBinding                        { [$1] }
+  | PortBinding "," PortBindingsInside { $1 : $3}
+PortBinding :: { PortBinding }
+  : "." Identifier "(" opt(Expr) ")" { ($2, $4) }
+  | "." Identifier                   { ($2, Just $ Ident $2) }
+  | Expr                             { ("", Just $1) }
+  | ".*"                             { ("*", Nothing) }
+
+ParameterBindings :: { [ParamBinding] }
+  : "#" "(" ParamBindingsInside ")" { $3 }
+ParamBindingsInside :: { [ParamBinding] }
+  : ParamBinding                         { [$1] }
+  | ParamBinding "," ParamBindingsInside { $1 : $3}
+ParamBinding :: { ParamBinding }
+  : "." Identifier "(" TypeOrExpr ")" { ($2, $4) }
+  | "." Identifier "("            ")" { ($2, Right Nil) }
+  | TypeOrExpr                        { ("", $1) }
+
 Bindings :: { [(Identifier, Maybe Expr)] }
   : {- empty -}      { [] }
   | BindingsNonEmpty { $1 }
@@ -830,9 +849,6 @@ Binding :: { (Identifier, Maybe Expr) }
   | "." Identifier                   { ($2, Just $ Ident $2) }
   | Expr                             { ("", Just $1) }
   | ".*"                             { ("*", Nothing) }
-
-ParameterBindings :: { [(Identifier, Maybe Expr)] }
-  : "#" "(" BindingsNonEmpty ")" { $3 }
 
 Stmts :: { [Stmt] }
   : {- empty -} { [] }
@@ -987,16 +1003,17 @@ Exprs :: { [Expr] }
   :           Expr  { [$1] }
   | Exprs "," Expr  { $1 ++ [$3] }
 
-BitsArg :: { Either Type Expr }
+TypeOrExpr :: { TypeOrExpr }
   : TypeNonIdent { Left $1 }
   | Expr         { Right $1 }
+
 Expr :: { Expr }
   : "(" Expr ")"                { $2 }
   | String                      { String $1 }
   | Number                      { Number $1 }
   |                 Identifier "(" CallArgs ")" { Call (Nothing) $1 $3 }
   | Identifier "::" Identifier "(" CallArgs ")" { Call (Just $1) $3 $5 }
-  | "$bits"    "(" BitsArg  ")" { Bits $3 }
+  | "$bits" "(" TypeOrExpr  ")" { Bits $3 }
   | Identifier                  { Ident $1 }
   | Identifier "::" Identifier  { PSIdent $1 $3 }
   | Expr PartSelect             { Range $1 (fst $2) (snd $2) }

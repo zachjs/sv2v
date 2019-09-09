@@ -464,6 +464,7 @@ traverseNestedExprsM mapper = exprMapper
             let names = map fst l
             exprs <- mapM exprMapper $ map snd l
             return $ Pattern $ zip names exprs
+        em (Nil) = return Nil
 
 exprMapperHelpers :: Monad m => MapperM m Expr ->
     (MapperM m Range, MapperM m (Maybe Expr), MapperM m Decl, MapperM m LHS, MapperM m Type)
@@ -524,6 +525,11 @@ traverseExprsM' strat exprMapper = moduleItemMapper
     portBindingMapper (p, me) =
         maybeExprMapper me >>= \me' -> return (p, me')
 
+    paramBindingMapper (p, Left t) =
+        typeMapper t >>= \t' -> return (p, Left t')
+    paramBindingMapper (p, Right e) =
+        exprMapper e >>= \e' -> return (p, Right e')
+
     moduleItemMapper (MIAttr attr mi) =
         -- note: we exclude expressions in attributes from conversion
         return $ MIAttr attr mi
@@ -567,7 +573,7 @@ traverseExprsM' strat exprMapper = moduleItemMapper
                 else return stmts
         return $ MIPackageItem $ Task lifetime f decls' stmts'
     moduleItemMapper (Instance m p x r l) = do
-        p' <- mapM portBindingMapper p
+        p' <- mapM paramBindingMapper p
         l' <- mapM portBindingMapper l
         r' <- mapM rangeMapper r
         return $ Instance m p' x r' l'

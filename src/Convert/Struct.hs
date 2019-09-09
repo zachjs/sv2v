@@ -445,6 +445,7 @@ convertAsgn structs types (lhs, expr) =
             where
                 items' = map mapItem items
                 mapItem (mx, e) = (mx, snd $ convertSubExpr e)
+        convertSubExpr Nil = (Implicit Unspecified [], Nil)
 
         -- lookup the range of a field in its unstructured type
         lookupUnstructRange :: TypeFunc -> Identifier -> Range

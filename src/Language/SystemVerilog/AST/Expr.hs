@@ -8,6 +8,7 @@
 module Language.SystemVerilog.AST.Expr
     ( Expr (..)
     , Range
+    , TypeOrExpr
     , Args (..)
     , PartSelectMode (..)
     , showAssignment
@@ -30,6 +31,8 @@ import {-# SOURCE #-} Language.SystemVerilog.AST.Type
 
 type Range = (Expr, Expr)
 
+type TypeOrExpr = Either Type Expr
+
 data Expr
     = String  String
     | Number  String
@@ -44,13 +47,15 @@ data Expr
     | UniOp   UniOp Expr
     | BinOp   BinOp Expr Expr
     | Mux     Expr Expr Expr
-    | Cast    (Either Type Expr) Expr
-    | Bits    (Either Type Expr)
+    | Cast    TypeOrExpr Expr
+    | Bits    TypeOrExpr
     | Dot     Expr Identifier
     | Pattern [(Maybe Identifier, Expr)]
+    | Nil
     deriving (Eq, Ord)
 
 instance Show Expr where
+    show (Nil          ) = ""
     show (Number  str  ) = str
     show (Ident   str  ) = str
     show (PSIdent x y  ) = printf "%s::%s" x y
