@@ -32,12 +32,12 @@ simulate() {
         echo "$iv_output"
     fi
     # run the simulation
-    $sim_prog > $sim_log
+    $sim_prog > "$sim_log.temp"
     assertTrue "simulating $1 failed" $?
     # remove the date from the VCD
     sed -i.orig -e "1,3d" "$sim_vcd"
-    # remove the "opened file..." prompt from the log
-    sed -i.orig -e "1,1d" "$sim_log"
+    # remove extraneous log lines
+    cat "$sim_log.temp" | grep -v "VCD info: dumpfile" > $sim_log
 }
 
 assertConverts() {
