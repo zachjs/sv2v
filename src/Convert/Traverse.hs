@@ -79,6 +79,7 @@ module Convert.Traverse
 , traverseScopesM
 , scopedConversion
 , stately
+, traverseFilesM
 , traverseFiles
 ) where
 
@@ -1068,17 +1069,25 @@ stately mapper thing = do
 -- packages, or typenames in other files. Global resolution of modules and
 -- interfaces is more commonly expected than global resolution of typenames and
 -- packages.
+traverseFilesM
+    :: (Monoid w, Monad m)
+    => CollectorM (Writer w) AST
+    -> (w -> MapperM m AST)
+    -> MapperM m [AST]
+traverseFilesM fileCollectorM fileMapperM files =
+    mapM traverseFileM files
+    where
+        globalNotes = execWriter $ mapM fileCollectorM files
+        traverseFileM file =
+            fileMapperM notes file
+            where
+                localNotes = execWriter $ fileCollectorM file
+                notes = localNotes <> globalNotes
 traverseFiles
     :: Monoid w
     => CollectorM (Writer w) AST
     -> (w -> Mapper AST)
     -> Mapper [AST]
 traverseFiles fileCollectorM fileMapper files =
-    map traverseFile files
-    where
-        globalNotes = execWriter $ mapM fileCollectorM files
-        traverseFile file =
-            fileMapper notes file
-            where
-                localNotes = execWriter $ fileCollectorM file
-                notes = localNotes <> globalNotes
+    evalState (traverseFilesM fileCollectorM fileMapperM  files) ()
+    where fileMapperM = (\w -> return . fileMapper w)
