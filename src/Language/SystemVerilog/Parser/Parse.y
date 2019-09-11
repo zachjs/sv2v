@@ -839,18 +839,6 @@ ParamBinding :: { ParamBinding }
   | "." Identifier "("            ")" { ($2, Right Nil) }
   | TypeOrExpr                        { ("", $1) }
 
-Bindings :: { [(Identifier, Maybe Expr)] }
-  : {- empty -}      { [] }
-  | BindingsNonEmpty { $1 }
-BindingsNonEmpty :: { [(Identifier, Maybe Expr)] }
-  : Binding                      { [$1] }
-  | Binding "," BindingsNonEmpty { $1 : $3}
-Binding :: { (Identifier, Maybe Expr) }
-  : "." Identifier "(" opt(Expr) ")" { ($2, $4) }
-  | "." Identifier                   { ($2, Just $ Ident $2) }
-  | Expr                             { ("", Just $1) }
-  | ".*"                             { ("*", Nothing) }
-
 Stmts :: { [Stmt] }
   : {- empty -} { [] }
   | Stmts Stmt  { $1 ++ [$2] }
