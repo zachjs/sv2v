@@ -731,8 +731,9 @@ PackageItem :: { [PackageItem] }
   | NonDeclPackageItem { $1 }
 NonDeclPackageItem :: { [PackageItem] }
   : "typedef" Type Identifier ";" { [Typedef $2 $3] }
-  | "function" opt(Lifetime) FuncRetAndName TFItems DeclsAndStmts "endfunction" opt(Tag) { [Function $2 (fst $3) (snd $3) (map defaultFuncInput $ (map makeInput $4) ++ fst $5) (snd $5)] }
-  | "task" opt(Lifetime) Identifier TFItems DeclsAndStmts "endtask" opt(Tag) { [Task $2 $3 (map defaultFuncInput $ $4 ++ fst $5) (snd $5)] }
+  | "function" opt(Lifetime) FuncRetAndName    TFItems DeclsAndStmts "endfunction" opt(Tag) { [Function $2 (fst $3) (snd $3) (map defaultFuncInput $ (map makeInput $4) ++ fst $5) (snd $5)] }
+  | "function" opt(Lifetime) "void" Identifier TFItems DeclsAndStmts "endfunction" opt(Tag) { [Task     $2 $4                (map defaultFuncInput $ $5 ++ fst $6) (snd $6)] }
+  | "task"     opt(Lifetime) Identifier        TFItems DeclsAndStmts "endtask"     opt(Tag) { [Task     $2 $3                (map defaultFuncInput $ $4 ++ fst $5) (snd $5)] }
   | "import" PackageImportItems ";" { map (uncurry Import) $2 }
   | "export" PackageImportItems ";" { map (Export .  Just) $2 }
   | "export" "*" "::" "*" ";"       { [Export Nothing] } -- "Nothing" being no restrictions
