@@ -285,6 +285,8 @@ convertAsgn structs types (lhs, expr) =
         convertLHS (LHSStream o e lhss) =
             (Implicit Unspecified [], LHSStream o e $ map (snd . convertLHS) lhss)
 
+        defaultKey = Just "default"
+
         -- try expression conversion by looking at the *outermost* type first
         convertExpr :: Type -> Expr -> Expr
         -- TODO: This is really a conversion for using default patterns to
@@ -298,7 +300,7 @@ convertAsgn structs types (lhs, expr) =
             convertExpr (Struct (Packed sg) fields rs) e
         convertExpr (Struct (Packed sg) fields rs) (Pattern [(Just "default", e)]) =
             if Map.notMember structTf structs then
-                Pattern [(Just "default", e)]
+                Pattern [(defaultKey, e)]
             else if null rs then
                 expanded
             else
@@ -326,9 +328,19 @@ convertAsgn structs types (lhs, expr) =
                 itemsNamed =
                     -- if the pattern does not use identifiers, use the
                     -- identifiers from the struct type definition in order
-                    if not (all (isJust . fst) itemsOrig)
-                        then zip (map (Just. snd) fields) (map snd itemsOrig)
-                        else itemsOrig
+                    if not (all (isJust . fst) itemsOrig) then
+                        zip (map (Just. snd) fields) (map snd itemsOrig)
+                    -- if the pattern has a default value, use that for any
+                    -- missing fields
+                    else if any ((== defaultKey) . fst) itemsOrig then
+                        let origValueMap = Map.fromList itemsOrig
+                            origValues = Map.delete defaultKey origValueMap
+                            defaultValue = origValueMap Map.! defaultKey
+                            defaultValues = Map.fromList $
+                                zip (map Just fieldNames) (repeat defaultValue)
+                        in Map.toList $ Map.union origValues defaultValues
+                    else
+                        itemsOrig
                 items = sortOn itemPosition $ map subMap itemsNamed
                 fieldNames = map snd fields
                 itemsFieldNames = map (fromJust . fst) items
