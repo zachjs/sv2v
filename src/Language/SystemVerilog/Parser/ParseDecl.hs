@@ -314,6 +314,10 @@ tripLookahead l0 =
     -- know we must have a valid triplet ahead
     else if null l1 || asgn /= Nothing then
         True
+    -- if there is an ident followed by some number of ranges, and that's it,
+    -- then there is a trailing declaration of an array ahead
+    else if (not $ null l1) && (null l2) then
+        True
     -- if there is a comma after the identifier (and optional ranges and
     -- assignment) that we're looking at, then we know this identifier is not a
     -- type name, as type names must be followed by a first identifier before a
