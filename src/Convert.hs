@@ -27,6 +27,7 @@ import qualified Convert.NamedBlock
 import qualified Convert.NestPI
 import qualified Convert.Package
 import qualified Convert.PackedArray
+import qualified Convert.ParamType
 import qualified Convert.RemoveComments
 import qualified Convert.Return
 import qualified Convert.StarPort
@@ -54,6 +55,7 @@ phases excludes =
     , Convert.KWArgs.convert
     , Convert.Mux.convert
     , Convert.PackedArray.convert
+    , Convert.ParamType.convert
     , Convert.StarPort.convert
     , Convert.StmtBlock.convert
     , Convert.Stream.convert
