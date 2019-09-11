@@ -36,6 +36,7 @@ convert =
 convertDescription :: Types -> Description -> Description
 convertDescription globalTypes description =
     traverseModuleItems removeTypedef $
+    traverseModuleItems convertModuleItem $
     traverseModuleItems (traverseExprs $ traverseNestedExprs $ convertExpr) $
     traverseModuleItems (traverseTypes $ resolveType types) $
     description
@@ -49,12 +50,20 @@ convertDescription globalTypes description =
         removeTypedef (MIPackageItem (Typedef _ x)) =
             MIPackageItem $ Comment $ "removed typedef: " ++ x
         removeTypedef other = other
-        convertExpr :: Expr -> Expr
-        convertExpr (Bits (Right (Ident x))) =
+        convertTypeOrExpr :: TypeOrExpr -> TypeOrExpr
+        convertTypeOrExpr (Right (Ident x)) =
             if Map.member x types
-                then Bits $ Left $ resolveType types (Alias Nothing x [])
-                else Bits $ Right $ Ident x
+                then Left $ resolveType types (Alias Nothing x [])
+                else Right $ Ident x
+        convertTypeOrExpr other = other
+        convertExpr :: Expr -> Expr
+        convertExpr (Bits v) = Bits $ convertTypeOrExpr v
         convertExpr other = other
+        convertModuleItem :: ModuleItem -> ModuleItem
+        convertModuleItem (Instance m params x r p) =
+            Instance m (map mapParam params) x r p
+            where mapParam (i, v) = (i, convertTypeOrExpr v)
+        convertModuleItem other = other
 
 resolveItem :: Types -> (Type, Identifier) -> (Type, Identifier)
 resolveItem types (t, x) = (resolveType types t, x)

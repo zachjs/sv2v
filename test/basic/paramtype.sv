@@ -88,6 +88,7 @@ module d_1; n_def #(logic [1:0], logic [2:0]) x(); endmodule
 module d_2; n_def #(.T(logic [1:0])) x(); endmodule
 module d_3; n_def #(.U(logic [1:0])) x(); endmodule
 module d_4; n_def #(.U(logic), .T(logic [1:0])) x(); endmodule
+module d_5; n_def x(); endmodule
 
 module e_1; n_tdef #(logic [1:0], logic [2:0]) x(); endmodule
 module e_2; n_tdef #(.T(logic [1:0]), .U(logic)) x(); endmodule

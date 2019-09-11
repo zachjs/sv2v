@@ -849,6 +849,13 @@ traverseTypesM mapper item =
             fullMapper t >>= \t' -> return $ MIPackageItem $ Function l t' x d s
         miMapper (MIPackageItem (other @ (Task _ _ _ _))) =
             return $ MIPackageItem other
+        miMapper (Instance m params x r p) = do
+            params' <- mapM mapParam params
+            return $ Instance m params' x r p
+            where
+                mapParam (i, Left t) =
+                    fullMapper t >>= \t' -> return (i, Left t')
+                mapParam (i, Right e) = return $ (i, Right e)
         miMapper other = return other
 
 traverseTypes :: Mapper Type -> Mapper ModuleItem
