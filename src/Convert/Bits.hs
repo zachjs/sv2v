@@ -90,7 +90,7 @@ convertExpr info (Bits (Right e)) =
         Stream _ _ exprs -> convertExpr info $ Bits $ Right $ Concat exprs
         Number n ->
             case elemIndex '\'' n of
-                Nothing -> Bits $ Right $ Number n
+                Nothing -> Number "32"
                 Just idx -> Number $ take idx n
         _ -> Bits $ Right e
 convertExpr _ other = other

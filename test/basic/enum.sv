@@ -26,10 +26,20 @@ typedef enum [0:0] {
     G_1, G_2
 } EnumG;
 
+typedef logic [3:0] Foo_t;
+typedef enum Foo_t {
+    H_1 = 'b1, H_2 = 'b0
+} EnumH;
+
 `define PRINT(name, val) \
     dummy``name = name``_``val; \
     $display("%h %h %0d %0d", \
         name``_``val, dummy``name, $bits(name``_``val), $bits(dummy``name));
+
+`define PRINT_UNSIZED(name, val) \
+    dummy``name = name``_``val; \
+    $display("%h %h %0d", \
+        name``_``val, dummy``name, $bits(dummy``name));
 
 module top;
     EnumA dummyA;
@@ -39,6 +49,7 @@ module top;
     EnumE dummyE;
     EnumF dummyF;
     EnumG dummyG;
+    EnumH dummyH;
 
     initial begin
 
@@ -70,6 +81,9 @@ module top;
 
         `PRINT(G, 1)
         `PRINT(G, 2)
+
+        `PRINT_UNSIZED(H, 1)
+        `PRINT_UNSIZED(H, 2)
 
     end
 endmodule

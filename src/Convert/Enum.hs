@@ -108,6 +108,7 @@ toBaseType :: Maybe Type -> Type
 toBaseType Nothing = defaultType
 toBaseType (Just (Implicit _ rs)) =
     fst (typeRanges defaultType) rs
+toBaseType (Just t @ (Alias _ _ _)) = t
 toBaseType (Just t) =
     if null rs
         then tf [(Number "0", Number "0")]
