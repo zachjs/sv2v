@@ -20,13 +20,14 @@ convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription description =
+convertDescription (description @ (Part _ _ _ _ _ _)) =
     traverseModuleItems
         (traverseExprs $ traverseNestedExprs $ convertExpr functions)
         description'
     where
         (description', functions) =
             runWriter $ traverseModuleItemsM traverseFunctionsM description
+convertDescription other = other
 
 traverseFunctionsM :: ModuleItem -> Writer Idents ModuleItem
 traverseFunctionsM (MIPackageItem (Function ml t f decls stmts)) = do
