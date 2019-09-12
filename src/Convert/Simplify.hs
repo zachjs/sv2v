@@ -1,8 +1,8 @@
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
- - Elaboration of ternary expressions where the condition references a
- - localparam.
+ - Elaboration of size casts and ternary expressions where the condition
+ - references a localparam.
  -
  - Our conversions generate a lot of ternary expressions. This conversion
  - attempts to make the code output a bit cleaner. Note that we can only do this
@@ -14,7 +14,7 @@
  - expression to be simplified further.
  -}
 
-module Convert.Mux (convert) where
+module Convert.Simplify (convert) where
 
 import Control.Monad.State
 import qualified Data.Map.Strict as Map
@@ -48,18 +48,25 @@ traverseExprM :: Expr -> State Info Expr
 traverseExprM = traverseNestedExprsM $ stately convertExpr
 
 convertExpr :: Info -> Expr -> Expr
+convertExpr info (Cast (Right c) e) =
+    if sized == e
+        then Cast (Right c') e
+        else sized
+    where
+        c' = simplify $ traverseNestedExprs (substitute info) (simplify c)
+        sized = sizedExpr "" c' e
 convertExpr info (Mux cc aa bb) =
     if before == after
         then Mux cc aa bb
         else simplify $ Mux after aa bb
     where
-        before = traverseNestedExprs substitute (simplify cc)
+        before = traverseNestedExprs (substitute info) (simplify cc)
         after = simplify before
-        substitute :: Expr -> Expr
-        substitute (Ident x) =
-            case Map.lookup x info of
-                Nothing -> Ident x
-                Just e-> e
-        substitute other = other
 convertExpr _ other = other
 
+substitute :: Info -> Expr -> Expr
+substitute info (Ident x) =
+    case Map.lookup x info of
+        Nothing -> Ident x
+        Just e -> e
+substitute _ other = other

@@ -217,14 +217,14 @@ endianCondRange r r1 r2 =
     )
 
 -- attempts to make a number literal have an explicit size
-sizedExpr :: Identifier -> Range -> Expr -> Expr
-sizedExpr x r (Number n) =
+sizedExpr :: Identifier -> Expr -> Expr -> Expr
+sizedExpr x s (Number n) =
     if size /= show resSize
         then error $ "literal " ++ show n ++ " for " ++ show x
                 ++ " doesn't have size " ++ show size
         else Number res
     where
-        Number size = simplify $ rangeSize r
+        Number size = simplify s
         unticked = case n of
             '\'' : rest -> rest
             rest -> rest

@@ -57,6 +57,7 @@ convertDescription globalTypes description =
                 else Right $ Ident x
         convertTypeOrExpr other = other
         convertExpr :: Expr -> Expr
+        convertExpr (Cast v e) = Cast (convertTypeOrExpr v) e
         convertExpr (Bits v) = Bits $ convertTypeOrExpr v
         convertExpr other = other
         convertModuleItem :: ModuleItem -> ModuleItem

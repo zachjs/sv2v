@@ -95,7 +95,7 @@ toItem ((mr, x), v) =
     where
         v' = if mr == Nothing
                 then simplify v
-                else sizedExpr x r (simplify v)
+                else sizedExpr x (rangeSize r) (simplify v)
         rs = maybe [] (\a -> [a]) mr
         r = defaultRange mr
         itemType = Implicit Unspecified rs

@@ -1021,8 +1021,8 @@ Expr :: { Expr }
   | Expr "?" Expr ":" Expr      { Mux $1 $3 $5 }
   | CastingType "'" "(" Expr ")" { Cast (Left            $1) $4 }
   | Number      "'" "(" Expr ")" { Cast (Right $ Number  $1) $4 }
-  |                 Identifier  "'" "(" Expr ")" { Cast (Left $ Alias (Nothing) $1 []) $4 }
-  | Identifier "::" Identifier  "'" "(" Expr ")" { Cast (Left $ Alias (Just $1) $3 []) $6 }
+  |                 Identifier  "'" "(" Expr ")" { Cast (Right $ Ident   $1   ) $4 }
+  | Identifier "::" Identifier  "'" "(" Expr ")" { Cast (Right $ PSIdent $1 $3) $6 }
   | Expr "." Identifier         { Dot $1 $3 }
   | "'" "{" PatternItems "}"    { Pattern $3 }
   | "{" StreamOp StreamSize Concat "}" { Stream $2 $3           $4 }
