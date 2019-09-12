@@ -9,13 +9,12 @@ module Convert.NestPI (convert) where
 import Control.Monad.State
 import Control.Monad.Writer
 import Data.List (isPrefixOf)
-import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type PIs = Map.Map Identifier PackageItem
+type PIs = [(Identifier, PackageItem)]
 type Idents = Set.Set Identifier
 
 convert :: [AST] -> [AST]
@@ -28,7 +27,7 @@ convert asts =
                 then curr
                 else nest next
             where
-                next = evalState (traverseM curr) Map.empty
+                next = evalState (traverseM curr) []
                 traverseM = traverseDescriptionsM traverseDescriptionM
         isPI :: Description -> Bool
         isPI (PackageItem item) = piName item /= Nothing
@@ -39,16 +38,16 @@ traverseDescriptionM :: Description -> State PIs Description
 traverseDescriptionM (PackageItem item) = do
     () <- case piName item of
         Nothing -> return ()
-        Just ident -> modify $ Map.insert ident item
+        Just ident -> modify $ flip (++) [(ident, item)]
     return $ PackageItem item
 traverseDescriptionM (orig @ (Part extern kw lifetime name ports items)) = do
     tfs <- get
     let neededPIs = Set.difference
             (Set.union usedPIs $
-                Set.filter (isPrefixOf "import ") $ Map.keysSet tfs)
+                Set.filter (isPrefixOf "import ") $ Set.fromList $ map fst tfs)
             existingPIs
-    let newItems = map MIPackageItem $ Map.elems $
-            Map.restrictKeys tfs neededPIs
+    let newItems = map MIPackageItem $ map snd $
+            filter (\(x, _) -> Set.member x neededPIs) tfs
     return $ Part extern kw lifetime name ports (newItems ++ items)
     where
         existingPIs = execWriter $ collectModuleItemsM collectPIsM orig

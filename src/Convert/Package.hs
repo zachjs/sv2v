@@ -33,7 +33,7 @@ import Convert.Traverse
 import Language.SystemVerilog.AST
 
 type Packages = Map.Map Identifier PackageItems
-type PackageItems = Map.Map Identifier PackageItem
+type PackageItems = [(Identifier, PackageItem)]
 type Idents = Set.Set Identifier
 
 convert :: [AST] -> [AST]
@@ -64,13 +64,13 @@ convertFile packages ast =
 
 globalPackageItems :: Identifier -> PackageItems -> [PackageItem]
 globalPackageItems name items =
-    map (prefixPackageItem name (packageItemIdents items)) (Map.elems items)
+    map (prefixPackageItem name (packageItemIdents items)) (map snd items)
 
 packageItemIdents :: PackageItems -> Idents
 packageItemIdents items =
     Set.union
-        (Map.keysSet items)
-        (Set.unions $ map packageItemSubIdents $ Map.elems items)
+        (Set.fromList $ map fst items)
+        (Set.unions $ map (packageItemSubIdents . snd) items)
     where
         packageItemSubIdents :: PackageItem -> Idents
         packageItemSubIdents (Typedef (Enum _ enumItems _) _) =
@@ -114,14 +114,14 @@ collectDescriptionM :: Description -> Writer Packages ()
 collectDescriptionM (Package _ name items) =
     if any isImport items
         then return ()
-        else tell $ Map.singleton name itemMap
+        else tell $ Map.singleton name itemList
     where
-        itemMap = Map.unions $ map toMap items
-        toMap :: PackageItem -> PackageItems
-        toMap item =
+        itemList = concatMap toPackageItems items
+        toPackageItems :: PackageItem -> PackageItems
+        toPackageItems item =
             case piName item of
-                Nothing -> Map.empty
-                Just x -> Map.singleton x item
+                Nothing -> []
+                Just x -> [(x, item)]
         isImport :: PackageItem -> Bool
         isImport (Import _ _) = True
         isImport _ = False
@@ -151,7 +151,7 @@ traverseModuleItem existingItemNames packages (MIPackageItem (Import x y)) =
         filterer itemName = case y of
                 Nothing -> Set.notMember itemName existingItemNames
                 Just ident -> ident == itemName
-        items = map snd $ filter (filterer . fst) $ Map.toList packageItems
+        items = map snd $ filter (filterer . fst) $ packageItems
 traverseModuleItem _ _ item =
     (traverseExprs $ traverseNestedExprs traverseExpr) $
     (traverseStmts traverseStmt) $
