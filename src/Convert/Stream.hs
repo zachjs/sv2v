@@ -7,6 +7,7 @@
 module Convert.Stream (convert) where
 
 import Control.Monad.Writer
+import Data.List.Unique (complex)
 
 import Convert.Traverse
 import Language.SystemVerilog.AST
@@ -23,12 +24,7 @@ convertDescription (description @ (Part _ _ _ _ _ _)) =
         (description', funcSet) =
             runWriter $ traverseModuleItemsM (traverseStmtsM traverseStmtM) description
         Part extern kw lifetime name ports items = description'
-        funcs = reverse $ uniq [] funcSet
-        uniq curr [] = curr
-        uniq curr (x : xs) =
-            if elem x curr
-                then uniq curr xs
-                else uniq (x : curr) xs
+        (funcs, _, _) = complex funcSet
 convertDescription other = other
 
 streamerBlock :: Expr -> Expr -> (LHS -> Expr -> Stmt) -> LHS -> Expr -> Stmt

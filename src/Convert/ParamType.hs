@@ -8,6 +8,7 @@ module Convert.ParamType (convert) where
 
 import Control.Monad.Writer
 import Data.Either (isLeft)
+import Data.List.Unique (complex)
 import Data.Maybe (isJust, isNothing, fromJust)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -32,13 +33,8 @@ convert files =
             mapM (collectDescriptionsM collectDescriptionM) files
         (files', instancesRaw) = runWriter $ mapM
             (mapM $ traverseModuleItemsM $ convertModuleItemM info) files
-        instances = reverse $ uniq [] instancesRaw
-        -- TODO: use the unique package
-        uniq curr [] = curr
-        uniq curr (x : xs) =
-            if elem x curr
-                then uniq curr xs
-                else uniq (x : curr) xs
+        instances = uniq instancesRaw
+        uniq l = l' where (l', _, _) = complex l
 
         -- add type parameter instantiations
         files'' = map (concatMap explodeDescription) files'
@@ -61,7 +57,7 @@ convert files =
         explodeDescription other = [other]
 
         -- remove or rewrite source modules that are no longer needed
-        files''' = map (reverse . uniq [] . concatMap replaceDefault) files''
+        files''' = map (uniq . concatMap replaceDefault) files''
         (usageMapRaw, usedTypedModulesRaw) =
             execWriter $ mapM (mapM collectUsageInfoM) files''
         usageMap = Map.unionsWith Set.union $ map (uncurry Map.singleton)

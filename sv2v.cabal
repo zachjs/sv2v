@@ -30,7 +30,8 @@ executable sv2v
     directory,
     filepath,
     hashable,
-    mtl
+    mtl,
+    Unique
   other-modules:
     -- SystemVerilog modules
     Language.SystemVerilog
