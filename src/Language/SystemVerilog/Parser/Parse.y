@@ -1134,7 +1134,7 @@ IncOrDecOperator :: { BinOp }
 parseError :: [Token] -> a
 parseError a = case a of
   []              -> error "Parse error: no tokens left to parse."
-  Token t s p : _ -> error $ "Parse error: unexpected token '" ++ s ++ "' (" ++ show t ++ ") at " ++ show p ++ "."
+  Token t s p : _ -> error $ show p ++ ": Parse error: unexpected token '" ++ s ++ "' (" ++ show t ++ ")"
 
 genItemsToGenItem :: [GenItem] -> GenItem
 genItemsToGenItem [x] = x
