@@ -85,6 +85,13 @@ $decimalDigit = [0-9]
 
 @string = \" (\\\"|[^\"\r\n])* \"
 
+-- Times
+
+@timeUnit = s | ms | us | ns | ps | fs
+@time
+    = @unsignedNumber @timeUnit
+    | @fixedPointNumber @timeUnit
+
 -- Identifiers
 
 @escapedIdentifier = "\" ($printable # $white)+ $white
@@ -364,6 +371,7 @@ tokens :-
 
     @number            { tok Lit_number }
     @string            { tok Lit_string }
+    @time              { tok Lit_time }
 
     "("                { tok Sym_paren_l }
     ")"                { tok Sym_paren_r }

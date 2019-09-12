@@ -281,9 +281,9 @@ data TokenName
     | Id_simple
     | Id_escaped
     | Id_system
-    | Lit_number_unsigned
     | Lit_number
     | Lit_string
+    | Lit_time
     | Sym_paren_l
     | Sym_paren_r
     | Sym_brack_l

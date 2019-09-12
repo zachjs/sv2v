@@ -281,6 +281,7 @@ escapedIdentifier  { Token Id_escaped      _ _ }
 systemIdentifier   { Token Id_system       _ _ }
 number             { Token Lit_number      _ _ }
 string             { Token Lit_string      _ _ }
+time               { Token Lit_time        _ _ }
 
 "("                { Token Sym_paren_l _ _ }
 ")"                { Token Sym_paren_r _ _ }
@@ -738,10 +739,15 @@ NonDeclPackageItem :: { [PackageItem] }
   | "export" PackageImportItems ";" { map (Export .  Just) $2 }
   | "export" "*" "::" "*" ";"       { [Export Nothing] } -- "Nothing" being no restrictions
   | ForwardTypedef ";"              { $1 }
+  | TimeunitsDeclaration            { $1 }
 ForwardTypedef :: { [PackageItem] }
   : "typedef" "enum"   Identifier { [] }
   | "typedef" "struct" Identifier { [] }
   | "typedef" "union"  Identifier { [] }
+TimeunitsDeclaration :: { [PackageItem] }
+  : "timeunit" Time          ";" { [] }
+  | "timeunit" Time "/" Time ";" { [] }
+  | "timeprecision" Time     ";" { [] }
 
 PackageImportItems :: { [(Identifier, Maybe Identifier)] }
   : PackageImportItem                        { [$1] }
@@ -969,6 +975,9 @@ Number :: { String }
 
 String :: { String }
   : string { tail $ init $ tokenString $1 }
+
+Time :: { String }
+  : time { tokenString $1 }
 
 CallArgs :: { Args }
   : {- empty -}                        { Args [            ] [] }
