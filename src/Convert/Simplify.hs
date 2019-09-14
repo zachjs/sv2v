@@ -1,8 +1,8 @@
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
- - Elaboration of size casts and ternary expressions where the condition
- - references a localparam.
+ - Elaboration of size casts, dimension query system functions, and ternary
+ - expressions where the condition references a localparam.
  -
  - Our conversions generate a lot of ternary expressions. This conversion
  - attempts to make the code output a bit cleaner. Note that we can only do this
@@ -55,6 +55,10 @@ convertExpr info (Cast (Right c) e) =
     where
         c' = simplify $ traverseNestedExprs (substitute info) (simplify c)
         sized = sizedExpr "" c' e
+convertExpr info (DimFn f v e) =
+    DimFn f v e'
+    where
+        e' = simplify $ traverseNestedExprs (substitute info) e
 convertExpr info (Mux cc aa bb) =
     if before == after
         then Mux cc aa bb

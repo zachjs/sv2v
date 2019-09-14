@@ -94,9 +94,12 @@ typeRanges (InterfaceT x my r) = (InterfaceT x my, r)
 nullRange :: Type -> ([Range] -> Type)
 nullRange t [] = t
 nullRange t [(Number "0", Number "0")] = t
-nullRange t other =
-    error $ "non vector type " ++ show t ++
-        " cannot have a range: " ++ show other
+nullRange (IntegerAtom TInteger sg) rs =
+    -- integer arrays are allowed in SystemVerilog but not in Verilor
+    IntegerVector TBit sg (rs ++ [(Number "31", Number "0")])
+nullRange t rs =
+    error $ "non-vector type " ++ show t ++
+        " cannot have a packed dimesions:" ++ show rs
 
 data Signing
     = Unspecified

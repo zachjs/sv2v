@@ -21,6 +21,7 @@ module Language.SystemVerilog.AST.Expr
     , endianCondRange
     , sizedExpr
     , dimensionsSize
+    , readNumber
     ) where
 
 import Data.List (intercalate)

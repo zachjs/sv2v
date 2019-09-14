@@ -57,8 +57,8 @@ executable sv2v
     Convert.AlwaysKW
     Convert.AsgnOp
     Convert.Assertion
-    Convert.Bits
     Convert.BlockDecl
+    Convert.DimensionQuery
     Convert.EmptyArgs
     Convert.Enum
     Convert.ForDecl

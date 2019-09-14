@@ -12,8 +12,8 @@ import qualified Job (Exclude(..))
 import qualified Convert.AlwaysKW
 import qualified Convert.AsgnOp
 import qualified Convert.Assertion
-import qualified Convert.Bits
 import qualified Convert.BlockDecl
+import qualified Convert.DimensionQuery
 import qualified Convert.EmptyArgs
 import qualified Convert.Enum
 import qualified Convert.ForDecl
@@ -45,7 +45,6 @@ phases excludes =
     [ Convert.AsgnOp.convert
     , Convert.NamedBlock.convert
     , Convert.Assertion.convert
-    , Convert.Bits.convert
     , Convert.BlockDecl.convert
     , selectExclude (Job.Logic    , Convert.Logic.convert)
     , Convert.ForDecl.convert
@@ -54,6 +53,7 @@ phases excludes =
     , Convert.IntTypes.convert
     , Convert.KWArgs.convert
     , Convert.PackedArray.convert
+    , Convert.DimensionQuery.convert
     , Convert.ParamType.convert
     , Convert.Simplify.convert
     , Convert.StarPort.convert
