@@ -115,7 +115,16 @@ $decimalDigit = [0-9]
 
 tokens :-
 
-    "$bits"            { tok KW_dollar_bits  }
+    "$bits"                { tok KW_dollar_bits                }
+    "$dimensions"          { tok KW_dollar_dimensions          }
+    "$unpacked_dimensions" { tok KW_dollar_unpacked_dimensions }
+    "$left"                { tok KW_dollar_left                }
+    "$right"               { tok KW_dollar_right               }
+    "$low"                 { tok KW_dollar_low                 }
+    "$high"                { tok KW_dollar_high                }
+    "$increment"           { tok KW_dollar_increment           }
+    "$size"                { tok KW_dollar_size                }
+
     "accept_on"        { tok KW_accept_on    }
     "alias"            { tok KW_alias        }
     "always"           { tok KW_always       }

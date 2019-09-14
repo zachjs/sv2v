@@ -26,7 +26,16 @@ import Language.SystemVerilog.Parser.Tokens
 
 %token
 
-"$bits"            { Token KW_dollar_bits  _ _ }
+"$bits"                { Token KW_dollar_bits                _ _ }
+"$dimensions"          { Token KW_dollar_dimensions          _ _ }
+"$unpacked_dimensions" { Token KW_dollar_unpacked_dimensions _ _ }
+"$left"                { Token KW_dollar_left                _ _ }
+"$right"               { Token KW_dollar_right               _ _ }
+"$low"                 { Token KW_dollar_low                 _ _ }
+"$high"                { Token KW_dollar_high                _ _ }
+"$increment"           { Token KW_dollar_increment           _ _ }
+"$size"                { Token KW_dollar_size                _ _ }
+
 "accept_on"        { Token KW_accept_on    _ _ }
 "alias"            { Token KW_alias        _ _ }
 "always"           { Token KW_always       _ _ }
@@ -1011,7 +1020,9 @@ Expr :: { Expr }
   | Number                      { Number $1 }
   |                 Identifier "(" CallArgs ")" { Call (Nothing) $1 $3 }
   | Identifier "::" Identifier "(" CallArgs ")" { Call (Just $1) $3 $5 }
-  | "$bits" "(" TypeOrExpr  ")" { Bits $3 }
+  | DimsFn "(" TypeOrExpr ")"   { DimsFn $1 $3 }
+  | DimFn  "(" TypeOrExpr ")"   { DimFn  $1 $3 (Number "1") }
+  | DimFn  "(" TypeOrExpr "," Expr ")" { DimFn $1 $3 $5 }
   | Identifier                  { Ident $1 }
   | Identifier "::" Identifier  { PSIdent $1 $3 }
   | Expr PartSelect             { Range $1 (fst $2) (snd $2) }
@@ -1088,7 +1099,7 @@ StreamOp :: { StreamOp }
   : "<<" { StreamL }
   | ">>" { StreamR }
 StreamSize :: { Expr }
-  : TypeNonIdent { Bits $ Left $1 }
+  : TypeNonIdent { DimsFn FnBits (Left $1) }
   | Expr         { $1 }
 
 GenItemOrNull :: { GenItem }
@@ -1151,6 +1162,18 @@ AsgnOp :: { AsgnOp }
 IncOrDecOperator :: { BinOp }
   : "++" { Add }
   | "--" { Sub }
+
+DimsFn :: { DimsFn }
+  : "$bits"                { FnBits               }
+  | "$dimensions"          { FnDimensions         }
+  | "$unpacked_dimensions" { FnUnpackedDimensions }
+DimFn :: { DimFn }
+  : "$left"                { FnLeft               }
+  | "$right"               { FnRight              }
+  | "$low"                 { FnLow                }
+  | "$high"                { FnHigh               }
+  | "$increment"           { FnIncrement          }
+  | "$size"                { FnSize               }
 
 {
 

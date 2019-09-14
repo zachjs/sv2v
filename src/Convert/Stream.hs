@@ -79,8 +79,8 @@ traverseAsgnM (lhs, Stream StreamR _ exprs) constructor =
     return $ constructor lhs expr
     where
         expr = Concat $ exprs ++ [Repeat delta [Number "1'b0"]]
-        size = Bits $ Right $ lhsToExpr lhs
-        exprSize = Bits $ Right (Concat exprs)
+        size = DimsFn FnBits $ Right $ lhsToExpr lhs
+        exprSize = DimsFn FnBits $ Right (Concat exprs)
         delta = BinOp Sub size exprSize
 traverseAsgnM (LHSStream StreamR _ lhss, expr) constructor =
     return $ constructor (LHSConcat lhss) expr
@@ -88,13 +88,13 @@ traverseAsgnM (lhs, Stream StreamL chunk exprs) constructor = do
     return $ streamerBlock chunk size constructor lhs expr
     where
         expr = Concat $ Repeat delta [Number "1'b0"] : exprs
-        size = Bits $ Right $ lhsToExpr lhs
-        exprSize = Bits $ Right (Concat exprs)
+        size = DimsFn FnBits $ Right $ lhsToExpr lhs
+        exprSize = DimsFn FnBits $ Right (Concat exprs)
         delta = BinOp Sub size exprSize
 traverseAsgnM (LHSStream StreamL chunk lhss, expr) constructor = do
     return $ streamerBlock chunk size constructor lhs expr
     where
         lhs = LHSConcat lhss
-        size = Bits $ Right expr
+        size = DimsFn FnBits $ Right expr
 traverseAsgnM (lhs, expr) constructor =
     return $ constructor lhs expr

@@ -446,10 +446,14 @@ convertAsgn structs types (lhs, expr) =
             (t, Cast (Left t) (snd $ convertSubExpr sub))
         convertSubExpr (Cast (Right e) sub) =
             (Implicit Unspecified [], Cast (Right e) (snd $ convertSubExpr sub))
-        convertSubExpr (Bits (Left t)) = (Implicit Unspecified [], Bits (Left t))
-        convertSubExpr (Bits (Right e)) =
-            (Implicit Unspecified [], Bits (Right e'))
-            where e' = snd $ convertSubExpr e
+        convertSubExpr (DimsFn f tore) =
+            (Implicit Unspecified [], DimsFn f tore')
+            where tore' = convertTypeOrExpr tore
+        convertSubExpr (DimFn f tore e) =
+            (Implicit Unspecified [], DimFn f tore' e')
+            where
+                tore' = convertTypeOrExpr tore
+                e' = snd $ convertSubExpr e
         convertSubExpr (Pattern items) =
             if all (== Nothing) $ map fst items'
                 then (Implicit Unspecified [], Concat $ map snd items')
@@ -458,6 +462,10 @@ convertAsgn structs types (lhs, expr) =
                 items' = map mapItem items
                 mapItem (mx, e) = (mx, snd $ convertSubExpr e)
         convertSubExpr Nil = (Implicit Unspecified [], Nil)
+
+        convertTypeOrExpr :: TypeOrExpr -> TypeOrExpr
+        convertTypeOrExpr (Left t) = Left t
+        convertTypeOrExpr (Right e) = Right $ snd $ convertSubExpr e
 
         -- lookup the range of a field in its unstructured type
         lookupUnstructRange :: TypeFunc -> Identifier -> Range

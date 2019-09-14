@@ -11,6 +11,8 @@ module Language.SystemVerilog.AST.Expr
     , TypeOrExpr
     , Args (..)
     , PartSelectMode (..)
+    , DimsFn (..)
+    , DimFn (..)
     , showAssignment
     , showRanges
     , simplify
@@ -48,7 +50,8 @@ data Expr
     | BinOp   BinOp Expr Expr
     | Mux     Expr Expr Expr
     | Cast    TypeOrExpr Expr
-    | Bits    TypeOrExpr
+    | DimsFn  DimsFn TypeOrExpr
+    | DimFn   DimFn  TypeOrExpr Expr
     | Dot     Expr Identifier
     | Pattern [(Maybe Identifier, Expr)]
     | Nil
@@ -69,9 +72,10 @@ instance Show Expr where
     show (BinOp   o a b) = printf "(%s %s %s)" (show a) (show o) (show b)
     show (Dot     e n  ) = printf "%s.%s"      (show e) n
     show (Mux     c a b) = printf "(%s ? %s : %s)" (show c) (show a) (show b)
-    show (Call   ps f l) = printf "%s%s(%s)" (maybe "" (++ "::") ps) f (show l)
-    show (Cast tore e  ) = printf "%s'(%s)" (showEither tore) (show e)
-    show (Bits tore    ) = printf "$bits(%s)" (showEither tore)
+    show (Call   ps f l) = printf "%s%s(%s)"   (maybe "" (++ "::") ps) f (show l)
+    show (Cast tore e  ) = printf "%s'(%s)"    (showEither tore) (show e)
+    show (DimsFn  f v  ) = printf "%s(%s)"     (show f) (showEither v)
+    show (DimFn   f v e) = printf "%s(%s, %s)" (show f) (showEither v) (show e)
     show (Pattern l    ) =
         printf "'{\n%s\n}" (indent $ intercalate ",\n" $ map showPatternItem l)
         where
@@ -100,6 +104,35 @@ instance Show PartSelectMode where
     show NonIndexed   = ":"
     show IndexedPlus  = "+:"
     show IndexedMinus = "-:"
+
+data DimsFn
+    = FnBits
+    | FnDimensions
+    | FnUnpackedDimensions
+    deriving (Eq, Ord)
+
+data DimFn
+    = FnLeft
+    | FnRight
+    | FnLow
+    | FnHigh
+    | FnIncrement
+    | FnSize
+    deriving (Eq, Ord)
+
+instance Show DimsFn where
+    show FnBits               = "$bits"
+    show FnDimensions         = "$dimensions"
+    show FnUnpackedDimensions = "$unpacked_dimensions"
+
+instance Show DimFn where
+    show FnLeft               = "$left"
+    show FnRight              = "$right"
+    show FnLow                = "$low"
+    show FnHigh               = "$high"
+    show FnIncrement          = "$increment"
+    show FnSize               = "$size"
+
 
 showAssignment :: Show a => Maybe a -> String
 showAssignment Nothing = ""

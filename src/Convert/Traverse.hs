@@ -411,6 +411,9 @@ traverseNestedExprsM mapper = exprMapper
         maybeExprMapper Nothing = return Nothing
         maybeExprMapper (Just e) =
             exprMapper e >>= return . Just
+        typeOrExprMapper (Left t) = return $ Left t
+        typeOrExprMapper (Right e) =
+            exprMapper e >>= return . Right
         em (String s) = return $ String s
         em (Number s) = return $ Number s
         em (Ident  i) = return $ Ident  i
@@ -456,9 +459,12 @@ traverseNestedExprsM mapper = exprMapper
             e1' <- exprMapper e1
             e2' <- exprMapper e2
             return $ Cast (Right e1') e2'
-        em (Bits (Right e)) =
-            exprMapper e >>= return . Bits . Right
-        em (Bits (Left t)) = return $ Bits (Left t)
+        em (DimsFn f tore) =
+            typeOrExprMapper tore >>= return . DimsFn f
+        em (DimFn f tore e) = do
+            tore' <- typeOrExprMapper tore
+            e' <- exprMapper e
+            return $ DimFn f tore' e'
         em (Dot e x) =
             exprMapper e >>= \e' -> return $ Dot e' x
         em (Pattern l) = do
@@ -832,10 +838,16 @@ traverseTypesM mapper item =
         fullMapper = traverseNestedTypesM mapper
         maybeMapper Nothing = return Nothing
         maybeMapper (Just t) = fullMapper t >>= return . Just
+        typeOrExprMapper (Right e) = return $ Right e
+        typeOrExprMapper (Left t) =
+            fullMapper t >>= return . Left
         exprMapper (Cast (Left t) e) =
             fullMapper t >>= \t' -> return $ Cast (Left t') e
-        exprMapper (Bits (Left t)) =
-            fullMapper t >>= return . Bits . Left
+        exprMapper (DimsFn f tore) =
+            typeOrExprMapper tore >>= return . DimsFn f
+        exprMapper (DimFn f tore e) = do
+            tore' <- typeOrExprMapper tore
+            return $ DimFn f tore' e
         exprMapper other = return other
         declMapper (Param s t x e) =
             fullMapper t >>= \t' -> return $ Param s t' x e

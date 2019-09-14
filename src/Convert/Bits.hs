@@ -26,7 +26,11 @@ import Language.SystemVerilog.AST
 type Info = Map.Map Identifier (Type, [Range])
 
 convert :: [AST] -> [AST]
-convert = map $ traverseDescriptions convertDescription
+convert files =
+    if files == files'
+        then files
+        else convert files'
+    where files' = map (traverseDescriptions convertDescription) files
 
 convertDescription :: Description -> Description
 convertDescription =
@@ -54,28 +58,28 @@ traverseExprM = traverseNestedExprsM $ stately converter
 
 -- simplify a bits expression given scoped type information
 convertExpr :: Info -> Expr -> Expr
-convertExpr _ (Bits (Left t)) =
+convertExpr _ (DimsFn FnBits (Left t)) =
     case t of
         IntegerVector _ _ rs -> dimensionsSize rs
         Implicit        _ rs -> dimensionsSize rs
         Net             _ rs -> dimensionsSize rs
-        _ -> Bits $ Left t
-convertExpr info (Bits (Right e)) =
+        _ -> DimsFn FnBits $ Left t
+convertExpr info (DimsFn FnBits (Right e)) =
     case e of
         Ident x ->
             case Map.lookup x info of
-                Nothing -> Bits $ Right e
+                Nothing -> DimsFn FnBits $ Right e
                 Just (t, rs) -> simplify $ BinOp Mul
                         (dimensionsSize rs)
-                        (convertExpr info $ Bits $ Left t)
+                        (convertExpr info $ DimsFn FnBits $ Left t)
         Concat exprs ->
             foldl (BinOp Add) (Number "0") $
             map (convertExpr info) $
-            map (Bits . Right) $
+            map (DimsFn FnBits . Right) $
             exprs
         Range expr mode range ->
             simplify $ BinOp Mul size
-                (convertExpr info $ Bits $ Right $ Bit expr (Number "0"))
+                (convertExpr info $ DimsFn FnBits $ Right $ Bit expr (Number "0"))
             where
                 size = case mode of
                     NonIndexed   -> rangeSize range
@@ -83,16 +87,16 @@ convertExpr info (Bits (Right e)) =
                     IndexedMinus -> snd range
         Bit (Ident x) idx ->
             case Map.lookup x info of
-                Nothing -> Bits $ Right $ Bit (Ident x) idx
+                Nothing -> DimsFn FnBits $ Right $ Bit (Ident x) idx
                 Just (t, rs) ->
-                    convertExpr info $ Bits $ Left t'
+                    convertExpr info $ DimsFn FnBits $ Left t'
                     where t' = popRange t rs
-        Stream _ _ exprs -> convertExpr info $ Bits $ Right $ Concat exprs
+        Stream _ _ exprs -> convertExpr info $ DimsFn FnBits $ Right $ Concat exprs
         Number n ->
             case elemIndex '\'' n of
                 Nothing -> Number "32"
                 Just idx -> Number $ take idx n
-        _ -> Bits $ Right e
+        _ -> DimsFn FnBits $ Right e
 convertExpr _ other = other
 
 -- combines the given type and dimensions and returns a new type with the

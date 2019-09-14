@@ -30,6 +30,14 @@ data Token
 
 data TokenName
     = KW_dollar_bits
+    | KW_dollar_dimensions
+    | KW_dollar_unpacked_dimensions
+    | KW_dollar_left
+    | KW_dollar_right
+    | KW_dollar_low
+    | KW_dollar_high
+    | KW_dollar_increment
+    | KW_dollar_size
     | KW_accept_on
     | KW_alias
     | KW_always

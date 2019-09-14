@@ -101,7 +101,7 @@ convertDescription ports orig =
                             collectNestedExprsM exprIdents expr
                         tmp = "sv2v_tmp_" ++ instanceName ++ "_" ++ portName
                         tmpExpr = Ident tmp
-                        t = Net TWire [(Bits $ Right expr, Number "1")]
+                        t = Net TWire [(DimsFn FnBits $ Right expr, Number "1")]
                         items =
                             [ MIPackageItem $ Decl $ Variable Local t tmp [] Nothing
                             , AlwaysC AlwaysComb $ AsgnBlk AsgnOpEq lhs tmpExpr]

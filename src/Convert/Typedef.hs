@@ -58,7 +58,8 @@ convertDescription globalTypes description =
         convertTypeOrExpr other = other
         convertExpr :: Expr -> Expr
         convertExpr (Cast v e) = Cast (convertTypeOrExpr v) e
-        convertExpr (Bits v) = Bits $ convertTypeOrExpr v
+        convertExpr (DimsFn f v) = DimsFn f (convertTypeOrExpr v)
+        convertExpr (DimFn f v e) = DimFn f (convertTypeOrExpr v) e
         convertExpr other = other
         convertModuleItem :: ModuleItem -> ModuleItem
         convertModuleItem (Instance m params x r p) =
