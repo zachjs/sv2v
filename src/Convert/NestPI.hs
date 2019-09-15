@@ -6,9 +6,9 @@
 
 module Convert.NestPI (convert) where
 
-import Control.Monad.State
 import Control.Monad.Writer
 import Data.List (isPrefixOf)
+import Data.List.Unique (complex)
 import qualified Data.Set as Set
 
 import Convert.Traverse
@@ -18,37 +18,35 @@ type PIs = [(Identifier, PackageItem)]
 type Idents = Set.Set Identifier
 
 convert :: [AST] -> [AST]
-convert asts =
-    map (filter (not . isPI) . nest) asts
+convert =
+    map (filter (not . isPI)) . nest
     where
-        nest :: AST -> AST
+        nest :: [AST] -> [AST]
         nest curr =
             if next == curr
                 then curr
                 else nest next
             where
-                next = evalState (traverseM curr) []
-                traverseM = traverseDescriptionsM traverseDescriptionM
+                next = traverseFiles
+                    (collectDescriptionsM collectDescriptionM)
+                    (traverseDescriptions . convertDescription)
+                    curr
         isPI :: Description -> Bool
         isPI (PackageItem item) = piName item /= Nothing
         isPI _ = False
 
--- collects and nests in tasks and functions missing from modules
-traverseDescriptionM :: Description -> State PIs Description
-traverseDescriptionM (PackageItem item) = do
-    () <- case piName item of
+-- collects packages items missing
+collectDescriptionM :: Description -> Writer PIs ()
+collectDescriptionM (PackageItem item) = do
+    case piName item of
         Nothing -> return ()
-        Just ident -> modify $ flip (++) [(ident, item)]
-    return $ PackageItem item
-traverseDescriptionM (orig @ (Part extern kw lifetime name ports items)) = do
-    tfs <- get
-    let neededPIs = Set.difference
-            (Set.union usedPIs $
-                Set.filter (isPrefixOf "import ") $ Set.fromList $ map fst tfs)
-            existingPIs
-    let newItems = map MIPackageItem $ map snd $
-            filter (\(x, _) -> Set.member x neededPIs) tfs
-    return $ Part extern kw lifetime name ports (newItems ++ items)
+        Just ident -> tell [(ident, item)]
+collectDescriptionM _ = return ()
+
+-- nests packages items missing from modules
+convertDescription :: PIs -> Description -> Description
+convertDescription pis (orig @ (Part extern kw lifetime name ports items)) =
+    Part extern kw lifetime name ports (newItems ++ items)
     where
         existingPIs = execWriter $ collectModuleItemsM collectPIsM orig
         runner f = execWriter $ collectModuleItemsM f orig
@@ -57,7 +55,14 @@ traverseDescriptionM (orig @ (Part extern kw lifetime name ports items)) = do
             , collectTypesM $ collectNestedTypesM collectTypenamesM
             , collectExprsM $ collectNestedExprsM collectIdentsM
             ]
-traverseDescriptionM other = return other
+        neededPIs = Set.difference
+            (Set.union usedPIs $
+                Set.filter (isPrefixOf "import ") $ Set.fromList $ map fst pis)
+            existingPIs
+        uniq l = l' where (l', _, _) = complex l
+        newItems = uniq $ map MIPackageItem $ map snd $
+            filter (\(x, _) -> Set.member x neededPIs) pis
+convertDescription _ other = other
 
 -- writes down the names of package items
 collectPIsM :: ModuleItem -> Writer Idents ()
