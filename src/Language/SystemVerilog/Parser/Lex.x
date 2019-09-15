@@ -458,6 +458,7 @@ tokens :-
     "<<<"              { tok Sym_lt_lt_lt }
     "<<="              { tok Sym_lt_lt_eq }
     ">>="              { tok Sym_gt_gt_eq }
+    "<->"              { tok Sym_lt_dash_gt }
     "|->"              { tok Sym_bar_dash_gt }
     "|=>"              { tok Sym_bar_eq_gt }
     "[->"              { tok Sym_brack_l_dash_gt }

@@ -366,6 +366,7 @@ time               { Token Lit_time        _ _ }
 "<<<"              { Token Sym_lt_lt_lt _ _ }
 "<<="              { Token Sym_lt_lt_eq _ _ }
 ">>="              { Token Sym_gt_gt_eq _ _ }
+"<->"              { Token Sym_lt_dash_gt _ _ }
 "|->"              { Token Sym_bar_dash_gt _ _ }
 "|=>"              { Token Sym_bar_eq_gt _ _ }
 "[->"              { Token Sym_brack_l_dash_gt _ _ }
@@ -391,6 +392,7 @@ time               { Token Lit_time        _ _ }
 %right "throughout"
 %left "##"
 %nonassoc "[*]" "[=]" "[->]"
+%right "->" "<->"
 %right "?" ":"
 %left  "||"
 %left  "&&"
@@ -1042,6 +1044,8 @@ Expr :: { Expr }
   -- binary expressions
   | Expr "||"  Expr { BinOp LogOr  $1 $3 }
   | Expr "&&"  Expr { BinOp LogAnd $1 $3 }
+  | Expr "->"  Expr { BinOp LogImp $1 $3 }
+  | Expr "<->" Expr { BinOp LogEq  $1 $3 }
   | Expr "|"   Expr { BinOp BitOr  $1 $3 }
   | Expr "^"   Expr { BinOp BitXor $1 $3 }
   | Expr "&"   Expr { BinOp BitAnd $1 $3 }

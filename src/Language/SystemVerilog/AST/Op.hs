@@ -40,6 +40,8 @@ instance Show UniOp where
 data BinOp
     = LogAnd
     | LogOr
+    | LogImp
+    | LogEq
     | BitAnd
     | BitXor
     | BitXnor
@@ -69,6 +71,8 @@ data BinOp
 instance Show BinOp where
     show LogAnd  = "&&"
     show LogOr   = "||"
+    show LogImp  = "->"
+    show LogEq   = "<->"
     show BitAnd  = "&"
     show BitXor  = "^"
     show BitXnor = "~^"

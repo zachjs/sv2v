@@ -366,6 +366,7 @@ data TokenName
     | Sym_lt_lt_lt
     | Sym_lt_lt_eq
     | Sym_gt_gt_eq
+    | Sym_lt_dash_gt
     | Sym_bar_dash_gt
     | Sym_bar_eq_gt
     | Sym_pound_dash_pound

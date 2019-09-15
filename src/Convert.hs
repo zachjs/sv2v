@@ -22,6 +22,7 @@ import qualified Convert.Interface
 import qualified Convert.IntTypes
 import qualified Convert.KWArgs
 import qualified Convert.Logic
+import qualified Convert.LogOp
 import qualified Convert.NamedBlock
 import qualified Convert.NestPI
 import qualified Convert.Package
@@ -52,6 +53,7 @@ phases excludes =
     , Convert.EmptyArgs.convert
     , Convert.IntTypes.convert
     , Convert.KWArgs.convert
+    , Convert.LogOp.convert
     , Convert.PackedArray.convert
     , Convert.DimensionQuery.convert
     , Convert.ParamType.convert

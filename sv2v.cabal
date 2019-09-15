@@ -67,6 +67,7 @@ executable sv2v
     Convert.IntTypes
     Convert.KWArgs
     Convert.Logic
+    Convert.LogOp
     Convert.NamedBlock
     Convert.NestPI
     Convert.Package
