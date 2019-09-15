@@ -8,7 +8,7 @@ import System.IO
 import System.Exit
 
 import Data.List (elemIndex)
-import Job (readJob, files, exclude, incdir, define, oneunit)
+import Job (readJob, files, exclude, incdir, define, siloed)
 import Convert (convert)
 import Language.SystemVerilog.Parser (parseFiles)
 
@@ -25,7 +25,7 @@ main = do
     let includePaths = incdir job
     let defines = map splitDefine $ define job
     let singleton = \x -> [x]
-    let toFileLists = if oneunit job then singleton else map singleton
+    let toFileLists = if siloed job then map singleton else singleton
     astLists <- mapM
         (parseFiles includePaths defines)
         (toFileLists $ files job)

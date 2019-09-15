@@ -67,15 +67,18 @@ Below is the current usage printout. This interface is subject to change.
 ```
 sv2v [OPTIONS] [FILES]
 
-Common flags:
-  -e --exclude=CONV         exclude a particular conversion (always,
+Preprocessing:
+  -I --incdir=DIR           Add directory to include search path
+  -D --define=NAME[=VALUE]  Define a macro for preprocessing
+     --siloed               Lex input files separately, so macros from
+                            earlier files are not defined in later files
+Conversion:
+  -E --exclude=CONV         Exclude a particular conversion (always,
                             interface, or logic)
-  -i --incdir=DIR           add directory to include search path
-  -d --define=NAME[=VALUE]  define a macro for preprocessing
-  -o --oneunit              put all files in one compilation unit, so macros
-                            from earlier files remain defined in later files
-  -? --help                 Display help message
-  -V --version              Print version information
+  -v --verbose              Retain certain conversion artifacts
+Other:
+     --help                 Display help message
+     --version              Print version information
      --numeric-version      Print just the version number
 ```
 
