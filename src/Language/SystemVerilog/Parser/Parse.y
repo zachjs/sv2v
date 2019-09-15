@@ -802,7 +802,7 @@ DimensionsNonEmpty :: { [Range] }
   | DimensionsNonEmpty Dimension { $1 ++ [$2] }
 Dimension :: { Range }
   : Range        { $1 }
-  | "[" Expr "]" { (simplify $  BinOp Sub $2 (Number "1"), Number "0") }
+  | "[" Expr "]" { (Number "0", BinOp Sub $2 (Number "1")) }
 
 DeclAsgns :: { [(Identifier, Expr, [Range])] }
   : DeclAsgn               { [$1] }

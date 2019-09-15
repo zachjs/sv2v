@@ -14,3 +14,20 @@ module foo(clock, data);
         data[0][0] = ~data[0][0];
     end
 endmodule
+
+module top;
+  logic [10:0] data [5];
+    reg clock;
+    foo f(clock, data);
+
+    initial begin
+        clock = 1;
+        forever #1 clock = ~clock;
+    end
+
+    initial begin : foo
+        $monitor("%d %b%b%b%b%b", $time, data[0], data[1], data[2], data[3], data[4]);
+        #100;
+        $finish();
+    end
+endmodule

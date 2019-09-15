@@ -357,7 +357,7 @@ takeRanges (token : tokens) =
         _                       -> ([]            , token : tokens)
     where
         (rs, rest) = takeRanges tokens
-        asRange s = (simplify $ BinOp Sub s (Number "1"), Number "0")
+        asRange s = (Number "0", BinOp Sub s (Number "1"))
 
 -- Matching DTAsgnNBlk here allows tripLookahead to work both for standard
 -- declarations and in `parseDTsAsDeclOrAsgn`, where we're checking for an
