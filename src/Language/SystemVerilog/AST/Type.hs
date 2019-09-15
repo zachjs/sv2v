@@ -95,7 +95,10 @@ nullRange :: Type -> ([Range] -> Type)
 nullRange t [] = t
 nullRange t [(Number "0", Number "0")] = t
 nullRange (IntegerAtom TInteger sg) rs =
-    -- integer arrays are allowed in SystemVerilog but not in Verilor
+    -- integer arrays are allowed in SystemVerilog but not in Verilog
+    IntegerVector TBit sg (rs ++ [(Number "31", Number "0")])
+nullRange (IntegerAtom TInt sg) rs =
+    -- int arrays are allowed in SystemVerilog but not in Verilog
     IntegerVector TBit sg (rs ++ [(Number "31", Number "0")])
 nullRange t rs =
     error $ "non-vector type " ++ show t ++

@@ -884,6 +884,7 @@ StmtNonAsgn :: { Stmt }
   | "repeat" "(" Expr ")" Stmt                 { RepeatL $3 $5 }
   | "do"      Stmt "while" "(" Expr ")" ";"    { DoWhile $5 $2 }
   | "forever" Stmt                             { Forever $2 }
+  | "foreach" "(" Identifier IdxVars ")" Stmt  { Foreach $3 $4 $6 }
   | "->" Identifier ";"                        { Trigger $2 }
   | AttributeInstance Stmt                     { StmtAttr $1 $2 }
   | ProceduralAssertionStatement               { Assertion $1 }
@@ -904,6 +905,12 @@ ForStepAssignment :: { (LHS, AsgnOp, Expr) }
   : LHS AsgnOp Expr { ($1, $2, $3) }
   | IncOrDecOperator LHS { ($2, AsgnOp $1, Number "1") }
   | LHS IncOrDecOperator { ($1, AsgnOp $2, Number "1") }
+
+IdxVars :: { [Maybe Identifier] }
+  : "[" IdxVarsInside "]" { $2 }
+IdxVarsInside :: { [Maybe Identifier] }
+  : opt(Identifier)                   { [$1] }
+  | opt(Identifier) "," IdxVarsInside { $1 : $3 }
 
 DeclsAndStmts :: { ([Decl], [Stmt]) }
   : DeclOrStmt DeclsAndStmts { combineDeclsAndStmts $1 $2 }

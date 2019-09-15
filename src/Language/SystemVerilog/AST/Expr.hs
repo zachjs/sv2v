@@ -162,6 +162,8 @@ readNumber n =
 -- basic expression simplfication utility to help us generate nicer code in the
 -- common case of ranges like `[FOO-1:0]`
 simplify :: Expr -> Expr
+simplify (UniOp LogNot (Number "1")) = Number "0"
+simplify (UniOp LogNot (Number "0")) = Number "1"
 simplify (Repeat (Number "0") _) = Concat []
 simplify (Concat [expr]) = expr
 simplify (Concat exprs) =
@@ -170,23 +172,17 @@ simplify (orig @ (Call Nothing "$clog2" (Args [Just (Number n)] []))) =
     case readNumber n of
         Nothing -> orig
         Just x -> Number $ show $ clog2 x
-simplify (Mux (Number "0") e _) = e
-simplify (Mux (BinOp Ge c1 c2) e1 e2) =
-    case (c1', c2') of
-        (Number a, Number b) ->
-            case (readNumber a, readNumber b) of
-                (Just x, Just y) ->
-                    if x >= y
-                        then e1
-                        else e2
-                _ -> nochange
-        _ -> nochange
+simplify (Mux cc e1 e2) =
+    case cc' of
+        Number "1" -> e1'
+        Number "0" -> e2'
+        _ -> Mux cc' e1' e2'
     where
-        c1' = simplify c1
-        c2' = simplify c2
+        cc' = simplify cc
         e1' = simplify e1
         e2' = simplify e2
-        nochange = Mux (BinOp Ge c1' c2') e1' e2'
+simplify (Range e NonIndexed r) = Range e NonIndexed r
+simplify (Range e _ (i, Number "0")) = Bit e i
 simplify (BinOp Sub (Number n1) (BinOp Sub (Number n2) e)) =
     simplify $ BinOp Add (BinOp Sub (Number n1) (Number n2)) e
 simplify (BinOp Sub (Number n1) (BinOp Sub e (Number n2))) =
@@ -211,21 +207,30 @@ simplify (BinOp op e1 e2) =
         (Add, BinOp Sub e (Number "1"), Number "1") -> e
         (Add, e, BinOp Sub (Number "0") (Number "1")) -> BinOp Sub e (Number "1")
         (_  , Number a, Number b) ->
-            case (op, readNumber a, readNumber b) of
+            case (op, readNumber a :: Maybe Int, readNumber b :: Maybe Int) of
                 (Add, Just x, Just y) -> Number $ show (x + y)
                 (Sub, Just x, Just y) -> Number $ show (x - y)
                 (Mul, Just x, Just y) -> Number $ show (x * y)
                 (Div, Just _, Just 0) -> Number "x"
                 (Div, Just x, Just y) -> Number $ show (x `quot` y)
+                (Eq , Just x, Just y) -> bool $ x == y
+                (Ne , Just x, Just y) -> bool $ x /= y
+                (Gt , Just x, Just y) -> bool $ x >  y
+                (Ge , Just x, Just y) -> bool $ x >= y
+                (Lt , Just x, Just y) -> bool $ x <  y
+                (Le , Just x, Just y) -> bool $ x <= y
                 _ -> BinOp op e1' e2'
         (Add, BinOp Add e (Number a), Number b) ->
             case (readNumber a, readNumber b) of
                 (Just x, Just y) -> BinOp Add e $ Number $ show (x + y)
                 _ -> BinOp op e1' e2'
+        (Sub, e, Number "-1") -> BinOp Add e (Number "1")
         _ -> BinOp op e1' e2'
     where
         e1' = simplify e1
         e2' = simplify e2
+        bool True = Number "1"
+        bool False = Number "0"
 simplify other = other
 
 rangeSize :: Range -> Expr
@@ -258,7 +263,10 @@ sizedExpr x s (Number n) =
                 ++ " doesn't have size " ++ show size
         else Number res
     where
-        Number size = simplify s
+        size =
+            case simplify s of
+                Number v -> v
+                other -> error $ "could not simplify sizedExpr: " ++ show other
         unticked = case n of
             '\'' : rest -> rest
             rest -> rest

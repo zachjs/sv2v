@@ -17,6 +17,7 @@ import qualified Convert.DimensionQuery
 import qualified Convert.EmptyArgs
 import qualified Convert.Enum
 import qualified Convert.ForDecl
+import qualified Convert.Foreach
 import qualified Convert.FuncRet
 import qualified Convert.Interface
 import qualified Convert.IntTypes
@@ -69,6 +70,7 @@ phases excludes =
     , Convert.Enum.convert
     , Convert.NestPI.convert
     , Convert.Return.convert
+    , Convert.Foreach.convert
     , selectExclude (Job.Interface, Convert.Interface.convert)
     , selectExclude (Job.Always   , Convert.AlwaysKW.convert)
     , selectExclude (Job.Succinct , Convert.RemoveComments.convert)

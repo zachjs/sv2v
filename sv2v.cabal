@@ -62,6 +62,7 @@ executable sv2v
     Convert.EmptyArgs
     Convert.Enum
     Convert.ForDecl
+    Convert.Foreach
     Convert.FuncRet
     Convert.Interface
     Convert.IntTypes

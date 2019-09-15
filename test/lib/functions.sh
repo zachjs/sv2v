@@ -113,8 +113,8 @@ simulateAndCompare() {
     # simulate and compare the two files
     simulate "$ref_vcd" "$ref_log" top "$ve" "$tb"
     simulate "$gen_vcd" "$gen_log" top "$cv" "$tb"
-    diff "$ref_vcd" "$gen_vcd" > /dev/null
-    assertTrue "VCDs are different" $?
+    output=`diff "$ref_vcd" "$gen_vcd"`
+    assertTrue "VCDs are different:\n$output" $?
     output=`diff "$ref_log" "$gen_log"`
     assertTrue "Simulation outputs differ:\n$output" $?
 }

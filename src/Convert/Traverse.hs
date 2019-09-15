@@ -235,6 +235,7 @@ traverseSinglyNestedStmtsM fullMapper = cs
         cs (RepeatL e stmt) = fullMapper stmt >>= return . RepeatL e
         cs (DoWhile e stmt) = fullMapper stmt >>= return . DoWhile e
         cs (Forever   stmt) = fullMapper stmt >>= return . Forever
+        cs (Foreach x vars stmt) = fullMapper stmt >>= return . Foreach x vars
         cs (If u e s1 s2) = do
             s1' <- fullMapper s1
             s2' <- fullMapper s2
@@ -682,6 +683,7 @@ traverseStmtExprsM exprMapper = flatStmtMapper
     flatStmtMapper (DoWhile e stmt) =
         exprMapper e >>= \e' -> return $ DoWhile e' stmt
     flatStmtMapper (Forever   stmt) = return $ Forever stmt
+    flatStmtMapper (Foreach x vars stmt) = return $ Foreach x vars stmt
     flatStmtMapper (If u cc s1 s2) =
         exprMapper cc >>= \cc' -> return $ If u cc' s1 s2
     flatStmtMapper (Timing event stmt) = return $ Timing event stmt

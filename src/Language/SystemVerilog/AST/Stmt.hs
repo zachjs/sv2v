@@ -43,6 +43,7 @@ data Stmt
     | RepeatL Expr Stmt
     | DoWhile Expr Stmt
     | Forever Stmt
+    | Foreach Identifier [Maybe Identifier] Stmt
     | If      (Maybe UniquePriority) Expr Stmt Stmt
     | Timing  Timing Stmt
     | Return  Expr
@@ -86,6 +87,7 @@ instance Show Stmt where
     show (RepeatL e s) = printf "repeat (%s) %s" (show e) (show s)
     show (DoWhile e s) = printf "do %s while (%s);" (show s) (show e)
     show (Forever s  ) = printf "forever %s" (show s)
+    show (Foreach x i s) = printf "foreach (%s [ %s ]) %s" x (commas $ map (maybe "" id) i) (show s)
     show (If u a b Null) = printf "%sif (%s) %s"          (maybe "" showPad u) (show a) (show b)
     show (If u a b c   ) = printf "%sif (%s) %s\nelse %s" (maybe "" showPad u) (show a) (show b) (show c)
     show (Return e   ) = printf "return %s;" (show e)
