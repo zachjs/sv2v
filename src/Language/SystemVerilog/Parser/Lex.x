@@ -518,12 +518,12 @@ lexFile includePaths env path = do
 alexEOF :: Alex ()
 alexEOF = return ()
 
--- raises an alexError with the current file position appended
+-- raises an alexError with the current file position
 lexicalError :: String -> Alex a
 lexicalError msg = do
     (pn, _, _, _) <- alexGetInput
     pos <- toTokPos pn
-    alexError $ show pos ++ "error: " ++ msg
+    alexError $ show pos ++ ": Lexical error: " ++ msg
 
 -- get the current user state
 get :: Alex AlexUserState
