@@ -147,7 +147,7 @@ convertBits _ (Left t) =
     case elaborateType t of
         IntegerVector _ _ rs -> dimensionsSize rs
         Implicit        _ rs -> dimensionsSize rs
-        Net             _ rs -> dimensionsSize rs
+        Net           _ _ rs -> dimensionsSize rs
         _ -> DimsFn FnBits $ Left t
 convertBits info (Right e) =
     case e of

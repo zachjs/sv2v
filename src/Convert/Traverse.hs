@@ -808,7 +808,7 @@ traverseNestedTypesM mapper = fullMapper
     where
         fullMapper t = tm t >>= mapper
         tm (Alias      ps xx    rs) = return $ Alias      ps xx    rs
-        tm (Net           kw    rs) = return $ Net           kw    rs
+        tm (Net           kw sg rs) = return $ Net           kw sg rs
         tm (Implicit         sg rs) = return $ Implicit         sg rs
         tm (IntegerVector kw sg rs) = return $ IntegerVector kw sg rs
         tm (IntegerAtom   kw sg   ) = return $ IntegerAtom   kw sg

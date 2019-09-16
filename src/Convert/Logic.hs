@@ -101,7 +101,7 @@ convertDescription ports orig =
                             collectNestedExprsM exprIdents expr
                         tmp = "sv2v_tmp_" ++ instanceName ++ "_" ++ portName
                         tmpExpr = Ident tmp
-                        t = Net TWire [(DimsFn FnBits $ Right expr, Number "1")]
+                        t = Net TWire Unspecified [(DimsFn FnBits $ Right expr, Number "1")]
                         items =
                             [ MIPackageItem $ Decl $ Variable Local t tmp [] Nothing
                             , AlwaysC AlwaysComb $ AsgnBlk AsgnOpEq lhs tmpExpr]
@@ -118,7 +118,7 @@ convertDescription ports orig =
             where
                 t = if sg /= Unspecified || Set.member ident idents
                     then IntegerVector TReg sg
-                    else Net TWire
+                    else Net TWire sg
         convertModuleItem other = other
         -- all other logics (i.e. inside of functions) become regs
         convertDecl :: Decl -> Decl

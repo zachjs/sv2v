@@ -71,7 +71,7 @@ resolveItem :: Types -> (Type, Identifier) -> (Type, Identifier)
 resolveItem types (t, x) = (resolveType types t, x)
 
 resolveType :: Types -> Type -> Type
-resolveType _ (Net           kw    rs) = Net           kw    rs
+resolveType _ (Net           kw sg rs) = Net           kw sg rs
 resolveType _ (Implicit         sg rs) = Implicit         sg rs
 resolveType _ (IntegerVector kw sg rs) = IntegerVector kw sg rs
 resolveType _ (IntegerAtom   kw sg   ) = IntegerAtom   kw sg
@@ -86,7 +86,7 @@ resolveType types (Alias Nothing st rs1) =
     if Map.notMember st types
     then Alias Nothing st rs1
     else case resolveType types $ types Map.! st of
-        (Net           kw    rs2) -> Net           kw    $ rs1 ++ rs2
+        (Net           kw sg rs2) -> Net           kw sg $ rs1 ++ rs2
         (Implicit         sg rs2) -> Implicit         sg $ rs1 ++ rs2
         (IntegerVector kw sg rs2) -> IntegerVector kw sg $ rs1 ++ rs2
         (Enum            t v rs2) -> Enum            t v $ rs1 ++ rs2

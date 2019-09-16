@@ -432,7 +432,7 @@ Type :: { Type }
 TypeNonIdent :: { Type }
   : PartialType OptSigning Dimensions { $1 $2 $3 }
 PartialType :: { Signing -> [Range] -> Type }
-  : NetType                                 { \Unspecified ->        Net           $1    }
+  : NetType                                 {                        Net           $1    }
   | IntegerVectorType                       {                        IntegerVector $1    }
   | IntegerAtomType                         { \sg          -> \[] -> IntegerAtom   $1 sg }
   | NonIntegerType                          { \Unspecified -> \[] -> NonInteger    $1    }

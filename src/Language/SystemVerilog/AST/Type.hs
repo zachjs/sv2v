@@ -33,7 +33,7 @@ data Type
     = IntegerVector IntegerVectorType  Signing [Range]
     | IntegerAtom   IntegerAtomType    Signing
     | NonInteger    NonIntegerType
-    | Net           NetType                    [Range]
+    | Net           NetType            Signing [Range]
     | Implicit                         Signing [Range]
     | Alias    (Maybe Identifier) Identifier   [Range]
     | Enum     (Maybe Type) [Item]             [Range]
@@ -44,7 +44,7 @@ data Type
 
 instance Show Type where
     show (Alias      ps xx    rs) = printf "%s%s%s" (maybe "" (++ "::") ps)  xx  (showRanges rs)
-    show (Net           kw    rs) = printf "%s%s"   (show kw)                    (showRanges rs)
+    show (Net           kw sg rs) = printf "%s%s%s" (show kw) (showPadBefore sg) (showRanges rs)
     show (Implicit         sg rs) = printf "%s%s"             (showPad       sg) (dropWhile (== ' ') $ showRanges rs)
     show (IntegerVector kw sg rs) = printf "%s%s%s" (show kw) (showPadBefore sg) (showRanges rs)
     show (IntegerAtom   kw sg   ) = printf "%s%s"   (show kw) (showPadBefore sg)
@@ -81,7 +81,7 @@ instance Ord (Signing -> [Range] -> Type) where
 
 typeRanges :: Type -> ([Range] -> Type, [Range])
 typeRanges (Alias      ps xx    rs) = (Alias      ps xx   , rs)
-typeRanges (Net           kw    rs) = (Net           kw   , rs)
+typeRanges (Net           kw sg rs) = (Net           kw sg, rs)
 typeRanges (Implicit         sg rs) = (Implicit         sg, rs)
 typeRanges (IntegerVector kw sg rs) = (IntegerVector kw sg, rs)
 typeRanges (IntegerAtom   kw sg   ) = (nullRange $ IntegerAtom kw sg, [])

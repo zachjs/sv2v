@@ -218,7 +218,7 @@ isSimpleType :: Type -> Bool
 isSimpleType (IntegerVector _ _ _) = True
 isSimpleType (IntegerAtom   _ _  ) = True
 isSimpleType (NonInteger    _    ) = True
-isSimpleType (Net           _ _  ) = True
+isSimpleType (Net           _ _ _) = True
 isSimpleType _ = False
 
 -- attempt to rewrite instantiations with type parameters
