@@ -1,4 +1,4 @@
-module top;
+(* a=1 *) module top;
     (* foo="bar" *) reg x;
     initial begin
         x = 1;

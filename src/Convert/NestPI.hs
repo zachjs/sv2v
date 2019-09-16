@@ -45,9 +45,10 @@ collectDescriptionM _ = return ()
 
 -- nests packages items missing from modules
 convertDescription :: PIs -> Description -> Description
-convertDescription pis (orig @ (Part extern kw lifetime name ports items)) =
-    Part extern kw lifetime name ports (newItems ++ items)
+convertDescription pis (orig @ Part{}) =
+    Part attrs extern kw lifetime name ports (newItems ++ items)
     where
+        Part attrs extern kw lifetime name ports items = orig
         existingPIs = execWriter $ collectModuleItemsM collectPIsM orig
         runner f = execWriter $ collectModuleItemsM f orig
         usedPIs = Set.unions $ map runner $

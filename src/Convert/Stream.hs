@@ -18,12 +18,12 @@ convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription (description @ (Part _ _ _ _ _ _)) =
-    Part extern kw lifetime name ports (items ++ funcs)
+convertDescription (description @ Part{}) =
+    Part attrs extern kw lifetime name ports (items ++ funcs)
     where
         (description', funcSet) =
             runWriter $ traverseModuleItemsM (traverseStmtsM traverseStmtM) description
-        Part extern kw lifetime name ports items = description'
+        Part attrs extern kw lifetime name ports items = description'
         (funcs, _, _) = complex funcSet
 convertDescription other = other
 

@@ -25,7 +25,7 @@ convert =
     where
         getTypedef :: Description -> Writer Types ()
         getTypedef (PackageItem (Typedef a b)) = tell $ Map.singleton b a
-        getTypedef (Part _ Interface _ x _ _) =
+        getTypedef (Part _ _ Interface _ x _ _) =
             tell $ Map.singleton x (InterfaceT x Nothing [])
         getTypedef _ = return ()
         removeTypedef :: Description -> Description

@@ -29,7 +29,7 @@ convert =
             map (convertDescription interfaces modules)
         -- we can only collect/map non-extern interfaces
         collectDesc :: Description -> Writer (Interfaces, Modules) ()
-        collectDesc (orig @ (Part False kw _ name ports items)) = do
+        collectDesc (orig @ (Part _ False kw _ name ports items)) = do
             if kw == Interface
                 then tell (Map.singleton name (ports, items), Map.empty)
                 else collectModuleItemsM (collectDeclsM $ collectDecl name) orig
@@ -39,12 +39,12 @@ convert =
             tell (Map.empty, Map.singleton (name, ident) t)
         collectDecl _ _ = return ()
         isInterface :: Description -> Bool
-        isInterface (Part False Interface _ _ _ _) = True
+        isInterface (Part _ False Interface _ _ _ _) = True
         isInterface _ = False
 
 convertDescription :: Interfaces -> Modules -> Description -> Description
-convertDescription interfaces modules (Part extern Module lifetime name ports items) =
-    Part extern Module lifetime name ports' items'
+convertDescription interfaces modules (Part attrs extern Module lifetime name ports items) =
+    Part attrs extern Module lifetime name ports' items'
     where
         items' =
             map (traverseNestedModuleItems $ traverseExprs' ExcludeTFs (traverseNestedExprs $ convertExpr instances modports)) $

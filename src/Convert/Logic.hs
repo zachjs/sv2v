@@ -42,7 +42,7 @@ convert =
         (traverseDescriptions . convertDescription)
     where
         collectPortsM :: Description -> Writer Ports ()
-        collectPortsM (orig @ (Part _ _ _ name portNames _)) =
+        collectPortsM (orig @ (Part _ _ _ _ name portNames _)) =
             collectModuleItemsM collectPortDirsM orig
             where
                 collectPortDirsM :: ModuleItem -> Writer Ports ()
@@ -64,8 +64,8 @@ convertDescription ports orig =
         else orig
     where
         shouldConvert = case orig of
-            Part _ Interface _ _ _ _ -> False
-            Part _ Module _ _ _ _ -> True
+            Part _ _ Interface _ _ _ _ -> False
+            Part _ _ Module _ _ _ _ -> True
             PackageItem _ -> True
             Package _ _ _ -> False
             Directive _ -> False

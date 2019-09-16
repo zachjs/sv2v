@@ -119,10 +119,10 @@ maybeDo _ Nothing = return Nothing
 maybeDo fun (Just val) = fun val >>= return . Just
 
 traverseModuleItemsM :: Monad m => MapperM m ModuleItem -> MapperM m Description
-traverseModuleItemsM mapper (Part extern kw lifetime name ports items) = do
+traverseModuleItemsM mapper (Part attrs extern kw lifetime name ports items) = do
     items' <- mapM fullMapper items
     let items'' = concatMap breakGenerate items'
-    return $ Part extern kw lifetime name ports items''
+    return $ Part attrs extern kw lifetime name ports items''
     where
         fullMapper (Generate [GenBlock Nothing genItems]) =
             mapM fullGenItemMapper genItems >>= mapper . Generate
@@ -151,9 +151,9 @@ traverseModuleItemsM mapper (Part extern kw lifetime name ports items) = do
 traverseModuleItemsM mapper (PackageItem packageItem) = do
     let item = MIPackageItem packageItem
     converted <-
-        traverseModuleItemsM mapper (Part False Module Nothing "DNE" [] [item])
+        traverseModuleItemsM mapper (Part [] False Module Nothing "DNE" [] [item])
     let item' = case converted of
-            Part False Module Nothing "DNE" [] [newItem] -> newItem
+            Part [] False Module Nothing "DNE" [] [newItem] -> newItem
             _ -> error $ "redirected PackageItem traverse failed: "
                     ++ show converted
     return $ case item' of
@@ -162,9 +162,9 @@ traverseModuleItemsM mapper (PackageItem packageItem) = do
 traverseModuleItemsM mapper (Package lifetime name packageItems) = do
     let items = map MIPackageItem packageItems
     converted <-
-        traverseModuleItemsM mapper (Part False Module Nothing "DNE" [] items)
+        traverseModuleItemsM mapper (Part [] False Module Nothing "DNE" [] items)
     let items' = case converted of
-            Part False Module Nothing "DNE" [] newItems -> newItems
+            Part [] False Module Nothing "DNE" [] newItems -> newItems
             _ -> error $ "redirected Package traverse failed: "
                     ++ show converted
     return $ Package lifetime name $ map (\(MIPackageItem item) -> item) items'
@@ -972,9 +972,9 @@ collectStmtAsgnsM = collectify traverseStmtAsgnsM
 traverseNestedModuleItemsM :: Monad m => MapperM m ModuleItem -> MapperM m ModuleItem
 traverseNestedModuleItemsM mapper item = do
     converted <-
-        traverseModuleItemsM mapper (Part False Module Nothing "DNE" [] [item])
+        traverseModuleItemsM mapper (Part [] False Module Nothing "DNE" [] [item])
     let items' = case converted of
-            Part False Module Nothing "DNE" [] newItems -> newItems
+            Part [] False Module Nothing "DNE" [] newItems -> newItems
             _ -> error $ "redirected NestedModuleItems traverse failed: "
                     ++ show converted
     return $ case items' of

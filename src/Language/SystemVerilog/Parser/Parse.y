@@ -498,8 +498,11 @@ Packing :: { Packing }
   | {- empty -}         { Unpacked }
 
 Part(begin, end) :: { Description }
-  :          begin opt(Lifetime) Identifier PackageImportDeclarations Params PortDecls ";" ModuleItems end opt(Tag) { Part False $1 $2 $3 (fst $6) ($4 ++ $5 ++ (snd $6) ++ $8) }
-  | "extern" begin opt(Lifetime) Identifier PackageImportDeclarations Params PortDecls ";"                          { Part True  $2 $3 $4 (fst $7) ($5 ++ $6 ++ (snd $7)      ) }
+  : AttributeInstances          begin PartHeader ModuleItems end opt(Tag) { $3 $1 False $2 $4 }
+  | AttributeInstances "extern" begin PartHeader                          { $4 $1 True  $3 [] }
+
+PartHeader :: { [Attr] -> Bool -> PartKW -> [ModuleItem] -> Description }
+  : opt(Lifetime) Identifier PackageImportDeclarations Params PortDecls ";" { \attrs extern kw items -> Part attrs extern kw $1 $2 (fst $5) ($3 ++ $4 ++ (snd $5) ++ items) }
 
 ModuleKW :: { PartKW }
   : "module" { Module }
@@ -693,6 +696,9 @@ ActionBlock :: { ActionBlock }
   |      "else" Stmt  { ActionBlockElse (Nothing) $2 }
   | Stmt "else" Stmt  { ActionBlockElse (Just $1) $3 }
 
+AttributeInstances :: { [Attr] }
+  : {- empty -}                          { [] }
+  | AttributeInstance AttributeInstances { $1 : $2 }
 AttributeInstance :: { Attr }
   : "(*" AttrSpecs "*)" { Attr $2 }
 AttrSpecs :: { [AttrSpec] }

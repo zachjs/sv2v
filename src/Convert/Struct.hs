@@ -27,11 +27,11 @@ convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription (description @ (Part _ _ _ _ _ _)) =
+convertDescription (description @ Part{}) =
     traverseModuleItems (traverseTypes $ convertType structs) $
-    Part extern kw lifetime name ports (items ++ funcs)
+    Part attrs extern kw lifetime name ports (items ++ funcs)
     where
-        description' @ (Part extern kw lifetime name ports items) =
+        description' @ (Part attrs extern kw lifetime name ports items) =
             scopedConversion (traverseDeclM structs) traverseModuleItemM
                 traverseStmtM tfArgTypes description
         -- collect information about this description

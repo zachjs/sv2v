@@ -21,7 +21,7 @@ convert =
         (traverseDescriptions . traverseModuleItems . mapInstance)
 
 collectPortsM :: Description -> Writer Ports ()
-collectPortsM (Part _ _ _ name ports _) = tell $ Map.singleton name ports
+collectPortsM (Part _ _ _ _ name ports _) = tell $ Map.singleton name ports
 collectPortsM _ = return ()
 
 mapInstance :: Ports -> ModuleItem -> ModuleItem

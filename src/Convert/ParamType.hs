@@ -39,7 +39,7 @@ convert files =
         -- add type parameter instantiations
         files'' = map (concatMap explodeDescription) files'
         explodeDescription :: Description -> [Description]
-        explodeDescription (part @ (Part _ _ _ name _ _)) =
+        explodeDescription (part @ (Part _ _ _ _ name _ _)) =
             if null theseInstances then
                 [part]
             else
@@ -52,7 +52,7 @@ convert files =
                 isNonDefault = (name /=) . moduleName
                 alreadyExists = (flip Map.member info) . moduleName
                 moduleName :: Description -> Identifier
-                moduleName (Part _ _ _ x _ _) = x
+                moduleName (Part _ _ _ _ x _ _) = x
                 moduleName _ = error "not possible"
         explodeDescription other = [other]
 
@@ -65,7 +65,7 @@ convert files =
         usedTypedModules = Map.unionsWith Set.union $ map (uncurry
             Map.singleton) usedTypedModulesRaw
         collectUsageInfoM :: Description -> Writer (UsageMap, UsageMap) ()
-        collectUsageInfoM (part @ (Part _ _ _ name _ _)) =
+        collectUsageInfoM (part @ (Part _ _ _ _ name _ _)) =
             tell (makeList used, makeList usedTyped)
             where
                 makeList s = zip (Set.toList s) (repeat $ Set.singleton name)
@@ -83,7 +83,7 @@ convert files =
                         else tell (Set.singleton m, Set.empty)
         collectModuleItemM _ = return ()
         replaceDefault :: Description -> [Description]
-        replaceDefault (part @ (Part _ _ _ name _ _)) =
+        replaceDefault (part @ (Part _ _ _ _ name _ _)) =
             if Map.notMember name info then
                 [part]
             else if Map.null maybeTypeMap then
@@ -103,10 +103,10 @@ convert files =
         replaceDefault other = [other]
 
         removeDefaultTypeParams :: Description -> Description
-        removeDefaultTypeParams (part @ (Part _ _ _ _ _ _)) =
-            Part extern kw ml (moduleDefaultName name) p items
+        removeDefaultTypeParams (part @ Part{}) =
+            Part attrs extern kw ml (moduleDefaultName name) p items
             where
-                Part extern kw ml name p items =
+                Part attrs extern kw ml name p items =
                     traverseModuleItems (traverseDecls rewriteDecl) part
                 rewriteDecl :: Decl -> Decl
                 rewriteDecl (ParamType Parameter x _) =
@@ -139,9 +139,9 @@ convert files =
         -- substitute in a particular instance's parameter types
         rewriteModule :: Description -> Instance -> Description
         rewriteModule part typeMap =
-            Part extern kw ml m' p items'
+            Part attrs extern kw ml m' p items'
             where
-                Part extern kw ml m p items = part
+                Part attrs extern kw ml m p items = part
                 m' = moduleInstanceName m typeMap
                 items' = map rewriteDecl items
                 rewriteDecl :: ModuleItem -> ModuleItem
@@ -158,7 +158,7 @@ convert files =
 
 -- write down module parameter names and type parameters
 collectDescriptionM :: Description -> Writer Info ()
-collectDescriptionM (part @ (Part _ _ _ name _ _)) =
+collectDescriptionM (part @ (Part _ _ _ _ name _ _)) =
     tell $ Map.singleton name (paramNames, maybeTypeMap)
     where
         params = execWriter $

@@ -40,11 +40,11 @@ defaultType :: Type
 defaultType = IntegerVector TLogic Unspecified [(Number "31", Number "0")]
 
 convertDescription :: Description -> Description
-convertDescription (description @ (Part _ _ _ _ _ _)) =
-    Part extern kw lifetime name ports (enumItems ++ items)
+convertDescription (description @ Part{}) =
+    Part attrs extern kw lifetime name ports (enumItems ++ items)
     where
         -- replace and collect the enum types in this description
-        (Part extern kw lifetime name ports items, enumPairs) =
+        (Part attrs extern kw lifetime name ports items, enumPairs) =
             convertDescription' description
         -- convert the collected enums into their corresponding localparams
         enumItems = map MIPackageItem $ map toItem $ sortOn snd $ convergeUsage items enumPairs

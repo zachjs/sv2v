@@ -18,13 +18,14 @@ import Text.Printf (printf)
 
 import Language.SystemVerilog.AST.ShowHelp
 
+import Language.SystemVerilog.AST.Attr (Attr)
 import Language.SystemVerilog.AST.Decl (Decl)
 import Language.SystemVerilog.AST.Stmt (Stmt)
 import Language.SystemVerilog.AST.Type (Type, Identifier)
 import {-# SOURCE #-} Language.SystemVerilog.AST.ModuleItem (ModuleItem)
 
 data Description
-    = Part Bool PartKW (Maybe Lifetime) Identifier [Identifier] [ModuleItem]
+    = Part [Attr] Bool PartKW (Maybe Lifetime) Identifier [Identifier] [ModuleItem]
     | PackageItem PackageItem
     | Package (Maybe Lifetime) Identifier [PackageItem]
     | Directive String -- currently unused
@@ -32,12 +33,14 @@ data Description
 
 instance Show Description where
     showList descriptions _ = intercalate "\n" $ map show descriptions
-    show (Part True  kw lifetime name _ items) =
-        printf "extern %s %s%s %s;"
-          (show kw) (showLifetime lifetime) name (indentedParenList itemStrs)
+    show (Part attrs True  kw lifetime name _ items) =
+        printf "%sextern %s %s%s %s;"
+            (concatMap showPad attrs)
+            (show kw) (showLifetime lifetime) name (indentedParenList itemStrs)
         where itemStrs = map (init . show) items
-    show (Part False kw lifetime name ports items) =
-        printf "%s %s%s%s;\n%s\nend%s"
+    show (Part attrs False kw lifetime name ports items) =
+        printf "%s%s %s%s%s;\n%s\nend%s"
+            (concatMap showPad attrs)
             (show kw) (showLifetime lifetime) name portsStr bodyStr (show kw)
         where
             portsStr = if null ports
