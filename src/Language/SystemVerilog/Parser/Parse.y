@@ -528,8 +528,14 @@ Params :: { [ModuleItem] }
   : {- empty -}          { [] }
   | "#" "(" ParamsFollow { map (MIPackageItem . Decl) $3 }
 ParamsFollow :: { [Decl] }
-  : ParameterDecl(")")              { $1 }
-  | ParameterDecl(",") ParamsFollow { $1 ++ $2 }
+  : ParamAsgn ")"              { [$1] }
+  | ParamAsgn "," ParamsFollow { $1 : $3 }
+  |               ParamsDecl   { $1 }
+ParamsDecl :: { [Decl] }
+  : ParameterDecl(")")            { $1 }
+  | ParameterDecl(",") ParamsDecl { $1 ++ $2 }
+ParamAsgn :: { Decl }
+  : Identifier "=" Expr { Param Parameter (Implicit Unspecified []) $1 $3 }
 
 PortDecls :: { ([Identifier], [ModuleItem]) }
   : "(" DeclTokens(")") { parseDTsAsPortDecls $2 }
