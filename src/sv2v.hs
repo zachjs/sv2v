@@ -22,16 +22,15 @@ main :: IO ()
 main = do
     job <- readJob
     -- parse the input files
-    let includePaths = incdir job
     let defines = map splitDefine $ define job
-    let singleton = \x -> [x]
-    let toFileLists = if siloed job then map singleton else singleton
-    astLists <- mapM
-        (parseFiles includePaths defines)
-        (toFileLists $ files job)
-    let asts = concat astLists
-    -- convert the files
-    let asts' = convert (exclude job) asts
-    -- print the converted files out
-    hPrint stdout $ concat asts'
-    exitSuccess
+    result <- parseFiles (incdir job) defines (siloed job) (files job)
+    case result of
+        Left msg -> do
+            hPutStr stderr $ msg ++ "\n"
+            exitFailure
+        Right asts -> do
+            -- convert the files
+            let asts' = convert (exclude job) asts
+            -- print the converted files out
+            hPrint stdout $ concat asts'
+            exitSuccess

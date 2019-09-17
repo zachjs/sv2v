@@ -13,11 +13,13 @@
 {
 module Language.SystemVerilog.Parser.Parse (parse) where
 
+import Control.Monad.Except
 import Language.SystemVerilog.AST
 import Language.SystemVerilog.Parser.ParseDecl
 import Language.SystemVerilog.Parser.Tokens
 }
 
+%monad { ExceptT String IO }
 %name parse
 %tokentype { Token }
 %error { parseError }
@@ -1194,10 +1196,10 @@ DimFn :: { DimFn }
 
 {
 
-parseError :: [Token] -> a
+parseError :: [Token] -> ExceptT String IO a
 parseError a = case a of
-  []              -> error "Parse error: no tokens left to parse."
-  Token t s p : _ -> error $ "Parse error: unexpected token '" ++ s ++ "' (" ++ show t ++ ") at " ++ show p ++ "."
+  []              -> throwError $ "Parse error: no tokens left to parse."
+  Token t s p : _ -> throwError $ "Parse error: unexpected token '" ++ s ++ "' (" ++ show t ++ ") at " ++ show p ++ "."
 
 genItemsToGenItem :: [GenItem] -> GenItem
 genItemsToGenItem [x] = x

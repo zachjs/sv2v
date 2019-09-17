@@ -511,16 +511,16 @@ alexInitUserState :: AlexUserState
 alexInitUserState = LS [] "" Map.empty [] []
 
 -- public-facing lexer entrypoint
-lexFile :: [String] -> Env -> FilePath -> IO ([Token], Env)
+lexFile :: [String] -> Env -> FilePath -> IO (Either String ([Token], Env))
 lexFile includePaths env path = do
     str <- readFile path
     let result = runAlex str $ setEnv >> alexMonadScan >> get
     return $ case result of
-        Left msg -> error $ "Lexical Error: " ++ msg
+        Left msg -> Left msg
         Right finalState ->
             if null $ lsCondStack finalState
-                then (reverse $ lsToks finalState, lsEnv finalState)
-                else error $ "unfinished conditional directives: " ++
+                then Right (reverse $ lsToks finalState, lsEnv finalState)
+                else Left $ path ++ ": unfinished conditional directives: " ++
                         (show $ length $ lsCondStack finalState)
     where
         setEnv = do
@@ -541,7 +541,7 @@ lexicalError :: String -> Alex a
 lexicalError msg = do
     (pn, _, _, _) <- alexGetInput
     pos <- toTokPos pn
-    alexError $ msg ++ ", at " ++ show pos
+    alexError $ "Lexical error: " ++ msg ++ ", at " ++ show pos
 
 -- get the current user state
 get :: Alex AlexUserState
