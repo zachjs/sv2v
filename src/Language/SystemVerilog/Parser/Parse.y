@@ -408,7 +408,7 @@ time               { Token Lit_time        _ _ }
 %left  "*" "/" "%"
 %left  "**"
 %right REDUCE_OP "!" "~" "++" "--"
-%left  "(" ")" "[" "]" "." "'" "::"
+%left  "(" ")" "[" "]" "." "::"
 
 %%
 
@@ -1055,6 +1055,7 @@ Expr :: { Expr }
   | Expr "?" Expr ":" Expr      { Mux $1 $3 $5 }
   | CastingType "'" "(" Expr ")" { Cast (Left            $1) $4 }
   | Number      "'" "(" Expr ")" { Cast (Right $ Number  $1) $4 }
+  | "(" Expr ")" "'""(" Expr ")" { Cast (Right           $2) $6 }
   |                 Identifier  "'" "(" Expr ")" { Cast (Right $ Ident   $1   ) $4 }
   | Identifier "::" Identifier  "'" "(" Expr ")" { Cast (Right $ PSIdent $1 $3) $6 }
   | Expr "." Identifier         { Dot $1 $3 }
