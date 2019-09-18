@@ -586,6 +586,7 @@ DeclOrStmtTokens(delim) :: { [DeclToken] }
   | DeclOrStmtToken DeclOrStmtTokens(delim) { [$1] ++ $2 }
   | AsgnOp Expr "," DeclOrStmtTokens(delim) { [DTAsgn $1 $2, DTComma] ++ $4 }
   | AsgnOp Expr                      delim  { [DTAsgn $1 $2] }
+  | IncOrDecOperator                 delim  { [DTAsgn (AsgnOp $1) (Number "1")] }
   | "<=" opt(DelayOrEventControl) Expr "," DeclOrStmtTokens(delim) { [DTAsgnNBlk $2 $3, DTComma] ++ $5 }
   | "<=" opt(DelayOrEventControl) Expr                      delim  { [DTAsgnNBlk $2 $3] }
 DeclOrStmtToken :: { DeclToken }
@@ -882,7 +883,6 @@ Stmt :: { Stmt }
   | Identifier "::" Identifier ";" { Subroutine (Just $1) $3 (Args [] []) }
   | LHS "<=" opt(DelayOrEventControl) Expr ";" { Asgn $3 $1 $4 }
   | LHS IncOrDecOperator ";" { AsgnBlk (AsgnOp $2) $1 (Number "1") }
-  | IncOrDecOperator LHS ";" { AsgnBlk (AsgnOp $1) $2 (Number "1") }
 StmtNonAsgn :: { Stmt }
   : ";" { Null }
   | "begin" opt(Tag) DeclsAndStmts "end" opt(Tag) { Block (combineTags $2 $5) (fst $3) (snd $3) }
@@ -903,6 +903,7 @@ StmtNonAsgn :: { Stmt }
   | "->" Identifier ";"                        { Trigger $2 }
   | AttributeInstance Stmt                     { StmtAttr $1 $2 }
   | ProceduralAssertionStatement               { Assertion $1 }
+  | IncOrDecOperator LHS ";"                   { AsgnBlk (AsgnOp $1) $2 (Number "1") }
 
 Unique :: { Maybe UniquePriority }
   : {- empty -} { Nothing }
