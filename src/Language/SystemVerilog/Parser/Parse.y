@@ -766,7 +766,8 @@ NonDeclPackageItem :: { [PackageItem] }
   | ForwardTypedef ";"              { $1 }
   | TimeunitsDeclaration            { $1 }
 ForwardTypedef :: { [PackageItem] }
-  : "typedef" "enum"   Identifier { [] }
+  : "typedef"          Identifier { [] }
+  | "typedef" "enum"   Identifier { [] }
   | "typedef" "struct" Identifier { [] }
   | "typedef" "union"  Identifier { [] }
 TimeunitsDeclaration :: { [PackageItem] }
