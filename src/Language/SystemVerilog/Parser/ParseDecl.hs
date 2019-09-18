@@ -116,13 +116,32 @@ parseDTsAsPortDecls pieces =
 parseDTsAsModuleItems :: [DeclToken] -> [ModuleItem]
 parseDTsAsModuleItems tokens =
     forbidNonEqAsgn tokens $
-    if any isInstance tokens
-        then parseDTsAsIntantiations tokens
-        else map (MIPackageItem . Decl) $ parseDTsAsDecl tokens
+    if isElabTask $ head tokens then
+        asElabTask tokens
+    else if any isInstance tokens then
+        parseDTsAsIntantiations tokens
+    else
+        map (MIPackageItem . Decl) $ parseDTsAsDecl tokens
     where
+        isElabTask :: DeclToken -> Bool
+        isElabTask (DTIdent x) = elem x elabTasks
+            where elabTasks = ["$fatal", "$error", "$warning", "$info"]
+        isElabTask _ = False
         isInstance :: DeclToken -> Bool
         isInstance (DTInstance _) = True
         isInstance _ = False
+
+-- internal; approximates the behavior of the elaboration system tasks
+asElabTask :: [DeclToken] -> [ModuleItem]
+asElabTask [DTIdent name, DTInstance args] =
+    if name == "$info"
+        then [] -- just drop them for simplicity
+        else [Instance "ThisModuleDoesNotExist" [] name' Nothing args]
+    where name' = "__sv2v_elab_" ++ tail name
+asElabTask [DTIdent name] =
+    asElabTask [DTIdent name, DTInstance []]
+asElabTask tokens =
+    error $ "could not parse elaboration system task: " ++ show tokens
 
 
 -- internal; parser for module instantiations
@@ -142,7 +161,8 @@ parseDTsAsIntantiations (DTIdent name : tokens) =
                     [DTIdent a, DTRange (NonIndexed, s), DTInstance b] ->
                         (a, Just s , b)
                     [DTIdent a, DTInstance b] -> (a, Nothing, b)
-                    _ -> error $ "unrecognized instantiation: " ++ show inst
+                    _ -> error $ "unrecognized instantiation of " ++ name
+                            ++ ": " ++ show inst
                 follow = x `seq` if null toks' then [] else step (tail toks')
         (params, rest) =
             case head tokens of
