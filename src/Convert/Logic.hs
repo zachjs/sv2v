@@ -60,7 +60,7 @@ convert =
 convertDescription :: Ports -> Description -> Description
 convertDescription ports orig =
     if shouldConvert
-        then traverseModuleItems conversion orig
+        then converted
         else orig
     where
         shouldConvert = case orig of
@@ -69,18 +69,23 @@ convertDescription ports orig =
             PackageItem _ -> True
             Package _ _ _ -> False
             Directive _ -> False
+
+        origIdents = execWriter (collectModuleItemsM regIdents orig)
+        fixed = traverseModuleItems fixModuleItem orig
+        fixedIdents = execWriter (collectModuleItemsM regIdents fixed)
         conversion = traverseDecls convertDecl . convertModuleItem
-        idents = execWriter (collectModuleItemsM regIdents orig)
-        convertModuleItem :: ModuleItem -> ModuleItem
+        converted = traverseModuleItems conversion fixed
+
+        fixModuleItem :: ModuleItem -> ModuleItem
         -- rewrite bad continuous assignments to use procedural assignments
-        convertModuleItem (Assign Nothing lhs expr) =
-            if Set.disjoint usedIdents idents
+        fixModuleItem (Assign Nothing lhs expr) =
+            if Set.disjoint usedIdents origIdents
                 then Assign Nothing lhs expr
                 else AlwaysC AlwaysComb $ AsgnBlk AsgnOpEq lhs expr
             where
                 usedIdents = execWriter $ collectNestedLHSsM lhsIdents lhs
         -- rewrite port bindings to use temporary nets where necessary
-        convertModuleItem (Instance moduleName params instanceName rs bindings) =
+        fixModuleItem (Instance moduleName params instanceName rs bindings) =
             if null newItems
                 then Instance moduleName params instanceName rs bindings
                 else Generate $ map GenModuleItem $
@@ -92,7 +97,7 @@ convertDescription ports orig =
                 newItems = concat newItemsList
                 fixBinding :: PortBinding -> (PortBinding, [ModuleItem])
                 fixBinding (portName, Just expr) =
-                    if portDir /= Just Output || Set.disjoint usedIdents idents
+                    if portDir /= Just Output || Set.disjoint usedIdents origIdents
                         then ((portName, Just expr), [])
                         else ((portName, Just tmpExpr), items)
                     where
@@ -112,11 +117,13 @@ convertDescription ports orig =
                                     ++ show expr ++ " connected to output port "
                                     ++ portName ++ " of " ++ instanceName
                 fixBinding other = (other, [])
+        fixModuleItem other = other
+
         -- rewrite variable declarations to have the correct type
         convertModuleItem (MIPackageItem (Decl (Variable dir (IntegerVector _ sg mr) ident a me))) =
             MIPackageItem $ Decl $ Variable dir (t mr) ident a me
             where
-                t = if sg /= Unspecified || Set.member ident idents
+                t = if Set.member ident fixedIdents
                     then IntegerVector TReg sg
                     else Net TWire sg
         convertModuleItem other = other
