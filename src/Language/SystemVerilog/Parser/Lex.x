@@ -541,7 +541,7 @@ lexicalError :: String -> Alex a
 lexicalError msg = do
     (pn, _, _, _) <- alexGetInput
     pos <- toTokPos pn
-    alexError $ "Lexical error: " ++ msg ++ ", at " ++ show pos
+    alexError $ show pos ++ ": Lexical error: " ++ msg
 
 -- get the current user state
 get :: Alex AlexUserState
