@@ -126,8 +126,9 @@ traverseModuleItemsM mapper (Part attrs extern kw lifetime name ports items) = d
     where
         fullMapper (Generate [GenBlock Nothing genItems]) =
             mapM fullGenItemMapper genItems >>= mapper . Generate
-        fullMapper (Generate genItems) =
-            mapM fullGenItemMapper genItems >>= mapper . Generate
+        fullMapper (Generate genItems) = do
+            let genItems' = filter (/= GenNull) genItems
+            mapM fullGenItemMapper genItems' >>= mapper . Generate
         fullMapper (MIAttr attr mi) =
             fullMapper mi >>= return . MIAttr attr
         fullMapper other = mapper other
@@ -137,6 +138,9 @@ traverseModuleItemsM mapper (Part attrs extern kw lifetime name ports items) = d
             return $ case moduleItem' of
                 Generate subItems -> GenBlock Nothing subItems
                 _ -> GenModuleItem moduleItem'
+        genItemMapper (GenIf (Number "1") s _) = return s
+        genItemMapper (GenIf (Number "0") _ s) = return s
+        genItemMapper (GenBlock _ []) = return GenNull
         genItemMapper other = return other
         breakGenerate :: ModuleItem -> [ModuleItem]
         breakGenerate (Generate genItems) =
