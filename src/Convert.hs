@@ -32,6 +32,7 @@ import qualified Convert.ParamType
 import qualified Convert.RemoveComments
 import qualified Convert.Return
 import qualified Convert.Simplify
+import qualified Convert.SizeCast
 import qualified Convert.StarPort
 import qualified Convert.StmtBlock
 import qualified Convert.Stream
@@ -58,6 +59,7 @@ phases excludes =
     , Convert.PackedArray.convert
     , Convert.DimensionQuery.convert
     , Convert.ParamType.convert
+    , Convert.SizeCast.convert
     , Convert.Simplify.convert
     , Convert.StarPort.convert
     , Convert.StmtBlock.convert

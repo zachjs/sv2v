@@ -78,11 +78,13 @@ module Convert.Traverse
 , collectNestedLHSsM
 , traverseScopesM
 , scopedConversion
+, scopedConversionM
 , stately
 , traverseFilesM
 , traverseFiles
 ) where
 
+import Data.Functor.Identity (runIdentity)
 import Control.Monad.State
 import Control.Monad.Writer
 import Language.SystemVerilog.AST
@@ -1009,10 +1011,11 @@ collectNestedExprsM = collectify traverseNestedExprsM
 -- statements recursively, as we add a recursive wrapper here.
 traverseScopesM
     :: (Eq s, Show s)
-    => MapperM (State s) Decl
-    -> MapperM (State s) ModuleItem
-    -> MapperM (State s) Stmt
-    -> MapperM (State s) ModuleItem
+    => Monad m
+    => MapperM (StateT s m) Decl
+    -> MapperM (StateT s m) ModuleItem
+    -> MapperM (StateT s m) Stmt
+    -> MapperM (StateT s m) ModuleItem
 traverseScopesM declMapper moduleItemMapper stmtMapper =
     fullModuleItemMapper
     where
@@ -1072,7 +1075,19 @@ scopedConversion
     -> Description
     -> Description
 scopedConversion traverseDeclM traverseModuleItemM traverseStmtM s description =
-    evalState (initialTraverse description >>= scopedTraverse) s
+    runIdentity $ scopedConversionM traverseDeclM traverseModuleItemM traverseStmtM s description
+
+scopedConversionM
+    :: (Eq s, Show s)
+    => Monad m
+    => MapperM (StateT s m) Decl
+    -> MapperM (StateT s m) ModuleItem
+    -> MapperM (StateT s m) Stmt
+    -> s
+    -> Description
+    -> m Description
+scopedConversionM traverseDeclM traverseModuleItemM traverseStmtM s description =
+    evalStateT (initialTraverse description >>= scopedTraverse) s
     where
         initialTraverse = traverseModuleItemsM traverseMIPackageItemDecl
         scopedTraverse = traverseModuleItemsM $

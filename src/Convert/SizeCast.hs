@@ -1,0 +1,133 @@
+{- sv2v
+ - Author: Zachary Snow <zach@zachjs.com>
+ -
+ - Conversion of size casts on non-constant expressions.
+ -}
+
+module Convert.SizeCast (convert) where
+
+import Control.Monad.State
+import Control.Monad.Writer
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+
+import Convert.Traverse
+import Language.SystemVerilog.AST
+
+type TypeMap = Map.Map Identifier Type
+type CastSet  = Set.Set (Int, Signing)
+
+type ST = StateT TypeMap (Writer CastSet)
+
+convert :: [AST] -> [AST]
+convert = map convertFile
+
+convertFile :: AST -> AST
+convertFile descriptions =
+    descriptions' ++ map (uncurry castFn) funcs
+    where
+        results = map convertDescription descriptions
+        descriptions' = map fst results
+        funcs = Set.toList $ Set.unions $ map snd results
+
+convertDescription :: Description -> (Description, CastSet)
+convertDescription description =
+    (description', info)
+    where
+        (description', info) =
+            runWriter $
+                scopedConversionM traverseDeclM traverseModuleItemM traverseStmtM
+                Map.empty description
+
+traverseDeclM :: Decl -> ST Decl
+traverseDeclM decl = do
+    case decl of
+        Variable _ t x _ _ -> modify $ Map.insert x t
+        Param    _ t x   _ -> modify $ Map.insert x t
+        ParamType    _ _ _ -> return ()
+    return decl
+
+traverseModuleItemM :: ModuleItem -> ST ModuleItem
+traverseModuleItemM item = traverseExprsM traverseExprM item
+
+traverseStmtM :: Stmt -> ST Stmt
+traverseStmtM stmt = traverseStmtExprsM traverseExprM stmt
+
+traverseExprM :: Expr -> ST Expr
+traverseExprM =
+    traverseNestedExprsM convertExprM
+    where
+        convertExprM :: Expr -> ST Expr
+        convertExprM (Cast (Right (Number n)) e) = do
+            typeMap <- get
+            case (readNumber n, exprSigning typeMap e) of
+                (Just size, Just sg) -> do
+                    lift $ tell $ Set.singleton (size, sg)
+                    let f = castFnName size sg
+                    let args = Args [Just e] []
+                    return $ Call Nothing f args
+                _ -> return $ Cast (Right $ Number n) e
+        convertExprM other = return other
+
+
+castFn :: Int -> Signing -> Description
+castFn n sg =
+    PackageItem $
+    Function (Just Automatic) t fnName [decl] [Return $ Ident inp]
+    where
+        inp = "inp"
+        r = (Number $ show (n - 1), Number "0")
+        t = IntegerVector TLogic sg [r]
+        fnName = castFnName n sg
+        decl = Variable Input t inp [] Nothing
+
+castFnName :: Int -> Signing -> String
+castFnName n sg =
+    if n <= 0
+        then error $ "cannot have non-positive size cast: " ++ show n
+        else
+            if sg == Unspecified
+                then init name
+                else name
+    where name = "sv2v_cast_" ++ show n ++ "_" ++ show sg
+
+exprSigning :: TypeMap -> Expr -> Maybe Signing
+exprSigning typeMap (Ident x) =
+    case Map.lookup x typeMap of
+        Just t -> typeSigning t
+        Nothing -> Just Unspecified
+exprSigning typeMap (BinOp op e1 e2) =
+    combiner sg1 sg2
+    where
+        sg1 = exprSigning typeMap e1
+        sg2 = exprSigning typeMap e2
+        combiner = case op of
+            BitAnd  -> combineSigning
+            BitXor  -> combineSigning
+            BitXnor -> combineSigning
+            BitOr   -> combineSigning
+            Mul     -> combineSigning
+            Div     -> combineSigning
+            Add     -> combineSigning
+            Sub     -> combineSigning
+            Mod     -> curry fst
+            Pow     -> curry fst
+            ShiftAL -> curry fst
+            ShiftAR -> curry fst
+            _ -> \_ _ -> Just Unspecified
+exprSigning _ _ = Just Unspecified
+
+combineSigning :: Maybe Signing -> Maybe Signing -> Maybe Signing
+combineSigning Nothing _ = Nothing
+combineSigning _ Nothing = Nothing
+combineSigning (Just Unspecified) msg = msg
+combineSigning msg (Just Unspecified) = msg
+combineSigning (Just Signed) _ = Just Signed
+combineSigning _ (Just Signed) = Just Signed
+combineSigning (Just Unsigned) _ = Just Unsigned
+
+typeSigning :: Type -> Maybe Signing
+typeSigning (Net           _ sg _) = Just sg
+typeSigning (Implicit        sg _) = Just sg
+typeSigning (IntegerVector _ sg _) = Just sg
+typeSigning _ = Nothing
