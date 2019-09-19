@@ -21,7 +21,7 @@ module top;
         $display("%b %b", y, {8'b0, y});
         $display("%b %b", z, {35'b0, z});
     end
-    localparam foo = 0;
+    localparam [0:0] foo = 0;
     localparam [31:0] bar = 32'b0;
     initial $display("%b %b", foo, bar);
 endmodule

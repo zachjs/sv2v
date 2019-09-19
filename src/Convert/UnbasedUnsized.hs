@@ -3,9 +3,9 @@
  -
  - Conversion for unbased, unsized literals ('0, '1, 'z, 'x)
  -
- - Maintaining the unsized-ness of the literals is critical, but those digits
- - are all equivalent regardless of base. We simply convert them to all use a
- - binary base for compatibility with Verilog-2005.
+ - We convert the literals to be signed to enable sign extension, and give them
+ - a size of 1 and a binary base. These values implicitly cast as desired in
+ - Verilog-2005.
  -}
 
 module Convert.UnbasedUnsized (convert) where
@@ -25,6 +25,6 @@ digits = ['0', '1', 'x', 'z', 'X', 'Z']
 convertExpr :: Expr -> Expr
 convertExpr (Number ['\'', ch]) =
     if elem ch digits
-        then Number ("'b" ++ [ch])
+        then Number ("1'sb" ++ [ch])
         else error $ "unexpected unbased-unsized digit: " ++ [ch]
 convertExpr other = other
