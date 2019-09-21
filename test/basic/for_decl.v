@@ -8,6 +8,14 @@ module top;
         end
     endgenerate
 
+    wire [0:31] b;
+    generate
+        genvar other_n;
+        for (other_n = 0; other_n < 32; other_n = other_n + 1) begin : gen_filter_other
+            assign b[other_n] = ~a[other_n];
+        end
+    endgenerate
+
     integer i;
     initial begin : foo_1
         for (i = 0; i < 32; i = i + 1)
@@ -53,6 +61,12 @@ module top;
         for (j = 0; j < 4; j++)
             for (k = 0; k < 8; k++)
                 $display("7: ", ~a[j * 8 + k] + 11);
+    end
+
+    initial begin : foo_8
+        integer i;
+        for (i = 0; i < 32; i = i + 1)
+            $display("8: ", a[i], b[i]);
     end
 
 endmodule

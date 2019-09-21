@@ -20,6 +20,7 @@ simulate() {
     iv_output=`iverilog \
         -Wall \
         -Wno-select-range \
+        -Wno-anachronisms \
         -o "$sim_prog" \
         -g2005 \
         -DTEST_VCD="\"$sim_vcd\"" \

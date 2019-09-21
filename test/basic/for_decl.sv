@@ -5,6 +5,11 @@ module top;
         assign a[n] = n & 1;
     end
 
+    wire [0:31] b;
+    for (genvar n = 0; n < 32; n++) begin : gen_filter_other
+        assign b[n] = ~a[n];
+    end
+
     initial
         for (integer i = 0; i < 32; i++)
             $display("1: ", a[i]);
@@ -48,5 +53,9 @@ module top;
                 $display("7: ", ~a[j * 8 + k] + 11);
         end
     end
+
+    initial
+        for (integer i = 0; i < 32; i++)
+            $display("8: ", a[i], b[i]);
 
 endmodule

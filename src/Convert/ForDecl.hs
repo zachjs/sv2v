@@ -24,10 +24,10 @@ convert =
     )
 
 convertGenItem :: GenItem -> GenItem
-convertGenItem (GenFor (True, x, e) a b c d) =
-    GenBlock Nothing
+convertGenItem (GenFor (True, x, e) a b mx c) =
+    GenBlock (fmap (++ "_for_decl") mx)
     [ GenModuleItem $ Genvar x
-    , GenFor (False, x, e) a b c d
+    , GenFor (False, x, e) a b mx c
     ]
 convertGenItem other = other
 
