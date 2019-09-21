@@ -24,11 +24,24 @@ convert =
     )
 
 convertGenItem :: GenItem -> GenItem
-convertGenItem (GenFor (True, x, e) a b mx c) =
-    GenBlock (fmap (++ "_for_decl") mx)
-    [ GenModuleItem $ Genvar x
-    , GenFor (False, x, e) a b mx c
-    ]
+convertGenItem (GenFor (True, x, e) a b mbx c) =
+    GenBlock Nothing genItems
+    where
+        x' = (maybe "" (++ "_") mbx) ++ x
+        Generate genItems =
+            traverseNestedModuleItems converter $ Generate $
+            [ GenModuleItem $ Genvar x'
+            , GenFor (False, x, e) a b mbx c
+            ]
+        converter =
+            (traverseExprs $ traverseNestedExprs convertExpr) .
+            (traverseLHSs  $ traverseNestedLHSs  convertLHS )
+        prefix :: String -> String
+        prefix ident = if ident == x then x' else ident
+        convertExpr (Ident ident) = Ident $ prefix ident
+        convertExpr other = other
+        convertLHS (LHSIdent ident) = LHSIdent $ prefix ident
+        convertLHS other = other
 convertGenItem other = other
 
 convertStmt :: Stmt -> Stmt

@@ -742,7 +742,17 @@ traverseLHSsM' strat mapper item =
                 Assertion a' -> AssertionItem (mx, a')
                 _ -> error $ "redirected AssertionItem traverse failed: "
                         ++ show converted
+        traverseModuleItemLHSsM (Generate items) = do
+            items' <- mapM (traverseNestedGenItemsM traverGenItemLHSsM) items
+            return $ Generate items'
         traverseModuleItemLHSsM other = return other
+        traverGenItemLHSsM (GenFor (n1, x1, e1) cc (x2, op2, e2) mn subItems) = do
+            wrapped_x1' <- (if n1 then return else mapper) $ LHSIdent x1
+            wrapped_x2' <- mapper $ LHSIdent x2
+            let LHSIdent x1' = wrapped_x1'
+            let LHSIdent x2' = wrapped_x2'
+            return $ GenFor (n1, x1', e1) cc (x2', op2, e2) mn subItems
+        traverGenItemLHSsM other = return other
 
 traverseLHSs' :: TFStrategy -> Mapper LHS -> Mapper ModuleItem
 traverseLHSs' strat = unmonad $ traverseLHSsM' strat

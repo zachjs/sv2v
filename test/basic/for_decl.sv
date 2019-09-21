@@ -3,11 +3,13 @@ module top;
     wire [0:31] a;
     for (genvar n = 0; n < 32; n++) begin : gen_filter
         assign a[n] = n & 1;
+        wire x;
+        assign x = a[n];
     end
 
     wire [0:31] b;
     for (genvar n = 0; n < 32; n++) begin : gen_filter_other
-        assign b[n] = ~a[n];
+        assign b[n] = ~gen_filter[n].x;
     end
 
     initial
@@ -57,5 +59,9 @@ module top;
     initial
         for (integer i = 0; i < 32; i++)
             $display("8: ", a[i], b[i]);
+
+    logic start;
+    assign start = gen_filter[0].x;
+    initial $display(start);
 
 endmodule
