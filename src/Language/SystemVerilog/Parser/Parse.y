@@ -1218,8 +1218,10 @@ combineDeclsAndStmts :: ([Decl], [Stmt]) -> ([Decl], [Stmt]) -> ([Decl], [Stmt])
 combineDeclsAndStmts (a1, b1) (a2, b2) = (a1 ++ a2, b1 ++ b2)
 
 makeInput :: Decl -> Decl
-makeInput (Variable _ t x a me) = Variable Input t x a me
-makeInput other = error $ "unexpected non-var decl: " ++ (show other)
+makeInput (Variable Local t x a me) = Variable Input t x a me
+makeInput (Variable Input t x a me) = Variable Input t x a me
+makeInput other =
+  error $ "unexpected non-var or non-input decl: " ++ (show other)
 
 defaultFuncInput :: Decl -> Decl
 defaultFuncInput (Variable dir (Implicit sg rs) x a me) =
