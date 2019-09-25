@@ -146,6 +146,7 @@ data NonIntegerType
     = TShortreal
     | TReal
     | TRealtime
+    | TString
     deriving (Eq, Ord)
 
 instance Show NetType where
@@ -176,6 +177,7 @@ instance Show NonIntegerType where
     show TShortreal = "shortreal"
     show TReal      = "real"
     show TRealtime  = "realtime"
+    show TString    = "string"
 
 data Packing
     = Unpacked

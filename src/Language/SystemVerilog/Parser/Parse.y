@@ -485,6 +485,7 @@ NonIntegerType :: { NonIntegerType }
   : "shortreal" { TShortreal }
   | "real"      { TReal      }
   | "realtime"  { TRealtime  }
+  | "string"    { TString    }
 
 EnumItems :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifiers { $1 }

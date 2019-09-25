@@ -170,7 +170,9 @@ traverseDeclM structs origDecl = do
     case origDecl of
         Variable d t x a me -> do
             let (tf, rs) = typeRanges t
-            modify $ Map.insert x (tf $ a ++ rs)
+            if isRangeable t
+                then modify $ Map.insert x (tf $ a ++ rs)
+                else return ()
             case me of
                 Nothing -> return origDecl
                 Just e -> do
@@ -188,6 +190,10 @@ traverseDeclM structs origDecl = do
             types <- get
             let (LHSIdent _, e') = convertAsgn structs types (LHSIdent x, e)
             return e'
+        isRangeable :: Type -> Bool
+        isRangeable (IntegerAtom _ _) = False
+        isRangeable (NonInteger  _  ) = False
+        isRangeable _ = True
 
 -- produces a function which packs the components of a struct literal
 packerFn :: TypeFunc -> ModuleItem
