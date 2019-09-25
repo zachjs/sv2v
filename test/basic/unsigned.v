@@ -6,4 +6,8 @@ module top;
             arr[i] = i;
     end
     initial $display(arr);
+
+    parameter foo = 1;
+    localparam bar = 1;
+    initial $display(foo, bar);
 endmodule

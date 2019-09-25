@@ -21,6 +21,7 @@ convert =
     traverseTypes convertType
 
 convertType :: Type -> Type
+convertType (Implicit        Unsigned rs) = Implicit        Unspecified rs
 convertType (IntegerVector t Unsigned rs) = IntegerVector t Unspecified rs
 convertType (Net           t Unsigned rs) = Net           t Unspecified rs
 convertType other = other
