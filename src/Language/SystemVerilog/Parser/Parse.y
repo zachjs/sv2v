@@ -890,7 +890,7 @@ StmtNonAsgn :: { Stmt }
   | Unique "if" "(" Expr ")" Stmt %prec NoElse        { If $1 $4 $6 Null      }
   | "for" "("            ";"  opt(Expr) ";" ForStep ")" Stmt { For []                           $4 $6 $8 }
   | "for" "(" DeclTokens(";") opt(Expr) ";" ForStep ")" Stmt { For (parseDTsAsDeclsAndAsgns $3) $4 $6 $8 }
-  | Unique CaseKW "(" Expr ")" Cases opt(CaseDefault) "endcase" { Case $1 $2 $4 $6 $7 }
+  | Unique CaseKW "(" Expr ")" CasesWithDefault "endcase" { Case $1 $2 $4 (fst $6) (snd $6) }
   |                 Identifier "(" CallArgs ")" ";" { Subroutine (Nothing) $1 $3 }
   | Identifier "::" Identifier "(" CallArgs ")" ";" { Subroutine (Just $1) $3 $5 }
   | TimingControl Stmt                         { Timing $1 $2 }
@@ -994,6 +994,10 @@ CaseKW :: { CaseKW }
   | "casex" { CaseX }
   | "casez" { CaseZ }
 
+CasesWithDefault :: { ([Case], Maybe Stmt) }
+  : {- empty -}           { ([], Nothing) }
+  | Case CasesWithDefault { ($1 : fst $2, snd $2) }
+  | CaseDefault Cases     { ($2, Just $1) }
 Cases :: { [Case] }
   : {- empty -}  { [] }
   | Cases Case   { $1 ++ [$2] }
@@ -1146,13 +1150,17 @@ GenItem :: { GenItem }
 ConditionalGenerateConstruct :: { GenItem }
   : "if" "(" Expr ")" GenItemOrNull "else" GenItemOrNull { GenIf $3 $5 $7      }
   | "if" "(" Expr ")" GenItemOrNull %prec NoElse         { GenIf $3 $5 GenNull }
-  | "case" "(" Expr ")" GenCases opt(GenCaseDefault) "endcase" { GenCase $3 $5 $6 }
+  | "case" "(" Expr ")" GenCasesWithDefault "endcase"    { GenCase $3 (fst $5) (snd $5) }
 LoopGenerateConstruct :: { GenItem }
   : "for" "(" GenvarInitialization ";" Expr ";" GenvarIteration ")" GenBlock { (uncurry $ GenFor $3 $5 $7) $9 }
 
 GenBlock :: { (Maybe Identifier, [GenItem]) }
   : "begin" opt(Tag) GenItems "end" opt(Tag) { (combineTags $2 $5, $3) }
 
+GenCasesWithDefault :: { ([GenCase], Maybe GenItem) }
+  : {- empty -}                 { ([], Nothing) }
+  | GenCase GenCasesWithDefault { ($1 : fst $2, snd $2) }
+  | GenCaseDefault GenCases     { ($2, Just $1) }
 GenCases :: { [GenCase] }
   : {- empty -}      { [] }
   | GenCases GenCase { $1 ++ [$2] }
