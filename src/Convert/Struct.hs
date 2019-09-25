@@ -48,7 +48,8 @@ convertDescription (description @ Part{}) =
         -- helpers for the scoped traversal
         traverseModuleItemM :: ModuleItem -> State Types ModuleItem
         traverseModuleItemM item =
-            traverseExprsM traverseExprM item >>=
+            traverseLHSsM  traverseLHSM  item >>=
+            traverseExprsM traverseExprM      >>=
             traverseAsgnsM traverseAsgnM
         traverseStmtM :: Stmt -> State Types Stmt
         traverseStmtM (Subroutine Nothing f args) = do
@@ -56,7 +57,8 @@ convertDescription (description @ Part{}) =
             return $ uncurry (Subroutine Nothing) $
                 convertCall structs stateTypes f args
         traverseStmtM stmt =
-            traverseStmtExprsM traverseExprM stmt >>=
+            traverseStmtLHSsM  traverseLHSM  stmt >>=
+            traverseStmtExprsM traverseExprM      >>=
             traverseStmtAsgnsM traverseAsgnM
         traverseExprM =
             traverseNestedExprsM $ stately converter
@@ -64,24 +66,30 @@ convertDescription (description @ Part{}) =
                 converter :: Types -> Expr -> Expr
                 converter types expr =
                     snd $ convertAsgn structs types (LHSIdent "", expr)
+        traverseLHSM =
+            traverseNestedLHSsM $ stately converter
+            where
+                converter :: Types -> LHS -> LHS
+                converter types lhs =
+                    fst $ convertAsgn structs types (lhs, Ident "")
         traverseAsgnM = stately $ convertAsgn structs
 convertDescription other = other
 
 -- write down unstructured versions of packed struct types
 collectStructM :: Type -> Writer Structs ()
 collectStructM (Struct (Packed sg) fields _) =
-    collectStructM' Struct True  sg fields
+    collectStructM' (Struct $ Packed sg) True  sg fields
 collectStructM (Union  (Packed sg) fields _) =
-    collectStructM' Union  False sg fields
+    collectStructM' (Union  $ Packed sg) False sg fields
 collectStructM _ = return ()
 
 collectStructM'
-    :: (Packing -> [Field] -> [Range] -> Type)
+    :: ([Field] -> [Range] -> Type)
     -> Bool -> Signing -> [Field] -> Writer Structs ()
 collectStructM' constructor isStruct sg fields = do
     if canUnstructure
         then tell $ Map.singleton
-            (constructor (Packed sg) fields)
+            (constructor fields)
             (unstructType, unstructFields)
         else return ()
     where
