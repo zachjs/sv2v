@@ -86,6 +86,7 @@ executable sv2v
     Convert.Traverse
     Convert.UnbasedUnsized
     Convert.Unique
+    Convert.Unsigned
     -- sv2v CLI modules
     Job
   ghc-options:

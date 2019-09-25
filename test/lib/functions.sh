@@ -56,12 +56,16 @@ assertConverts() {
     assertTrue "conversion of $ac_file not stable after the second iteration" $?
     # using sed to remove quoted strings
     filtered=`sed -E 's/"([^"]|\")+"//g' "$ac_tmpa"`
-    echo "$filtered" | grep "\$bits" > /dev/null
-    assertFalse "conversion of $ac_file still contains \$bits" $?
+    # check for various things iverilog accepts which we don't want to output
+    PATTERNS="\$bits\|\$dimensions\|\$unpacked_dimensions\|\$left\|\$right\|\$low\|\$high\|\$increment\|\$size"
+    echo "$filtered" | grep "$PATTERNS" > /dev/null
+    assertFalse "conversion of $ac_file still contains dimension queries" $?
     echo "$filtered" | grep "\]\[" > /dev/null
     assertFalse "conversion of $ac_file still contains multi-dim arrays" $?
     echo "$filtered" | egrep "\s(int\|bit\|logic\|byte\|struct\|enum\|longint\|shortint)\s"
     assertFalse "conversion of $ac_file still contains SV types" $?
+    echo "$filtered" | grep "[^$]unsigned" > /dev/null
+    assertFalse "conversion of $ac_file still contains unsigned keyword" $?
 }
 
 # convert SystemVerilog source file(s)

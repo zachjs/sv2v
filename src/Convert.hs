@@ -40,6 +40,7 @@ import qualified Convert.Struct
 import qualified Convert.Typedef
 import qualified Convert.UnbasedUnsized
 import qualified Convert.Unique
+import qualified Convert.Unsigned
 
 type Phase = [AST] -> [AST]
 
@@ -68,6 +69,7 @@ phases excludes =
     , Convert.Typedef.convert
     , Convert.UnbasedUnsized.convert
     , Convert.Unique.convert
+    , Convert.Unsigned.convert
     , Convert.Package.convert
     , Convert.Enum.convert
     , Convert.NestPI.convert
