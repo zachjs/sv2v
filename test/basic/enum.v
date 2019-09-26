@@ -18,6 +18,7 @@ module top;
     reg [0:0] dummyF;
     reg [0:0] dummyG;
     reg [3:0] dummyH;
+    reg [31:0] dummyI;
 
     initial begin
 
@@ -52,6 +53,9 @@ module top;
 
         `PRINT_UNSIZED(H, 'b1)
         `PRINT_UNSIZED(H, 'b0)
+
+        `PRINT_UNSIZED(I, 'b0)
+        `PRINT_UNSIZED(I, 'b1)
 
     end
 endmodule

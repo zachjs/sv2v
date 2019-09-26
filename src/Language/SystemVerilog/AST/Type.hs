@@ -17,6 +17,7 @@ module Language.SystemVerilog.AST.Type
     , IntegerAtomType   (..)
     , NonIntegerType    (..)
     , typeRanges
+    , nullRange
     ) where
 
 import Text.Printf (printf)

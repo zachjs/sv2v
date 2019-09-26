@@ -94,5 +94,5 @@ resolveType types (Alias Nothing st rs1) =
         (Union           p l rs2) -> Union           p l $ rs1 ++ rs2
         (InterfaceT     x my rs2) -> InterfaceT     x my $ rs1 ++ rs2
         (Alias          ps x rs2) -> Alias          ps x $ rs1 ++ rs2
-        (IntegerAtom   kw _ ) -> error $ "resolveType encountered packed `" ++ (show kw) ++ "` on " ++ st
-        (NonInteger    kw   ) -> error $ "resolveType encountered packed `" ++ (show kw) ++ "` on " ++ st
+        (IntegerAtom   kw sg    ) -> nullRange (IntegerAtom kw sg) rs1
+        (NonInteger    kw       ) -> nullRange (NonInteger  kw   ) rs1

@@ -31,6 +31,10 @@ typedef enum Foo_t {
     H_1 = 'b1, H_2 = 'b0
 } EnumH;
 
+typedef enum int {
+    I_1, I_2
+} EnumI;
+
 `define PRINT(name, val) \
     dummy``name = name``_``val; \
     $display("%h %h %0d %0d", \
@@ -50,6 +54,7 @@ module top;
     EnumF dummyF;
     EnumG dummyG;
     EnumH dummyH;
+    EnumI dummyI;
 
     initial begin
 
@@ -84,6 +89,9 @@ module top;
 
         `PRINT_UNSIZED(H, 1)
         `PRINT_UNSIZED(H, 2)
+
+        `PRINT_UNSIZED(I, 1)
+        `PRINT_UNSIZED(I, 2)
 
     end
 endmodule
