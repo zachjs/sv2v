@@ -49,9 +49,12 @@ traverseExprM = traverseNestedExprsM $ stately convertExpr
 
 convertExpr :: Info -> Expr -> Expr
 convertExpr info (Cast (Right c) e) =
-    if sized == e
-        then Cast (Right c') e
-        else sized
+    case c' of
+        Number _ ->
+            if sized == e
+                then Cast (Right c') e
+                else sized
+        _ -> Cast (Right c') e
     where
         c' = simplify $ traverseNestedExprs (substitute info) (simplify c)
         sized = sizedExpr "" c' e

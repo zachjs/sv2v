@@ -20,6 +20,10 @@ module top;
         $display("%b %b", x, {8'hFF, x});
         $display("%b %b", y, {8'b0, y});
         $display("%b %b", z, {35'b0, z});
+        $display("%0d %0d", w, w[4:0]);
+        $display("%0d %0d", x, $signed(x[4:0]));
+        $display("%0d %0d", y, $signed(y[4:0]));
+        $display("%0d %0d", z, z[4:0]);
     end
     localparam [0:0] foo = 0;
     localparam [31:0] bar = 32'b0;

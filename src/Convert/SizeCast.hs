@@ -15,7 +15,7 @@ import Convert.Traverse
 import Language.SystemVerilog.AST
 
 type TypeMap = Map.Map Identifier Type
-type CastSet  = Set.Set (Int, Signing)
+type CastSet  = Set.Set (Expr, Signing)
 
 type ST = StateT TypeMap (Writer CastSet)
 
@@ -58,38 +58,42 @@ traverseExprM =
     traverseNestedExprsM convertExprM
     where
         convertExprM :: Expr -> ST Expr
-        convertExprM (Cast (Right (Number n)) e) = do
+        convertExprM (Cast (Right s) e) = do
             typeMap <- get
-            case (readNumber n, exprSigning typeMap e) of
-                (Just size, Just sg) -> do
-                    lift $ tell $ Set.singleton (size, sg)
-                    let f = castFnName size sg
+            case exprSigning typeMap e of
+                Just sg -> do
+                    lift $ tell $ Set.singleton (s, sg)
+                    let f = castFnName s sg
                     let args = Args [Just e] []
                     return $ Call Nothing f args
-                _ -> return $ Cast (Right $ Number n) e
+                _ -> return $ Cast (Right s) e
         convertExprM other = return other
 
 
-castFn :: Int -> Signing -> Description
-castFn n sg =
+castFn :: Expr -> Signing -> Description
+castFn e sg =
     PackageItem $
     Function (Just Automatic) t fnName [decl] [Return $ Ident inp]
     where
         inp = "inp"
-        r = (Number $ show (n - 1), Number "0")
+        r = (BinOp Sub e (Number "1"), Number "0")
         t = IntegerVector TLogic sg [r]
-        fnName = castFnName n sg
+        fnName = castFnName e sg
         decl = Variable Input t inp [] Nothing
 
-castFnName :: Int -> Signing -> String
-castFnName n sg =
-    if n <= 0
-        then error $ "cannot have non-positive size cast: " ++ show n
-        else
-            if sg == Unspecified
-                then init name
-                else name
-    where name = "sv2v_cast_" ++ show n ++ "_" ++ show sg
+castFnName :: Expr -> Signing -> String
+castFnName e sg =
+    if sg == Unspecified
+        then init name
+        else name
+    where
+        sizeStr = case e of
+            Number n ->
+                case readNumber n of
+                    Just v -> show v
+                    _ -> shortHash e
+            _ -> shortHash e
+        name = "sv2v_cast_" ++ sizeStr ++ "_" ++ show sg
 
 exprSigning :: TypeMap -> Expr -> Maybe Signing
 exprSigning typeMap (Ident x) =
