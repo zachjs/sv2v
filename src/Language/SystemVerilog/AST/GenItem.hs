@@ -34,10 +34,13 @@ instance Show GenItem where
         printf "begin%s\n%s\nend"
             (maybe "" (" : " ++) mx)
             (indent $ unlines' $ map show i)
-    show (GenCase e c md) =
-        printf "case (%s)\n%s%s\nendcase" (show e)
-            (indent $ unlines' $ map showCase c)
-            (maybe "" (indent . indent . show) md)
+    show (GenCase e cs def) =
+        printf "case (%s)\n%s%s\nendcase" (show e) bodyStr defStr
+        where
+            bodyStr = indent $ unlines' $ map showCase cs
+            defStr = case def of
+                Nothing -> ""
+                Just c -> printf "\n\tdefault: %s" (show c)
     show (GenIf e a GenNull) = printf "if (%s) %s"          (show e) (show a)
     show (GenIf e a b      ) = printf "if (%s) %s\nelse %s" (show e) (show a) (show b)
     show (GenFor (new, x1, e1) c (x2, o2, e2) mx is) =
