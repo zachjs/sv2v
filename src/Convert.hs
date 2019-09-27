@@ -24,10 +24,10 @@ import qualified Convert.IntTypes
 import qualified Convert.KWArgs
 import qualified Convert.Logic
 import qualified Convert.LogOp
+import qualified Convert.MultiplePacked
 import qualified Convert.NamedBlock
 import qualified Convert.NestPI
 import qualified Convert.Package
-import qualified Convert.PackedArray
 import qualified Convert.ParamType
 import qualified Convert.RemoveComments
 import qualified Convert.Return
@@ -40,6 +40,7 @@ import qualified Convert.Struct
 import qualified Convert.Typedef
 import qualified Convert.UnbasedUnsized
 import qualified Convert.Unique
+import qualified Convert.UnpackedArray
 import qualified Convert.Unsigned
 
 type Phase = [AST] -> [AST]
@@ -57,7 +58,7 @@ phases excludes =
     , Convert.IntTypes.convert
     , Convert.KWArgs.convert
     , Convert.LogOp.convert
-    , Convert.PackedArray.convert
+    , Convert.MultiplePacked.convert
     , Convert.DimensionQuery.convert
     , Convert.ParamType.convert
     , Convert.SizeCast.convert
@@ -69,6 +70,7 @@ phases excludes =
     , Convert.Typedef.convert
     , Convert.UnbasedUnsized.convert
     , Convert.Unique.convert
+    , Convert.UnpackedArray.convert
     , Convert.Unsigned.convert
     , Convert.Package.convert
     , Convert.Enum.convert

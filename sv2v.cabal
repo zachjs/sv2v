@@ -69,10 +69,10 @@ executable sv2v
     Convert.KWArgs
     Convert.Logic
     Convert.LogOp
+    Convert.MultiplePacked
     Convert.NamedBlock
     Convert.NestPI
     Convert.Package
-    Convert.PackedArray
     Convert.ParamType
     Convert.RemoveComments
     Convert.Return
@@ -82,10 +82,11 @@ executable sv2v
     Convert.StmtBlock
     Convert.Stream
     Convert.Struct
-    Convert.Typedef
     Convert.Traverse
+    Convert.Typedef
     Convert.UnbasedUnsized
     Convert.Unique
+    Convert.UnpackedArray
     Convert.Unsigned
     -- sv2v CLI modules
     Job

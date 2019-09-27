@@ -15,7 +15,7 @@ import Convert.Traverse
 import Language.SystemVerilog.AST
 
 type TypeMap = Map.Map Identifier Type
-type CastSet  = Set.Set (Expr, Signing)
+type CastSet = Set.Set (Expr, Signing)
 
 type ST = StateT TypeMap (Writer CastSet)
 

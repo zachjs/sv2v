@@ -60,8 +60,6 @@ assertConverts() {
     PATTERNS="\$bits\|\$dimensions\|\$unpacked_dimensions\|\$left\|\$right\|\$low\|\$high\|\$increment\|\$size"
     echo "$filtered" | grep "$PATTERNS" > /dev/null
     assertFalse "conversion of $ac_file still contains dimension queries" $?
-    echo "$filtered" | grep "\]\[" > /dev/null
-    assertFalse "conversion of $ac_file still contains multi-dim arrays" $?
     echo "$filtered" | egrep "\s(int\|bit\|logic\|byte\|struct\|enum\|longint\|shortint)\s"
     assertFalse "conversion of $ac_file still contains SV types" $?
     echo "$filtered" | grep "[^$]unsigned" > /dev/null
