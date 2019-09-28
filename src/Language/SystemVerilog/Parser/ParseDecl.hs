@@ -46,6 +46,7 @@ import Language.SystemVerilog.AST
 -- [PUBLIC]: combined (irregular) tokens for declarations
 data DeclToken
     = DTComma
+    | DTAutoDim
     | DTAsgn     AsgnOp Expr
     | DTAsgnNBlk (Maybe Timing) Expr
     | DTRange    (PartSelectMode, Range)
@@ -384,10 +385,22 @@ takeRanges (token : tokens) =
     case token of
         DTRange (NonIndexed, r) -> (r         : rs, rest          )
         DTBit   s               -> (asRange s : rs, rest          )
+        DTAutoDim               ->
+            case rest of
+                (DTAsgn AsgnOpEq (Pattern l) : _) -> autoDim l
+                (DTAsgn AsgnOpEq (Concat  l) : _) -> autoDim l
+                _ ->               ([]            , token : tokens)
         _                       -> ([]            , token : tokens)
     where
         (rs, rest) = takeRanges tokens
         asRange s = (Number "0", BinOp Sub s (Number "1"))
+        autoDim :: [a] -> ([Range], [DeclToken])
+        autoDim l =
+            ((lo, hi) : rs, rest)
+            where
+                n = length l
+                lo = Number "0"
+                hi = Number $ show (n - 1)
 
 -- Matching DTAsgnNBlk here allows tripLookahead to work both for standard
 -- declarations and in `parseDTsAsDeclOrAsgn`, where we're checking for an

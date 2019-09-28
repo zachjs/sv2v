@@ -6,8 +6,7 @@ module top;
         logic [3:0] data;
     } packet_t;
     initial begin
-        // TODO: Add support for implicitly sized arrays.
-        logic [1:0] array[4] = '{ 2'b10, 2'b01, 2'b11, 2'b00 };
+        logic [1:0] array[] = '{ 2'b10, 2'b01, 2'b11, 2'b00 };
         packet_t packet = {<<4{ {<<2{array}} }};
         $display("packet addr = %b", packet.addr);
         $display("packet data = %b", packet.data);
