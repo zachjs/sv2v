@@ -164,7 +164,15 @@ readNumber n =
 simplify :: Expr -> Expr
 simplify (UniOp LogNot (Number "1")) = Number "0"
 simplify (UniOp LogNot (Number "0")) = Number "1"
-simplify (Repeat (Number "0") _) = Concat []
+simplify (orig @ (Repeat (Number n) exprs)) =
+    case readNumber n of
+        Nothing -> orig
+        Just 0 -> Concat []
+        Just 1 -> Concat exprs
+        Just x ->
+            if x < 0
+                then error $ "negative repeat count: " ++ show orig
+                else orig
 simplify (Concat [expr]) = expr
 simplify (Concat exprs) =
     Concat $ filter (/= Concat []) exprs
