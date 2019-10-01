@@ -25,7 +25,7 @@ convertStmt (Foreach x idxs stmt) =
         toLoop :: (Int, Maybe Identifier) -> (Stmt -> Stmt)
         toLoop (_, Nothing) = id
         toLoop (d, Just i) =
-            For [Left idxDecl] (Just cmp) [incr]
+            For (Left [idxDecl]) cmp [incr]
             where
                 queryFn f = DimFn f (Right $ Ident x) (Number $ show d)
                 idxDecl = Variable Local (IntegerAtom TInteger Unspecified) i []

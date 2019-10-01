@@ -518,6 +518,10 @@ PackageDeclaration :: { Description }
 Tag :: { Identifier }
   : ":" Identifier { $2 }
 
+StrTag :: { Identifier }
+  : {- empty -}    { "" }
+  | ":" Identifier { $2 }
+
 PackageImportDeclarations :: { [ModuleItem] }
   : PackageImportDeclaration PackageImportDeclarations { $1 ++ $2 }
   | {- empty -}                                        { [] }
@@ -699,8 +703,8 @@ SeqMatchItems :: { [SeqMatchItem] }
   : "," SeqMatchItem               { [$2] }
   | SeqMatchItems "," SeqMatchItem { $1 ++ [$3] }
 SeqMatchItem :: { SeqMatchItem }
-  : ForStepAssignment           { Left $1 }
-  | Identifier "(" CallArgs ")" { Right ($1, $3) }
+  : ForStepAssignment   { Left $1 }
+  | Identifier CallArgs { Right ($1, $2) }
 
 ActionBlock :: { ActionBlock }
   : Stmt %prec NoElse { ActionBlockIf   $1 }
@@ -879,22 +883,31 @@ Stmts :: { [Stmt] }
   | Stmts Stmt  { $1 ++ [$2] }
 
 Stmt :: { Stmt }
-  : StmtNonAsgn         { $1 }
-  | LHS AsgnOp Expr ";" { AsgnBlk $2 $1 $3 }
+  : StmtAsgn    { $1 }
+  | StmtNonAsgn { $1 }
+
+StmtAsgn :: { Stmt }
+  : LHS AsgnOp Expr ";"                        { AsgnBlk $2 $1 $3 }
+  | LHS IncOrDecOperator ";"                   { AsgnBlk (AsgnOp $2) $1 (Number "1") }
+  | LHS "<=" opt(DelayOrEventControl) Expr ";" { Asgn $3 $1 $4 }
   |                 Identifier ";" { Subroutine (Nothing) $1 (Args [] []) }
   | Identifier "::" Identifier ";" { Subroutine (Just $1) $3 (Args [] []) }
-  | LHS "<=" opt(DelayOrEventControl) Expr ";" { Asgn $3 $1 $4 }
-  | LHS IncOrDecOperator ";" { AsgnBlk (AsgnOp $2) $1 (Number "1") }
 StmtNonAsgn :: { Stmt }
+  : StmtBlock(BlockKWSeq, "end" ) { $1 }
+  | StmtBlock(BlockKWPar, "join") { $1 }
+  |                StmtNonBlock   { $1 }
+  | Identifier ":" StmtNonBlock   { Block Seq $1 [] [$3] }
+StmtBlock(begin, end) :: { Stmt }
+  :                begin StrTag DeclsAndStmts end StrTag { uncurry (Block $1 $ combineTags $2 $5) $3 }
+  | Identifier ":" begin        DeclsAndStmts end StrTag { uncurry (Block $3 $ combineTags $1 $6) $4 }
+StmtNonBlock :: { Stmt }
   : ";" { Null }
-  | "begin" opt(Tag) DeclsAndStmts "end" opt(Tag) { Block (combineTags $2 $5) (fst $3) (snd $3) }
-  | Unique "if" "(" Expr ")" Stmt "else" Stmt         { If $1 $4 $6 $8        }
-  | Unique "if" "(" Expr ")" Stmt %prec NoElse        { If $1 $4 $6 Null      }
-  | "for" "("            ";"  opt(Expr) ";" ForStep ")" Stmt { For []                           $4 $6 $8 }
-  | "for" "(" DeclTokens(";") opt(Expr) ";" ForStep ")" Stmt { For (parseDTsAsDeclsAndAsgns $3) $4 $6 $8 }
-  | Unique CaseKW "(" Expr ")" CasesWithDefault "endcase" { Case $1 $2 $4 (fst $6) (snd $6) }
-  |                 Identifier "(" CallArgs ")" ";" { Subroutine (Nothing) $1 $3 }
-  | Identifier "::" Identifier "(" CallArgs ")" ";" { Subroutine (Just $1) $3 $5 }
+  | Unique "if" "(" Expr ")" Stmt "else" Stmt  { If $1 $4 $6 $8   }
+  | Unique "if" "(" Expr ")" Stmt %prec NoElse { If $1 $4 $6 Null }
+  | "for" "(" ForInit ForCond ForStep ")" Stmt { For $3 $4 $5 $7 }
+  | Unique CaseKW "(" Expr ")" Cases "endcase" { Case $1 $2 $4 (fst $6) (snd $6) }
+  |                 Identifier CallArgs ";"    { Subroutine (Nothing) $1 $2 }
+  | Identifier "::" Identifier CallArgs ";"    { Subroutine (Just $1) $3 $4 }
   | TimingControl Stmt                         { Timing $1 $2 }
   | "return" Expr ";"                          { Return $2 }
   | "while"  "(" Expr ")" Stmt                 { While   $3 $5 }
@@ -907,11 +920,24 @@ StmtNonAsgn :: { Stmt }
   | ProceduralAssertionStatement               { Assertion $1 }
   | IncOrDecOperator LHS ";"                   { AsgnBlk (AsgnOp $1) $2 (Number "1") }
 
+BlockKWPar :: { BlockKW }
+  : "fork" { Par }
+BlockKWSeq :: { BlockKW }
+  : "begin" { Seq }
+
 Unique :: { Maybe UniquePriority }
   : {- empty -} { Nothing }
   | "unique"    { Just Unique   }
   | "unique0"   { Just Unique0  }
   | "priority"  { Just Priority }
+
+ForInit :: { Either [Decl] [(LHS, Expr)] }
+  :            ";"  { Right [] }
+  | DeclTokens(";") { parseDTsAsDeclsOrAsgns $1 }
+
+ForCond :: { Expr }
+  :      ";" { Number "1" }
+  | Expr ";" { $1 }
 
 ForStep :: { [(LHS, AsgnOp, Expr)] }
   : {- empty -}     { [] }
@@ -996,13 +1022,13 @@ CaseKW :: { CaseKW }
   | "casex" { CaseX }
   | "casez" { CaseZ }
 
-CasesWithDefault :: { ([Case], Maybe Stmt) }
-  : {- empty -}           { ([], Nothing) }
-  | Case CasesWithDefault { ($1 : fst $2, snd $2) }
-  | CaseDefault Cases     { ($2, Just $1) }
-Cases :: { [Case] }
-  : {- empty -}  { [] }
-  | Cases Case   { $1 ++ [$2] }
+Cases :: { ([Case], Maybe Stmt) }
+  : {- empty -}                { ([], Nothing) }
+  | Case Cases                 { ($1 : fst $2, snd $2) }
+  | CaseDefault CasesNoDefault { ($2, Just $1) }
+CasesNoDefault :: { [Case] }
+  : {- empty -} { [] }
+  | CasesNoDefault Case  { $1 ++ [$2] }
 
 Case :: { Case }
   : Exprs ":" Stmt { ($1, $3) }
@@ -1020,6 +1046,8 @@ Time :: { String }
   : time { tokenString $1 }
 
 CallArgs :: { Args }
+  : "(" CallArgsInside ")" { $2 }
+CallArgsInside :: { Args }
   : {- empty -}                        { Args [            ] [] }
   |                NamedCallArgsFollow { Args [            ] $1 }
   | Expr                 NamedCallArgs { Args [Just $1     ] $2 }
@@ -1049,8 +1077,8 @@ Expr :: { Expr }
   : "(" Expr ")"                { $2 }
   | String                      { String $1 }
   | Number                      { Number $1 }
-  |                 Identifier "(" CallArgs ")" { Call (Nothing) $1 $3 }
-  | Identifier "::" Identifier "(" CallArgs ")" { Call (Just $1) $3 $5 }
+  |                 Identifier CallArgs { Call (Nothing) $1 $2 }
+  | Identifier "::" Identifier CallArgs { Call (Just $1) $3 $4 }
   | DimsFn "(" TypeOrExpr ")"   { DimsFn $1 $3 }
   | DimFn  "(" TypeOrExpr ")"   { DimFn  $1 $3 (Number "1") }
   | DimFn  "(" TypeOrExpr "," Expr ")" { DimFn $1 $3 $5 }
@@ -1156,8 +1184,8 @@ ConditionalGenerateConstruct :: { GenItem }
 LoopGenerateConstruct :: { GenItem }
   : "for" "(" GenvarInitialization ";" Expr ";" GenvarIteration ")" GenBlock { (uncurry $ GenFor $3 $5 $7) $9 }
 
-GenBlock :: { (Maybe Identifier, [GenItem]) }
-  : "begin" opt(Tag) GenItems "end" opt(Tag) { (combineTags $2 $5, $3) }
+GenBlock :: { (Identifier, [GenItem]) }
+  : "begin" StrTag GenItems "end" StrTag { (combineTags $2 $5, $3) }
 
 GenCasesWithDefault :: { ([GenCase], Maybe GenItem) }
   : {- empty -}                 { ([], Nothing) }
@@ -1222,7 +1250,7 @@ parseError a = case a of
 
 genItemsToGenItem :: [GenItem] -> GenItem
 genItemsToGenItem [x] = x
-genItemsToGenItem xs = GenBlock Nothing xs
+genItemsToGenItem xs = GenBlock "" xs
 
 combineDeclsAndStmts :: ([Decl], [Stmt]) -> ([Decl], [Stmt]) -> ([Decl], [Stmt])
 combineDeclsAndStmts (a1, b1) (a2, b2) = (a1 ++ a2, b1 ++ b2)
@@ -1242,13 +1270,13 @@ defaultFuncInput (Variable dir (Implicit sg rs) x a me) =
       else Implicit sg rs
 defaultFuncInput other = other
 
-combineTags :: Maybe Identifier -> Maybe Identifier -> Maybe Identifier
-combineTags (Just a) (Just b) =
+combineTags :: Identifier -> Identifier -> Identifier
+combineTags a "" = a
+combineTags "" b = b
+combineTags a b =
   if a == b
-    then Just a
+    then a
     else error $ "tag mismatch: " ++ show (a, b)
-combineTags Nothing other = other
-combineTags other   _     = other
 
 toLHS :: Expr -> LHS
 toLHS expr =

@@ -27,4 +27,4 @@ convertPackageItem other = other
 
 stmtsToStmt :: [Stmt] -> Stmt
 stmtsToStmt [stmt] = stmt
-stmtsToStmt stmts = Block Nothing [] stmts
+stmtsToStmt stmts = Block Seq "" [] stmts

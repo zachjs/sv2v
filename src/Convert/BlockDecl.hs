@@ -20,8 +20,8 @@ convert =
     $ traverseStmts $ convertStmt
 
 convertStmt :: Stmt -> Stmt
-convertStmt (Block name decls stmts) =
-    Block name decls' stmts'
+convertStmt (Block Seq name decls stmts) =
+    Block Seq name decls' stmts'
     where
         splitDecls = map splitDecl decls
         decls' = map fst splitDecls

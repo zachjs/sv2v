@@ -26,19 +26,19 @@ convert asts =
     where runner = mapM . traverseDescriptionsM . traverseModuleItemsM . traverseStmtsM
 
 collectStmtM :: Stmt -> State Idents Stmt
-collectStmtM (Block (Just x) decls stmts) = do
+collectStmtM (Block kw x decls stmts) = do
     modify $ Set.insert x
-    return $ Block (Just x) decls stmts
+    return $ Block kw x decls stmts
 collectStmtM other = return other
 
 traverseStmtM :: Stmt -> State Idents Stmt
-traverseStmtM (Block Nothing [] stmts) =
-    return $ Block Nothing [] stmts
-traverseStmtM (Block Nothing decls stmts) = do
+traverseStmtM (Block kw "" [] stmts) =
+    return $ Block kw "" [] stmts
+traverseStmtM (Block kw "" decls stmts) = do
     names <- get
     let x = uniqueBlockName names
     modify $ Set.insert x
-    return $ Block (Just x) decls stmts
+    return $ Block kw x decls stmts
 traverseStmtM other = return other
 
 uniqueBlockName :: Idents -> Identifier

@@ -126,7 +126,7 @@ traverseModuleItemsM mapper (Part attrs extern kw lifetime name ports items) = d
     let items'' = concatMap breakGenerate items'
     return $ Part attrs extern kw lifetime name ports items''
     where
-        fullMapper (Generate [GenBlock Nothing genItems]) =
+        fullMapper (Generate [GenBlock "" genItems]) =
             mapM fullGenItemMapper genItems >>= mapper . Generate
         fullMapper (Generate genItems) = do
             let genItems' = filter (/= GenNull) genItems
@@ -138,7 +138,7 @@ traverseModuleItemsM mapper (Part attrs extern kw lifetime name ports items) = d
         genItemMapper (GenModuleItem moduleItem) = do
             moduleItem' <- fullMapper moduleItem
             return $ case moduleItem' of
-                Generate subItems -> GenBlock Nothing subItems
+                Generate subItems -> GenBlock "" subItems
                 _ -> GenModuleItem moduleItem'
         genItemMapper (GenIf (Number "1") s _) = return s
         genItemMapper (GenIf (Number "0") _ s) = return s
@@ -228,9 +228,9 @@ traverseSinglyNestedStmtsM :: Monad m => MapperM m Stmt -> MapperM m Stmt
 traverseSinglyNestedStmtsM fullMapper = cs
     where
         cs (StmtAttr a stmt) = fullMapper stmt >>= return . StmtAttr a
-        cs (Block Nothing [] []) = return Null
-        cs (Block name decls stmts) =
-            mapM fullMapper stmts >>= return . Block name decls
+        cs (Block _ "" [] []) = return Null
+        cs (Block kw name decls stmts) =
+            mapM fullMapper stmts >>= return . Block kw name decls
         cs (Case u kw expr cases def) = do
             caseStmts <- mapM fullMapper $ map snd cases
             let cases' = zip (map fst cases) caseStmts
@@ -373,16 +373,17 @@ traverseStmtLHSsM mapper = stmtMapper
         stmtMapper (AsgnBlk op lhs expr) = fullMapper lhs >>= \lhs' -> return $ AsgnBlk op lhs' expr
         stmtMapper (Asgn    mt lhs expr) = fullMapper lhs >>= \lhs' -> return $ Asgn    mt lhs' expr
         stmtMapper (For inits me incrs stmt) = do
-            inits' <- mapM mapInit inits
+            inits' <- mapInits inits
             let (lhss, asgnOps, exprs) = unzip3 incrs
             lhss' <- mapM fullMapper lhss
             let incrs' = zip3 lhss' asgnOps exprs
             return $ For inits' me incrs' stmt
             where
-                mapInit (Left decl) = return $ Left decl
-                mapInit (Right (lhs, expr)) = do
-                    lhs' <- fullMapper lhs
-                    return $ Right (lhs', expr)
+                mapInits (Left decls) = return $ Left decls
+                mapInits (Right asgns) = do
+                    let (lhss, exprs) = unzip asgns
+                    lhss' <- mapM fullMapper lhss
+                    return $ Right $ zip lhss' exprs
         stmtMapper (Assertion a) =
             assertionMapper a >>= return . Assertion
         stmtMapper other = return other
@@ -664,9 +665,9 @@ traverseStmtExprsM exprMapper = flatStmtMapper
     flatStmtMapper (StmtAttr attr stmt) =
         -- note: we exclude expressions in attributes from conversion
         return $ StmtAttr attr stmt
-    flatStmtMapper (Block name decls stmts) = do
+    flatStmtMapper (Block kw name decls stmts) = do
         decls' <- mapM declMapper decls
-        return $ Block name decls' stmts
+        return $ Block kw name decls' stmts
     flatStmtMapper (Case u kw e cases def) = do
         e' <- exprMapper e
         cases' <- mapM caseMapper cases
@@ -680,8 +681,8 @@ traverseStmtExprsM exprMapper = flatStmtMapper
         expr' <- exprMapper expr
         return $ Asgn    mt lhs' expr'
     flatStmtMapper (For inits cc asgns stmt) = do
-        inits' <- mapM initMapper inits
-        cc' <- maybeExprMapper cc
+        inits' <- initsMapper inits
+        cc' <- exprMapper cc
         asgns' <- mapM asgnMapper asgns
         return $ For inits' cc' asgns' stmt
     flatStmtMapper (While   e stmt) =
@@ -709,8 +710,9 @@ traverseStmtExprsM exprMapper = flatStmtMapper
         return $ Assertion a''
     flatStmtMapper (Null) = return Null
 
-    initMapper (Left decl) = declMapper decl >>= return . Left
-    initMapper (Right (l, e)) = exprMapper e >>= \e' -> return $ Right (l, e')
+    initsMapper (Left decls) = mapM declMapper decls >>= return . Left
+    initsMapper (Right asgns) = mapM mapper asgns >>= return . Right
+        where mapper (l, e) = exprMapper e >>= return . (,) l
 
     asgnMapper (l, op, e) = exprMapper e >>= \e' -> return $ (l, op, e')
 
@@ -802,9 +804,9 @@ traverseDeclsM' strat mapper item = do
                     else return decls
             return $ MIPackageItem $ Task l x decls' stmts
         miMapper other = return other
-        stmtMapper (Block name decls stmts) = do
+        stmtMapper (Block kw name decls stmts) = do
             decls' <- mapM mapper decls
-            return $ Block name decls' stmts
+            return $ Block kw name decls' stmts
         stmtMapper other = return other
 
 traverseDecls' :: TFStrategy -> Mapper Decl -> Mapper ModuleItem
@@ -938,7 +940,7 @@ traverseSinglyNestedGenItemsM fullMapper = gim
             return $ GenModuleItem moduleItem
         gim (GenNull) = return GenNull
         flattenBlocks :: GenItem -> [GenItem]
-        flattenBlocks (GenBlock Nothing items) = items
+        flattenBlocks (GenBlock "" items) = items
         flattenBlocks other = [other]
 
 traverseAsgnsM' :: Monad m => TFStrategy -> MapperM m (LHS, Expr) -> MapperM m ModuleItem
@@ -1032,10 +1034,10 @@ traverseScopesM declMapper moduleItemMapper stmtMapper =
 
         nestedStmtMapper stmt =
             stmtMapper stmt >>= traverseSinglyNestedStmtsM fullStmtMapper
-        fullStmtMapper (Block name decls stmts) = do
+        fullStmtMapper (Block kw name decls stmts) = do
             prevState <- get
             decls' <- mapM declMapper decls
-            block <- nestedStmtMapper $ Block name decls' stmts
+            block <- nestedStmtMapper $ Block kw name decls' stmts
             put prevState
             return block
         fullStmtMapper other = nestedStmtMapper other

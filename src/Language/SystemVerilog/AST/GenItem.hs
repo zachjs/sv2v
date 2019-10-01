@@ -20,9 +20,9 @@ import Language.SystemVerilog.AST.Type (Identifier)
 import {-# SOURCE #-} Language.SystemVerilog.AST.ModuleItem (ModuleItem)
 
 data GenItem
-    = GenBlock (Maybe Identifier) [GenItem]
+    = GenBlock Identifier [GenItem]
     | GenCase  Expr [GenCase] (Maybe GenItem)
-    | GenFor   (Bool, Identifier, Expr) Expr (Identifier, AsgnOp, Expr) (Maybe Identifier) [GenItem]
+    | GenFor   (Bool, Identifier, Expr) Expr (Identifier, AsgnOp, Expr) Identifier [GenItem]
     | GenIf    Expr GenItem GenItem
     | GenNull
     | GenModuleItem ModuleItem
@@ -30,9 +30,9 @@ data GenItem
 
 instance Show GenItem where
     showList i _ = unlines' $ map show i
-    show (GenBlock mx i)  =
+    show (GenBlock x i)  =
         printf "begin%s\n%s\nend"
-            (maybe "" (" : " ++) mx)
+            (if null x then "" else " : " ++ x)
             (indent $ unlines' $ map show i)
     show (GenCase e cs def) =
         printf "case (%s)\n%s%s\nendcase" (show e) bodyStr defStr
@@ -43,13 +43,13 @@ instance Show GenItem where
                 Just c -> printf "\n\tdefault: %s" (show c)
     show (GenIf e a GenNull) = printf "if (%s) %s"          (show e) (show a)
     show (GenIf e a b      ) = printf "if (%s) %s\nelse %s" (show e) (show a) (show b)
-    show (GenFor (new, x1, e1) c (x2, o2, e2) mx is) =
+    show (GenFor (new, x1, e1) c (x2, o2, e2) x is) =
         printf "for (%s%s = %s; %s; %s %s %s) %s"
             (if new then "genvar " else "")
             x1 (show e1)
             (show c)
             x2 (show o2) (show e2)
-            (show $ GenBlock mx is)
+            (show $ GenBlock x is)
     show (GenNull) = ";"
     show (GenModuleItem item) = show item
 

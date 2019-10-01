@@ -35,7 +35,7 @@ module Language.SystemVerilog.Parser.ParseDecl
 , parseDTsAsDecls
 , parseDTsAsDecl
 , parseDTsAsDeclOrAsgn
-, parseDTsAsDeclsAndAsgns
+, parseDTsAsDeclsOrAsgns
 ) where
 
 import Data.List (elemIndex, findIndex, findIndices)
@@ -219,28 +219,14 @@ parseDTsAsDeclOrAsgn tokens =
         isAsgn (DTAsgn _ _) = True
         isAsgn _ = False
 
--- [PUBLIC]: parser for mixed comma-separated declaration and assignment lists;
--- the main use case is for `for` loop initialization lists
-parseDTsAsDeclsAndAsgns :: [DeclToken] -> [Either Decl (LHS, Expr)]
-parseDTsAsDeclsAndAsgns [] = []
-parseDTsAsDeclsAndAsgns tokens =
+-- [PUBLIC]: parser for comma-separated declarations or assignment lists; this
+-- is only used for `for` loop initialization lists
+parseDTsAsDeclsOrAsgns :: [DeclToken] -> Either [Decl] [(LHS, Expr)]
+parseDTsAsDeclsOrAsgns tokens =
+    forbidNonEqAsgn tokens $
     if hasLeadingAsgn || tripLookahead tokens
-        then
-            let (lhsToks, l0) = break isDTAsgn tokens
-                lhs = case takeLHS lhsToks of
-                    Nothing ->
-                        error $ "could not parse as LHS: " ++ show lhsToks
-                    Just l -> l
-                DTAsgn AsgnOpEq expr : l1 = l0
-                asgn = Right (lhs, expr)
-            in case l1 of
-                DTComma : remaining -> asgn : parseDTsAsDeclsAndAsgns remaining
-                [] -> [asgn]
-                _ -> error $ "bad decls and asgns tokens: " ++ show tokens
-        else
-            let (component, remaining) = parseDTsAsComponent tokens
-                decls = finalize component
-            in (map Left decls) ++ parseDTsAsDeclsAndAsgns remaining
+        then Right $ parseDTsAsAsgns tokens
+        else Left  $ parseDTsAsDecls tokens
     where
         hasLeadingAsgn =
             -- if there is an asgn token before the next comma
@@ -248,6 +234,22 @@ parseDTsAsDeclsAndAsgns tokens =
                 (Just a, Just b) -> a > b
                 (Nothing, Just _) -> True
                 _ -> False
+
+-- internal parser for basic assignment lists
+parseDTsAsAsgns :: [DeclToken] -> [(LHS, Expr)]
+parseDTsAsAsgns tokens =
+    case l1 of
+        [] -> [asgn]
+        DTComma : remaining -> asgn : parseDTsAsAsgns remaining
+        _ -> error $ "bad assignment tokens: " ++ show tokens
+    where
+        (lhsToks, l0) = break isDTAsgn tokens
+        lhs = case takeLHS lhsToks of
+            Nothing -> error $ "could not parse as LHS: " ++ show lhsToks
+            Just l -> l
+        DTAsgn AsgnOpEq expr : l1 = l0
+        asgn = (lhs, expr)
+
         isDTAsgn :: DeclToken -> Bool
         isDTAsgn (DTAsgn _ _) = True
         isDTAsgn _ = False

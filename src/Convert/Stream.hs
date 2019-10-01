@@ -29,7 +29,7 @@ convertDescription other = other
 
 streamerBlock :: Expr -> Expr -> (LHS -> Expr -> Stmt) -> LHS -> Expr -> Stmt
 streamerBlock chunk size asgn output input =
-    Block Nothing
+    Block Seq ""
     [ Variable Local t inp [] $ Just input
     , Variable Local t out [] Nothing
     , Variable Local (IntegerAtom TInteger Unspecified) idx [] Nothing
@@ -50,14 +50,14 @@ streamerBlock chunk size asgn output input =
         idx = name ++ "_idx"
         bas = name ++ "_bas"
         -- main chunk loop
-        inits = [Right (LHSIdent idx, lo)]
-        cmp = Just $ BinOp Le (Ident idx) (BinOp Sub hi chunk)
+        inits = Right [(LHSIdent idx, lo)]
+        cmp = BinOp Le (Ident idx) (BinOp Sub hi chunk)
         incr = [(LHSIdent idx, AsgnOp Add, chunk)]
         lhs = LHSRange (LHSIdent out) IndexedMinus (BinOp Sub hi (Ident idx), chunk)
         expr = Range (Ident inp) IndexedPlus (Ident idx, chunk)
         stmt = AsgnBlk AsgnOpEq lhs expr
         -- final chunk loop
-        cmp2 = Just $ BinOp Lt (Ident idx) (BinOp Sub size (Ident bas))
+        cmp2 = BinOp Lt (Ident idx) (BinOp Sub size (Ident bas))
         incr2 = [(LHSIdent idx, AsgnOp Add, Number "1")]
         lhs2 = LHSBit (LHSIdent out) (Ident idx)
         expr2 = Bit (Ident inp) (BinOp Add (Ident idx) (Ident bas))

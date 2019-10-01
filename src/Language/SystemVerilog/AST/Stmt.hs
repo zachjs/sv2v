@@ -20,6 +20,7 @@ module Language.SystemVerilog.AST.Stmt
     , Assertion    (..)
     , PropertySpec (..)
     , UniquePriority (..)
+    , BlockKW (..)
     ) where
 
 import Text.Printf (printf)
@@ -29,14 +30,14 @@ import Language.SystemVerilog.AST.Attr (Attr)
 import Language.SystemVerilog.AST.Decl (Decl)
 import Language.SystemVerilog.AST.Expr (Expr, Args)
 import Language.SystemVerilog.AST.LHS (LHS)
-import Language.SystemVerilog.AST.Op (AsgnOp)
+import Language.SystemVerilog.AST.Op (AsgnOp(AsgnOpEq))
 import Language.SystemVerilog.AST.Type (Identifier)
 
 data Stmt
     = StmtAttr Attr Stmt
-    | Block   (Maybe Identifier) [Decl] [Stmt]
+    | Block   BlockKW Identifier [Decl] [Stmt]
     | Case    (Maybe UniquePriority) CaseKW Expr [Case] (Maybe Stmt)
-    | For     [Either Decl (LHS, Expr)] (Maybe Expr) [(LHS, AsgnOp, Expr)] Stmt
+    | For     (Either [Decl] [(LHS, Expr)]) Expr [(LHS, AsgnOp, Expr)] Stmt
     | AsgnBlk AsgnOp LHS Expr
     | Asgn    (Maybe Timing) LHS Expr
     | While   Expr Stmt
@@ -55,10 +56,10 @@ data Stmt
 
 instance Show Stmt where
     show (StmtAttr attr stmt) = printf "%s\n%s" (show attr) (show stmt)
-    show (Block name decls stmts) =
-        printf "begin%s\n%s\nend" header body
+    show (Block kw name decls stmts) =
+        printf "%s%s\n%s\n%s" (show kw) header body (blockEndToken kw)
         where
-            header = maybe "" (" : " ++) name
+            header = if null name then "" else " : " ++ name
             bodyLines = (map show decls) ++ (map show stmts)
             body = indent $ unlines' bodyLines
     show (Case u kw e cs def) =
@@ -68,16 +69,17 @@ instance Show Stmt where
             defStr = case def of
                 Nothing -> ""
                 Just c -> printf "\n\tdefault: %s" (show c)
-    show (For inits mc assigns stmt) =
+    show (For inits cond assigns stmt) =
         printf "for (%s; %s; %s)\n%s"
-            (commas $ map showInit inits)
-            (maybe "" show mc)
+            (showInits inits)
+            (show cond)
             (commas $ map showAssign assigns)
             (indent $ show stmt)
         where
-            showInit :: Either Decl (LHS, Expr) -> String
-            showInit (Left d) = init $ show d
-            showInit (Right (l, e)) = printf "%s = %s" (show l) (show e)
+            showInits :: Either [Decl] [(LHS, Expr)] -> String
+            showInits (Left decls) = commas $ map (init . show) decls
+            showInits (Right asgns) = commas $ map showInit asgns
+                where showInit (l, e) = showAssign (l, AsgnOpEq, e)
             showAssign :: (LHS, AsgnOp, Expr) -> String
             showAssign (l, op, e) = printf "%s %s %s" (show l) (show op) (show e)
     show (Subroutine ps x a) = printf "%s%s(%s);" (maybe "" (++ "::") ps) x (show a)
@@ -221,3 +223,16 @@ instance Show UniquePriority where
     show Unique   = "unique"
     show Unique0  = "unique0"
     show Priority = "priority"
+
+data BlockKW
+    = Seq
+    | Par
+    deriving Eq
+
+instance Show BlockKW where
+    show Seq = "begin"
+    show Par = "fork"
+
+blockEndToken :: BlockKW -> Identifier
+blockEndToken Seq = "end"
+blockEndToken Par = "join"

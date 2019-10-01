@@ -11,8 +11,6 @@
 
 module Convert.ForDecl (convert) where
 
-import Data.Either (isLeft, isRight, lefts, rights)
-
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
@@ -24,14 +22,14 @@ convert =
     )
 
 convertGenItem :: GenItem -> GenItem
-convertGenItem (GenFor (True, x, e) a b mbx c) =
-    GenBlock Nothing genItems
+convertGenItem (GenFor (True, x, e) a b bx c) =
+    GenBlock "" genItems
     where
-        x' = (maybe "" (++ "_") mbx) ++ x
+        x' = if null bx then x else bx ++ "_" ++ x
         Generate genItems =
             traverseNestedModuleItems converter $ Generate $
             [ GenModuleItem $ Genvar x'
-            , GenFor (False, x, e) a b mbx c
+            , GenFor (False, x, e) a b bx c
             ]
         converter =
             (traverseExprs $ traverseNestedExprs convertExpr) .
@@ -45,33 +43,28 @@ convertGenItem (GenFor (True, x, e) a b mbx c) =
 convertGenItem other = other
 
 convertStmt :: Stmt -> Stmt
-convertStmt (For [] cc asgns stmt) =
+convertStmt (For (Left []) cc asgns stmt) =
+    convertStmt $ For (Right []) cc asgns stmt
+convertStmt (For (Right []) cc asgns stmt) =
     convertStmt $ For inits cc asgns stmt
-    where inits = [Left $ dummyDecl (Just $ Number "0")]
-convertStmt (orig @ (For [Right _] _ _ _)) = orig
+    where inits = Left [dummyDecl (Just $ Number "0")]
+convertStmt (orig @ (For (Right [_]) _ _ _)) = orig
 
-convertStmt (orig @ (For (inits @ (Left _: _)) cc asgns stmt)) =
-    if not $ all isLeft inits
-    then error $ "for loop has mix of decls and asgns: " ++ show orig
-    else Block
-            Nothing
-            decls
-            (initAsgns ++ [For [Right (lhs, expr)] cc asgns stmt])
+convertStmt (For (Left inits) cc asgns stmt) =
+    Block Seq "" decls $
+        initAsgns ++
+        [For (Right [(lhs, expr)]) cc asgns stmt]
     where
-        splitDecls = map splitDecl $ lefts inits
+        splitDecls = map splitDecl inits
         decls = map fst splitDecls
         initAsgns = map asgnStmt $ init $ map snd splitDecls
         (lhs, expr) = snd $ last splitDecls
 
-convertStmt (orig @ (For inits cc asgns stmt)) =
-    if not $ all isRight inits
-    then error $ "for loop has mix of decls and asgns: " ++ show orig
-    else Block
-            Nothing
-            []
-            (initAsgns ++ [For [Right (lhs, expr)] cc asgns stmt])
+convertStmt (For (Right origPairs) cc asgns stmt) =
+    Block Seq "" [] $
+        initAsgns ++
+        [For (Right [(lhs, expr)]) cc asgns stmt]
     where
-        origPairs = rights inits
         (lhs, expr) = last origPairs
         initAsgns = map asgnStmt $ init origPairs
 
