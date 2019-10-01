@@ -18,6 +18,7 @@ module Language.SystemVerilog.AST.Type
     , NonIntegerType    (..)
     , typeRanges
     , nullRange
+    , elaborateIntegerAtom
     ) where
 
 import Text.Printf (printf)
@@ -98,12 +99,32 @@ nullRange t [(Number "0", Number "0")] = t
 nullRange (IntegerAtom TInteger sg) rs =
     -- integer arrays are allowed in SystemVerilog but not in Verilog
     IntegerVector TBit sg (rs ++ [(Number "31", Number "0")])
-nullRange (IntegerAtom TInt sg) rs =
-    -- int arrays are allowed in SystemVerilog but not in Verilog
-    IntegerVector TBit sg (rs ++ [(Number "31", Number "0")])
-nullRange t rs =
-    error $ "non-vector type " ++ show t ++
-        " cannot have a packed dimesions:" ++ show rs
+nullRange t rs1 =
+    if t == t'
+        then error $ "non-vector type " ++ show t ++
+                " cannot have packed dimesions:" ++ show rs1
+        else tf $ rs1 ++ rs2
+    where
+        t' = elaborateIntegerAtom t
+        (tf, rs2) = typeRanges t'
+
+elaborateIntegerAtom :: Type -> Type
+elaborateIntegerAtom (IntegerAtom TInt      sg) = baseIntType sg Signed      32
+elaborateIntegerAtom (IntegerAtom TShortint sg) = baseIntType sg Signed      16
+elaborateIntegerAtom (IntegerAtom TLongint  sg) = baseIntType sg Signed      64
+elaborateIntegerAtom (IntegerAtom TByte     sg) = baseIntType sg Unspecified  8
+elaborateIntegerAtom other = other
+
+-- makes a integer "compatible" type with the given signing, base signing and
+-- size; if not unspecified, the first signing overrides the second
+baseIntType :: Signing -> Signing -> Int -> Type
+baseIntType sgOverride sgBase size =
+    IntegerVector TReg sg [(Number hi, Number "0")]
+    where
+        hi = show (size - 1)
+        sg = if sgOverride /= Unspecified
+                then sgOverride
+                else sgBase
 
 data Signing
     = Unspecified
