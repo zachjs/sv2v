@@ -486,6 +486,7 @@ NonIntegerType :: { NonIntegerType }
   | "real"      { TReal      }
   | "realtime"  { TRealtime  }
   | "string"    { TString    }
+  | "event"     { TEvent     }
 
 EnumItems :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifiers { $1 }
@@ -915,7 +916,8 @@ StmtNonBlock :: { Stmt }
   | "do"      Stmt "while" "(" Expr ")" ";"    { DoWhile $5 $2 }
   | "forever" Stmt                             { Forever $2 }
   | "foreach" "(" Identifier IdxVars ")" Stmt  { Foreach $3 $4 $6 }
-  | "->" Identifier ";"                        { Trigger $2 }
+  | "->"  Identifier ";"                       { Trigger True  $2 }
+  | "->>" Identifier ";"                       { Trigger False $2 }
   | AttributeInstance Stmt                     { StmtAttr $1 $2 }
   | ProceduralAssertionStatement               { Assertion $1 }
   | IncOrDecOperator LHS ";"                   { AsgnBlk (AsgnOp $1) $2 (Number "1") }
@@ -1000,6 +1002,7 @@ EventControl :: { Sense }
   : "@" "(" Senses ")" { $3 }
   | "@" "(*)"          { SenseStar }
   | "@*"               { SenseStar }
+  | "@" Identifier     { Sense $ LHSIdent $2 }
 Senses :: { Sense }
   : Sense             { $1 }
   | Senses "or" Sense { SenseOr $1 $3 }

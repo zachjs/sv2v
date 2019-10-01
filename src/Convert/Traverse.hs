@@ -251,7 +251,7 @@ traverseSinglyNestedStmtsM fullMapper = cs
         cs (Timing event stmt) = fullMapper stmt >>= return . Timing event
         cs (Return expr) = return $ Return expr
         cs (Subroutine ps f exprs) = return $ Subroutine ps f exprs
-        cs (Trigger x) = return $ Trigger x
+        cs (Trigger blocks x) = return $ Trigger blocks x
         cs (Assertion a) =
             traverseAssertionStmtsM fullMapper a >>= return . Assertion
         cs (Null) = return Null
@@ -703,7 +703,7 @@ traverseStmtExprsM exprMapper = flatStmtMapper
         return $ Subroutine ps f (Args l' p')
     flatStmtMapper (Return expr) =
         exprMapper expr >>= return . Return
-    flatStmtMapper (Trigger x) = return $ Trigger x
+    flatStmtMapper (Trigger blocks x) = return $ Trigger blocks x
     flatStmtMapper (Assertion a) = do
         a' <- traverseAssertionStmtsM stmtMapper a
         a'' <- traverseAssertionExprsM exprMapper a'

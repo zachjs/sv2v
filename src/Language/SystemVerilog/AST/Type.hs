@@ -148,6 +148,7 @@ data NonIntegerType
     | TReal
     | TRealtime
     | TString
+    | TEvent
     deriving (Eq, Ord)
 
 instance Show NetType where
@@ -179,6 +180,7 @@ instance Show NonIntegerType where
     show TReal      = "real"
     show TRealtime  = "realtime"
     show TString    = "string"
+    show TEvent     = "event"
 
 data Packing
     = Unpacked

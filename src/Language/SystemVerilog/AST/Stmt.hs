@@ -49,7 +49,7 @@ data Stmt
     | Timing  Timing Stmt
     | Return  Expr
     | Subroutine (Maybe Identifier) Identifier Args
-    | Trigger Identifier
+    | Trigger Bool Identifier
     | Assertion Assertion
     | Null
     deriving Eq
@@ -94,7 +94,7 @@ instance Show Stmt where
     show (If u a b c   ) = printf "%sif (%s) %s\nelse %s" (maybe "" showPad u) (show a) (show b) (show c)
     show (Return e   ) = printf "return %s;" (show e)
     show (Timing t s ) = printf "%s %s" (show t) (show s)
-    show (Trigger x  ) = printf "-> %s;" x
+    show (Trigger b x) = printf "->%s %s;" (if b then "" else ">") x
     show (Assertion a) = show a
     show (Null       ) = ";"
 
