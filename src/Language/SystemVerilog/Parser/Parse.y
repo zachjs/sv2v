@@ -538,8 +538,8 @@ ParamsFollow :: { [Decl] }
   | ParamAsgn "," ParamsFollow { $1 : $3 }
   |               ParamsDecl   { $1 }
 ParamsDecl :: { [Decl] }
-  : ParameterDecl(")")            { $1 }
-  | ParameterDecl(",") ParamsDecl { $1 ++ $2 }
+  : ModuleParameterDecl(")")            { $1 }
+  | ModuleParameterDecl(",") ParamsDecl { $1 ++ $2 }
 ParamAsgn :: { Decl }
   : Identifier "=" Expr { Param Parameter (Implicit Unspecified []) $1 $3 }
 
@@ -966,6 +966,9 @@ DeclOrStmt :: { ([Decl], [Stmt]) }
   : DeclOrStmtTokens(";") { parseDTsAsDeclOrAsgn $1 }
   | ParameterDecl(";")    { ($1, []) }
 
+ModuleParameterDecl(delim) :: { [Decl] }
+  :    ParameterDecl(delim) { $1 }
+  | "type" TypeAsgns delim  { map (uncurry $ ParamType Parameter) $2 }
 ParameterDecl(delim) :: { [Decl] }
   : ParameterDeclKW                                       DeclAsgns delim { makeParamDecls $1 (Implicit Unspecified []) $2 }
   | ParameterDeclKW                             ParamType DeclAsgns delim { makeParamDecls $1 ($2                     ) $3 }

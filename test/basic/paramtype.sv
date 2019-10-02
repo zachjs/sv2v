@@ -67,6 +67,17 @@ module o_nodef #(
     end
 endmodule
 
+module p #(
+    type T = logic, U = logic
+);
+    T x = 0;
+    U y = 1;
+    initial begin
+        $display("p %b %b %d", x, x+1, $bits(T));
+        $display("p %b %b %d", y, y+1, $bits(U));
+    end
+endmodule
+
 module top; endmodule
 
 // Top level modules appear to be generally instantiated in lexicographic order,
@@ -98,3 +109,6 @@ module f_1; o_nodef #(1, logic [1:0], logic [2:0], 0) x(); endmodule
 module f_2; o_nodef #(.T(logic [1:0]), .U(logic), .b(1), .a(0)) x(); endmodule
 module f_3; o_nodef #(0, logic [1:0], logic [2:0], 1) x(); endmodule
 module f_4; o_nodef #(.T(logic [1:0]), .U(logic), .b(0), .a(1)) x(); endmodule
+
+module p_1; p #(logic [1:0], logic [2:0]) x(); endmodule
+module p_2; p x(); endmodule
