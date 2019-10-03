@@ -164,6 +164,10 @@ readNumber n =
 simplify :: Expr -> Expr
 simplify (UniOp LogNot (Number "1")) = Number "0"
 simplify (UniOp LogNot (Number "0")) = Number "1"
+simplify (orig @ (UniOp UniSub (Number n))) =
+    case readNumber n of
+        Nothing -> orig
+        Just x -> Number $ show (-x)
 simplify (orig @ (Repeat (Number n) exprs)) =
     case readNumber n of
         Nothing -> orig
