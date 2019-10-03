@@ -637,8 +637,8 @@ NonGenerateModuleItem :: { [ModuleItem] }
   -- This item covers module instantiations and all declarations
   : DeclTokens(";")                      { parseDTsAsModuleItems $1 }
   | ParameterDecl(";")                   { map (MIPackageItem . Decl) $1 }
-  | "defparam" DefparamAsgns ";"         { map (uncurry Defparam) $2 }
-  | "assign" opt(DelayControl) LHS "=" Expr ";" { [Assign $2 $3 $5] }
+  | "defparam" LHSAsgns ";"              { map (uncurry Defparam) $2 }
+  | "assign" opt(DelayControl) LHSAsgns ";" { map (uncurry $ Assign $2) $3 }
   | AlwaysKW Stmt                        { [AlwaysC $1 $2] }
   | "initial" Stmt                       { [Initial $2] }
   | "genvar" Identifiers ";"             { map Genvar $2 }
@@ -750,10 +750,10 @@ NOutputGateKW :: { NOutputGateKW }
   : "buf"  { GateBuf  }
   | "not"  { GateNot  }
 
-DefparamAsgns :: { [(LHS, Expr)] }
-  : DefparamAsgn                   { [$1] }
-  | DefparamAsgns "," DefparamAsgn { $1 ++ [$3] }
-DefparamAsgn :: { (LHS, Expr) }
+LHSAsgns :: { [(LHS, Expr)] }
+  : LHSAsgn                   { [$1] }
+  | LHSAsgns "," LHSAsgn { $1 ++ [$3] }
+LHSAsgn :: { (LHS, Expr) }
   : LHS "=" Expr { ($1, $3) }
 
 PackageItems :: { [PackageItem] }
