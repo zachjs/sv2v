@@ -107,14 +107,21 @@ front end if there is significant interest.
 
 ## Testing
 
-The current test suite is limited. Tests can be run with `make test`.
+Once the [test dependencies](#dependencies) are installed, tests can be run with
+`make test`. Travis CI is used to automatically test commits on GitHub.
+
+There is also a [SystemVerilog compliance suite] being created to test
+open-source tools' SystemVerilog support. Although not every test in the suite
+is applicable, it has been a valuable asset in finding edge cases.
+
+[SystemVerilog compliance suite]: https://github.com/SymbiFlow/sv-tests
 
 
 ## Acknowledgements
 
 This project was originally forked from [Tom Hawkin's Verilog parser]. While the
-front end has changed substantially to parse a different language, his project
-was a great starting point.
+front end has changed substantially to support the larger SystemVerilog
+standard, his project was a great starting point.
 
 [Tom Hawkin's Verilog parser]: https://github.com/tomahawkins/verilog
 
@@ -124,6 +131,10 @@ and advice, and isolating many bugs. His projects can be found
 
 Edric Kusuma helped me with the ins and outs of SystemVerilog, with which I had
 no prior experience, and has also helped with test cases.
+
+Since sv2v's public release, several people have taken the time to file detailed
+bug reports and feature requests. I greatly appreciate their help in furthering
+the project.
 
 
 ## License
