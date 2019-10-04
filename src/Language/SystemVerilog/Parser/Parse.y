@@ -1017,9 +1017,10 @@ Sense :: { Sense }
 
 DelayValue :: { Expr }
   : Number { Number $1 }
+  | Identifier { Ident $1 }
+  | Identifier "::" Identifier { PSIdent $1 $3 }
 -- TODO: Support these other DelayValues?
 -- | real_number
--- | ps_identifier
 -- | time_literal
 -- | 1step
 
