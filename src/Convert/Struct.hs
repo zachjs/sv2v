@@ -475,6 +475,12 @@ convertAsgn structs types (lhs, expr) =
             where
                 items' = map mapItem items
                 mapItem (mx, e) = (mx, snd $ convertSubExpr e)
+        convertSubExpr (MinTypMax a b c) =
+            (t, MinTypMax a' b' c')
+            where
+                (_, a') = convertSubExpr a
+                (t, b') = convertSubExpr b
+                (_, c') = convertSubExpr c
         convertSubExpr Nil = (Implicit Unspecified [], Nil)
 
         convertTypeOrExpr :: TypeOrExpr -> TypeOrExpr

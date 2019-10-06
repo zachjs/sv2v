@@ -55,6 +55,7 @@ data Expr
     | DimFn   DimFn  TypeOrExpr Expr
     | Dot     Expr Identifier
     | Pattern [(Maybe Identifier, Expr)]
+    | MinTypMax Expr Expr Expr
     | Nil
     deriving (Eq, Ord)
 
@@ -83,6 +84,7 @@ instance Show Expr where
             showPatternItem :: (Maybe Identifier, Expr) -> String
             showPatternItem (Nothing, e) = show e
             showPatternItem (Just n , e) = printf "%s: %s" n (show e)
+    show (MinTypMax a b c) = printf "(%s : %s : %s)" (show a) (show b) (show c)
 
 data Args
     = Args [Maybe Expr] [(Identifier, Maybe Expr)]

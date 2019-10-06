@@ -481,6 +481,11 @@ traverseNestedExprsM mapper = exprMapper
             let names = map fst l
             exprs <- mapM exprMapper $ map snd l
             return $ Pattern $ zip names exprs
+        em (MinTypMax e1 e2 e3) = do
+            e1' <- exprMapper e1
+            e2' <- exprMapper e2
+            e3' <- exprMapper e3
+            return $ MinTypMax e1' e2' e3'
         em (Nil) = return Nil
 
 exprMapperHelpers :: Monad m => MapperM m Expr ->

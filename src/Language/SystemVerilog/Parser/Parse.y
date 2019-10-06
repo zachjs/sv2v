@@ -1019,6 +1019,7 @@ DelayValue :: { Expr }
   : Number { Number $1 }
   | Identifier { Ident $1 }
   | Identifier "::" Identifier { PSIdent $1 $3 }
+  | "(" Expr ":" Expr ":" Expr ")" { MinTypMax $2 $4 $6 }
 -- TODO: Support these other DelayValues?
 -- | real_number
 -- | time_literal
@@ -1106,6 +1107,7 @@ Expr :: { Expr }
   | "{" StreamOp StreamSize Concat "}" { Stream $2 $3           $4 }
   | "{" StreamOp            Concat "}" { Stream $2 (Number "1") $3 }
   | Expr "inside" Concat        { foldl1 (BinOp LogOr) $ map (BinOp Eq $1) $3 }
+  | "(" Expr ":" Expr ":" Expr ")" { MinTypMax $2 $4 $6 }
   -- binary expressions
   | Expr "||"  Expr { BinOp LogOr  $1 $3 }
   | Expr "&&"  Expr { BinOp LogAnd $1 $3 }
