@@ -22,14 +22,17 @@ convert =
     )
 
 convertGenItem :: GenItem -> GenItem
-convertGenItem (GenFor (True, x, e) a b bx c) =
+convertGenItem (GenFor (True, x, e) a b c) =
     GenBlock "" genItems
     where
+        bx = case c of
+            GenBlock name _ -> name
+            _ -> ""
         x' = if null bx then x else bx ++ "_" ++ x
         Generate genItems =
             traverseNestedModuleItems converter $ Generate $
             [ GenModuleItem $ Genvar x'
-            , GenFor (False, x, e) a b bx c
+            , GenFor (False, x, e) a b c
             ]
         converter =
             (traverseExprs $ traverseNestedExprs convertExpr) .

@@ -619,11 +619,11 @@ traverseExprsM' strat exprMapper = moduleItemMapper
         a'' <- traverseAssertionExprsM exprMapper a'
         return $ AssertionItem (mx, a'')
 
-    genItemMapper (GenFor (n1, x1, e1) cc (x2, op2, e2) mn subItems) = do
+    genItemMapper (GenFor (n1, x1, e1) cc (x2, op2, e2) subItem) = do
         e1' <- exprMapper e1
         e2' <- exprMapper e2
         cc' <- exprMapper cc
-        return $ GenFor (n1, x1, e1') cc' (x2, op2, e2') mn subItems
+        return $ GenFor (n1, x1, e1') cc' (x2, op2, e2') subItem
     genItemMapper (GenIf e i1 i2) = do
         e' <- exprMapper e
         return $ GenIf e' i1 i2
@@ -748,12 +748,12 @@ traverseLHSsM' strat mapper item =
             items' <- mapM (traverseNestedGenItemsM traverGenItemLHSsM) items
             return $ Generate items'
         traverseModuleItemLHSsM other = return other
-        traverGenItemLHSsM (GenFor (n1, x1, e1) cc (x2, op2, e2) mn subItems) = do
+        traverGenItemLHSsM (GenFor (n1, x1, e1) cc (x2, op2, e2) subItem) = do
             wrapped_x1' <- (if n1 then return else mapper) $ LHSIdent x1
             wrapped_x2' <- mapper $ LHSIdent x2
             let LHSIdent x1' = wrapped_x1'
             let LHSIdent x2' = wrapped_x2'
-            return $ GenFor (n1, x1', e1) cc (x2', op2, e2) mn subItems
+            return $ GenFor (n1, x1', e1) cc (x2', op2, e2) subItem
         traverGenItemLHSsM other = return other
 
 traverseLHSs' :: TFStrategy -> Mapper LHS -> Mapper ModuleItem
@@ -924,9 +924,9 @@ traverseSinglyNestedGenItemsM fullMapper = gim
         gim (GenBlock x subItems) = do
             subItems' <- mapM fullMapper subItems
             return $ GenBlock x (concatMap flattenBlocks subItems')
-        gim (GenFor a b c d subItems) = do
-            subItems' <- mapM fullMapper subItems
-            return $ GenFor a b c d (concatMap flattenBlocks subItems')
+        gim (GenFor a b c subItem) = do
+            subItem' <- fullMapper subItem
+            return $ GenFor a b c subItem'
         gim (GenIf e i1 i2) = do
             i1' <- fullMapper i1
             i2' <- fullMapper i2

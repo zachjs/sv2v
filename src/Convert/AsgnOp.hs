@@ -19,8 +19,8 @@ convert =
     )
 
 convertGenItem :: GenItem -> GenItem
-convertGenItem (GenFor a b (ident, AsgnOp op, expr) c d) =
-    GenFor a b (ident, AsgnOpEq, BinOp op (Ident ident) expr) c d
+convertGenItem (GenFor a b (ident, AsgnOp op, expr) c) =
+    GenFor a b (ident, AsgnOpEq, BinOp op (Ident ident) expr) c
 convertGenItem other = other
 
 convertStmt :: Stmt -> Stmt

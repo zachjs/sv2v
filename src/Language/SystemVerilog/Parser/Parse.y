@@ -1189,7 +1189,7 @@ ConditionalGenerateConstruct :: { GenItem }
   | "if" "(" Expr ")" GenItemOrNull %prec NoElse         { GenIf $3 $5 GenNull }
   | "case" "(" Expr ")" GenCasesWithDefault "endcase"    { GenCase $3 (fst $5) (snd $5) }
 LoopGenerateConstruct :: { GenItem }
-  : "for" "(" GenvarInitialization ";" Expr ";" GenvarIteration ")" GenBlock { (uncurry $ GenFor $3 $5 $7) $9 }
+  : "for" "(" GenvarInitialization ";" Expr ";" GenvarIteration ")" GenItem { GenFor $3 $5 $7 $9 }
 
 GenBlock :: { (Identifier, [GenItem]) }
   : "begin" StrTag GenItems "end" StrTag { (combineTags $2 $5, $3) }

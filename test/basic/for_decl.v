@@ -75,4 +75,10 @@ module top;
     assign start = gen_filter[0].x;
     initial $display(start);
 
+    wire [0:31] c;
+    generate
+        for (n = 0; n < 32; n = n + 1)
+            assign c[n] = n & 1;
+    endgenerate
+
 endmodule

@@ -22,7 +22,7 @@ import {-# SOURCE #-} Language.SystemVerilog.AST.ModuleItem (ModuleItem)
 data GenItem
     = GenBlock Identifier [GenItem]
     | GenCase  Expr [GenCase] (Maybe GenItem)
-    | GenFor   (Bool, Identifier, Expr) Expr (Identifier, AsgnOp, Expr) Identifier [GenItem]
+    | GenFor   (Bool, Identifier, Expr) Expr (Identifier, AsgnOp, Expr) GenItem
     | GenIf    Expr GenItem GenItem
     | GenNull
     | GenModuleItem ModuleItem
@@ -43,13 +43,13 @@ instance Show GenItem where
                 Just c -> printf "\n\tdefault: %s" (show c)
     show (GenIf e a GenNull) = printf "if (%s) %s"          (show e) (show a)
     show (GenIf e a b      ) = printf "if (%s) %s\nelse %s" (show e) (show a) (show b)
-    show (GenFor (new, x1, e1) c (x2, o2, e2) x is) =
+    show (GenFor (new, x1, e1) c (x2, o2, e2) s) =
         printf "for (%s%s = %s; %s; %s %s %s) %s"
             (if new then "genvar " else "")
             x1 (show e1)
             (show c)
             x2 (show o2) (show e2)
-            (show $ GenBlock x is)
+            (show s)
     show (GenNull) = ";"
     show (GenModuleItem item) = show item
 
