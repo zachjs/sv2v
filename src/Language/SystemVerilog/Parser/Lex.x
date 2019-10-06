@@ -13,6 +13,10 @@
  - be able to search for and read files whenever we see an include directive.
  - Trying to thread the IO Monad through alex's interface would be very
  - convoluted. The operations performed are not effectful, and are type safe.
+ -
+ - It may be possible to separate the preprocessor from the lexer by having a
+ - preprocessor which produces location annotations. This could improve error
+ - messaging and remove the include file and macro boundary hacks.
  -}
 
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
@@ -519,9 +523,10 @@ lexFile includePaths env path = do
         Left msg -> Left msg
         Right finalState ->
             if null $ lsCondStack finalState
-                then Right (reverse $ lsToks finalState, lsEnv finalState)
+                then Right (finalToks, lsEnv finalState)
                 else Left $ path ++ ": unfinished conditional directives: " ++
                         (show $ length $ lsCondStack finalState)
+            where finalToks = coalesce $ reverse $ lsToks finalState
     where
         setEnv = do
             -- standardize the file path format
@@ -531,6 +536,26 @@ lexFile includePaths env path = do
                 , lsIncludePaths = includePaths
                 , lsCurrFile = path'
                 }
+
+-- combines identifiers and numbers that cross macro boundaries
+coalesce :: [Token] -> [Token]
+coalesce [] = []
+coalesce (Token MacroBoundary _ _ : rest) = coalesce rest
+coalesce (Token t1 str1 pn1 : Token MacroBoundary _ _ : Token t2 str2 pn2 : rest) =
+    case (t1, t2, immediatelyFollows) of
+        (Lit_number, Lit_number, _) ->
+            Token t1 (str1 ++ str2) pn1 : (coalesce rest)
+        (Id_simple, Id_simple, True) ->
+            Token t1 (str1 ++ str2) pn1 : (coalesce rest)
+        _ ->
+            Token t1 str1 pn1 : (coalesce $ Token t2 str2 pn2 : rest)
+    where
+        Position _ l1 c1 = pn1
+        Position _ l2 c2 = pn2
+        apn1 = AlexPn 0 l1 c1
+        apn2 = AlexPn (length str1) l2 c2
+        immediatelyFollows = apn2 == foldl alexMove apn1 str1
+coalesce (x : xs) = x : coalesce xs
 
 -- invoked by alexMonadScan
 alexEOF :: Alex ()
@@ -955,7 +980,9 @@ handleDirective (posOrig, _, _, strOrig) len = do
                     let loc = "macro expansion of " ++ directive ++ " at " ++ currFile
                     let pos = Position loc l (c - length directive - 1)
                     let reTag (Token a b _) = Token a b pos
-                    modify $ \s -> s { lsToks = (map reTag newToks) ++ currToks }
+                    let boundary = Token MacroBoundary "" (Position "" 0 0)
+                    let boundedToks = boundary : (map reTag newToks) ++ boundary : currToks
+                    modify $ \s -> s { lsToks = boundedToks }
                     -- continue lexing after the macro
                     alexSetInput currInput
                     alexMonadScan

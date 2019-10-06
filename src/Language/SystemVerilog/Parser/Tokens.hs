@@ -379,4 +379,5 @@ data TokenName
     | Sym_lt_lt_lt_eq
     | Sym_gt_gt_gt_eq
     | Unknown
+    | MacroBoundary
     deriving (Show, Eq)
