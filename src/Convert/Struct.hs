@@ -441,6 +441,7 @@ convertAsgn structs types (lhs, expr) =
             (Implicit Unspecified [], Call (Just x) f args)
         convertSubExpr (String s) = (Implicit Unspecified [], String s)
         convertSubExpr (Number n) = (Implicit Unspecified [], Number n)
+        convertSubExpr (Time   n) = (Implicit Unspecified [], Time   n)
         convertSubExpr (PSIdent x y) = (Implicit Unspecified [], PSIdent x y)
         convertSubExpr (Repeat e es) =
             (Implicit Unspecified [], Repeat e' es')

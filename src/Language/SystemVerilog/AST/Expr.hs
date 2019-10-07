@@ -39,6 +39,7 @@ type TypeOrExpr = Either Type Expr
 data Expr
     = String  String
     | Number  String
+    | Time    String
     | Ident   Identifier
     | PSIdent Identifier Identifier
     | Range   Expr PartSelectMode Range
@@ -62,6 +63,7 @@ data Expr
 instance Show Expr where
     show (Nil          ) = ""
     show (Number  str  ) = str
+    show (Time    str  ) = str
     show (Ident   str  ) = str
     show (PSIdent x y  ) = printf "%s::%s" x y
     show (String  str  ) = printf "\"%s\"" str

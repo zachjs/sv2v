@@ -426,6 +426,7 @@ traverseNestedExprsM mapper = exprMapper
             exprMapper e >>= return . Right
         em (String s) = return $ String s
         em (Number s) = return $ Number s
+        em (Time   s) = return $ Time   s
         em (Ident  i) = return $ Ident  i
         em (PSIdent x y) = return $ PSIdent x y
         em (Range e m (e1, e2)) = do

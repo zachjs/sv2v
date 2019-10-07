@@ -1085,6 +1085,7 @@ Expr :: { Expr }
   : "(" Expr ")"                { $2 }
   | String                      { String $1 }
   | Number                      { Number $1 }
+  | Time                        { Time   $1 }
   |                 Identifier CallArgs { Call (Nothing) $1 $2 }
   | Identifier "::" Identifier CallArgs { Call (Just $1) $3 $4 }
   | DimsFn "(" TypeOrExpr ")"   { DimsFn $1 $3 }
