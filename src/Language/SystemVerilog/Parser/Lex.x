@@ -780,11 +780,7 @@ takeMacroArguments = do
             case (stack, ch) of
                 (      s,'\\') -> do
                     ch2 <- takeChar
-                    if ch2 == '\n'
-                        then do
-                            dropWhitespace
-                            loop curr s
-                        else loop (curr ++ [ch, ch2]) s
+                    loop (curr ++ [ch, ch2]) s
                 ([     ], ',') -> return (curr, False)
                 ([     ], ')') -> return (curr, True)
 
