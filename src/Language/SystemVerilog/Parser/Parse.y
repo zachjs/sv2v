@@ -911,6 +911,9 @@ StmtNonBlock :: { Stmt }
   | Identifier "::" Identifier CallArgs ";"    { Subroutine (Just $1) $3 $4 }
   | TimingControl Stmt                         { Timing $1 $2 }
   | "return" Expr ";"                          { Return $2 }
+  | "return"      ";"                          { Return Nil }
+  | "break"       ";"                          { Break }
+  | "continue"    ";"                          { Continue }
   | "while"  "(" Expr ")" Stmt                 { While   $3 $5 }
   | "repeat" "(" Expr ")" Stmt                 { RepeatL $3 $5 }
   | "do"      Stmt "while" "(" Expr ")" ";"    { DoWhile $5 $2 }

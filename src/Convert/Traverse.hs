@@ -229,6 +229,13 @@ traverseSinglyNestedStmtsM fullMapper = cs
     where
         cs (StmtAttr a stmt) = fullMapper stmt >>= return . StmtAttr a
         cs (Block _ "" [] []) = return Null
+        cs (Block Seq name decls stmts) = do
+            stmts' <- mapM fullMapper stmts
+            return $ Block Seq name decls $ concatMap explode stmts'
+            where
+                explode :: Stmt -> [Stmt]
+                explode (Block Seq "" [] ss) = ss
+                explode other = [other]
         cs (Block kw name decls stmts) =
             mapM fullMapper stmts >>= return . Block kw name decls
         cs (Case u kw expr cases def) = do
@@ -254,6 +261,8 @@ traverseSinglyNestedStmtsM fullMapper = cs
         cs (Trigger blocks x) = return $ Trigger blocks x
         cs (Assertion a) =
             traverseAssertionStmtsM fullMapper a >>= return . Assertion
+        cs (Continue) = return Continue
+        cs (Break) = return Break
         cs (Null) = return Null
 
 traverseAssertionStmtsM :: Monad m => MapperM m Stmt -> MapperM m Assertion
@@ -714,6 +723,8 @@ traverseStmtExprsM exprMapper = flatStmtMapper
         a' <- traverseAssertionStmtsM stmtMapper a
         a'' <- traverseAssertionExprsM exprMapper a'
         return $ Assertion a''
+    flatStmtMapper (Continue) = return Continue
+    flatStmtMapper (Break) = return Break
     flatStmtMapper (Null) = return Null
 
     initsMapper (Left decls) = mapM declMapper decls >>= return . Left

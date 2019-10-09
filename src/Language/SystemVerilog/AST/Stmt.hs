@@ -51,6 +51,8 @@ data Stmt
     | Subroutine (Maybe Identifier) Identifier Args
     | Trigger Bool Identifier
     | Assertion Assertion
+    | Continue
+    | Break
     | Null
     deriving Eq
 
@@ -96,6 +98,8 @@ instance Show Stmt where
     show (Timing t s ) = printf "%s %s" (show t) (show s)
     show (Trigger b x) = printf "->%s %s;" (if b then "" else ">") x
     show (Assertion a) = show a
+    show (Continue   ) = "continue;"
+    show (Break      ) = "break;"
     show (Null       ) = ";"
 
 data CaseKW

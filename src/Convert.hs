@@ -21,6 +21,7 @@ import qualified Convert.Foreach
 import qualified Convert.FuncRet
 import qualified Convert.Interface
 import qualified Convert.IntTypes
+import qualified Convert.Jump
 import qualified Convert.KWArgs
 import qualified Convert.Logic
 import qualified Convert.LogOp
@@ -30,7 +31,6 @@ import qualified Convert.NestPI
 import qualified Convert.Package
 import qualified Convert.ParamType
 import qualified Convert.RemoveComments
-import qualified Convert.Return
 import qualified Convert.Simplify
 import qualified Convert.SizeCast
 import qualified Convert.StarPort
@@ -75,7 +75,7 @@ phases excludes =
     , Convert.Package.convert
     , Convert.Enum.convert
     , Convert.NestPI.convert
-    , Convert.Return.convert
+    , Convert.Jump.convert
     , Convert.Foreach.convert
     , selectExclude (Job.Interface, Convert.Interface.convert)
     , selectExclude (Job.Always   , Convert.AlwaysKW.convert)

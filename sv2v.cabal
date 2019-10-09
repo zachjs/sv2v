@@ -66,6 +66,7 @@ executable sv2v
     Convert.FuncRet
     Convert.Interface
     Convert.IntTypes
+    Convert.Jump
     Convert.KWArgs
     Convert.Logic
     Convert.LogOp
@@ -75,7 +76,6 @@ executable sv2v
     Convert.Package
     Convert.ParamType
     Convert.RemoveComments
-    Convert.Return
     Convert.Simplify
     Convert.SizeCast
     Convert.StarPort
