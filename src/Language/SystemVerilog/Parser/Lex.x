@@ -529,12 +529,10 @@ lexFile includePaths env path = do
             where finalToks = coalesce $ reverse $ lsToks finalState
     where
         setEnv = do
-            -- standardize the file path format
-            path' <- includeSearch path
             modify $ \s -> s
                 { lsEnv = env
                 , lsIncludePaths = includePaths
-                , lsCurrFile = path'
+                , lsCurrFile = path
                 }
 
 -- combines identifiers and numbers that cross macro boundaries
@@ -716,6 +714,27 @@ takeQuotedString = do
         then lexicalError $ "library includes are not supported: " ++ res
         else return res
 
+-- removes and returns a decimal number
+takeNumber :: Alex Int
+takeNumber = do
+    dropSpaces
+    leadCh <- peekChar
+    if '0' <= leadCh && leadCh <= '9'
+        then step 0
+        else lexicalError $ "expected number, but found unexpected char: "
+                ++ show leadCh
+    where
+        step number = do
+            ch <- takeChar
+            if ch == ' ' || ch == '\n' then
+                return number
+            else if '0' <= ch && ch <= '9' then do
+                let digit = ord ch - ord '0'
+                step $ number * 10 + digit
+            else
+                lexicalError $ "unexpected char while reading number: "
+                    ++ show ch
+
 peekChar :: Alex Char
 peekChar = do
     (_, _, _, str) <- alexGetInput
@@ -881,6 +900,16 @@ handleDirective (posOrig, _, _, strOrig) len = do
             modify $ push $ Token Lit_number tokStr tokPos
             alexMonadScan
 
+        "line" -> do
+            lineNumber <- takeNumber
+            quotedFilename <- takeQuotedString
+            _ <- takeNumber -- level, ignored
+            let filename = init $ tail quotedFilename
+            setCurrentFile filename
+            (AlexPn f _ c, prev, _, str) <- alexGetInput
+            alexSetInput (AlexPn f (lineNumber + 1) c, prev, [], str)
+            alexMonadScan
+
         "include" -> do
             quotedFilename <- takeQuotedString
             inputFollow <- alexGetInput
@@ -968,7 +997,7 @@ handleDirective (posOrig, _, _, strOrig) len = do
                     currToks <- gets lsToks
                     modify $ \s -> s { lsToks = [] }
                     -- lex the macro expansion, preserving the file and line
-                    alexSetInput (AlexPn 0 l 0, ' ' , [], replacement)
+                    alexSetInput (AlexPn 0 l 0, ' ', [], replacement)
                     alexMonadScan
                     -- re-tag and save tokens from the macro expansion
                     newToks <- gets lsToks

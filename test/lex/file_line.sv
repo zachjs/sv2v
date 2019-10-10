@@ -1,3 +1,8 @@
+`ifndef INCLUDED
+`define INCLUDED
+`include "file_line.sv"
+`else
+
 `define MACRO(arg) $display(arg, `__FILE__, `__LINE__);
 `define MACRO_NO_ARG $display(`__FILE__, `__LINE__);
 module top;
@@ -14,3 +19,5 @@ initial begin
     `MACRO("f")
 end
 endmodule
+
+`endif
