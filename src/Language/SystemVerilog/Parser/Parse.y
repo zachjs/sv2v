@@ -1015,9 +1015,12 @@ Senses :: { Sense }
   | Senses "or" Sense { SenseOr $1 $3 }
   | Senses ","  Sense { SenseOr $1 $3 }
 Sense :: { Sense }
-  :           LHS { Sense        $1 }
-  | "posedge" LHS { SensePosedge $2 }
-  | "negedge" LHS { SenseNegedge $2 }
+  : "(" Sense ")"         {              $2 }
+  |               LHS     { Sense        $1 }
+  | "posedge"     LHS     { SensePosedge $2 }
+  | "negedge"     LHS     { SenseNegedge $2 }
+  | "posedge" "(" LHS ")" { SensePosedge $3 }
+  | "negedge" "(" LHS ")" { SenseNegedge $3 }
 
 DelayValue :: { Expr }
   : Number { Number $1 }
