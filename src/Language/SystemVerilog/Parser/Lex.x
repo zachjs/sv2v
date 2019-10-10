@@ -43,8 +43,8 @@ import Language.SystemVerilog.Parser.Tokens
 
 -- Numbers
 
-$nonZeroDecimalDigit = [1-9]
-$decimalDigit = [0-9]
+@nonZeroDecimalDigit = [1-9]
+@decimalDigit = [0-9]
 @xDigit       = [xX]
 @zDigit       = [zZ\?]
 @binaryDigit  = @xDigit | @zDigit | [0-1]
@@ -56,33 +56,40 @@ $decimalDigit = [0-9]
 @octalBase   = "'" [sS]? [oO]
 @hexBase     = "'" [sS]? [hH]
 
-@binaryValue = @binaryDigit ("_" | @binaryDigit)*
-@octalValue  = @octalDigit  ("_" | @octalDigit)*
-@hexValue    = @hexDigit    ("_" | @hexDigit)*
+@nonZeroUnsignedNumber = @nonZeroDecimalDigit ("_" | @decimalDigit)*
+@unsignedNumber        = @decimalDigit        ("_" | @decimalDigit)*
+@binaryValue           = @binaryDigit         ("_" | @binaryDigit )*
+@octalValue            = @octalDigit          ("_" | @octalDigit  )*
+@hexValue              = @hexDigit            ("_" | @hexDigit    )*
 
-@unsignedNumber = $decimalDigit ("_" | $decimalDigit)*
-
+@exp = [eE]
 @sign = [\-\+]
-@fixedPointNumber    = @unsignedNumber "." @unsignedNumber
-@floatingPointNumber = @unsignedNumber ("." @unsignedNumber)? [eE] @sign? @unsignedNumber
+@fixedPointNumber = @unsignedNumber "." @unsignedNumber
+@realNumber
+    = @fixedPointNumber
+    | @unsignedNumber ("." @unsignedNumber)? @exp @sign? @unsignedNumber
 
-@size = @unsignedNumber " "?
+@size = @nonZeroUnsignedNumber " "?
 
-@decimalNumber = @size? @decimalBase " "? @unsignedNumber
-@binaryNumber  = @size? @binaryBase  " "? @binaryValue
-@octalNumber   = @size? @octalBase   " "? @octalValue
-@hexNumber     = @size? @hexBase     " "? @hexValue
-@realNumber    = @fixedPointNumber | @floatingPointNumber
+@binaryNumber = @size? @binaryBase " "? @binaryValue
+@octalNumber  = @size? @octalBase  " "? @octalValue
+@hexNumber    = @size? @hexBase    " "? @hexValue
 
 @unbasedUnsizedLiteral = "'" ( 0 | 1 | x | X | z | Z )
 
-@number
+@decimalNumber
     = @unsignedNumber
-    | @decimalNumber
+    | @size? @decimalBase " "? @unsignedNumber
+    | @size? @decimalBase " "? @xDigit "_"*
+    | @size? @decimalBase " "? @zDigit "_"*
+@integralNumber
+    = @decimalNumber
     | @octalNumber
     | @binaryNumber
     | @hexNumber
     | @unbasedUnsizedLiteral
+@number
+    = @integralNumber
     | @realNumber
 
 -- Strings
