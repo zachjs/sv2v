@@ -608,6 +608,7 @@ DeclOrStmtToken :: { DeclToken }
   | Signing        { DTSigning  $1 }
   | Lifetime       { DTLifetime $1 }
   | Identifier "::" Identifier { DTPSIdent $1 $3 }
+  | "const" PartialType { DTType $2 }
   | "{" StreamOp StreamSize Concat "}" { DTStream $2 $3           (map toLHS $4) }
   | "{" StreamOp            Concat "}" { DTStream $2 (Number "1") (map toLHS $3) }
 
