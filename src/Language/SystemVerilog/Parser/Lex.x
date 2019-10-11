@@ -33,9 +33,11 @@ import System.FilePath (dropFileName)
 import System.Directory (findFile)
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import Data.List (span, elemIndex, dropWhileEnd)
 import Data.Maybe (isJust, fromJust)
 
+import Language.SystemVerilog.Parser.Keywords (specMap)
 import Language.SystemVerilog.Parser.Tokens
 }
 
@@ -513,13 +515,14 @@ data AlexUserState = LS
     , lsEnv          :: Env -- active macro definitions
     , lsCondStack    :: [Cond] -- if-else cascade state
     , lsIncludePaths :: [FilePath] -- folders to search for includes
+    , lsSpecStack    :: [Set.Set TokenName] -- stack of non-keyword token names
     } deriving (Eq, Show)
 
 -- this initial user state does not contain the initial filename, environment,
 -- or include paths; alex requires that this be defined; we override it before
 -- we begin the actual lexing procedure
 alexInitUserState :: AlexUserState
-alexInitUserState = LS [] "" Map.empty [] []
+alexInitUserState = LS [] "" Map.empty [] [] []
 
 -- public-facing lexer entrypoint
 lexFile :: [String] -> Env -> FilePath -> IO (Either String ([Token], Env))
@@ -529,10 +532,14 @@ lexFile includePaths env path = do
     return $ case result of
         Left msg -> Left msg
         Right finalState ->
-            if null $ lsCondStack finalState
-                then Right (finalToks, lsEnv finalState)
-                else Left $ path ++ ": unfinished conditional directives: " ++
-                        (show $ length $ lsCondStack finalState)
+            if not $ null $ lsCondStack finalState then
+                Left $ path ++ ": unfinished conditional directives: " ++
+                    (show $ length $ lsCondStack finalState)
+            else if not $ null $ lsSpecStack finalState then
+                Left $ path ++ ": unterminated begin_keywords blocks: " ++
+                    (show $ length $ lsSpecStack finalState)
+            else
+                Right (finalToks, lsEnv finalState)
             where finalToks = coalesce $ reverse $ lsToks finalState
     where
         setEnv = do
@@ -910,6 +917,27 @@ handleDirective (posOrig, _, _, strOrig) len = do
         "pragma" -> passThrough
         "resetall" -> passThrough
 
+        "begin_keywords" -> do
+            quotedSpec <- takeQuotedString
+            let spec = tail $ init quotedSpec
+            case Map.lookup spec specMap of
+                Nothing ->
+                    lexicalError $ "invalid keyword set name: " ++ show spec
+                Just set -> do
+                    specStack <- gets lsSpecStack
+                    modify $ \s -> s { lsSpecStack = set : specStack }
+                    dropWhitespace
+                    alexMonadScan
+        "end_keywords" -> do
+            specStack <- gets lsSpecStack
+            if null specStack
+                then
+                    lexicalError "unexpected end_keywords before begin_keywords"
+                else do
+                    modify $ \s -> s { lsSpecStack = tail specStack }
+                    dropWhitespace
+                    alexMonadScan
+
         "__FILE__" -> do
             tokPos <- toTokPos posOrig
             currFile <- gets lsCurrFile
@@ -1070,7 +1098,11 @@ tok tokId (pos, _, _, input) len = do
     tokPos <- toTokPos pos
     condStack <- gets lsCondStack
     () <- if any (/= CurrentlyTrue) condStack
-        then modify id
-        else modify (push $ Token tokId tokStr tokPos)
+        then return ()
+        else do
+            specStack <- gets lsSpecStack
+            if null specStack || Set.notMember tokId (head specStack)
+                then modify (push $ Token tokId tokStr tokPos)
+                else modify (push $ Token Id_simple ('_' : tokStr) tokPos)
     alexMonadScan
 }

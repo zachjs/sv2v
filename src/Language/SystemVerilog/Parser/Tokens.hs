@@ -381,4 +381,4 @@ data TokenName
     | Spe_Directive
     | Unknown
     | MacroBoundary
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
