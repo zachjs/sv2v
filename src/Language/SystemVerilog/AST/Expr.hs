@@ -76,7 +76,7 @@ instance Show Expr where
     show (BinOp   o a b) = printf "(%s %s %s)" (show a) (show o) (show b)
     show (Dot     e n  ) = printf "%s.%s"      (show e) n
     show (Mux     c a b) = printf "(%s ? %s : %s)" (show c) (show a) (show b)
-    show (Call   ps f l) = printf "%s%s(%s)"   (maybe "" (++ "::") ps) f (show l)
+    show (Call   ps f l) = printf "%s%s%s"     (maybe "" (++ "::") ps) f (show l)
     show (Cast tore e  ) = printf "%s'(%s)"    (showEither tore) (show e)
     show (DimsFn  f v  ) = printf "%s(%s)"     (show f) (showEither v)
     show (DimFn   f v e) = printf "%s(%s, %s)" (show f) (showEither v) (show e)
@@ -93,7 +93,7 @@ data Args
     deriving (Eq, Ord)
 
 instance Show Args where
-    show (Args pnArgs kwArgs) = commas strs
+    show (Args pnArgs kwArgs) = "(" ++ (commas strs) ++ ")"
         where
             strs = (map showPnArg pnArgs) ++ (map showKwArg kwArgs)
             showPnArg = maybe "" show

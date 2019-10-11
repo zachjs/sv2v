@@ -28,7 +28,7 @@ import Text.Printf (printf)
 import Language.SystemVerilog.AST.ShowHelp (commas, indent, unlines', showPad, showCase)
 import Language.SystemVerilog.AST.Attr (Attr)
 import Language.SystemVerilog.AST.Decl (Decl)
-import Language.SystemVerilog.AST.Expr (Expr, Args)
+import Language.SystemVerilog.AST.Expr (Expr, Args(..))
 import Language.SystemVerilog.AST.LHS (LHS)
 import Language.SystemVerilog.AST.Op (AsgnOp(AsgnOpEq))
 import Language.SystemVerilog.AST.Type (Identifier)
@@ -84,7 +84,8 @@ instance Show Stmt where
                 where showInit (l, e) = showAssign (l, AsgnOpEq, e)
             showAssign :: (LHS, AsgnOp, Expr) -> String
             showAssign (l, op, e) = printf "%s %s %s" (show l) (show op) (show e)
-    show (Subroutine ps x a) = printf "%s%s(%s);" (maybe "" (++ "::") ps) x (show a)
+    show (Subroutine ps x a) = printf "%s%s%s;" (maybe "" (++ "::") ps) x aStr
+        where aStr = if a == Args [] [] then "" else show a
     show (AsgnBlk o v e) = printf "%s %s %s;" (show v) (show o) (show e)
     show (Asgn    t v e) = printf "%s <= %s%s;" (show v) (maybe "" showPad t) (show e)
     show (While   e s) = printf  "while (%s) %s" (show e) (show s)
