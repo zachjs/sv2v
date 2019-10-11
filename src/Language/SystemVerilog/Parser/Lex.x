@@ -884,6 +884,10 @@ handleDirective (posOrig, _, _, strOrig) len = do
     env <- gets lsEnv
     tempInput <- alexGetInput
     let dropUntilNewline = removeUntil "\n" tempInput 0
+    let passThrough = do
+            rest <- takeUntilNewline
+            let str = '`' : directive ++ rest
+            tok Spe_Directive (posOrig, ' ', [], strOrig) (length str)
 
     condStack <- gets lsCondStack
     if any (/= CurrentlyTrue) condStack
@@ -891,8 +895,17 @@ handleDirective (posOrig, _, _, strOrig) len = do
     then alexMonadScan
     else case directive of
 
-        "default_nettype" -> dropUntilNewline
         "timescale" -> dropUntilNewline
+
+        "celldefine" -> passThrough
+        "endcelldefine" -> passThrough
+
+        "unconnected_drive" -> passThrough
+        "nounconnected_drive" -> passThrough
+
+        "default_nettype" -> passThrough
+        "pragma" -> passThrough
+        "resetall" -> passThrough
 
         "__FILE__" -> do
             tokPos <- toTokPos posOrig

@@ -293,6 +293,7 @@ systemIdentifier   { Token Id_system       _ _ }
 number             { Token Lit_number      _ _ }
 string             { Token Lit_string      _ _ }
 time               { Token Lit_time        _ _ }
+directive          { Token Spe_Directive   _ _ }
 
 "("                { Token Sym_paren_l _ _ }
 ")"                { Token Sym_paren_r _ _ }
@@ -775,6 +776,7 @@ NonDeclPackageItem :: { [PackageItem] }
   | "export" "*" "::" "*" ";"       { [Export Nothing] } -- "Nothing" being no restrictions
   | ForwardTypedef ";"              { $1 }
   | TimeunitsDeclaration            { $1 }
+  | Directive                       { [Directive $1] }
 ForwardTypedef :: { [PackageItem] }
   : "typedef"          Identifier { [] }
   | "typedef" "enum"   Identifier { [] }
@@ -784,6 +786,9 @@ TimeunitsDeclaration :: { [PackageItem] }
   : "timeunit" Time          ";" { [] }
   | "timeunit" Time "/" Time ";" { [] }
   | "timeprecision" Time     ";" { [] }
+
+Directive :: { String }
+  : directive { tokenString $1 }
 
 PackageImportItems :: { [(Identifier, Maybe Identifier)] }
   : PackageImportItem                        { [$1] }

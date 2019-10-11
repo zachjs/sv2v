@@ -68,7 +68,6 @@ convertDescription ports orig =
             Part _ _ Module _ _ _ _ -> True
             PackageItem _ -> True
             Package _ _ _ -> False
-            Directive _ -> False
 
         origIdents = execWriter (collectModuleItemsM regIdents orig)
         fixed = traverseModuleItems fixModuleItem orig

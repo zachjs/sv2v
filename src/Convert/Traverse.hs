@@ -174,7 +174,6 @@ traverseModuleItemsM mapper (Package lifetime name packageItems) = do
             _ -> error $ "redirected Package traverse failed: "
                     ++ show converted
     return $ Package lifetime name $ map (\(MIPackageItem item) -> item) items'
-traverseModuleItemsM _ (Directive str) = return $ Directive str
 
 traverseModuleItems :: Mapper ModuleItem -> Mapper Description
 traverseModuleItems = unmonad traverseModuleItemsM
@@ -623,6 +622,8 @@ traverseExprsM' strat exprMapper = moduleItemMapper
     moduleItemMapper (Generate items) = do
         items' <- mapM (traverseNestedGenItemsM genItemMapper) items
         return $ Generate items'
+    moduleItemMapper (MIPackageItem (Directive c)) =
+        return $ MIPackageItem $ Directive c
     moduleItemMapper (MIPackageItem (Comment c)) =
         return $ MIPackageItem $ Comment c
     moduleItemMapper (MIPackageItem (Import x y)) =

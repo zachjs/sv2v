@@ -378,6 +378,7 @@ data TokenName
     | Sym_amp_amp_amp
     | Sym_lt_lt_lt_eq
     | Sym_gt_gt_gt_eq
+    | Spe_Directive
     | Unknown
     | MacroBoundary
     deriving (Show, Eq)

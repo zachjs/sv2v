@@ -28,7 +28,6 @@ data Description
     = Part [Attr] Bool PartKW (Maybe Lifetime) Identifier [Identifier] [ModuleItem]
     | PackageItem PackageItem
     | Package (Maybe Lifetime) Identifier [PackageItem]
-    | Directive String -- currently unused
     deriving Eq
 
 instance Show Description where
@@ -53,7 +52,6 @@ instance Show Description where
         where
             bodyStr = indent $ unlines' $ map show items
     show (PackageItem i) = show i
-    show (Directive str) = str
 
 data PackageItem
     = Typedef Type Identifier
@@ -62,6 +60,7 @@ data PackageItem
     | Import Identifier (Maybe Identifier)
     | Export (Maybe (Identifier, Maybe Identifier))
     | Decl Decl
+    | Directive String
     | Comment String
     deriving Eq
 
@@ -79,6 +78,7 @@ instance Show PackageItem where
     show (Export Nothing) = "export *::*";
     show (Export (Just (x, y))) = printf "export %s::%s;" x (fromMaybe "*" y)
     show (Decl decl) = show decl
+    show (Directive str) = str
     show (Comment c) =
         if elem '\n' c
             then "// " ++ show c
