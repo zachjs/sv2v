@@ -15,9 +15,21 @@ import Language.SystemVerilog.AST
 
 convert :: [AST] -> [AST]
 convert =
-    map
-    $ traverseDescriptions $ traverseModuleItems
-    $ traverseStmts $ convertStmt
+    map $ traverseDescriptions $ traverseModuleItems
+    (convertModuleItem . traverseStmts convertStmt)
+
+convertModuleItem :: ModuleItem -> ModuleItem
+convertModuleItem (MIPackageItem (Function ml t f decls stmts)) =
+    MIPackageItem $ Function ml t f decls' stmts'
+    where
+        Block Seq "" decls' stmts' = convertStmt $
+            Block Seq "" decls stmts
+convertModuleItem (MIPackageItem (Task ml f decls stmts)) =
+    MIPackageItem $ Task ml f decls' stmts'
+    where
+        Block Seq "" decls' stmts' = convertStmt $
+            Block Seq "" decls stmts
+convertModuleItem other = other
 
 convertStmt :: Stmt -> Stmt
 convertStmt (Block Seq name decls stmts) =
