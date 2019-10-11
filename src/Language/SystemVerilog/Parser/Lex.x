@@ -682,12 +682,15 @@ takeChar = do
 dropSpaces :: Alex ()
 dropSpaces = do
     (pos, _, _, str) <- alexGetInput
-    case str of
-        ' ' : rest -> do
-            alexSetInput (alexMove pos ' ', ' ', [], rest)
+    if null str then
+        return ()
+    else do
+        let ch : rest = str
+        if ch == '\t' || ch == ' ' then do
+            alexSetInput (alexMove pos ch, ch, [], tail str)
             dropSpaces
-        [] -> return ()
-        _ -> return ()
+        else
+            return ()
 
 isWhitespaceChar :: Char -> Bool
 isWhitespaceChar ch = elem ch [' ', '\t', '\n']
