@@ -1,4 +1,5 @@
 module top;
+
     initial begin : foo_block
         reg [31:0] w;
         reg signed [31:0] x;
@@ -25,7 +26,14 @@ module top;
         $display("%0d %0d", y, $signed(y[4:0]));
         $display("%0d %0d", z, z[4:0]);
     end
+
     localparam [0:0] foo = 0;
     localparam [31:0] bar = 32'b0;
     initial $display("%b %b", foo, bar);
+
+    initial begin
+        $display("%b", 5'sb11111);
+        $display("%b", 5'sb11111);
+    end
+
 endmodule

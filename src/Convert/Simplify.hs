@@ -49,31 +49,37 @@ traverseExprM = traverseNestedExprsM $ stately convertExpr
 
 convertExpr :: Info -> Expr -> Expr
 convertExpr info (Cast (Right c) e) =
-    case c' of
-        Number _ ->
-            if sized == e
-                then Cast (Right c') e
-                else sized
-        _ -> Cast (Right c') e
+    Cast (Right c') e
     where
-        c' = simplify $ traverseNestedExprs (substitute info) (simplify c)
-        sized = sizedExpr "" c' e
+        c' = simplify $ substitute info c
 convertExpr info (DimFn f v e) =
     DimFn f v e'
     where
-        e' = simplify $ traverseNestedExprs (substitute info) e
+        e' = simplify $ substitute info e
+convertExpr info (Call Nothing "$clog2" (Args [Just e] [])) =
+    if clog2' == clog2
+        then clog2
+        else clog2'
+    where
+        e' = simplify $ substitute info e
+        clog2 = Call Nothing "$clog2" (Args [Just e'] [])
+        clog2' = simplify clog2
 convertExpr info (Mux cc aa bb) =
     if before == after
         then Mux cc aa bb
         else simplify $ Mux after aa bb
     where
-        before = traverseNestedExprs (substitute info) (simplify cc)
+        before = substitute info cc
         after = simplify before
 convertExpr _ other = other
 
 substitute :: Info -> Expr -> Expr
-substitute info (Ident x) =
-    case Map.lookup x info of
-        Nothing -> Ident x
-        Just e -> e
-substitute _ other = other
+substitute info expr =
+    traverseNestedExprs substitute' $ simplify expr
+    where
+        substitute' :: Expr -> Expr
+        substitute' (Ident x) =
+            case Map.lookup x info of
+                Nothing -> Ident x
+                Just e -> e
+        substitute' other = other

@@ -1,4 +1,5 @@
 module top;
+
     parameter WIDTH = 32;
     initial begin
         logic [31:0] w = 1234;
@@ -22,7 +23,14 @@ module top;
         $display("%0d %0d", y, ($clog2(WIDTH))'(y));
         $display("%0d %0d", z, ($clog2(WIDTH))'(z));
     end
+
     localparam bit foo = '0;
     localparam logic [31:0] bar = 32'(foo);
     initial $display("%b %b", foo, bar);
+
+    initial begin
+        $display("%b", 5'('1));
+        $display("%b", 5'(1'sb1));
+    end
+
 endmodule

@@ -93,16 +93,9 @@ toItem :: EnumItem -> PackageItem
 toItem ((mr, x), v) =
     Decl $ Param Localparam itemType x v'
     where
-        v' = if mr == Nothing
-                then simplify v
-                else sizedExpr x (rangeSize r) (simplify v)
+        v' = simplify v
         rs = maybe [] (\a -> [a]) mr
-        r = defaultRange mr
         itemType = Implicit Unspecified rs
-
-defaultRange :: Maybe Range -> Range
-defaultRange Nothing = (Number "0", Number "0")
-defaultRange (Just r) = r
 
 toBaseType :: Maybe Type -> Type
 toBaseType Nothing = defaultType
