@@ -1175,7 +1175,11 @@ PatternNamedItem :: { (Identifier, Expr) }
   : Identifier ":" Expr { ($1, $3) }
   | "default"  ":" Expr { (tokenString $1, $3) }
 PatternUnnamedItems :: { [Expr] }
-  : Exprs { $1 }
+  :                         PatternUnnamedItem { [$1] }
+  | PatternUnnamedItems "," PatternUnnamedItem { $1 ++ [$3] }
+PatternUnnamedItem :: { Expr }
+  : Expr        { $1 }
+  | Expr Concat { Repeat $1 $2 }
 
 Concat :: { [Expr] }
   : "{" Exprs "}" { $2 }
