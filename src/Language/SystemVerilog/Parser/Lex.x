@@ -540,7 +540,9 @@ lexFile includePaths env path = do
                     (show $ length $ lsSpecStack finalState)
             else
                 Right (finalToks, lsEnv finalState)
-            where finalToks = coalesce $ reverse $ lsToks finalState
+            where
+                finalToks = coalesce $ combineBoundaries $
+                    reverse $ lsToks finalState
     where
         setEnv = do
             modify $ \s -> s
@@ -568,6 +570,12 @@ coalesce (Token t1 str1 pn1 : Token MacroBoundary _ _ : Token t2 str2 pn2 : rest
         apn2 = AlexPn (length str1) l2 c2
         immediatelyFollows = apn2 == foldl alexMove apn1 str1
 coalesce (x : xs) = x : coalesce xs
+
+combineBoundaries :: [Token] -> [Token]
+combineBoundaries [] = []
+combineBoundaries (Token MacroBoundary s p : Token MacroBoundary _ _ : rest) =
+    combineBoundaries $ Token MacroBoundary s p : rest
+combineBoundaries (x : xs) = x : combineBoundaries xs
 
 -- invoked by alexMonadScan
 alexEOF :: Alex ()
