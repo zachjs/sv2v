@@ -1030,13 +1030,10 @@ Sense :: { Sense }
 
 DelayValue :: { Expr }
   : Number { Number $1 }
+  | Time   { Time   $1 }
   | Identifier { Ident $1 }
   | Identifier "::" Identifier { PSIdent $1 $3 }
   | "(" Expr ":" Expr ":" Expr ")" { MinTypMax $2 $4 $6 }
--- TODO: Support these other DelayValues?
--- | real_number
--- | time_literal
--- | 1step
 
 CaseKW :: { CaseKW }
   : "case"  { CaseN }
