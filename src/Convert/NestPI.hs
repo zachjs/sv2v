@@ -46,7 +46,7 @@ collectDescriptionM _ = return ()
 -- nests packages items missing from modules
 convertDescription :: PIs -> Description -> Description
 convertDescription pis (orig @ Part{}) =
-    Part attrs extern kw lifetime name ports (newItems ++ items)
+    Part attrs extern kw lifetime name ports items'
     where
         Part attrs extern kw lifetime name ports items = orig
         existingPIs = execWriter $ collectModuleItemsM collectPIsM orig
@@ -63,6 +63,13 @@ convertDescription pis (orig @ Part{}) =
         uniq l = l' where (l', _, _) = complex l
         newItems = uniq $ map MIPackageItem $ map snd $
             filter (\(x, _) -> Set.member x neededPIs) pis
+        -- place data declarations at the beginning to obey declaration
+        -- ordering; everything else can go at the end
+        newItemsBefore = filter isDecl newItems
+        newItemsAfter = filter (not . isDecl) newItems
+        items' = newItemsBefore ++ items ++ newItemsAfter
+        isDecl (MIPackageItem (Decl{})) = True
+        isDecl _ = False
 convertDescription _ other = other
 
 -- writes down the names of package items
