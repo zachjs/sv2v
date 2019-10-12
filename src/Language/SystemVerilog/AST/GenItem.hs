@@ -54,3 +54,7 @@ instance Show GenItem where
     show (GenModuleItem item) = show item
 
 type GenCase = ([Expr], GenItem)
+
+showCase :: (Show x, Show y) => ([x], y) -> String
+showCase (a, b) = printf "%s: %s" (commas $ map show a) (show b)
+

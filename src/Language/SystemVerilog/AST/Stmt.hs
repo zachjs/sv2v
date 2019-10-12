@@ -25,7 +25,7 @@ module Language.SystemVerilog.AST.Stmt
 
 import Text.Printf (printf)
 
-import Language.SystemVerilog.AST.ShowHelp (commas, indent, unlines', showPad, showCase)
+import Language.SystemVerilog.AST.ShowHelp (commas, indent, unlines', showPad)
 import Language.SystemVerilog.AST.Attr (Attr)
 import Language.SystemVerilog.AST.Decl (Decl)
 import Language.SystemVerilog.AST.Expr (Expr, Args(..))
@@ -93,15 +93,31 @@ instance Show Stmt where
     show (DoWhile e s) = printf "do %s while (%s);" (show s) (show e)
     show (Forever s  ) = printf "forever %s" (show s)
     show (Foreach x i s) = printf "foreach (%s [ %s ]) %s" x (commas $ map (maybe "" id) i) (show s)
-    show (If u a b Null) = printf "%sif (%s) %s"          (maybe "" showPad u) (show a) (show b)
-    show (If u a b c   ) = printf "%sif (%s) %s\nelse %s" (maybe "" showPad u) (show a) (show b) (show c)
+    show (If u a b Null) = printf "%sif (%s)%s"         (maybe "" showPad u) (show a) (showBranch b)
+    show (If u a b c   ) = printf "%sif (%s)%s\nelse%s" (maybe "" showPad u) (show a) (showBranch b) (showElseBranch c)
     show (Return e   ) = printf "return %s;" (show e)
-    show (Timing t s ) = printf "%s %s" (show t) (show s)
+    show (Timing t s ) = printf "%s%s" (show t) (showShortBranch s)
     show (Trigger b x) = printf "->%s %s;" (if b then "" else ">") x
     show (Assertion a) = show a
     show (Continue   ) = "continue;"
     show (Break      ) = "break;"
     show (Null       ) = ";"
+
+showBranch :: Stmt -> String
+showBranch (block @ Block{}) = ' ' : show block
+showBranch stmt = '\n' : (indent $ show stmt)
+
+showElseBranch :: Stmt -> String
+showElseBranch (stmt @ If{}) = ' ' : show stmt
+showElseBranch stmt = showBranch stmt
+
+showShortBranch :: Stmt -> String
+showShortBranch (stmt @ AsgnBlk{}) = ' ' : show stmt
+showShortBranch (stmt @ Asgn{}) = ' ' : show stmt
+showShortBranch stmt = showBranch stmt
+
+showCase :: ([Expr], Stmt) -> String
+showCase (a, b) = printf "%s:%s" (commas $ map show a) (showShortBranch b)
 
 data CaseKW
     = CaseN

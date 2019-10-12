@@ -72,7 +72,7 @@ instance Show Expr where
     show (Repeat  e l  ) = printf "{%s {%s}}"  (show e) (commas $ map show l)
     show (Concat  l    ) = printf "{%s}"                (commas $ map show l)
     show (Stream  o e l) = printf "{%s %s%s}"  (show o) (show e) (show $ Concat l)
-    show (UniOp   a b  ) = printf "(%s %s)"    (show a) (show b)
+    show (UniOp   o e  ) = printf "%s%s"       (show o) (show e)
     show (BinOp   o a b) = printf "(%s %s %s)" (show a) (show o) (show b)
     show (Dot     e n  ) = printf "%s.%s"      (show e) n
     show (Mux     c a b) = printf "(%s ? %s : %s)" (show c) (show a) (show b)
