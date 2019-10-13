@@ -1162,15 +1162,16 @@ Expr :: { Expr }
   | "~^" Expr %prec REDUCE_OP { UniOp RedXnor $2 }
   | "^~" Expr %prec REDUCE_OP { UniOp RedXnor $2 }
 
-PatternItems :: { [(Maybe Identifier, Expr)] }
-  : PatternNamedItems   { map (\(x,e) -> (Just x, e)) $1 }
-  | PatternUnnamedItems { zip (repeat Nothing) $1 }
+PatternItems :: { [(Identifier, Expr)] }
+  : PatternNamedItems   { $1 }
+  | PatternUnnamedItems { zip (repeat "") $1 }
 PatternNamedItems :: { [(Identifier, Expr)] }
   : PatternNamedItem                       { [$1] }
   | PatternNamedItems "," PatternNamedItem { $1 ++ [$3] }
 PatternNamedItem :: { (Identifier, Expr) }
-  : Identifier ":" Expr { ($1, $3) }
-  | "default"  ":" Expr { (tokenString $1, $3) }
+  : Identifier  ":" Expr { ($1       , $3) }
+  | PartialType ":" Expr { (':' : show $1  , $3) }
+  | "default"   ":" Expr { (':' : "default", $3) }
 PatternUnnamedItems :: { [Expr] }
   :                         PatternUnnamedItem { [$1] }
   | PatternUnnamedItems "," PatternUnnamedItem { $1 ++ [$3] }

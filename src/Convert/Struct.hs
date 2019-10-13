@@ -8,8 +8,7 @@ module Convert.Struct (convert) where
 
 import Control.Monad.State
 import Control.Monad.Writer
-import Data.List (elemIndex, sortOn)
-import Data.Maybe (fromJust, isJust)
+import Data.List (partition)
 import Data.Tuple (swap)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -299,67 +298,86 @@ convertAsgn structs types (lhs, expr) =
         convertLHS (LHSStream o e lhss) =
             (Implicit Unspecified [], LHSStream o e $ map (snd . convertLHS) lhss)
 
-        defaultKey = Just "default"
+        specialTag = ':'
+        defaultKey = specialTag : "default"
 
         -- try expression conversion by looking at the *outermost* type first
         convertExpr :: Type -> Expr -> Expr
         -- TODO: This is really a conversion for using default patterns to
         -- populate arrays. Maybe this should be somewhere else?
-        convertExpr (IntegerVector t sg (r:rs)) (Pattern [(Just "default", e)]) =
+        convertExpr (IntegerVector t sg (r:rs)) (Pattern [(":default", e)]) =
             Repeat (rangeSize r) [e']
             where e' = convertExpr (IntegerVector t sg rs) e
         convertExpr (Struct (Packed sg) fields (_:rs)) (Concat exprs) =
             Concat $ map (convertExpr (Struct (Packed sg) fields rs)) exprs
         convertExpr (Struct (Packed sg) fields (_:rs)) (Bit e _) =
             convertExpr (Struct (Packed sg) fields rs) e
-        convertExpr (Struct (Packed sg) fields rs) (Pattern [(Just "default", e)]) =
-            if Map.notMember structTf structs then
-                Pattern [(defaultKey, e)]
-            else if null rs then
-                expanded
-            else
-                Repeat (dimensionsSize rs) [expanded]
-            where
-                structTf = Struct (Packed sg) fields
-                expanded = convertExpr (structTf []) $ Pattern $
-                    take (length fields) (repeat (Nothing, e))
         convertExpr (Struct (Packed sg) fields []) (Pattern itemsOrig) =
-            if length items /= length fields then
-                error $ "struct pattern " ++ show items ++
-                    " doesn't have the same # of items as " ++ show structTf
-            else if itemsFieldNames /= fieldNames then
-                error $ "struct pattern " ++ show items ++ " has fields " ++
-                    show itemsFieldNames ++ ", but struct type has fields " ++
-                    show fieldNames
-            else if Map.notMember structTf structs then
-                Pattern items
+            if extraNames /= Set.empty then
+                error $ "pattern " ++ show (Pattern itemsOrig) ++
+                    " has extra named fields: " ++
+                    show (Set.toList extraNames) ++ " that are not in " ++
+                    show structTf
+            else if Map.member structTf structs then
+                Call Nothing
+                    (packerFnName structTf)
+                    (Args (map (Just . snd) items) [])
             else
-                Call Nothing fnName $ Args (map (Just . snd) items) []
+                Pattern items
             where
-                subMap = \(Just ident, subExpr) ->
-                    (Just ident, convertExpr (lookupFieldType fields ident) subExpr)
                 structTf = Struct (Packed sg) fields
+                fieldNames = map snd fields
+                fieldTypeMap = Map.fromList $ map swap fields
+
                 itemsNamed =
+                    -- patterns either use positions based or name/type/default
+                    if all ((/= "") . fst) itemsOrig then
+                        itemsOrig
+                    -- position-based patterns should cover every field
+                    else if length itemsOrig /= length fields then
+                        error $ "struct pattern " ++ show items ++
+                            " doesn't have the same # of items as " ++
+                            show structTf
                     -- if the pattern does not use identifiers, use the
                     -- identifiers from the struct type definition in order
-                    if not (all (isJust . fst) itemsOrig) then
-                        zip (map (Just. snd) fields) (map snd itemsOrig)
-                    -- if the pattern has a default value, use that for any
-                    -- missing fields
-                    else if any ((== defaultKey) . fst) itemsOrig then
-                        let origValueMap = Map.fromList itemsOrig
-                            origValues = Map.delete defaultKey origValueMap
-                            defaultValue = origValueMap Map.! defaultKey
-                            defaultValues = Map.fromList $
-                                zip (map Just fieldNames) (repeat defaultValue)
-                        in Map.toList $ Map.union origValues defaultValues
                     else
-                        itemsOrig
-                items = sortOn itemPosition $ map subMap itemsNamed
-                fieldNames = map snd fields
-                itemsFieldNames = map (fromJust . fst) items
-                itemPosition = \(Just x, _) -> fromJust $ elemIndex x fieldNames
-                fnName = packerFnName structTf
+                        zip fieldNames (map snd itemsOrig)
+                (specialItems, namedItems) =
+                    partition ((== specialTag) . head . fst) itemsNamed
+                namedItemMap = Map.fromList namedItems
+                specialItemMap = Map.fromList specialItems
+
+                extraNames = Set.difference
+                    (Set.fromList $ map fst namedItems)
+                    (Map.keysSet fieldTypeMap)
+
+                items = zip fieldNames $ map resolveField fieldNames
+                resolveField :: Identifier -> Expr
+                resolveField fieldName =
+                    convertExpr fieldType $
+                    -- look up by name
+                    if Map.member fieldName namedItemMap then
+                        namedItemMap Map.! fieldName
+                    -- look up by field type
+                    else if Map.member fieldTypeName specialItemMap then
+                        specialItemMap Map.! fieldTypeName
+                    -- fall back on the default value
+                    else if Map.member defaultKey specialItemMap then
+                        specialItemMap Map.! defaultKey
+                    else
+                        error $ "couldn't find field " ++ fieldName ++
+                            " from struct definition " ++ show structTf ++
+                            " in struct pattern " ++ show itemsOrig
+                    where
+                        fieldType = fieldTypeMap Map.! fieldName
+                        fieldTypeName =
+                            specialTag : (show $ fst $ typeRanges fieldType)
+
+        convertExpr (Struct (Packed sg) fields (r : rs)) subExpr =
+            Repeat (rangeSize r) [subExpr']
+            where
+                structTf = Struct (Packed sg) fields
+                subExpr' = convertExpr (structTf rs) subExpr
         convertExpr _ other = other
 
         -- try expression conversion by looking at the *innermost* type first
@@ -470,7 +488,7 @@ convertAsgn structs types (lhs, expr) =
                 tore' = convertTypeOrExpr tore
                 e' = snd $ convertSubExpr e
         convertSubExpr (Pattern items) =
-            if all (== Nothing) $ map fst items'
+            if all (== "") $ map fst items'
                 then (Implicit Unspecified [], Concat $ map snd items')
                 else (Implicit Unspecified [], Pattern items')
             where
