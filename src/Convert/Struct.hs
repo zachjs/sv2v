@@ -358,6 +358,9 @@ convertAsgn structs types (lhs, expr) =
                     -- look up by name
                     if Map.member fieldName namedItemMap then
                         namedItemMap Map.! fieldName
+                    -- recurse for substructures
+                    else if isStruct fieldType then
+                        Pattern specialItems
                     -- look up by field type
                     else if Map.member fieldTypeName specialItemMap then
                         specialItemMap Map.! fieldTypeName
@@ -372,6 +375,9 @@ convertAsgn structs types (lhs, expr) =
                         fieldType = fieldTypeMap Map.! fieldName
                         fieldTypeName =
                             specialTag : (show $ fst $ typeRanges fieldType)
+                        isStruct :: Type -> Bool
+                        isStruct (Struct{}) = True
+                        isStruct _ = False
 
         convertExpr (Struct (Packed sg) fields (r : rs)) subExpr =
             Repeat (rangeSize r) [subExpr']
