@@ -496,7 +496,13 @@ StructItems :: { [(Type, Identifier)] }
   : StructItem             { $1 }
   | StructItems StructItem { $1 ++ $2 }
 StructItem :: { [(Type, Identifier)] }
-  : Type Identifiers ";" { map (\a -> ($1, a)) $2 }
+  : Type FieldDecls ";" { map (fieldDecl $1) $2 }
+
+FieldDecls :: { [(Identifier, [Range])] }
+  : FieldDecl                 { [$1] }
+  | FieldDecls "," FieldDecl  { $1 ++ [$3] }
+FieldDecl :: { (Identifier, [Range]) }
+  : Identifier Dimensions { ($1, $2) }
 
 Packing :: { Packing }
   : "packed" OptSigning { Packed $2 }
@@ -1320,5 +1326,10 @@ makeParamDecls s t items =
   where
     (tf, rs) = typeRanges t
     mapper (x, e, a) = Param s (tf $ a ++ rs) x e
+
+fieldDecl :: Type -> (Identifier, [Range]) -> (Type, Identifier)
+fieldDecl t (x, rs2) =
+  (tf $ rs2 ++ rs1, x)
+  where (tf, rs1) = typeRanges t
 
 }
