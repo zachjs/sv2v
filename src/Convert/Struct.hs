@@ -76,10 +76,12 @@ convertDescription other = other
 
 -- write down unstructured versions of packed struct types
 collectStructM :: Type -> Writer Structs ()
+collectStructM (Struct Unpacked fields _) =
+    collectStructM' (Struct Unpacked) True Unspecified fields
 collectStructM (Struct (Packed sg) fields _) =
-    collectStructM' (Struct $ Packed sg) True  sg fields
+    collectStructM' (Struct $ Packed sg) True sg fields
 collectStructM (Union  (Packed sg) fields _) =
-    collectStructM' (Union  $ Packed sg) False sg fields
+    collectStructM' (Union $ Packed sg) False sg fields
 collectStructM _ = return ()
 
 collectStructM'
@@ -208,7 +210,7 @@ packerFn structTf =
     MIPackageItem $
     Function Nothing (structTf []) fnName decls [retStmt]
     where
-        Struct (Packed _) fields [] = structTf []
+        Struct _ fields [] = structTf []
         toInput (t, x) = Variable Input t x [] Nothing
         decls = map toInput fields
         retStmt = Return $ Concat $ map (Ident . snd) fields
@@ -308,11 +310,18 @@ convertAsgn structs types (lhs, expr) =
         convertExpr (IntegerVector t sg (r:rs)) (Pattern [(":default", e)]) =
             Repeat (rangeSize r) [e']
             where e' = convertExpr (IntegerVector t sg rs) e
-        convertExpr (Struct (Packed sg) fields (_:rs)) (Concat exprs) =
-            Concat $ map (convertExpr (Struct (Packed sg) fields rs)) exprs
-        convertExpr (Struct (Packed sg) fields (_:rs)) (Bit e _) =
-            convertExpr (Struct (Packed sg) fields rs) e
-        convertExpr (Struct (Packed sg) fields []) (Pattern itemsOrig) =
+        convertExpr (Struct packing fields (_:rs)) (Concat exprs) =
+            Concat $ map (convertExpr (Struct packing fields rs)) exprs
+        convertExpr (Struct packing fields (_:rs)) (Bit e _) =
+            convertExpr (Struct packing fields rs) e
+        convertExpr (Struct packing fields []) (Pattern [("", Repeat (Number nStr) exprs)]) =
+            case readNumber nStr of
+                Just n -> convertExpr (Struct packing fields []) $ Pattern $
+                        zip (repeat "") (concat $ take n $ repeat exprs)
+                Nothing ->
+                    error $ "unable to handle repeat in pattern: " ++
+                        (show $ Repeat (Number nStr) exprs)
+        convertExpr (Struct packing fields []) (Pattern itemsOrig) =
             if extraNames /= Set.empty then
                 error $ "pattern " ++ show (Pattern itemsOrig) ++
                     " has extra named fields: " ++
@@ -325,7 +334,7 @@ convertAsgn structs types (lhs, expr) =
             else
                 Pattern items
             where
-                structTf = Struct (Packed sg) fields
+                structTf = Struct packing fields
                 fieldNames = map snd fields
                 fieldTypeMap = Map.fromList $ map swap fields
 
@@ -335,7 +344,7 @@ convertAsgn structs types (lhs, expr) =
                         itemsOrig
                     -- position-based patterns should cover every field
                     else if length itemsOrig /= length fields then
-                        error $ "struct pattern " ++ show items ++
+                        error $ "struct pattern " ++ show (Pattern itemsOrig) ++
                             " doesn't have the same # of items as " ++
                             show structTf
                     -- if the pattern does not use identifiers, use the
@@ -379,10 +388,10 @@ convertAsgn structs types (lhs, expr) =
                         isStruct (Struct{}) = True
                         isStruct _ = False
 
-        convertExpr (Struct (Packed sg) fields (r : rs)) subExpr =
+        convertExpr (Struct packing fields (r : rs)) subExpr =
             Repeat (rangeSize r) [subExpr']
             where
-                structTf = Struct (Packed sg) fields
+                structTf = Struct packing fields
                 subExpr' = convertExpr (structTf rs) subExpr
         convertExpr _ other = other
 
