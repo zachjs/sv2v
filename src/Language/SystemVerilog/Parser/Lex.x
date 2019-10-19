@@ -527,7 +527,7 @@ alexInitUserState = LS [] "" Map.empty [] [] []
 -- public-facing lexer entrypoint
 lexFile :: [String] -> Env -> FilePath -> IO (Either String ([Token], Env))
 lexFile includePaths env path = do
-    str <- readFile path
+    str <- readFile path >>= return . normalize
     let result = runAlex str $ setEnv >> alexMonadScan >> get
     return $ case result of
         Left msg -> Left msg
@@ -622,7 +622,13 @@ includeSearch file = do
 
 -- read in the given file
 loadFile :: FilePath -> Alex String
-loadFile = return . unsafePerformIO . readFile
+loadFile = return . normalize . unsafePerformIO . readFile
+
+-- removes carriage returns before newlines
+normalize :: String -> String
+normalize ('\r' : '\n' : rest) = '\n' : (normalize rest)
+normalize (ch : chs) = ch : (normalize chs)
+normalize [] = []
 
 isIdentChar :: Char -> Bool
 isIdentChar ch =
