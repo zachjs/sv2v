@@ -82,12 +82,12 @@ collectPIsM _ = return ()
 
 -- writes down the names of subroutine invocations
 collectSubroutinesM :: Stmt -> Writer Idents ()
-collectSubroutinesM (Subroutine Nothing f _) = tell $ Set.singleton f
+collectSubroutinesM (Subroutine (Ident f) _) = tell $ Set.singleton f
 collectSubroutinesM _ = return ()
 
 -- writes down the names of function calls and identifiers
 collectIdentsM :: Expr -> Writer Idents ()
-collectIdentsM (Call Nothing x _) = tell $ Set.singleton x
+collectIdentsM (Call (Ident x) _) = tell $ Set.singleton x
 collectIdentsM (Ident x)          = tell $ Set.singleton x
 collectIdentsM _ = return ()
 

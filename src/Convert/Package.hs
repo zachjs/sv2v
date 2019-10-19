@@ -154,21 +154,13 @@ traverseModuleItem existingItemNames packages (MIPackageItem (Import x y)) =
         items = map snd $ filter (filterer . fst) $ packageItems
 traverseModuleItem _ _ item =
     (traverseExprs $ traverseNestedExprs traverseExpr) $
-    (traverseStmts traverseStmt) $
     (traverseTypes $ traverseNestedTypes traverseType) $
     item
     where
 
         traverseExpr :: Expr -> Expr
         traverseExpr (PSIdent x y) = Ident $ x ++ "_" ++ y
-        traverseExpr (Call (Just ps) f args) =
-            Call Nothing (ps ++ "_" ++ f) args
         traverseExpr other = other
-
-        traverseStmt :: Stmt -> Stmt
-        traverseStmt (Subroutine (Just ps) f args) =
-            Subroutine Nothing (ps ++ "_" ++ f) args
-        traverseStmt other = other
 
         traverseType :: Type -> Type
         traverseType (Alias (Just ps) xx rs) =

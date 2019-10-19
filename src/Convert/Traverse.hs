@@ -257,7 +257,7 @@ traverseSinglyNestedStmtsM fullMapper = cs
             return $ If u e s1' s2'
         cs (Timing event stmt) = fullMapper stmt >>= return . Timing event
         cs (Return expr) = return $ Return expr
-        cs (Subroutine ps f exprs) = return $ Subroutine ps f exprs
+        cs (Subroutine expr exprs) = return $ Subroutine expr exprs
         cs (Trigger blocks x) = return $ Trigger blocks x
         cs (Assertion a) =
             traverseAssertionStmtsM fullMapper a >>= return . Assertion
@@ -455,11 +455,12 @@ traverseNestedExprsM mapper = exprMapper
             e' <- exprMapper e
             l' <- mapM exprMapper l
             return $ Stream o e' l'
-        em (Call    ps f (Args l p)) = do
+        em (Call  e (Args l p)) = do
+            e' <- exprMapper e
             l' <- mapM maybeExprMapper l
             pes <- mapM maybeExprMapper $ map snd p
             let p' = zip (map fst p) pes
-            return $ Call ps f (Args l' p')
+            return $ Call e' (Args l' p')
         em (UniOp      o e) =
             exprMapper e >>= return . UniOp o
         em (BinOp      o e1 e2) = do
@@ -711,11 +712,12 @@ traverseStmtExprsM exprMapper = flatStmtMapper
     flatStmtMapper (If u cc s1 s2) =
         exprMapper cc >>= \cc' -> return $ If u cc' s1 s2
     flatStmtMapper (Timing event stmt) = return $ Timing event stmt
-    flatStmtMapper (Subroutine ps f (Args l p)) = do
+    flatStmtMapper (Subroutine e (Args l p)) = do
+        e' <- exprMapper e
         l' <- mapM maybeExprMapper l
         pes <- mapM maybeExprMapper $ map snd p
         let p' = zip (map fst p) pes
-        return $ Subroutine ps f (Args l' p')
+        return $ Subroutine e' (Args l' p')
     flatStmtMapper (Return expr) =
         exprMapper expr >>= return . Return
     flatStmtMapper (Trigger blocks x) = return $ Trigger blocks x

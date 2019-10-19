@@ -46,7 +46,7 @@ data Expr
     | Repeat  Expr [Expr]
     | Concat  [Expr]
     | Stream  StreamOp Expr [Expr]
-    | Call    (Maybe Identifier) Identifier Args
+    | Call    Expr Args
     | UniOp   UniOp Expr
     | BinOp   BinOp Expr Expr
     | Mux     Expr Expr Expr
@@ -75,7 +75,7 @@ instance Show Expr where
     show (BinOp   o a b) = printf "(%s %s %s)" (show a) (show o) (show b)
     show (Dot     e n  ) = printf "%s.%s"      (show e) n
     show (Mux     c a b) = printf "(%s ? %s : %s)" (show c) (show a) (show b)
-    show (Call   ps f l) = printf "%s%s%s"     (maybe "" (++ "::") ps) f (show l)
+    show (Call    e l  ) = printf "%s%s"       (show e) (show l)
     show (Cast tore e  ) = printf "%s'(%s)"    (showEither tore) (show e)
     show (DimsFn  f v  ) = printf "%s(%s)"     (show f) (showEither v)
     show (DimFn   f v e) = printf "%s(%s, %s)" (show f) (showEither v) (show e)
@@ -184,7 +184,7 @@ simplify (orig @ (Repeat (Number n) exprs)) =
 simplify (Concat [expr]) = expr
 simplify (Concat exprs) =
     Concat $ filter (/= Concat []) exprs
-simplify (orig @ (Call Nothing "$clog2" (Args [Just (Number n)] []))) =
+simplify (orig @ (Call (Ident "$clog2") (Args [Just (Number n)] []))) =
     case readNumber n of
         Nothing -> orig
         Just x -> Number $ show $ clog2 x

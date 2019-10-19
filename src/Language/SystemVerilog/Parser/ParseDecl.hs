@@ -38,8 +38,8 @@ module Language.SystemVerilog.Parser.ParseDecl
 , parseDTsAsDeclsOrAsgns
 ) where
 
-import Data.List (elemIndex, findIndex, findIndices)
-import Data.Maybe (fromJust, mapMaybe)
+import Data.List (elemIndex, findIndex, findIndices, partition)
+import Data.Maybe (mapMaybe)
 
 import Language.SystemVerilog.AST
 
@@ -202,22 +202,34 @@ parseDTsAsDecl tokens =
 -- [PUBLIC]: parser for single block item declarations or assign or arg-less
 -- subroutine call statetments
 parseDTsAsDeclOrAsgn :: [DeclToken] -> ([Decl], [Stmt])
-parseDTsAsDeclOrAsgn [DTIdent     f] = ([], [Subroutine (Nothing) f (Args [] [])])
-parseDTsAsDeclOrAsgn [DTPSIdent p f] = ([], [Subroutine (Just  p) f (Args [] [])])
+parseDTsAsDeclOrAsgn [DTIdent     f] = ([], [Subroutine (Ident     f) (Args [] [])])
+parseDTsAsDeclOrAsgn [DTPSIdent p f] = ([], [Subroutine (PSIdent p f) (Args [] [])])
 parseDTsAsDeclOrAsgn tokens =
-    if (isAsgn (last tokens) || tripLookahead tokens) && lhs /= Nothing
-        then ([], [constructor (fromJust lhs) expr])
+    if (isStmt (last tokens) || tripLookahead tokens) && maybeLhs /= Nothing
+        then ([], [stmt])
         else (parseDTsAsDecl tokens, [])
     where
-        (constructor, expr) = case last tokens of
-            DTAsgn     op e -> (AsgnBlk op, e)
-            DTAsgnNBlk mt e -> (Asgn    mt, e)
+        stmt = case last tokens of
+            DTAsgn     op e -> AsgnBlk op lhs e
+            DTAsgnNBlk mt e -> Asgn    mt lhs e
+            DTInstance args -> Subroutine (lhsToExpr lhs) (instanceToArgs args)
             _ -> error $ "invalid block item decl or stmt: " ++ (show tokens)
-        lhs = takeLHS $ init tokens
-        isAsgn :: DeclToken -> Bool
-        isAsgn (DTAsgnNBlk      _ _) = True
-        isAsgn (DTAsgn _ _) = True
-        isAsgn _ = False
+        maybeLhs = takeLHS $ init tokens
+        Just lhs = maybeLhs
+        isStmt :: DeclToken -> Bool
+        isStmt (DTAsgnNBlk{}) = True
+        isStmt (DTAsgn{}) = True
+        isStmt (DTInstance{}) = True
+        isStmt _ = False
+
+-- converts port bindings to call args
+instanceToArgs :: [PortBinding] -> Args
+instanceToArgs bindings =
+    Args pnArgs kwArgs
+    where
+        (pnBindings, kwBindings) = partition (null . fst) bindings
+        pnArgs = map snd pnBindings
+        kwArgs = kwBindings
 
 -- [PUBLIC]: parser for comma-separated declarations or assignment lists; this
 -- is only used for `for` loop initialization lists

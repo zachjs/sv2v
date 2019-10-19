@@ -65,7 +65,7 @@ traverseExprM =
                     lift $ tell $ Set.singleton (s, sg)
                     let f = castFnName s sg
                     let args = Args [Just e] []
-                    return $ Call Nothing f args
+                    return $ Call (Ident f) args
                 _ -> return $ Cast (Right s) e
         convertExprM other = return other
 

@@ -48,7 +48,7 @@ data Stmt
     | If      (Maybe UniquePriority) Expr Stmt Stmt
     | Timing  Timing Stmt
     | Return  Expr
-    | Subroutine (Maybe Identifier) Identifier Args
+    | Subroutine Expr Args
     | Trigger Bool Identifier
     | Assertion Assertion
     | Continue
@@ -84,7 +84,7 @@ instance Show Stmt where
                 where showInit (l, e) = showAssign (l, AsgnOpEq, e)
             showAssign :: (LHS, AsgnOp, Expr) -> String
             showAssign (l, op, e) = printf "%s %s %s" (show l) (show op) (show e)
-    show (Subroutine ps x a) = printf "%s%s%s;" (maybe "" (++ "::") ps) x aStr
+    show (Subroutine e a) = printf "%s%s;" (show e) aStr
         where aStr = if a == Args [] [] then "" else show a
     show (AsgnBlk o v e) = printf "%s %s %s;" (show v) (show o) (show e)
     show (Asgn    t v e) = printf "%s <= %s%s;" (show v) (maybe "" showPad t) (show e)

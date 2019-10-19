@@ -592,7 +592,6 @@ DeclTokens(delim) :: { [DeclToken] }
 DeclToken :: { DeclToken }
   : DeclOrStmtToken   { $1 }
   | ParameterBindings { DTParams   $1 }
-  | PortBindings      { DTInstance $1 }
 
 DeclOrStmtTokens(delim) :: { [DeclToken] }
   : DeclOrStmtToken                  delim  { [$1] }
@@ -612,6 +611,7 @@ DeclOrStmtToken :: { DeclToken }
   | LHSConcat      { DTConcat   $1 }
   | PartialType    { DTType     $1 }
   | "." Identifier { DTDot      $2 }
+  | PortBindings   { DTInstance $1 }
   | Signing        { DTSigning  $1 }
   | Lifetime       { DTLifetime $1 }
   | Identifier "::" Identifier { DTPSIdent $1 $3 }
@@ -904,8 +904,8 @@ StmtAsgn :: { Stmt }
   : LHS AsgnOp Expr ";"                        { AsgnBlk $2 $1 $3 }
   | LHS IncOrDecOperator ";"                   { AsgnBlk (AsgnOp $2) $1 (Number "1") }
   | LHS "<=" opt(DelayOrEventControl) Expr ";" { Asgn $3 $1 $4 }
-  |                 Identifier ";" { Subroutine (Nothing) $1 (Args [] []) }
-  | Identifier "::" Identifier ";" { Subroutine (Just $1) $3 (Args [] []) }
+  | LHS          ";" { Subroutine (lhsToExpr $1) (Args [] []) }
+  | LHS CallArgs ";" { Subroutine (lhsToExpr $1) $2 }
 StmtNonAsgn :: { Stmt }
   : StmtBlock(BlockKWSeq, "end" ) { $1 }
   | StmtBlock(BlockKWPar, "join") { $1 }
@@ -920,8 +920,6 @@ StmtNonBlock :: { Stmt }
   | Unique "if" "(" Expr ")" Stmt %prec NoElse { If $1 $4 $6 Null }
   | "for" "(" ForInit ForCond ForStep ")" Stmt { For $3 $4 $5 $7 }
   | Unique CaseKW "(" Expr ")" Cases "endcase" { Case $1 $2 $4 (fst $6) (snd $6) }
-  |                 Identifier CallArgs ";"    { Subroutine (Nothing) $1 $2 }
-  | Identifier "::" Identifier CallArgs ";"    { Subroutine (Just $1) $3 $4 }
   | TimingControl Stmt                         { Timing $1 $2 }
   | "return" Expr ";"                          { Return $2 }
   | "return"      ";"                          { Return Nil }
@@ -1102,8 +1100,7 @@ Expr :: { Expr }
   | String                      { String $1 }
   | Number                      { Number $1 }
   | Time                        { Time   $1 }
-  |                 Identifier CallArgs { Call (Nothing) $1 $2 }
-  | Identifier "::" Identifier CallArgs { Call (Just $1) $3 $4 }
+  | Expr CallArgs               { Call $1 $2 }
   | DimsFn "(" TypeOrExpr ")"   { DimsFn $1 $3 }
   | DimFn  "(" TypeOrExpr ")"   { DimFn  $1 $3 (Number "1") }
   | DimFn  "(" TypeOrExpr "," Expr ")" { DimFn $1 $3 $5 }

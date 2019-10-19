@@ -46,8 +46,8 @@ traverseFunctionsM (MIPackageItem (Function ml t f decls stmts)) = do
 traverseFunctionsM other = return other
 
 convertExpr :: Idents -> Expr -> Expr
-convertExpr functions (Call Nothing func (Args [] [])) =
-    Call Nothing func (Args args [])
+convertExpr functions (Call (Ident func) (Args [] [])) =
+    Call (Ident func) (Args args [])
     where args = if Set.member func functions
             then [Just $ Number "0"]
             else []

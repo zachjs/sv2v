@@ -51,10 +51,10 @@ convertDescription (description @ Part{}) =
             traverseExprsM traverseExprM      >>=
             traverseAsgnsM traverseAsgnM
         traverseStmtM :: Stmt -> State Types Stmt
-        traverseStmtM (Subroutine Nothing f args) = do
+        traverseStmtM (Subroutine expr args) = do
             stateTypes <- get
-            return $ uncurry (Subroutine Nothing) $
-                convertCall structs stateTypes f args
+            return $ Subroutine expr $
+                convertCall structs stateTypes expr args
         traverseStmtM stmt =
             traverseStmtLHSsM  traverseLHSM  stmt >>=
             traverseStmtExprsM traverseExprM      >>=
@@ -152,7 +152,7 @@ convertType structs t1 =
 
 -- writes down the names of called functions
 collectCallsM :: Expr -> Writer Idents ()
-collectCallsM (Call Nothing f _) = tell $ Set.singleton f
+collectCallsM (Call (Ident f) _) = tell $ Set.singleton f
 collectCallsM _ = return ()
 
 collectTFArgsM :: ModuleItem -> Writer Types ()
@@ -328,8 +328,8 @@ convertAsgn structs types (lhs, expr) =
                     show (Set.toList extraNames) ++ " that are not in " ++
                     show structTf
             else if Map.member structTf structs then
-                Call Nothing
-                    (packerFnName structTf)
+                Call
+                    (Ident $ packerFnName structTf)
                     (Args (map (Just . snd) items) [])
             else
                 Pattern items
@@ -464,14 +464,15 @@ convertAsgn structs types (lhs, expr) =
                     (_, []) -> Implicit Unspecified []
                     (tf, rs) -> tf $ tail rs
                 (_, i') = convertSubExpr i
-        convertSubExpr (Call Nothing f args) =
-            (retType, uncurry (Call Nothing) $ convertCall structs types f args)
+        convertSubExpr (Call e args) =
+            (retType, Call e $ convertCall structs types e' args)
             where
-                retType = case Map.lookup f types of
-                    Nothing -> Implicit Unspecified []
-                    Just t -> t
-        convertSubExpr (Call (Just x) f args) =
-            (Implicit Unspecified [], Call (Just x) f args)
+                (_, e') = convertSubExpr e
+                retType = case e' of
+                    Ident f -> case Map.lookup f types of
+                        Nothing -> Implicit Unspecified []
+                        Just t -> t
+                    _ -> Implicit Unspecified []
         convertSubExpr (String s) = (Implicit Unspecified [], String s)
         convertSubExpr (Number n) = (Implicit Unspecified [], Number n)
         convertSubExpr (Time   n) = (Implicit Unspecified [], Time   n)
@@ -536,10 +537,13 @@ convertAsgn structs types (lhs, expr) =
             where fieldMap = Map.fromList $ map swap fields
 
 -- attempts to convert based on the assignment-like contexts of TF arguments
-convertCall :: Structs -> Types -> Identifier -> Args -> (Identifier, Args)
-convertCall structs types f (Args pnArgs kwArgs) =
-    (f, args)
+convertCall :: Structs -> Types -> Expr -> Args -> Args
+convertCall structs types fn (Args pnArgs kwArgs) =
+    case fn of
+        Ident _ -> args
+        _ -> Args pnArgs kwArgs
     where
+        Ident f = fn
         idxs = map show ([0..] :: [Int])
         args = Args
             (map snd $ map convertArg $ zip idxs pnArgs)

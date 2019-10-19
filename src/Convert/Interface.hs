@@ -186,6 +186,7 @@ convertDescription _ _ other = other
 -- add a prefix to all standard identifiers in a module item
 prefixModuleItems :: Identifier -> ModuleItem -> ModuleItem
 prefixModuleItems prefix =
+    prefixMIPackageItem .
     traverseDecls prefixDecl .
     traverseExprs (traverseNestedExprs prefixExpr) .
     traverseLHSs  (traverseNestedLHSs  prefixLHS )
@@ -200,6 +201,19 @@ prefixModuleItems prefix =
         prefixLHS :: LHS -> LHS
         prefixLHS (LHSIdent x) = LHSIdent (prefix ++ x)
         prefixLHS other = other
+        prefixMIPackageItem (MIPackageItem item) =
+            MIPackageItem $ prefixPackageItem prefix item
+        prefixMIPackageItem other = other
+
+-- add a prefix to all standard identifiers in a package item
+prefixPackageItem :: Identifier -> PackageItem -> PackageItem
+prefixPackageItem prefix (Function lifetime t x decls stmts) =
+    Function lifetime t x' decls stmts
+    where x' = prefix ++ x
+prefixPackageItem prefix (Task     lifetime   x decls stmts) =
+    Task     lifetime   x' decls stmts
+    where x' = prefix ++ x
+prefixPackageItem _ other = other
 
 lookupType :: [ModuleItem] -> Expr -> (Type, [Range])
 lookupType items (Ident ident) =
