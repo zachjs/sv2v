@@ -55,8 +55,7 @@ traverseStmtM :: Stmt -> State Info Stmt
 traverseStmtM stmt = traverseStmtExprsM traverseExprM stmt
 
 traverseExprM :: Expr -> State Info Expr
-traverseExprM = traverseNestedExprsM $ stately converter
-    where converter a b = simplify $ (traverseNestedExprs (convertExpr a) b)
+traverseExprM = traverseNestedExprsM $ stately convertExpr
 
 -- elaborate integer atom types to have explicit dimensions
 elaborateType :: Type -> Type

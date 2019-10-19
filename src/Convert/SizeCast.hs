@@ -76,7 +76,7 @@ castFn e sg =
     Function (Just Automatic) t fnName [decl] [Return $ Ident inp]
     where
         inp = "inp"
-        r = (BinOp Sub e (Number "1"), Number "0")
+        r = (simplify $ BinOp Sub e (Number "1"), Number "0")
         t = IntegerVector TLogic sg [r]
         fnName = castFnName e sg
         decl = Variable Input t inp [] Nothing

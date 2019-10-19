@@ -349,9 +349,7 @@ traverseAssertionExprsM mapper = assertionMapper
         propExprMapper (PropExprIff p1 p2) =
             ppMapper PropExprIff p1 p2
         propSpecMapper (PropertySpec ms me pe) = do
-            me' <- case me of
-                Nothing -> return Nothing
-                Just e -> mapper e >>= return . Just
+            me' <- maybeExprMapper me
             pe' <- propExprMapper pe
             return $ PropertySpec ms me' pe'
         assertionExprMapper (Left e) =
