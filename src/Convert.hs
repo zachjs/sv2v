@@ -31,6 +31,7 @@ import qualified Convert.NestPI
 import qualified Convert.Package
 import qualified Convert.ParamType
 import qualified Convert.RemoveComments
+import qualified Convert.SignCast
 import qualified Convert.Simplify
 import qualified Convert.SizeCast
 import qualified Convert.StarPort
@@ -72,6 +73,7 @@ phases excludes =
     , Convert.Unique.convert
     , Convert.UnpackedArray.convert
     , Convert.Unsigned.convert
+    , Convert.SignCast.convert
     , Convert.Package.convert
     , Convert.Enum.convert
     , Convert.NestPI.convert
