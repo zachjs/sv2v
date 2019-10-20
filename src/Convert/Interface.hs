@@ -145,7 +145,10 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
         expandPortBinding _ other = [other]
 
         lookupModport :: Maybe Identifier -> Identifier -> Identifier -> Maybe [ModportDecl]
-        lookupModport instanceName interfaceName = (Map.!?) modportMap
+        lookupModport instanceName interfaceName =
+            if Map.member interfaceName interfaces
+                then (Map.!?) modportMap
+                else error $ "could not find interface " ++ show interfaceName
             where
                 prefix = maybe "" (++ "_") instanceName
                 interfaceItems =
