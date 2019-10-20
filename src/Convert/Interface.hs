@@ -85,13 +85,8 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
         mapInterface (Instance part params ident Nothing instancePorts) =
             case Map.lookup part interfaces of
                 Just interface ->
-                    -- TODO: Add support for interfaces with parameter bindings.
-                    if not $ null params
-                    then error $ "interface instantiations with parameter "
-                            ++ "bindings are not yet supported: "
-                            ++ show (part, params, ident)
-                    else Generate $ map GenModuleItem $
-                            inlineInterface interface (ident, expandedPorts)
+                    Generate $ map GenModuleItem $
+                        inlineInterface interface (ident, params, expandedPorts)
                 Nothing -> Instance part params ident Nothing expandedPorts
             where expandedPorts = concatMap (expandPortBinding part) instancePorts
         mapInterface (orig @ (MIPackageItem (Function _ _ _ decls _))) =
@@ -234,8 +229,8 @@ lookupType _ expr =
         ++ " are not identifiers: " ++ show expr
 
 -- convert an interface instantiation into a series of equivalent module items
-inlineInterface :: Interface -> (Identifier, [PortBinding]) -> [ModuleItem]
-inlineInterface (ports, items) (instanceName, instancePorts) =
+inlineInterface :: Interface -> (Identifier, [ParamBinding], [PortBinding]) -> [ModuleItem]
+inlineInterface (ports, items) (instanceName, instanceParams, instancePorts) =
     (:) (MIPackageItem $ Comment $ "expanded instance: " ++ instanceName) $
     flip (++) portBindings $
     map (traverseNestedModuleItems removeModport) $
@@ -243,7 +238,10 @@ inlineInterface (ports, items) (instanceName, instancePorts) =
     itemsPrefixed
     where
         prefix = instanceName ++ "_"
-        itemsPrefixed = map (prefixModuleItems prefix) $ items
+        itemsPrefixed =
+            map (prefixModuleItems prefix) $
+            map (traverseDecls overrideParam) $
+            items
         origInstancePortNames = map fst instancePorts
         instancePortExprs = map snd instancePorts
         instancePortNames =
@@ -263,6 +261,24 @@ inlineInterface (ports, items) (instanceName, instancePorts) =
         removeModport (Modport x _) =
             MIPackageItem $ Comment $ "removed modport " ++ x
         removeModport other = other
+
+        instanceParamMap = Map.fromList instanceParams
+        overrideParam :: Decl -> Decl
+        overrideParam (Param Parameter t x e) =
+            case Map.lookup x instanceParamMap of
+                Nothing -> Param Parameter t x e
+                Just (Right e') -> Param Parameter t x e'
+                Just (Left t') ->
+                    error $ "interface param expected expression, found type: "
+                        ++ show t'
+        overrideParam (ParamType Parameter x mt) =
+            case Map.lookup x instanceParamMap of
+                Nothing -> ParamType Parameter x mt
+                Just (Left t') -> ParamType Parameter x (Just t')
+                Just (Right e') ->
+                    error $ "interface param expected type, found expression: "
+                        ++ show e'
+        overrideParam other = other
 
         portBindingItem :: PortBinding -> Maybe ModuleItem
         portBindingItem (ident, Just expr) =
