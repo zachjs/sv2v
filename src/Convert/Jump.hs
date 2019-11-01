@@ -60,6 +60,13 @@ convertModuleItem (Initial stmt) =
     where
         initialState = Info { sJumpType = JTNone, sLoopID = "" }
         (stmt', finalState) = runState (convertStmt stmt) initialState
+convertModuleItem (Final stmt) =
+    if sJumpType finalState == JTNone
+        then Final stmt'
+        else error "illegal jump statement within final construct"
+    where
+        initialState = Info { sJumpType = JTNone, sLoopID = "" }
+        (stmt', finalState) = runState (convertStmt stmt) initialState
 convertModuleItem (AlwaysC kw stmt) =
     if sJumpType finalState == JTNone
         then AlwaysC kw stmt'

@@ -144,6 +144,8 @@ regIdents (AlwaysC _ stmt) =
         removeTimings other = other
 regIdents (Initial stmt) =
     regIdents $ AlwaysC Always stmt
+regIdents (Final stmt) =
+    regIdents $ AlwaysC Always stmt
 regIdents _ = return ()
 
 lhsIdents :: LHS -> Writer Idents ()

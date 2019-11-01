@@ -41,6 +41,7 @@ data ModuleItem
     | Generate   [GenItem]
     | Modport    Identifier [ModportDecl]
     | Initial    Stmt
+    | Final      Stmt
     | MIPackageItem PackageItem
     | NInputGate  NInputGateKW  (Maybe Identifier)  LHS [Expr]
     | NOutputGate NOutputGateKW (Maybe Identifier) [LHS] Expr
@@ -56,6 +57,7 @@ instance Show ModuleItem where
     show (Generate    b  ) = printf "generate\n%s\nendgenerate" (indent $ unlines' $ map show b)
     show (Modport     x l) = printf "modport %s(\n%s\n);" x (indent $ intercalate ",\n" $ map showModportDecl l)
     show (Initial     s  ) = printf "initial %s" (show s)
+    show (Final       s  ) = printf   "final %s" (show s)
     show (NInputGate  kw x lhs exprs) = printf "%s%s (%s, %s);" (show kw) (maybe "" (" " ++) x) (show lhs) (commas $ map show exprs)
     show (NOutputGate kw x lhss expr) = printf "%s%s (%s, %s);" (show kw) (maybe "" (" " ++) x) (commas $ map show lhss) (show expr)
     show (Assign d a b) =

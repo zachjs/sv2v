@@ -649,6 +649,7 @@ NonGenerateModuleItem :: { [ModuleItem] }
   | "assign" opt(DelayControl) LHSAsgns ";" { map (uncurry $ Assign $2) $3 }
   | AlwaysKW Stmt                        { [AlwaysC $1 $2] }
   | "initial" Stmt                       { [Initial $2] }
+  | "final"   Stmt                       { [Final   $2] }
   | "genvar" Identifiers ";"             { map Genvar $2 }
   | "modport" ModportItems ";"           { map (uncurry Modport) $2 }
   | NonDeclPackageItem                   { map MIPackageItem $1 }

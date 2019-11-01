@@ -199,6 +199,8 @@ traverseStmtsM' strat mapper = moduleItemMapper
             return $ MIPackageItem $ Task lifetime name decls stmts'
         moduleItemMapper (Initial stmt) =
             fullMapper stmt >>= return . Initial
+        moduleItemMapper (Final stmt) =
+            fullMapper stmt >>= return . Final
         moduleItemMapper other = return $ other
         fullMapper = traverseNestedStmtsM mapper
 
@@ -577,6 +579,8 @@ traverseExprsM' strat exprMapper = moduleItemMapper
         stmtMapper stmt >>= return . AlwaysC kw
     moduleItemMapper (Initial stmt) =
         stmtMapper stmt >>= return . Initial
+    moduleItemMapper (Final stmt) =
+        stmtMapper stmt >>= return . Final
     moduleItemMapper (Assign delay lhs expr) = do
         delay' <- maybeExprMapper delay
         lhs' <- lhsMapper lhs
@@ -1034,7 +1038,7 @@ collectNestedExprsM :: Monad m => CollectorM m Expr -> CollectorM m Expr
 collectNestedExprsM = collectify traverseNestedExprsM
 
 -- Traverse all the declaration scopes within a ModuleItem. Note that Functions,
--- Tasks, Always and Initial blocks are all NOT passed through ModuleItem
+-- Tasks, Always/Initial/Final blocks are all NOT passed through ModuleItem
 -- mapper, and Decl ModuleItems are NOT passed through the Decl mapper. The
 -- state is restored to its previous value after each scope is exited. Only the
 -- Decl mapper may modify the state, as we maintain the invariant that all other
@@ -1082,6 +1086,8 @@ traverseScopesM declMapper moduleItemMapper stmtMapper =
             fullStmtMapper stmt >>= return . AlwaysC kw
         redirectModuleItem (Initial stmt) =
             fullStmtMapper stmt >>= return . Initial
+        redirectModuleItem (Final stmt) =
+            fullStmtMapper stmt >>= return . Final
         redirectModuleItem item =
             moduleItemMapper item
 
