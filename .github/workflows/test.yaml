@@ -1,0 +1,49 @@
+name: Test
+on: push
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-18.04, macOS-10.14]
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install Dependencies
+        run: |
+          brew install haskell-stack shunit2 icarus-verilog || ls
+          sudo apt-get install -y haskell-stack shunit2 flex bison autoconf gperf || ls
+      - name: Cache iverilog
+        uses: actions/cache@v1
+        with:
+          path: ~/.local
+          key: ${{ runner.OS }}-iverilog-10-2
+          restore-keys: ${{ runner.OS }}-iverilog-10-2
+      - name: Install iverilog
+        run: |
+          if [ "${{ runner.OS }}" = "Linux" ]; then
+            if [ ! -e "$HOME/.local/bin/iverilog" ]; then
+              curl --retry-max-time 60 -L https://github.com/steveicarus/iverilog/archive/v10_2.tar.gz > iverilog.tar.gz
+              tar -xzf iverilog.tar.gz
+              cd iverilog-10_2
+              autoconf
+              ./configure --prefix=$HOME/.local
+              make
+              make install
+              cd ..
+            fi
+          fi
+      - name: Cache Build
+        uses: actions/cache@v1
+        with:
+          path: ~/.stack
+          key: ${{ runner.OS }}-${{ hashFiles('**/stack.yaml') }}-${{ hashFiles('**/sv2v.cabal') }}
+          restore-keys: |
+            ${{ runner.OS }}-${{ hashFiles('**/stack.yaml') }}-${{ hashFiles('**/sv2v.cabal') }}
+            ${{ runner.OS }}-${{ hashFiles('**/stack.yaml') }}-
+            ${{ runner.OS }}-
+      - name: Build
+        run: make
+      - name: Test
+        run: |
+          export PATH="$PATH:$HOME/.local/bin"
+          make test
