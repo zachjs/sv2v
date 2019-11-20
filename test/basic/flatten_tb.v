@@ -35,5 +35,8 @@ module top;
     `FOO(B)
     `FOO(C)
     `FOO(D)
+    `FOO(E)
+    `FOO(F)
+    `FOO(G)
 
 endmodule

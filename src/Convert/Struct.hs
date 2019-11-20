@@ -97,7 +97,10 @@ collectStructM' constructor isStruct sg fields = do
         zero = Number "0"
         typeRange :: Type -> Range
         typeRange t =
-            if null ranges then (zero, zero) else head ranges
+            case ranges of
+                [] -> (zero, zero)
+                [range] -> range
+                _ -> error "Struct.hs invariant failure"
             where ranges = snd $ typeRanges t
 
         -- extract info about the fields
@@ -132,13 +135,13 @@ collectStructM' constructor isStruct sg fields = do
         packedRange = (simplify $ BinOp Sub structSize (Number "1"), zero)
         unstructType = IntegerVector TLogic sg [packedRange]
 
-        -- check if this struct can be packed into an integer vector; integer
-        -- atoms and non-integers do not have a definitive size, and so cannot
-        -- be packed; net types are not permitted as struct fields
-        isIntVec :: Type -> Bool
-        isIntVec (IntegerVector _ _ _) = True
-        isIntVec _ = False
-        canUnstructure = all isIntVec fieldTypes
+        -- check if this struct can be packed into an integer vector; we only
+        -- pack flat integer vector types; the fields will be flattened and
+        -- converted by other phases
+        isFlatIntVec :: Type -> Bool
+        isFlatIntVec (IntegerVector _ _ rs) = length rs <= 1
+        isFlatIntVec _ = False
+        canUnstructure = all isFlatIntVec fieldTypes
 
 
 -- convert a struct type to its unstructured equivalent
@@ -221,6 +224,13 @@ packerFnName :: TypeFunc -> Identifier
 packerFnName structTf =
     "sv2v_struct_" ++ shortHash structTf
 
+-- removes the innermost range from the given type, if possible
+dropInnerTypeRange :: Type -> Type
+dropInnerTypeRange t =
+    case typeRanges t of
+        (_, []) -> Implicit Unspecified []
+        (tf, rs) -> tf $ tail rs
+
 -- This is where the magic happens. This is responsible for converting struct
 -- accesses, assignments, and literals, given appropriate information about the
 -- structs and the current declaration context. The general strategy involves
@@ -249,9 +259,7 @@ convertAsgn structs types (lhs, expr) =
                 _ -> (t', LHSBit l' e)
             where
                 (t, l') = convertLHS l
-                t' = case typeRanges t of
-                    (_, []) -> Implicit Unspecified []
-                    (tf, rs) -> tf $ tail rs
+                t' = dropInnerTypeRange t
         convertLHS (LHSRange lOuter NonIndexed rOuter) =
             case lOuter' of
                 LHSRange lInner NonIndexed (_, loI) ->
@@ -268,13 +276,23 @@ convertAsgn structs types (lhs, expr) =
             where
                 (hiO, loO) = rOuter
                 (t, lOuter') = convertLHS lOuter
+        convertLHS (LHSRange lOuter IndexedPlus (rOuter @ (baseO, lenO))) =
+            case lOuter' of
+                LHSRange lInner NonIndexed (hiI, loI) ->
+                    (t', LHSRange lInner IndexedPlus (simplify base, simplify len))
+                    where
+                        base = BinOp Add baseO $
+                            endianCondExpr (hiI, loI) loI hiI
+                        len = lenO
+                _ -> (t', LHSRange lOuter' IndexedPlus rOuter)
+            where
+                (t, lOuter') = convertLHS lOuter
+                t' = dropInnerTypeRange t
         convertLHS (LHSRange l m r) =
             (t', LHSRange l' m r)
             where
                 (t, l') = convertLHS l
-                t' = case typeRanges t of
-                    (_, []) -> Implicit Unspecified []
-                    (tf, rs) -> tf $ tail rs
+                t' = dropInnerTypeRange t
         convertLHS (LHSDot    l x ) =
             case t of
                 InterfaceT _ _ _ -> (Implicit Unspecified [], LHSDot l' x)
@@ -421,24 +439,36 @@ convertAsgn structs types (lhs, expr) =
             -- semantics are that a range returns a new, zero-indexed sub-range.
             case eOuter' of
                 Range eInner NonIndexed (_, loI) ->
-                    (t, Range eInner NonIndexed (simplify hi, simplify lo))
+                    (t', Range eInner NonIndexed (simplify hi, simplify lo))
                     where
                         lo = BinOp Add loI loO
                         hi = BinOp Add loI hiO
                 Range eInner IndexedPlus (baseI, _) ->
-                    (t, Range eInner IndexedPlus (simplify base, simplify len))
+                    (t', Range eInner IndexedPlus (simplify base, simplify len))
                     where
                         base = BinOp Add baseI loO
                         len = rangeSize rOuter
-                _ -> (t, Range eOuter' NonIndexed rOuter)
-            where (t, eOuter') = convertSubExpr eOuter
+                _ -> (t', Range eOuter' NonIndexed rOuter)
+            where
+                (t, eOuter') = convertSubExpr eOuter
+                t' = dropInnerTypeRange t
+        convertSubExpr (Range eOuter IndexedPlus (rOuter @ (baseO, lenO))) =
+            case eOuter' of
+                Range eInner NonIndexed (hiI, loI) ->
+                    (t', Range eInner IndexedPlus (simplify base, simplify len))
+                    where
+                        base = BinOp Add baseO $
+                            endianCondExpr (hiI, loI) loI hiI
+                        len = lenO
+                _ -> (t', Range eOuter' IndexedPlus rOuter)
+            where
+                (t, eOuter') = convertSubExpr eOuter
+                t' = dropInnerTypeRange t
         convertSubExpr (Range e m r) =
             (t', Range e' m r)
             where
                 (t, e') = convertSubExpr e
-                t' = case typeRanges t of
-                    (_, []) -> Implicit Unspecified []
-                    (tf, rs) -> tf $ tail rs
+                t' = dropInnerTypeRange t
         convertSubExpr (Concat exprs) =
             (Implicit Unspecified [], Concat $ map (snd . convertSubExpr) exprs)
         convertSubExpr (Stream o e exprs) =
@@ -460,9 +490,7 @@ convertAsgn structs types (lhs, expr) =
                 _ -> (t', Bit e' i')
             where
                 (t, e') = convertSubExpr e
-                t' = case typeRanges t of
-                    (_, []) -> Implicit Unspecified []
-                    (tf, rs) -> tf $ tail rs
+                t' = dropInnerTypeRange t
                 (_, i') = convertSubExpr i
         convertSubExpr (Call e args) =
             (retType, Call e $ convertCall structs types e' args)

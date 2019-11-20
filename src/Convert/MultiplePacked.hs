@@ -33,7 +33,8 @@ import qualified Data.Map.Strict as Map
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type Info = Map.Map Identifier ([Range], [Range])
+type TypeInfo = (Type, [Range])
+type Info = Map.Map Identifier TypeInfo
 
 convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
@@ -55,16 +56,27 @@ traverseDeclM (ParamType s ident mt) =
 
 traverseTypeM :: Type -> [Range] -> Identifier -> State Info Type
 traverseTypeM t a ident = do
-    let (tf, rs) = typeRanges t
+    modify $ Map.insert ident (t, a)
+    t' <- case t of
+        Struct pk fields rs -> do
+            fields' <- flattenFields fields
+            return $ Struct pk fields' rs
+        Union  pk fields rs -> do
+            fields' <- flattenFields fields
+            return $ Union  pk fields' rs
+        _ -> return t
+    let (tf, rs) = typeRanges t'
     if length rs <= 1
-        then do
-            modify $ Map.delete ident
-            return t
+        then return t'
         else do
-            modify $ Map.insert ident (rs, a)
             let r1 : r2 : rest = rs
             let rs' = (combineRanges r1 r2) : rest
             return $ tf rs'
+    where
+        flattenFields fields = do
+            let (fieldTypes, fieldNames) = unzip fields
+            fieldTypes' <- mapM (\x -> traverseTypeM x [] "") fieldTypes
+            return $ zip fieldTypes' fieldNames
 
 -- combines two ranges into one flattened range
 combineRanges :: Range -> Range -> Range
@@ -110,33 +122,46 @@ traverseLHSM lhs = do
     return $ fromJust $ exprToLHS expr'
 
 traverseExpr :: Info -> Expr -> Expr
-traverseExpr typeDims =
+traverseExpr typeMap =
     rewriteExpr
     where
-        -- removes the innermost dimensions of the given packed and unpacked
-        -- dimensions, and applies the given transformation to the expression
-        dropLevel
-            :: (Expr -> Expr)
-            -> ([Range], [Range], Expr)
-            -> ([Range], [Range], Expr)
-        dropLevel nest ([], [], expr) =
-            ([], [], nest expr)
-        dropLevel nest (packed, [], expr) =
-            (tail packed, [], nest expr)
-        dropLevel nest (packed, unpacked, expr) =
-            (packed, tail unpacked, nest expr)
+        -- removes the innermost dimensions of the given type information, and
+        -- applies the given transformation to the expression
+        dropLevel :: (Expr -> Expr) -> (TypeInfo, Expr) -> (TypeInfo, Expr)
+        dropLevel nest ((t, a), expr) =
+            ((tf rs', a'), nest expr)
+            where
+                (tf, rs) = typeRanges t
+                (rs', a') = case (rs, a) of
+                    ([], []) -> ([], [])
+                    (packed, []) -> (tail packed, [])
+                    (packed, unpacked) -> (packed, tail unpacked)
 
-        -- given an expression, returns the packed and unpacked dimensions and a
-        -- tagged version of the expression, if possible
-        levels :: Expr -> Maybe ([Range], [Range], Expr)
+        -- given an expression, returns its type information and a tagged
+        -- version of the expression, if possible
+        levels :: Expr -> Maybe (TypeInfo, Expr)
         levels (Ident x) =
-            case Map.lookup x typeDims of
-                Just (a, b) -> Just (a, b, Ident $ tag : x)
+            case Map.lookup x typeMap of
+                Just a -> Just (a, Ident $ tag : x)
                 Nothing -> Nothing
         levels (Bit expr a) =
             fmap (dropLevel $ \expr' -> Bit expr' a) (levels expr)
         levels (Range expr a b) =
             fmap (dropLevel $ \expr' -> Range expr' a b) (levels expr)
+        levels (Dot expr x) =
+            case levels expr of
+                Just ((Struct _ fields [], []), expr') -> dropDot fields expr'
+                Just ((Union  _ fields [], []), expr') -> dropDot fields expr'
+                _ -> Nothing
+            where
+                dropDot :: [Field] -> Expr -> Maybe (TypeInfo, Expr)
+                dropDot fields expr' =
+                    if Map.member x fieldMap
+                        then Just ((fieldType, []), Dot expr' x)
+                        else Nothing
+                    where
+                        fieldMap = Map.fromList $ map swap fields
+                        fieldType = fieldMap Map.! x
         levels _ = Nothing
 
         -- given an expression, returns the two innermost packed dimensions and a
@@ -144,8 +169,11 @@ traverseExpr typeDims =
         dims :: Expr -> Maybe (Range, Range, Expr)
         dims expr =
             case levels expr of
-                Just (dimInner : dimOuter : _, [], expr') ->
-                    Just (dimInner, dimOuter, expr')
+                Just ((t, []), expr') ->
+                    case snd $ typeRanges t of
+                        dimInner : dimOuter : _ ->
+                            Just (dimInner, dimOuter, expr')
+                        _ -> Nothing
                 _ -> Nothing
 
         -- if the given range is flipped, the result will flip around the given
