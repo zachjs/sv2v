@@ -527,7 +527,10 @@ alexInitUserState = LS [] "" Map.empty [] [] []
 -- public-facing lexer entrypoint
 lexFile :: [String] -> Env -> FilePath -> IO (Either String ([Token], Env))
 lexFile includePaths env path = do
-    str <- readFile path >>= return . normalize
+    str <-
+        if path == "-"
+            then getContents
+            else readFile path >>= return . normalize
     let result = runAlex str $ setEnv >> alexMonadScan >> get
     return $ case result of
         Left msg -> Left msg

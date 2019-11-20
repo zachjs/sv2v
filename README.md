@@ -60,7 +60,8 @@ running `stack install`, or copy over the executable manually.
 
 sv2v takes in a list of files and prints the converted Verilog to `stdout`.
 Users may specify `include` search paths, define macros during preprocessing,
-and exclude some of the conversions.
+and exclude some of the conversions. Specifying `-` as an input file will read
+from `stdin`.
 
 Below is the current usage printout. This interface is subject to change.
 
