@@ -135,13 +135,20 @@ convertDescription ports orig =
         convertDecl other = other
 
 regIdents :: ModuleItem -> Writer Idents ()
-regIdents (AlwaysC _ stmt) =
+regIdents (AlwaysC _ stmt) = do
+    collectNestedStmtsM collectReadMemsM stmt
     collectNestedStmtsM (collectStmtLHSsM (collectNestedLHSsM lhsIdents)) $
-    traverseNestedStmts removeTimings stmt
+        traverseNestedStmts removeTimings stmt
     where
         removeTimings :: Stmt -> Stmt
         removeTimings (Timing _ s) = s
         removeTimings other = other
+        collectReadMemsM :: Stmt -> Writer Idents ()
+        collectReadMemsM (Subroutine (Ident f) (Args (_ : Just (Ident x) : _) [])) =
+            if f == "$readmemh" || f == "$readmemb"
+                then tell $ Set.singleton x
+                else return ()
+        collectReadMemsM _ = return ()
 regIdents (Initial stmt) =
     regIdents $ AlwaysC Always stmt
 regIdents (Final stmt) =
