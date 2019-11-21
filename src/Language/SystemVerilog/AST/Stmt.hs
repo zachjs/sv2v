@@ -94,7 +94,7 @@ instance Show Stmt where
     show (Forever s  ) = printf "forever %s" (show s)
     show (Foreach x i s) = printf "foreach (%s [ %s ]) %s" x (commas $ map (maybe "" id) i) (show s)
     show (If u a b Null) = printf "%sif (%s)%s"         (maybe "" showPad u) (show a) (showBranch b)
-    show (If u a b c   ) = printf "%sif (%s)%s\nelse%s" (maybe "" showPad u) (show a) (showBranch b) (showElseBranch c)
+    show (If u a b c   ) = printf "%sif (%s)%s\nelse%s" (maybe "" showPad u) (show a) (showBlockedBranch b) (showElseBranch c)
     show (Return e   ) = printf "return %s;" (show e)
     show (Timing t s ) = printf "%s%s" (show t) (showShortBranch s)
     show (Trigger b x) = printf "->%s %s;" (if b then "" else ">") x
@@ -106,6 +106,23 @@ instance Show Stmt where
 showBranch :: Stmt -> String
 showBranch (block @ Block{}) = ' ' : show block
 showBranch stmt = '\n' : (indent $ show stmt)
+
+showBlockedBranch :: Stmt -> String
+showBlockedBranch stmt =
+    showBranch $
+    if isControl
+        then Block Seq "" [] [stmt]
+        else stmt
+    where
+        isControl = case stmt of
+            If{} -> True
+            For{} -> True
+            While{} -> True
+            RepeatL{} -> True
+            DoWhile{} -> True
+            Forever{} -> True
+            Foreach{} -> True
+            _ -> False
 
 showElseBranch :: Stmt -> String
 showElseBranch (stmt @ If{}) = ' ' : show stmt
