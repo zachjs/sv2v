@@ -110,11 +110,11 @@ showBranch stmt = '\n' : (indent $ show stmt)
 showBlockedBranch :: Stmt -> String
 showBlockedBranch stmt =
     showBranch $
-    if isControl
+    if isControl stmt
         then Block Seq "" [] [stmt]
         else stmt
     where
-        isControl = case stmt of
+        isControl s = case s of
             If{} -> True
             For{} -> True
             While{} -> True
@@ -122,6 +122,7 @@ showBlockedBranch stmt =
             DoWhile{} -> True
             Forever{} -> True
             Foreach{} -> True
+            Timing _ subStmt -> isControl subStmt
             _ -> False
 
 showElseBranch :: Stmt -> String

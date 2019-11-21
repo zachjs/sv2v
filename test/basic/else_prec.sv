@@ -29,6 +29,18 @@ module top;
                 end
             end
 
+            $display("3 (%b, %b, %b)", a, b, c);
+            if (a) begin
+                #1
+                if (b) begin
+                    $display("FOO");
+                end
+            end else begin
+                if (c) begin
+                    $display("BAR");
+                end
+            end
+
         end
     endtask
 
