@@ -920,7 +920,7 @@ StmtNonBlock :: { Stmt }
   | Unique "if" "(" Expr ")" Stmt "else" Stmt  { If $1 $4 $6 $8   }
   | Unique "if" "(" Expr ")" Stmt %prec NoElse { If $1 $4 $6 Null }
   | "for" "(" ForInit ForCond ForStep ")" Stmt { For $3 $4 $5 $7 }
-  | Unique CaseKW "(" Expr ")" Cases "endcase" { Case $1 $2 $4 (fst $6) (snd $6) }
+  | Unique CaseKW "(" Expr ")" Cases "endcase" { Case $1 $2 $4 $6 }
   | TimingControl Stmt                         { Timing $1 $2 }
   | "return" Expr ";"                          { Return $2 }
   | "return"      ";"                          { Return Nil }
@@ -942,11 +942,11 @@ BlockKWPar :: { BlockKW }
 BlockKWSeq :: { BlockKW }
   : "begin" { Seq }
 
-Unique :: { Maybe UniquePriority }
-  : {- empty -} { Nothing }
-  | "unique"    { Just Unique   }
-  | "unique0"   { Just Unique0  }
-  | "priority"  { Just Priority }
+Unique :: { ViolationCheck }
+  : {- empty -} { NoCheck  }
+  | "unique"    { Unique   }
+  | "unique0"   { Unique0  }
+  | "priority"  { Priority }
 
 ForInit :: { Either [Decl] [(LHS, Expr)] }
   :            ";"  { Right [] }
@@ -1045,17 +1045,16 @@ CaseKW :: { CaseKW }
   | "casex" { CaseX }
   | "casez" { CaseZ }
 
-Cases :: { ([Case], Maybe Stmt) }
-  : {- empty -}                { ([], Nothing) }
-  | Case Cases                 { ($1 : fst $2, snd $2) }
-  | CaseDefault CasesNoDefault { ($2, Just $1) }
+Cases :: { [Case] }
+  : {- empty -}                { [] }
+  | Case        Cases          { $1       : $2 }
+  | CaseDefault CasesNoDefault { ([], $1) : $2 }
 CasesNoDefault :: { [Case] }
-  : {- empty -} { [] }
-  | CasesNoDefault Case  { $1 ++ [$2] }
+  : {- empty -}         { [] }
+  | CasesNoDefault Case { $1 ++ [$2] }
 
 Case :: { Case }
   : Exprs ":" Stmt { ($1, $3) }
-
 CaseDefault :: { Stmt }
   : "default" opt(":") Stmt { $3 }
 
@@ -1209,24 +1208,23 @@ GenItem :: { GenItem }
 ConditionalGenerateConstruct :: { GenItem }
   : "if" "(" Expr ")" GenItemOrNull "else" GenItemOrNull { GenIf $3 $5 $7      }
   | "if" "(" Expr ")" GenItemOrNull %prec NoElse         { GenIf $3 $5 GenNull }
-  | "case" "(" Expr ")" GenCasesWithDefault "endcase"    { GenCase $3 (fst $5) (snd $5) }
+  | "case" "(" Expr ")" GenCases "endcase" { GenCase $3 $5 }
 LoopGenerateConstruct :: { GenItem }
   : "for" "(" GenvarInitialization ";" Expr ";" GenvarIteration ")" GenItem { GenFor $3 $5 $7 $9 }
 
 GenBlock :: { (Identifier, [GenItem]) }
   : "begin" StrTag GenItems "end" StrTag { (combineTags $2 $5, $3) }
 
-GenCasesWithDefault :: { ([GenCase], Maybe GenItem) }
-  : {- empty -}                 { ([], Nothing) }
-  | GenCase GenCasesWithDefault { ($1 : fst $2, snd $2) }
-  | GenCaseDefault GenCases     { ($2, Just $1) }
 GenCases :: { [GenCase] }
-  : {- empty -}      { [] }
-  | GenCases GenCase { $1 ++ [$2] }
+  : {- empty -}                      { [] }
+  | GenCase        GenCases          { $1       : $2 }
+  | GenCaseDefault GenCasesNoDefault { ([], $1) : $2 }
+GenCasesNoDefault :: { [GenCase] }
+  : {- empty -}               { [] }
+  | GenCasesNoDefault GenCase { $1 ++ [$2] }
 
 GenCase :: { GenCase }
   : Exprs ":" GenItemOrNull { ($1, $3) }
-
 GenCaseDefault :: { GenItem }
   : "default" opt(":") GenItemOrNull { $3 }
 

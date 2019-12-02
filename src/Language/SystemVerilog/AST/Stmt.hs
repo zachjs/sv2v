@@ -19,7 +19,7 @@ module Language.SystemVerilog.AST.Stmt
     , AssertionExpr
     , Assertion    (..)
     , PropertySpec (..)
-    , UniquePriority (..)
+    , ViolationCheck (..)
     , BlockKW (..)
     ) where
 
@@ -36,7 +36,7 @@ import Language.SystemVerilog.AST.Type (Identifier)
 data Stmt
     = StmtAttr Attr Stmt
     | Block   BlockKW Identifier [Decl] [Stmt]
-    | Case    (Maybe UniquePriority) CaseKW Expr [Case] (Maybe Stmt)
+    | Case    ViolationCheck CaseKW Expr [Case]
     | For     (Either [Decl] [(LHS, Expr)]) Expr [(LHS, AsgnOp, Expr)] Stmt
     | AsgnBlk AsgnOp LHS Expr
     | Asgn    (Maybe Timing) LHS Expr
@@ -45,7 +45,7 @@ data Stmt
     | DoWhile Expr Stmt
     | Forever Stmt
     | Foreach Identifier [Maybe Identifier] Stmt
-    | If      (Maybe UniquePriority) Expr Stmt Stmt
+    | If      ViolationCheck Expr Stmt Stmt
     | Timing  Timing Stmt
     | Return  Expr
     | Subroutine Expr Args
@@ -64,13 +64,9 @@ instance Show Stmt where
             header = if null name then "" else " : " ++ name
             bodyLines = (map show decls) ++ (map show stmts)
             body = indent $ unlines' bodyLines
-    show (Case u kw e cs def) =
-        printf "%s%s (%s)\n%s%s\nendcase" (maybe "" showPad u) (show kw) (show e) bodyStr defStr
-        where
-            bodyStr = indent $ unlines' $ map showCase cs
-            defStr = case def of
-                Nothing -> ""
-                Just c -> printf "\n\tdefault: %s" (show c)
+    show (Case u kw e cs) =
+        printf "%s%s (%s)\n%s\nendcase" (showPad u) (show kw) (show e) bodyStr
+        where bodyStr = indent $ unlines' $ map showCase cs
     show (For inits cond assigns stmt) =
         printf "for (%s; %s; %s)\n%s"
             (showInits inits)
@@ -93,8 +89,8 @@ instance Show Stmt where
     show (DoWhile e s) = printf "do %s while (%s);" (show s) (show e)
     show (Forever s  ) = printf "forever %s" (show s)
     show (Foreach x i s) = printf "foreach (%s [ %s ]) %s" x (commas $ map (maybe "" id) i) (show s)
-    show (If u a b Null) = printf "%sif (%s)%s"         (maybe "" showPad u) (show a) (showBranch b)
-    show (If u a b c   ) = printf "%sif (%s)%s\nelse%s" (maybe "" showPad u) (show a) (showBlockedBranch b) (showElseBranch c)
+    show (If u a b Null) = printf "%sif (%s)%s"         (showPad u) (show a) (showBranch b)
+    show (If u a b c   ) = printf "%sif (%s)%s\nelse%s" (showPad u) (show a) (showBlockedBranch b) (showElseBranch c)
     show (Return e   ) = printf "return %s;" (show e)
     show (Timing t s ) = printf "%s%s" (show t) (showShortBranch s)
     show (Trigger b x) = printf "->%s %s;" (if b then "" else ">") x
@@ -134,8 +130,9 @@ showShortBranch (stmt @ AsgnBlk{}) = ' ' : show stmt
 showShortBranch (stmt @ Asgn{}) = ' ' : show stmt
 showShortBranch stmt = showBranch stmt
 
-showCase :: ([Expr], Stmt) -> String
-showCase (a, b) = printf "%s:%s" (commas $ map show a) (showShortBranch b)
+showCase :: Case -> String
+showCase (a, b) = printf "%s:%s" exprStr (showShortBranch b)
+    where exprStr = if null a then "default" else commas $ map show a
 
 data CaseKW
     = CaseN
@@ -252,16 +249,18 @@ instance Show PropertySpec where
                 Nothing -> ""
                 Just e -> printf "disable iff (%s)" (show e)
 
-data UniquePriority
+data ViolationCheck
     = Unique
     | Unique0
     | Priority
+    | NoCheck
     deriving Eq
 
-instance Show UniquePriority where
+instance Show ViolationCheck where
     show Unique   = "unique"
     show Unique0  = "unique0"
     show Priority = "priority"
+    show NoCheck  = ""
 
 data BlockKW
     = Seq

@@ -21,7 +21,7 @@ import {-# SOURCE #-} Language.SystemVerilog.AST.ModuleItem (ModuleItem)
 
 data GenItem
     = GenBlock Identifier [GenItem]
-    | GenCase  Expr [GenCase] (Maybe GenItem)
+    | GenCase  Expr [GenCase]
     | GenFor   (Bool, Identifier, Expr) Expr (Identifier, AsgnOp, Expr) GenItem
     | GenIf    Expr GenItem GenItem
     | GenNull
@@ -34,13 +34,9 @@ instance Show GenItem where
         printf "begin%s\n%s\nend"
             (if null x then "" else " : " ++ x)
             (indent $ unlines' $ map show i)
-    show (GenCase e cs def) =
-        printf "case (%s)\n%s%s\nendcase" (show e) bodyStr defStr
-        where
-            bodyStr = indent $ unlines' $ map showCase cs
-            defStr = case def of
-                Nothing -> ""
-                Just c -> printf "\n\tdefault: %s" (show c)
+    show (GenCase e cs) =
+        printf "case (%s)\n%s\nendcase" (show e) bodyStr
+        where bodyStr = indent $ unlines' $ map showGenCase cs
     show (GenIf e a GenNull) = printf "if (%s) %s"          (show e) (show a)
     show (GenIf e a b      ) = printf "if (%s) %s\nelse %s" (show e) (show a) (show b)
     show (GenFor (new, x1, e1) c (x2, o2, e2) s) =
@@ -55,6 +51,6 @@ instance Show GenItem where
 
 type GenCase = ([Expr], GenItem)
 
-showCase :: (Show x, Show y) => ([x], y) -> String
-showCase (a, b) = printf "%s: %s" (commas $ map show a) (show b)
-
+showGenCase :: GenCase -> String
+showGenCase (a, b) = printf "%s: %s" exprStr (show b)
+    where exprStr = if null a then "default" else commas $ map show a

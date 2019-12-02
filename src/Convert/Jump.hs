@@ -4,7 +4,7 @@
  - Conversion for `return`, `break`, and `continue`
  -
  - Because Verilog-2005 has no jumping statements, this conversion ends up
- - producing significantly more verbose code to acheive the same control flow.
+ - producing significantly more verbose code to achieve the same control flow.
  -}
 
 module Convert.Jump (convert) where
@@ -115,7 +115,7 @@ convertStmt (Block Seq x decls stmts) = do
                     let comp = BinOp Eq (Ident loopID) runLoop
                     let stmt = Block Seq "" [] ss'
                     modify $ \t -> t { sJumpType = jt' }
-                    return [s', If Nothing comp stmt Null]
+                    return [s', If NoCheck comp stmt Null]
             else do
                 return [Null]
         isBranch :: Stmt -> Bool
@@ -130,19 +130,13 @@ convertStmt (If unique expr thenStmt elseStmt) = do
     modify $ \s -> s { sJumpType = newJT }
     return $ If unique expr thenStmt' elseStmt'
 
-convertStmt (Case unique kw expr cases mdef) = do
-    (mdef', mdefJT) <-
-        case mdef of
-            Nothing -> return (Nothing, JTNone)
-            Just stmt -> do
-                (stmt', jt) <- convertSubStmt stmt
-                return (Just stmt', jt)
+convertStmt (Case unique kw expr cases) = do
     results <- mapM convertSubStmt $ map snd cases
     let (stmts', jts) = unzip results
     let cases' = zip (map fst cases) stmts'
-    let newJT = foldl max mdefJT jts
+    let newJT = foldl max JTNone jts
     modify $ \s -> s { sJumpType = newJT }
-    return $ Case unique kw expr cases' mdef'
+    return $ Case unique kw expr cases'
 
 convertStmt (For inits comp incr stmt) =
     convertLoop loop comp stmt

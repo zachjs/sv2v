@@ -116,10 +116,6 @@ traverseDescriptions = unmonad traverseDescriptionsM
 collectDescriptionsM :: Monad m => CollectorM m Description -> CollectorM m AST
 collectDescriptionsM = collectify traverseDescriptionsM
 
-maybeDo :: Monad m => (a -> m b) -> Maybe a -> m (Maybe b)
-maybeDo _ Nothing = return Nothing
-maybeDo fun (Just val) = fun val >>= return . Just
-
 traverseModuleItemsM :: Monad m => MapperM m ModuleItem -> MapperM m Description
 traverseModuleItemsM mapper (Part attrs extern kw lifetime name ports items) = do
     items' <- mapM fullMapper items
@@ -240,11 +236,10 @@ traverseSinglyNestedStmtsM fullMapper = cs
                 explode other = [other]
         cs (Block kw name decls stmts) =
             mapM fullMapper stmts >>= return . Block kw name decls
-        cs (Case u kw expr cases def) = do
+        cs (Case u kw expr cases) = do
             caseStmts <- mapM fullMapper $ map snd cases
             let cases' = zip (map fst cases) caseStmts
-            def' <- maybeDo fullMapper def
-            return $ Case u kw expr cases' def'
+            return $ Case u kw expr cases'
         cs (AsgnBlk op lhs expr) = return $ AsgnBlk op lhs expr
         cs (Asgn    mt lhs expr) = return $ Asgn    mt lhs expr
         cs (For a b c stmt) = fullMapper stmt >>= return . For a b c
@@ -647,11 +642,11 @@ traverseExprsM' strat exprMapper = moduleItemMapper
     genItemMapper (GenIf e i1 i2) = do
         e' <- exprMapper e
         return $ GenIf e' i1 i2
-    genItemMapper (GenCase e cases def) = do
+    genItemMapper (GenCase e cases) = do
         e' <- exprMapper e
         caseExprs <- mapM (mapM exprMapper . fst) cases
         let cases' = zip caseExprs (map snd cases)
-        return $ GenCase e' cases' def
+        return $ GenCase e' cases'
     genItemMapper other = return other
 
     modportDeclMapper (dir, ident, Just e) = do
@@ -688,10 +683,10 @@ traverseStmtExprsM exprMapper = flatStmtMapper
     flatStmtMapper (Block kw name decls stmts) = do
         decls' <- mapM declMapper decls
         return $ Block kw name decls' stmts
-    flatStmtMapper (Case u kw e cases def) = do
+    flatStmtMapper (Case u kw e cases) = do
         e' <- exprMapper e
         cases' <- mapM caseMapper cases
-        return $ Case u kw e' cases' def
+        return $ Case u kw e' cases'
     flatStmtMapper (AsgnBlk op lhs expr) = do
         lhs' <- lhsMapper lhs
         expr' <- exprMapper expr
@@ -954,11 +949,10 @@ traverseSinglyNestedGenItemsM fullMapper = gim
             i1' <- fullMapper i1
             i2' <- fullMapper i2
             return $ GenIf e i1' i2'
-        gim (GenCase e cases def) = do
+        gim (GenCase e cases) = do
             caseItems <- mapM (fullMapper . snd) cases
             let cases' = zip (map fst cases) caseItems
-            def' <- maybeDo fullMapper def
-            return $ GenCase e cases' def'
+            return $ GenCase e cases'
         gim (GenModuleItem moduleItem) =
             return $ GenModuleItem moduleItem
         gim (GenNull) = return GenNull
