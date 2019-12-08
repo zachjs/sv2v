@@ -1,4 +1,5 @@
 module top;
+
     initial begin : foo
         reg [1:0] a;
         for (a = 0; a < 3; a++) begin
@@ -8,4 +9,38 @@ module top;
                 $display("buzz");
         end
     end
+
+    initial $display("A", 1'b0);
+    initial $display("B", 1'bx);
+    initial $display("C", 1'bx);
+    initial $display("D", 1'bx);
+    initial $display("E", 1'bx);
+
+    function test1;
+        input [2:0] inp;
+        test1 = inp[0] == 1 && inp[2] == 1;
+    endfunction
+    initial begin
+        // should match
+        $display("test1: %b %b", 3'b101, test1(3'b101));
+        $display("test1: %b %b", 3'b111, test1(3'b111));
+        $display("test1: %b %b", 3'b1x1, test1(3'b1x1));
+        $display("test1: %b %b", 3'b1z1, test1(3'b1z1));
+        // shouldn't match
+        $display("test1: %b %b", 3'b001, test1(3'b001));
+        $display("test1: %b %b", 3'b011, test1(3'b011));
+        $display("test1: %b %b", 3'b0x1, test1(3'b0x1));
+        $display("test1: %b %b", 3'b0z1, test1(3'b0z1));
+    end
+
+    function test2;
+        input integer inp;
+        test2 = (16 <= inp && inp <= 23) || (32 <= inp && inp <= 47);
+    endfunction
+    initial begin : foobar
+        integer i;
+        for (i = 0; i < 64; ++i)
+            $display("test2(%02d) = %b", i, test2(i));
+    end
+
 endmodule

@@ -65,6 +65,7 @@ executable sv2v
     Convert.ForDecl
     Convert.Foreach
     Convert.FuncRet
+    Convert.Inside
     Convert.Interface
     Convert.IntTypes
     Convert.Jump
@@ -90,6 +91,7 @@ executable sv2v
     Convert.Unique
     Convert.UnpackedArray
     Convert.Unsigned
+    Convert.Wildcard
     -- sv2v CLI modules
     Job
   ghc-options:

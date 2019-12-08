@@ -9,6 +9,7 @@ module Language.SystemVerilog.AST.Expr
     ( Expr (..)
     , Range
     , TypeOrExpr
+    , ExprOrRange
     , Args (..)
     , PartSelectMode (..)
     , DimsFn (..)
@@ -34,6 +35,7 @@ import {-# SOURCE #-} Language.SystemVerilog.AST.Type
 type Range = (Expr, Expr)
 
 type TypeOrExpr = Either Type Expr
+type ExprOrRange = Either Expr Range
 
 data Expr
     = String  String
@@ -55,6 +57,7 @@ data Expr
     | DimFn   DimFn  TypeOrExpr Expr
     | Dot     Expr Identifier
     | Pattern [(Identifier, Expr)]
+    | Inside Expr [ExprOrRange]
     | MinTypMax Expr Expr Expr
     | Nil
     deriving (Eq, Ord)
@@ -79,6 +82,12 @@ instance Show Expr where
     show (Cast tore e  ) = printf "%s'(%s)"    (showEither tore) (show e)
     show (DimsFn  f v  ) = printf "%s(%s)"     (show f) (showEither v)
     show (DimFn   f v e) = printf "%s(%s, %s)" (show f) (showEither v) (show e)
+    show (Inside  e l  ) = printf "(%s inside { %s })"  (show e) (intercalate ", " strs)
+        where
+            strs = map showExprOrRange l
+            showExprOrRange :: ExprOrRange -> String
+            showExprOrRange (Left  x) = show x
+            showExprOrRange (Right x) = show x
     show (Pattern l    ) =
         printf "'{\n%s\n}" (indent $ intercalate ",\n" $ map showPatternItem l)
         where

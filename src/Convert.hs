@@ -19,6 +19,7 @@ import qualified Convert.Enum
 import qualified Convert.ForDecl
 import qualified Convert.Foreach
 import qualified Convert.FuncRet
+import qualified Convert.Inside
 import qualified Convert.Interface
 import qualified Convert.IntTypes
 import qualified Convert.Jump
@@ -43,6 +44,7 @@ import qualified Convert.UnbasedUnsized
 import qualified Convert.Unique
 import qualified Convert.UnpackedArray
 import qualified Convert.Unsigned
+import qualified Convert.Wildcard
 
 type Phase = [AST] -> [AST]
 
@@ -56,6 +58,7 @@ phases excludes =
     , Convert.ForDecl.convert
     , Convert.FuncRet.convert
     , Convert.EmptyArgs.convert
+    , Convert.Inside.convert
     , Convert.IntTypes.convert
     , Convert.KWArgs.convert
     , Convert.LogOp.convert
@@ -74,6 +77,7 @@ phases excludes =
     , Convert.UnpackedArray.convert
     , Convert.Unsigned.convert
     , Convert.SignCast.convert
+    , Convert.Wildcard.convert
     , Convert.Package.convert
     , Convert.Enum.convert
     , Convert.NestPI.convert

@@ -538,6 +538,18 @@ convertAsgn structs types (lhs, expr) =
             where
                 items' = map mapItem items
                 mapItem (mx, e) = (mx, snd $ convertSubExpr e)
+        convertSubExpr (Inside e l) =
+            (t, Inside e' l')
+            where
+                t = IntegerVector TLogic Unspecified []
+                (_, e') = convertSubExpr e
+                l' = map mapItem l
+                mapItem :: ExprOrRange -> ExprOrRange
+                mapItem (Left a) = Left $ snd $ convertSubExpr a
+                mapItem (Right (a, b)) = Right (a', b')
+                    where
+                        (_, a') = convertSubExpr a
+                        (_, b') = convertSubExpr b
         convertSubExpr (MinTypMax a b c) =
             (t, MinTypMax a' b' c')
             where

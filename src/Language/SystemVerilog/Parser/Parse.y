@@ -1095,6 +1095,13 @@ TypeOrExpr :: { TypeOrExpr }
   : TypeNonIdent { Left $1 }
   | Expr         { Right $1 }
 
+OpenRangeList :: { [ExprOrRange] }
+  : ValueRange                   { [$1] }
+  | OpenRangeList "," ValueRange { $1 ++ [$3] }
+ValueRange :: { ExprOrRange }
+  : Expr  { Left  $1 }
+  | Range { Right $1 }
+
 Expr :: { Expr }
   : "(" Expr ")"                { $2 }
   | String                      { String $1 }
@@ -1120,7 +1127,7 @@ Expr :: { Expr }
   | "'" "{" PatternItems "}"    { Pattern $3 }
   | "{" StreamOp StreamSize Concat "}" { Stream $2 $3           $4 }
   | "{" StreamOp            Concat "}" { Stream $2 (Number "1") $3 }
-  | Expr "inside" Concat        { foldl1 (BinOp LogOr) $ map (BinOp Eq $1) $3 }
+  | Expr "inside" "{" OpenRangeList "}" { Inside $1 $4 }
   | "(" Expr ":" Expr ":" Expr ")" { MinTypMax $2 $4 $6 }
   -- binary expressions
   | Expr "||"  Expr { BinOp LogOr  $1 $3 }

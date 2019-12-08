@@ -428,6 +428,12 @@ traverseNestedExprsM mapper = exprMapper
         typeOrExprMapper (Left t) = return $ Left t
         typeOrExprMapper (Right e) =
             exprMapper e >>= return . Right
+        exprOrRangeMapper (Left e) =
+            exprMapper e >>= return . Left
+        exprOrRangeMapper (Right (e1, e2)) = do
+            e1' <- exprMapper e1
+            e2' <- exprMapper e2
+            return $ Right (e1', e2')
         em (String s) = return $ String s
         em (Number s) = return $ Number s
         em (Time   s) = return $ Time   s
@@ -487,6 +493,10 @@ traverseNestedExprsM mapper = exprMapper
             let names = map fst l
             exprs <- mapM exprMapper $ map snd l
             return $ Pattern $ zip names exprs
+        em (Inside e l) = do
+            e' <- exprMapper e
+            l' <- mapM exprOrRangeMapper l
+            return $ Inside e' l'
         em (MinTypMax e1 e2 e3) = do
             e1' <- exprMapper e1
             e2' <- exprMapper e2
