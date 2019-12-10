@@ -1,21 +1,85 @@
-name: Haskell CI
+name: Build Release Binary
 
-on: [push]
+on:
+  push:
+    tags:
+      - v*
 
 jobs:
   build:
-
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
 
     steps:
     - uses: actions/checkout@v1
     - name: Install dependencies
       run: |
-        stack upgrade
-    - name: Build
+        brew install haskell-stack shunit2 icarus-verilog || ls
+        sudo apt-get install -y haskell-stack shunit2 flex bison autoconf gperf || ls
+    - name: Cache iverilog
+      uses: actions/cache@v1
+      with:
+        path: ~/.local
+        key: ${{ runner.OS }}-iverilog-10-2
+        restore-keys: ${{ runner.OS }}-iverilog-10-2
+    - name: Install iverilog
       run: |
-        make
-        zip --junk-paths sv2v ./bin/sv2v
+        if [ "${{ runner.OS }}" = "Linux" ]; then
+          if [ ! -e "$HOME/.local/bin/iverilog" ]; then
+            curl --retry-max-time 60 -L https://github.com/steveicarus/iverilog/archive/v10_2.tar.gz > iverilog.tar.gz
+            tar -xzf iverilog.tar.gz
+            cd iverilog-10_2
+            autoconf
+            ./configure --prefix=$HOME/.local
+            make
+            make install
+            cd ..
+          fi
+        fi
+    - name: Cache Build
+      uses: actions/cache@v1
+      with:
+        path: ~/.stack
+        key: ${{ runner.OS }}-${{ hashFiles('**/stack.yaml') }}-${{ hashFiles('**/sv2v.cabal') }}
+        restore-keys: |
+          ${{ runner.OS }}-${{ hashFiles('**/stack.yaml') }}-${{ hashFiles('**/sv2v.cabal') }}
+          ${{ runner.OS }}-${{ hashFiles('**/stack.yaml') }}-
+          ${{ runner.OS }}-
+    - name: Build
+      run: make
+#     - name: Test
+#       run: make test
+    - name: Upload artifact
+      uses: actions/upload-artifact@v1
+      with:
+        name: matrix.os
+        path: bin
+      
+  release:
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+    - run: sudo apt-get install -y tree
+    - name: Download Linux artifact
+    - uses: actions/download-artifact@v1
+      with:
+        name: ubuntu-latest
+        path: ubuntu-latest
+    - name: Download MacOS artifact
+    - uses: actions/download-artifact@v1
+      with:
+        name: macos-latest
+        path: macos-latest
+    - name: Testing
+      run: |
+        tree
+    - name: Zip binary
+      run: |
+        zip --junk-paths linux ./ubuntu-latest/sv2v
+        zip --junk-paths macos ./macos-latest/sv2v
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1.0.0
@@ -26,13 +90,21 @@ jobs:
         release_name: Release ${{ github.ref }}
         draft: false
         prerelease: true
-    - name: Upload Release Asset
-      id: upload-release-asset 
+    - name: Upload Linux Release Asset
       uses: actions/upload-release-asset@v1.0.1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-        asset_path: ./sv2v.zip
-        asset_name: sv2v.zip
+        asset_path: ./linux.zip
+        asset_name: linux.zip
+        asset_content_type: application/zip
+    - name: Upload MacOS Release Asset
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        asset_path: ./macos.zip
+        asset_name: macos.zip
         asset_content_type: application/zip
