@@ -931,7 +931,11 @@ handleDirective (posOrig, _, _, strOrig) len = do
         "nounconnected_drive" -> passThrough
 
         "default_nettype" -> passThrough
-        "pragma" -> passThrough
+        "pragma" -> do
+            leadCh <- peekChar
+            if leadCh == '\n' || leadCh == '\r'
+                then lexicalError "pragma directive cannot be empty"
+                else passThrough
         "resetall" -> passThrough
 
         "begin_keywords" -> do
@@ -971,12 +975,14 @@ handleDirective (posOrig, _, _, strOrig) len = do
         "line" -> do
             lineNumber <- takeNumber
             quotedFilename <- takeQuotedString
-            _ <- takeNumber -- level, ignored
+            levelNumber <- takeNumber -- level, ignored
             let filename = init $ tail quotedFilename
             setCurrentFile filename
             (AlexPn f _ c, prev, _, str) <- alexGetInput
             alexSetInput (AlexPn f (lineNumber + 1) c, prev, [], str)
-            alexMonadScan
+            if 0 <= levelNumber && levelNumber <= 2
+                then alexMonadScan
+                else lexicalError "line directive invalid level number"
 
         "include" -> do
             quotedFilename <- takeQuotedString
