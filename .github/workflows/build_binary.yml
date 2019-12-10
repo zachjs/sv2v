@@ -49,8 +49,8 @@ jobs:
           ${{ runner.OS }}-
     - name: Build
       run: make
-#     - name: Test
-#       run: make test
+    - name: Test
+      run: make test
     - name: Upload artifact
       uses: actions/upload-artifact@v1
       with:
@@ -73,9 +73,6 @@ jobs:
       with:
         name: macos-latest
         path: macos-latest
-    - name: Testing
-      run: |
-        tree
     - name: Zip binary
       run: |
         zip --junk-paths linux ./ubuntu-latest/sv2v
