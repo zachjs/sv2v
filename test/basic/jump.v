@@ -22,12 +22,28 @@ module top;
             $display("HELLO skip5-2");
         end
     endtask
+    task skip6;
+        $display("HELLO skip6");
+    endtask
+    task skip7;
+        $display("HELLO skip7");
+    endtask
+    task skip8;
+        begin
+            $display("HELLO skip8-1");
+            $display("HELLO skip8-2");
+            $display("HELLO skip8-3");
+        end
+    endtask
     initial begin
         skip1;
         skip2;
         $display(skip3(0));
         skip4;
         skip5;
+        skip6;
+        skip7;
+        skip8;
     end
 
     initial begin : loop_y

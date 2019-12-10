@@ -31,9 +31,15 @@ module top;
         $display("test1: %b %b", 3'b0z1, test1(3'b0z1));
     end
 
+    integer arr [] = { 32'd60, 32'd61, 32'd63 };
     function test2;
         input integer inp;
-        return inp inside { [16:23], [32:47] };
+        // TODO: Add support for array value ranges.
+        test2 = 0;
+        for (integer i = 0; i < 3; ++i)
+            if (inp == arr[i])
+                return 1'b1;
+        return test2 || inp inside { [16:23], [32:47] };
     endfunction
     initial begin
         for (integer i = 0; i < 64; ++i)

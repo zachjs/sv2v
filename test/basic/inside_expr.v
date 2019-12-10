@@ -33,9 +33,17 @@ module top;
         $display("test1: %b %b", 3'b0z1, test1(3'b0z1));
     end
 
+    wire [0:2][31:0] arr;
+    assign arr = { 32'd60, 32'd61, 32'd63 };
     function test2;
         input integer inp;
-        test2 = (16 <= inp && inp <= 23) || (32 <= inp && inp <= 47);
+        integer i;
+        begin
+            test2 = 0;
+            for (i = 0; i < 3; ++i)
+                test2 = test2 || (inp == arr[i]);
+            test2 = test2 || (16 <= inp && inp <= 23) || (32 <= inp && inp <= 47);
+        end
     endfunction
     initial begin : foobar
         integer i;

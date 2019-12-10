@@ -10,30 +10,35 @@
 module Convert.Jump (convert) where
 
 import Control.Monad.State
+import Control.Monad.Writer
 
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-data JumpType
-    = JTNone
-    | JTContinue
-    | JTBreak
-    | JTReturn
-    deriving (Eq, Ord, Show)
-
 data Info = Info
-    { sJumpType :: JumpType
-    , sLoopID :: Identifier
+    { sLoopDepth :: Int
+    , sHasJump :: Bool
+    , sReturnAllowed :: Bool
+    , sJumpAllowed :: Bool
     }
+
+initialState :: Info
+initialState = Info
+    { sLoopDepth = 0
+    , sHasJump = False
+    , sReturnAllowed = False
+    , sJumpAllowed = True
+    }
+
+initialStateTF :: Info
+initialStateTF = initialState { sReturnAllowed = True }
 
 convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions $ traverseModuleItems convertModuleItem
 
 convertModuleItem :: ModuleItem -> ModuleItem
 convertModuleItem (MIPackageItem (Function ml t f decls stmtsOrig)) =
-    if sJumpType finalState == JTNone || sJumpType finalState == JTReturn
-        then MIPackageItem $ Function ml t f decls stmts'
-        else error "illegal jump statement within task"
+    MIPackageItem $ Function ml t f decls' stmts''
     where
         stmts = map (traverseNestedStmts convertReturn) stmtsOrig
         convertReturn :: Stmt -> Stmt
@@ -44,37 +49,63 @@ convertModuleItem (MIPackageItem (Function ml t f decls stmtsOrig)) =
             , Return Nil
             ]
         convertReturn other = other
-        initialState = Info { sJumpType = JTNone, sLoopID = "" }
-        (stmts', finalState) = runState (convertStmts stmts) initialState
+        stmts' = evalState (convertStmts stmts) initialStateTF
+        (decls', stmts'') = addJumpStateDeclTF decls stmts'
 convertModuleItem (MIPackageItem (Task ml f decls stmts)) =
-    if sJumpType finalState == JTNone || sJumpType finalState == JTReturn
-        then MIPackageItem $ Task ml f decls $ stmts'
-        else error "illegal jump statement within task"
+    MIPackageItem $ Task ml f decls' stmts''
     where
-        initialState = Info { sJumpType = JTNone, sLoopID = "" }
-        (stmts', finalState) = runState (convertStmts stmts) initialState
-convertModuleItem (Initial stmt) =
-    if sJumpType finalState == JTNone
-        then Initial stmt'
-        else error "illegal jump statement within initial construct"
-    where
-        initialState = Info { sJumpType = JTNone, sLoopID = "" }
-        (stmt', finalState) = runState (convertStmt stmt) initialState
-convertModuleItem (Final stmt) =
-    if sJumpType finalState == JTNone
-        then Final stmt'
-        else error "illegal jump statement within final construct"
-    where
-        initialState = Info { sJumpType = JTNone, sLoopID = "" }
-        (stmt', finalState) = runState (convertStmt stmt) initialState
-convertModuleItem (AlwaysC kw stmt) =
-    if sJumpType finalState == JTNone
-        then AlwaysC kw stmt'
-        else error "illegal jump statement within always construct"
-    where
-        initialState = Info { sJumpType = JTNone, sLoopID = "" }
-        (stmt', finalState) = runState (convertStmt stmt) initialState
+        stmts' = evalState (convertStmts stmts) initialStateTF
+        (decls', stmts'') = addJumpStateDeclTF decls stmts'
+convertModuleItem (Initial    stmt) = convertMIStmt Initial      stmt
+convertModuleItem (Final      stmt) = convertMIStmt Final        stmt
+convertModuleItem (AlwaysC kw stmt) = convertMIStmt (AlwaysC kw) stmt
 convertModuleItem other = other
+
+convertMIStmt :: (Stmt -> ModuleItem) -> Stmt -> ModuleItem
+convertMIStmt constructor stmt =
+    constructor stmt''
+    where
+        stmt' = evalState (convertStmt stmt) initialState
+        stmt'' = addJumpStateDeclStmt stmt'
+
+-- adds a declaration of the jump state variable if it is needed; if the jump
+-- state is not used at all, then it is removed from the given statements
+-- entirely
+addJumpStateDeclTF :: [Decl] -> [Stmt] -> ([Decl], [Stmt])
+addJumpStateDeclTF decls stmts =
+    if uses && not declares then
+        ( decls ++
+            [Variable Local jumpStateType jumpState [] (Just jsNone)]
+        , stmts )
+    else if uses then
+        (decls, stmts)
+    else
+        (decls, map (traverseNestedStmts removeJumpState) stmts)
+    where
+        dummyModuleItem = Initial $ Block Seq "" decls stmts
+        declares = elem jumpState $ execWriter $
+            collectDeclsM collectVarM dummyModuleItem
+        uses = elem jumpState $ execWriter $
+            collectExprsM (collectNestedExprsM collectExprIdentM) dummyModuleItem
+        collectVarM :: Decl -> Writer [String] ()
+        collectVarM (Variable Local _ ident _ _) = tell [ident]
+        collectVarM _ = return ()
+        collectExprIdentM :: Expr -> Writer [String] ()
+        collectExprIdentM (Ident ident) = tell [ident]
+        collectExprIdentM _ = return ()
+addJumpStateDeclStmt :: Stmt -> Stmt
+addJumpStateDeclStmt stmt =
+    if null decls
+        then stmt'
+        else Block Seq "" decls [stmt']
+    where (decls, [stmt']) = addJumpStateDeclTF [] [stmt]
+
+removeJumpState :: Stmt -> Stmt
+removeJumpState (orig @ (AsgnBlk _ (LHSIdent ident) _)) =
+    if ident == jumpState
+        then Null
+        else orig
+removeJumpState other = other
 
 convertStmts :: [Stmt] -> State Info [Stmt]
 convertStmts stmts = do
@@ -88,10 +119,11 @@ convertStmt :: Stmt -> State Info Stmt
 
 convertStmt (Block Par x decls stmts) = do
     -- break, continue, and return disallowed in fork-join
-    modify $ \s -> s { sLoopID = "" }
-    loopID <- gets sLoopID
+    jumpAllowed <- gets sJumpAllowed
+    returnAllowed <- gets sReturnAllowed
+    modify $ \s -> s { sJumpAllowed = False, sReturnAllowed = False }
     stmts' <- mapM convertStmt stmts
-    modify $ \s -> s { sLoopID = loopID }
+    modify $ \s -> s { sJumpAllowed = jumpAllowed, sReturnAllowed = returnAllowed }
     return $ Block Par x decls stmts'
 
 convertStmt (Block Seq x decls stmts) = do
@@ -101,41 +133,35 @@ convertStmt (Block Seq x decls stmts) = do
         step :: [Stmt] -> State Info [Stmt]
         step [] = return []
         step (s : ss) = do
-            jt <- gets sJumpType
-            loopID <- gets sLoopID
-            if jt == JTNone then do
-                s' <- convertStmt s
-                jt' <- gets sJumpType
-                if jt' == JTNone || not (isBranch s) || null loopID then do
-                    ss' <- step ss
-                    return $ s' : ss'
-                else do
-                    modify $ \t -> t { sJumpType = JTNone }
-                    ss' <- step ss
-                    let comp = BinOp Eq (Ident loopID) runLoop
-                    let stmt = Block Seq "" [] ss'
-                    modify $ \t -> t { sJumpType = jt' }
-                    return [s', If NoCheck comp stmt Null]
+            hasJump <- gets sHasJump
+            loopDepth <- gets sLoopDepth
+            modify $ \st -> st { sHasJump = False }
+            s' <- convertStmt s
+            currHasJump <- gets sHasJump
+            currLoopDepth <- gets sLoopDepth
+            assertMsg (loopDepth == currLoopDepth) "loop depth invariant failed"
+            modify $ \st -> st { sHasJump = hasJump || currHasJump }
+            ss' <- step ss
+            if currHasJump && not (null ss)
+            then do
+                let comp = BinOp Eq (Ident jumpState) jsNone
+                let stmt = Block Seq "" [] ss'
+                return [s', If NoCheck comp stmt Null]
             else do
-                return [Null]
-        isBranch :: Stmt -> Bool
-        isBranch (If{}) = True
-        isBranch (Case{}) = True
-        isBranch _ = False
+                return $ s' : ss'
 
 convertStmt (If unique expr thenStmt elseStmt) = do
-    (thenStmt', thenJT) <- convertSubStmt thenStmt
-    (elseStmt', elseJT) <- convertSubStmt elseStmt
-    let newJT = max thenJT elseJT
-    modify $ \s -> s { sJumpType = newJT }
+    (thenStmt', thenHasJump) <- convertSubStmt thenStmt
+    (elseStmt', elseHasJump) <- convertSubStmt elseStmt
+    modify $ \s -> s { sHasJump = thenHasJump || elseHasJump }
     return $ If unique expr thenStmt' elseStmt'
 
 convertStmt (Case unique kw expr cases) = do
     results <- mapM convertSubStmt $ map snd cases
-    let (stmts', jts) = unzip results
+    let (stmts', hasJumps) = unzip results
     let cases' = zip (map fst cases) stmts'
-    let newJT = foldl max JTNone jts
-    modify $ \s -> s { sJumpType = newJT }
+    let hasJump = foldl (||) False hasJumps
+    modify $ \s -> s { sHasJump = hasJump }
     return $ Case unique kw expr cases'
 
 convertStmt (For inits comp incr stmt) =
@@ -147,33 +173,42 @@ convertStmt (DoWhile comp stmt) =
     convertLoop DoWhile comp stmt
 
 convertStmt (Continue) = do
-    loopID <- gets sLoopID
-    modify $ \s -> s { sJumpType = JTContinue }
-    assertMsg (not $ null loopID) "encountered continue outside of loop"
-    return $ asgn loopID continueLoop
+    loopDepth <- gets sLoopDepth
+    jumpAllowed <- gets sJumpAllowed
+    assertMsg (loopDepth > 0) "encountered continue outside of loop"
+    assertMsg jumpAllowed "encountered continue inside fork-join"
+    modify $ \s -> s { sHasJump = True }
+    return $ asgn jumpState jsContinue
 convertStmt (Break) = do
-    loopID <- gets sLoopID
-    modify $ \s -> s { sJumpType = JTBreak }
-    assertMsg (not $ null loopID) "encountered break outside of loop"
-    return $ asgn loopID exitLoop
+    loopDepth <- gets sLoopDepth
+    jumpAllowed <- gets sJumpAllowed
+    assertMsg (loopDepth > 0) "encountered break outside of loop"
+    assertMsg jumpAllowed "encountered break inside fork-join"
+    modify $ \s -> s { sHasJump = True }
+    return $ asgn jumpState jsBreak
 convertStmt (Return Nil) = do
-    loopID <- gets sLoopID
-    modify $ \s -> s { sJumpType = JTReturn }
-    if null loopID
-        then return Null
-        else return $ asgn loopID exitLoop
+    jumpAllowed <- gets sJumpAllowed
+    returnAllowed <- gets sReturnAllowed
+    assertMsg jumpAllowed "encountered return inside fork-join"
+    assertMsg returnAllowed "encountered return outside of task or function"
+    modify $ \s -> s { sHasJump = True }
+    return $ asgn jumpState jsReturn
 
 convertStmt (RepeatL expr stmt) = do
-    modify $ \s -> s { sLoopID = "repeat" }
+    loopDepth <- gets sLoopDepth
+    modify $ \s -> s { sLoopDepth = loopDepth + 1 }
     stmt' <- convertStmt stmt
-    jt <- gets sJumpType
-    assertMsg (jt == JTNone) "jumps not supported within repeat loops"
+    hasJump <- gets sHasJump
+    assertMsg (not hasJump) "jumps not supported within repeat loops"
+    modify $ \s -> s { sLoopDepth = loopDepth }
     return $ RepeatL expr stmt'
 convertStmt (Forever stmt) = do
-    modify $ \s -> s { sLoopID = "forever" }
+    loopDepth <- gets sLoopDepth
+    modify $ \s -> s { sLoopDepth = loopDepth + 1 }
     stmt' <- convertStmt stmt
-    jt <- gets sJumpType
-    assertMsg (jt == JTNone) "jumps not supported within forever loops"
+    hasJump <- gets sHasJump
+    assertMsg (not hasJump) "jumps not supported within forever loops"
+    modify $ \s -> s { sLoopDepth = loopDepth }
     return $ Forever stmt'
 
 convertStmt (Timing timing stmt) =
@@ -188,54 +223,74 @@ convertStmt (Foreach{}) = return $
 
 convertStmt other = return other
 
-
--- convert a statement on its own without changing the state, but returning the
--- resulting jump type; used to reconcile across branching statements
-convertSubStmt :: Stmt -> State Info (Stmt, JumpType)
+-- convert a statement on its own without changing the state, but returning
+-- whether or not the statement contains a jump; used to reconcile across
+-- branching statements
+convertSubStmt :: Stmt -> State Info (Stmt, Bool)
 convertSubStmt stmt = do
     origState <- get
     stmt' <- convertStmt stmt
-    jt <- gets sJumpType
+    hasJump <- gets sHasJump
     put origState
-    if sJumpType origState == JTNone
-        then return (stmt', jt)
-        else error $ "convertStmt invariant failed on: " ++ show stmt
+    return (stmt', hasJump)
 
 convertLoop :: (Expr -> Stmt -> Stmt) -> Expr -> Stmt -> State Info Stmt
 convertLoop loop comp stmt = do
-    Info { sJumpType = origJT, sLoopID = origLoopID } <- get
-    let loopID = (++) "_sv2v_loop_" $ shortHash $ loop comp stmt
-    modify $ \s -> s { sLoopID = loopID }
+    -- save the loop state and increment loop depth
+    Info { sLoopDepth = origLoopDepth, sHasJump = origHasJump } <- get
+    assertMsg (not origHasJump) "has jump invariant failed"
+    modify $ \s -> s { sLoopDepth = origLoopDepth + 1 }
+    -- convert the loop body
     stmt' <- convertStmt stmt
-    jt <- gets sJumpType
-    let afterJT = if jt == JTReturn then jt else origJT
-    put $ Info { sJumpType = afterJT, sLoopID = origLoopID }
-    let comp' = BinOp LogAnd (BinOp Ne (Ident loopID) exitLoop) comp
-    return $ if jt == JTNone
-        then loop comp stmt'
-        else Block Seq ""
-            [ Variable Local loopStateType loopID [] (Just runLoop)
+    -- restore the loop state
+    Info { sLoopDepth = afterLoopDepth, sHasJump = afterHasJump } <- get
+    assertMsg (origLoopDepth + 1 == afterLoopDepth) "loop depth invariant failed"
+    modify $ \s -> s { sLoopDepth = origLoopDepth }
+
+    let comp' = BinOp LogAnd comp $ BinOp Lt (Ident jumpState) jsBreak
+    let body = Block Seq "" []
+            [ asgn jumpState jsNone
+            , stmt'
             ]
-            [ loop comp' $ Block Seq "" []
-                [ asgn loopID runLoop
-                , stmt'
+    let jsStackIdent = jumpState ++ "_" ++ show origLoopDepth
+    let jsStackDecl = Variable Local jumpStateType jsStackIdent []
+                        (Just $ Ident jumpState)
+    let jsStackRestore = If NoCheck
+                (BinOp Ne (Ident jumpState) jsReturn)
+                (asgn jumpState (Ident jsStackIdent))
+                Null
+
+    return $
+        if not afterHasJump then
+            loop comp stmt'
+        else if origLoopDepth == 0 then
+            Block Seq "" []
+                [ loop comp' body ]
+        else
+            Block Seq ""
+                [ jsStackDecl ]
+                [ loop comp' body
+                , jsStackRestore
                 ]
-            , if afterJT == JTReturn && origLoopID /= ""
-                then asgn origLoopID exitLoop
-                else Null
-            ]
-    where loopStateType = IntegerVector TBit Unspecified [(Number "0", Number "1")]
 
+jumpStateType :: Type
+jumpStateType = IntegerVector TBit Unspecified [(Number "0", Number "1")]
 
--- stop running the loop immediately (break or return)
-exitLoop :: Expr
-exitLoop = Number "0"
--- keep running the loop normally
-runLoop :: Expr
-runLoop = Number "1"
+jumpState :: String
+jumpState = "_sv2v_jump"
+
+-- keep running the loop/function normally
+jsNone :: Expr
+jsNone = Number "2'b00"
 -- skip to the next iteration of the loop (continue)
-continueLoop :: Expr
-continueLoop = Number "2"
+jsContinue :: Expr
+jsContinue = Number "2'b01"
+-- stop running the loop immediately (break)
+jsBreak :: Expr
+jsBreak = Number "2'b10"
+-- stop running the function immediately (return)
+jsReturn :: Expr
+jsReturn = Number "2'b11"
 
 
 assertMsg :: Bool -> String -> State Info ()
