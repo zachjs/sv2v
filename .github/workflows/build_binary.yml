@@ -54,7 +54,7 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v1
       with:
-        name: matrix.os
+        name: ${{ matrix.os }}
         path: bin
       
   release:
