@@ -64,12 +64,12 @@ jobs:
     steps:
     - run: sudo apt-get install -y tree
     - name: Download Linux artifact
-    - uses: actions/download-artifact@v1
+      uses: actions/download-artifact@v1
       with:
         name: ubuntu-latest
         path: ubuntu-latest
     - name: Download MacOS artifact
-    - uses: actions/download-artifact@v1
+      uses: actions/download-artifact@v1
       with:
         name: macos-latest
         path: macos-latest
