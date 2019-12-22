@@ -25,9 +25,9 @@ import Language.SystemVerilog.AST.Type (Type, Identifier)
 import {-# SOURCE #-} Language.SystemVerilog.AST.ModuleItem (ModuleItem)
 
 data Description
-    = Part [Attr] Bool PartKW (Maybe Lifetime) Identifier [Identifier] [ModuleItem]
+    = Part [Attr] Bool PartKW Lifetime Identifier [Identifier] [ModuleItem]
     | PackageItem PackageItem
-    | Package (Maybe Lifetime) Identifier [PackageItem]
+    | Package Lifetime Identifier [PackageItem]
     deriving Eq
 
 instance Show Description where
@@ -35,12 +35,12 @@ instance Show Description where
     show (Part attrs True  kw lifetime name _ items) =
         printf "%sextern %s %s%s %s;"
             (concatMap showPad attrs)
-            (show kw) (showLifetime lifetime) name (indentedParenList itemStrs)
+            (show kw) (showPad lifetime) name (indentedParenList itemStrs)
         where itemStrs = map (init . show) items
     show (Part attrs False kw lifetime name ports items) =
         printf "%s%s %s%s%s;\n%s\nend%s"
             (concatMap showPad attrs)
-            (show kw) (showLifetime lifetime) name portsStr bodyStr (show kw)
+            (show kw) (showPad lifetime) name portsStr bodyStr (show kw)
         where
             portsStr = if null ports
                 then ""
@@ -48,15 +48,15 @@ instance Show Description where
             bodyStr = indent $ unlines' $ map show items
     show (Package lifetime name items) =
         printf "package %s%s;\n%s\nendpackage"
-            (showLifetime lifetime) name bodyStr
+            (showPad lifetime) name bodyStr
         where
             bodyStr = indent $ unlines' $ map show items
     show (PackageItem i) = show i
 
 data PackageItem
     = Typedef Type Identifier
-    | Function (Maybe Lifetime) Type Identifier [Decl] [Stmt]
-    | Task     (Maybe Lifetime)      Identifier [Decl] [Stmt]
+    | Function Lifetime Type Identifier [Decl] [Stmt]
+    | Task     Lifetime      Identifier [Decl] [Stmt]
     | Import Identifier (Maybe Identifier)
     | Export (Maybe (Identifier, Maybe Identifier))
     | Decl Decl
@@ -68,11 +68,11 @@ instance Show PackageItem where
     show (Typedef t x) = printf "typedef %s %s;" (show t) x
     show (Function ml t x i b) =
         printf "function %s%s%s;\n%s\n%s\nendfunction"
-            (showLifetime ml) (showPad t) x (indent $ show i)
+            (showPad ml) (showPad t) x (indent $ show i)
             (indent $ unlines' $ map show b)
     show (Task ml x i b) =
         printf "task %s%s;\n%s\n%s\nendtask"
-            (showLifetime ml) x (indent $ show i)
+            (showPad ml) x (indent $ show i)
             (indent $ unlines' $ map show b)
     show (Import x y) = printf "import %s::%s;" x (fromMaybe "*" y)
     show (Export Nothing) = "export *::*";
@@ -96,12 +96,10 @@ instance Show PartKW where
 data Lifetime
     = Static
     | Automatic
+    | Inherit
     deriving (Eq, Ord)
 
 instance Show Lifetime where
     show Static    = "static"
     show Automatic = "automatic"
-
-showLifetime :: Maybe Lifetime -> String
-showLifetime Nothing = ""
-showLifetime (Just l) = show l ++ " "
+    show Inherit   = ""

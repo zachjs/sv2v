@@ -211,7 +211,7 @@ traverseDeclM structs origDecl = do
 packerFn :: TypeFunc -> ModuleItem
 packerFn structTf =
     MIPackageItem $
-    Function Nothing (structTf []) fnName decls [retStmt]
+    Function Automatic (structTf []) fnName decls [retStmt]
     where
         Struct _ fields [] = structTf []
         toInput (t, x) = Variable Input t x [] Nothing

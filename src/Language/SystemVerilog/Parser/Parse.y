@@ -513,7 +513,7 @@ Part(begin, end) :: { Description }
   | AttributeInstances "extern" begin PartHeader                          { $4 $1 True  $3 [] }
 
 PartHeader :: { [Attr] -> Bool -> PartKW -> [ModuleItem] -> Description }
-  : opt(Lifetime) Identifier PackageImportDeclarations Params PortDecls ";" { \attrs extern kw items -> Part attrs extern kw $1 $2 (fst $5) ($3 ++ $4 ++ (snd $5) ++ items) }
+  : Lifetime Identifier PackageImportDeclarations Params PortDecls ";" { \attrs extern kw items -> Part attrs extern kw $1 $2 (fst $5) ($3 ++ $4 ++ (snd $5) ++ items) }
 
 ModuleKW :: { PartKW }
   : "module" { Module }
@@ -521,7 +521,7 @@ InterfaceKW :: { PartKW }
   : "interface" { Interface }
 
 PackageDeclaration :: { Description }
-  : "package" opt(Lifetime) Identifier ";" PackageItems "endpackage" opt(Tag) { Package $2 $3 $5 }
+  : "package" Lifetime Identifier ";" PackageItems "endpackage" opt(Tag) { Package $2 $3 $5 }
 
 Tag :: { Identifier }
   : ":" Identifier { $2 }
@@ -613,7 +613,7 @@ DeclOrStmtToken :: { DeclToken }
   | "." Identifier { DTDot      $2 }
   | PortBindings   { DTInstance $1 }
   | Signing        { DTSigning  $1 }
-  | Lifetime       { DTLifetime $1 }
+  | ExplicitLifetime { DTLifetime $1 }
   | Identifier "::" Identifier { DTPSIdent $1 $3 }
   | "const" PartialType { DTType $2 }
   | "{" StreamOp StreamSize Concat "}" { DTStream $2 $3           (map toLHS $4) }
@@ -775,9 +775,9 @@ PackageItem :: { [PackageItem] }
   | NonDeclPackageItem { $1 }
 NonDeclPackageItem :: { [PackageItem] }
   : "typedef" Type Identifier ";" { [Typedef $2 $3] }
-  | "function" opt(Lifetime) FuncRetAndName    TFItems DeclsAndStmts "endfunction" opt(Tag) { [Function $2 (fst $3) (snd $3) (map defaultFuncInput $ (map makeInput $4) ++ fst $5) (snd $5)] }
-  | "function" opt(Lifetime) "void" Identifier TFItems DeclsAndStmts "endfunction" opt(Tag) { [Task     $2 $4                (map defaultFuncInput $ $5 ++ fst $6) (snd $6)] }
-  | "task"     opt(Lifetime) Identifier        TFItems DeclsAndStmts "endtask"     opt(Tag) { [Task     $2 $3                (map defaultFuncInput $ $4 ++ fst $5) (snd $5)] }
+  | "function" Lifetime FuncRetAndName    TFItems DeclsAndStmts "endfunction" opt(Tag) { [Function $2 (fst $3) (snd $3) (map defaultFuncInput $ (map makeInput $4) ++ fst $5) (snd $5)] }
+  | "function" Lifetime "void" Identifier TFItems DeclsAndStmts "endfunction" opt(Tag) { [Task     $2 $4                (map defaultFuncInput $ $5 ++ fst $6) (snd $6)] }
+  | "task"     Lifetime Identifier        TFItems DeclsAndStmts "endtask"     opt(Tag) { [Task     $2 $3                (map defaultFuncInput $ $4 ++ fst $5) (snd $5)] }
   | "import" PackageImportItems ";" { map (uncurry Import) $2 }
   | "export" PackageImportItems ";" { map (Export .  Just) $2 }
   | "export" "*" "::" "*" ";"       { [Export Nothing] } -- "Nothing" being no restrictions
@@ -818,6 +818,9 @@ AlwaysKW :: { AlwaysKW }
   | "always_latch" { AlwaysLatch }
 
 Lifetime :: { Lifetime }
+  : {- empty -} { Inherit }
+  | ExplicitLifetime { $1 }
+ExplicitLifetime :: { Lifetime }
   : "static"    { Static    }
   | "automatic" { Automatic }
 

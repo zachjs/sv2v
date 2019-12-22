@@ -73,7 +73,7 @@ traverseExprM =
 castFn :: Expr -> Signing -> Description
 castFn e sg =
     PackageItem $
-    Function (Just Automatic) t fnName [decl] [Return $ Ident inp]
+    Function Automatic t fnName [decl] [Return $ Ident inp]
     where
         inp = "inp"
         r = (simplify $ BinOp Sub e (Number "1"), Number "0")
