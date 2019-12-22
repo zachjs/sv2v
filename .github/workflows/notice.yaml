@@ -1,0 +1,25 @@
+name: Notice
+on:
+  push:
+    paths:
+      - stack.yaml
+      - stack.yaml.lock
+      - sv2v.cabal
+      - notice.sh
+      - NOTICE
+jobs:
+  notice:
+    runs-on: macOS-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install Haskell Stack
+        run: brew install haskell-stack
+      - name: Regenerate NOTICE
+        run: ./notice.sh > NOTICE
+      - name: Validate NOTICE
+        run: |
+          if [ -n "`git status --porcelain`" ]; then
+            echo "Notice differs!"
+            PAGER= git diff
+            exit 1
+          fi
