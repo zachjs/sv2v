@@ -32,15 +32,6 @@ jobs:
               cd ..
             fi
           fi
-      - name: Cache Build
-        uses: actions/cache@v1
-        with:
-          path: ~/.stack
-          key: ${{ runner.OS }}-${{ hashFiles('**/stack.yaml') }}-${{ hashFiles('**/sv2v.cabal') }}
-          restore-keys: |
-            ${{ runner.OS }}-${{ hashFiles('**/stack.yaml') }}-${{ hashFiles('**/sv2v.cabal') }}
-            ${{ runner.OS }}-${{ hashFiles('**/stack.yaml') }}-
-            ${{ runner.OS }}-
       - name: Build
         run: make
       - name: Test
