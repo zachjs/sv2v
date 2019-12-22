@@ -16,6 +16,7 @@ module Language.SystemVerilog.AST.Expr
     , DimFn (..)
     , showAssignment
     , showRanges
+    , showExprOrRange
     , simplify
     , rangeSize
     , endianCondExpr
@@ -85,9 +86,6 @@ instance Show Expr where
     show (Inside  e l  ) = printf "(%s inside { %s })"  (show e) (intercalate ", " strs)
         where
             strs = map showExprOrRange l
-            showExprOrRange :: ExprOrRange -> String
-            showExprOrRange (Left  x) = show x
-            showExprOrRange (Right x) = show x
     show (Pattern l    ) =
         printf "'{\n%s\n}" (indent $ intercalate ",\n" $ map showPatternItem l)
         where
@@ -158,6 +156,10 @@ showRanges l = " " ++ (concatMap showRange l)
 
 showRange :: Range -> String
 showRange (h, l) = printf "[%s:%s]" (show h) (show l)
+
+showExprOrRange :: ExprOrRange -> String
+showExprOrRange (Left  x) = show x
+showExprOrRange (Right x) = show x
 
 clog2Help :: Int -> Int -> Int
 clog2Help p n = if p >= n then 0 else 1 + clog2Help (p*2) n

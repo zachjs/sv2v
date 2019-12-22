@@ -1046,17 +1046,13 @@ CaseKW :: { CaseKW }
   | "casez" { CaseZ }
 
 Cases :: { [Case] }
-  : {- empty -}                { [] }
-  | Case        Cases          { $1       : $2 }
-  | CaseDefault CasesNoDefault { ([], $1) : $2 }
-CasesNoDefault :: { [Case] }
-  : {- empty -}         { [] }
-  | CasesNoDefault Case { $1 ++ [$2] }
-
-Case :: { Case }
-  : Exprs ":" Stmt { ($1, $3) }
-CaseDefault :: { Stmt }
-  : "default" opt(":") Stmt { $3 }
+  : opt("inside") InsideCases { validateCases $1 $2 }
+InsideCases :: { [([ExprOrRange], Stmt)] }
+  : InsideCase             { [$1] }
+  | InsideCases InsideCase { $1 ++ [$2] }
+InsideCase :: { ([ExprOrRange], Stmt) }
+  : OpenRangeList ":"  Stmt { ($1, $3) }
+  | "default" opt(":") Stmt { ([], $3) }
 
 Number :: { String }
   : number    { tokenString $1 }
@@ -1223,17 +1219,11 @@ GenBlock :: { (Identifier, [GenItem]) }
   : "begin" StrTag GenItems "end" StrTag { (combineTags $2 $5, $3) }
 
 GenCases :: { [GenCase] }
-  : {- empty -}                      { [] }
-  | GenCase        GenCases          { $1       : $2 }
-  | GenCaseDefault GenCasesNoDefault { ([], $1) : $2 }
-GenCasesNoDefault :: { [GenCase] }
-  : {- empty -}               { [] }
-  | GenCasesNoDefault GenCase { $1 ++ [$2] }
-
+  : GenCase          { [$1] }
+  | GenCases GenCase { validateGenCases $ $1 ++ [$2] }
 GenCase :: { GenCase }
-  : Exprs ":" GenItemOrNull { ($1, $3) }
-GenCaseDefault :: { GenItem }
-  : "default" opt(":") GenItemOrNull { $3 }
+  : Exprs         ":"  GenItemOrNull { ($1, $3) }
+  | "default" opt(":") GenItemOrNull { ([], $3) }
 
 GenvarInitialization :: { (Bool, Identifier, Expr) }
   : "genvar" Identifier "=" Expr { (True , $2, $4) }
@@ -1334,5 +1324,35 @@ fieldDecl :: Type -> (Identifier, [Range]) -> (Type, Identifier)
 fieldDecl t (x, rs2) =
   (tf $ rs2 ++ rs1, x)
   where (tf, rs1) = typeRanges t
+
+validateCases :: Maybe Token -> [([ExprOrRange], Stmt)] -> [Case]
+validateCases Nothing items =
+  if length (filter null exprs) <= 1
+    then zip exprs' stmts
+    else error $ "multiple default cases: " ++ show items
+  where
+    (exprs, stmts) = unzip items
+    exprs' = map (map unwrap) exprs
+    unwrap (Left expr) = expr
+    unwrap (Right range) =
+      error $ "illegal use of a range (" ++ show range
+        ++ ") in a non-inside case"
+validateCases (Just _) items =
+  if length (filter null sets) <= 1
+    then zip sets' stmts
+    else error $ "multiple default cases: " ++ show items
+  where
+    (sets, stmts) = unzip items
+    sets' = map unwrap sets
+    unwrap [] = []
+    unwrap ls = [Inside Nil ls]
+
+validateGenCases :: [GenCase] -> [GenCase]
+validateGenCases items =
+  if length (filter null exprs) <= 1
+    then items
+    else error $ "multiple default generate cases: " ++ show items
+  where
+    (exprs, _) = unzip items
 
 }

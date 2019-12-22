@@ -28,7 +28,7 @@ import Text.Printf (printf)
 import Language.SystemVerilog.AST.ShowHelp (commas, indent, unlines', showPad)
 import Language.SystemVerilog.AST.Attr (Attr)
 import Language.SystemVerilog.AST.Decl (Decl)
-import Language.SystemVerilog.AST.Expr (Expr, Args(..))
+import Language.SystemVerilog.AST.Expr (Expr(Inside, Nil), Args(..), showExprOrRange)
 import Language.SystemVerilog.AST.LHS (LHS)
 import Language.SystemVerilog.AST.Op (AsgnOp(AsgnOpEq))
 import Language.SystemVerilog.AST.Type (Identifier)
@@ -132,7 +132,11 @@ showShortBranch stmt = showBranch stmt
 
 showCase :: Case -> String
 showCase (a, b) = printf "%s:%s" exprStr (showShortBranch b)
-    where exprStr = if null a then "default" else commas $ map show a
+    where
+        exprStr = case a of
+            [] -> "default"
+            [Inside Nil c] -> commas $ map showExprOrRange c
+            _ -> commas $ map show a
 
 data CaseKW
     = CaseN

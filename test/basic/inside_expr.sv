@@ -46,4 +46,18 @@ module top;
             $display("test2(%02d) = %b", i, test2(i));
     end
 
+    function integer test3;
+        input integer inp;
+        case (inp) inside
+            [16:23]: return 1;
+            [32:47]: return 2;
+            default: return 0;
+            0, [60:61], 4: return 3;
+        endcase
+    endfunction
+    initial begin
+        for (integer i = 0; i < 64; ++i)
+            $display("test3(%02d) = %b", i, test3(i));
+    end
+
 endmodule

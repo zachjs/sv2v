@@ -51,4 +51,19 @@ module top;
             $display("test2(%02d) = %b", i, test2(i));
     end
 
+    function [0:31] test3;
+        input integer inp;
+        begin
+            if (16 <= inp && inp <= 23) test3 = 1;
+            else if (32 <= inp && inp <= 47) test3 = 2;
+            else if (inp == 0 || (60 <= inp && inp <= 61) || inp == 4) test3 = 3;
+            else test3 = 0;
+        end
+    endfunction
+    initial begin : block3
+        integer i;
+        for (i = 0; i < 64; ++i)
+            $display("test3(%02d) = %b", i, test3(i));
+    end
+
 endmodule
