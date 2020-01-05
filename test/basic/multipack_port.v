@@ -22,12 +22,11 @@ module top;
 
     initial begin
         clock = 1;
-        forever #1 clock = ~clock;
+        repeat (100)
+            #1 clock = ~clock;
     end
 
     initial begin : foo
         $monitor("%d %b", $time, data);
-        #100;
-        $finish();
     end
 endmodule

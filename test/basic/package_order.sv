@@ -17,5 +17,5 @@ endmodule
 module top;
     logic [evil_pkg::B-1:0] foo;
     evil_mdl x(foo);
-    initial $display(foo);
+    initial $monitor(foo);
 endmodule
