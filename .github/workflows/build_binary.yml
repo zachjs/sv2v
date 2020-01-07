@@ -51,6 +51,8 @@ jobs:
       run: make
     - name: Test
       run: make test
+    - name: Packaging for artifact
+      run: cp LICENSE NOTICE README.md bin
     - name: Upload artifact
       uses: actions/upload-artifact@v1
       with:
@@ -67,16 +69,16 @@ jobs:
       uses: actions/download-artifact@v1
       with:
         name: Linux
-        path: Linux
+        path: sv2v-Linux
     - name: Download MacOS artifact
       uses: actions/download-artifact@v1
       with:
         name: macOS
-        path: macOS
+        path: sv2v-macOS
     - name: Zip binary
       run: |
-        zip --junk-paths Linux ./Linux/sv2v
-        zip --junk-paths macOS ./macOS/sv2v
+        zip sv2v-Linux ./sv2v-Linux/sv2v ./sv2v-Linux/LICENSE ./sv2v-Linux/NOTICE ./sv2v-Linux/README.md
+        zip sv2v-macOS ./sv2v-macOS/sv2v ./sv2v-macOS/LICENSE ./sv2v-macOS/NOTICE ./sv2v-macOS/README.md
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1.0.0
@@ -93,8 +95,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-        asset_path: ./Linux.zip
-        asset_name: Linux.zip
+        asset_path: ./sv2v-Linux.zip
+        asset_name: sv2v-Linux.zip
         asset_content_type: application/zip
     - name: Upload MacOS Release Asset
       uses: actions/upload-release-asset@v1.0.1
@@ -102,6 +104,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-        asset_path: ./macOS.zip
-        asset_name: macOS.zip
+        asset_path: ./sv2v-macOS.zip
+        asset_name: sv2v-macOS.zip
         asset_content_type: application/zip
