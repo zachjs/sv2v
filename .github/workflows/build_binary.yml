@@ -54,7 +54,7 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v1
       with:
-        name: ${{ matrix.os }}
+        name: ${{ runner.os }}
         path: bin
       
   release:
@@ -66,17 +66,17 @@ jobs:
     - name: Download Linux artifact
       uses: actions/download-artifact@v1
       with:
-        name: ubuntu-latest
-        path: ubuntu-latest
+        name: Linux
+        path: Linux
     - name: Download MacOS artifact
       uses: actions/download-artifact@v1
       with:
-        name: macos-latest
-        path: macos-latest
+        name: macOS
+        path: macOS
     - name: Zip binary
       run: |
-        zip --junk-paths linux ./ubuntu-latest/sv2v
-        zip --junk-paths macos ./macos-latest/sv2v
+        zip --junk-paths Linux ./Linux/sv2v
+        zip --junk-paths macOS ./macOS/sv2v
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1.0.0
@@ -93,8 +93,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-        asset_path: ./linux.zip
-        asset_name: linux.zip
+        asset_path: ./Linux.zip
+        asset_name: Linux.zip
         asset_content_type: application/zip
     - name: Upload MacOS Release Asset
       uses: actions/upload-release-asset@v1.0.1
@@ -102,6 +102,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-        asset_path: ./macos.zip
-        asset_name: macos.zip
+        asset_path: ./macOS.zip
+        asset_name: macOS.zip
         asset_content_type: application/zip
