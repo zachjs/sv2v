@@ -79,6 +79,7 @@ resolveType _ (NonInteger    kw      ) = NonInteger    kw
 resolveType _ (InterfaceT     x my rs) = InterfaceT     x my rs
 resolveType _ (Enum Nothing   vals rs) = Enum Nothing   vals rs
 resolveType _ (Alias (Just ps)  st rs) = Alias (Just ps)  st rs
+resolveType _ (TypeOf            expr) = TypeOf            expr
 resolveType types (Enum (Just t) vals rs) = Enum (Just $ resolveType types t) vals rs
 resolveType types (Struct p items rs) = Struct p (map (resolveItem types) items) rs
 resolveType types (Union  p items rs) = Union  p (map (resolveItem types) items) rs
@@ -96,3 +97,4 @@ resolveType types (Alias Nothing st rs1) =
         (Alias          ps x rs2) -> Alias          ps x $ rs1 ++ rs2
         (IntegerAtom   kw sg    ) -> nullRange (IntegerAtom kw sg) rs1
         (NonInteger    kw       ) -> nullRange (NonInteger  kw   ) rs1
+        (TypeOf             expr) -> nullRange (TypeOf       expr) rs1

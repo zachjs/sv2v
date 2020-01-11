@@ -88,6 +88,7 @@ executable sv2v
     Convert.Struct
     Convert.Traverse
     Convert.Typedef
+    Convert.TypeOf
     Convert.UnbasedUnsized
     Convert.Unique
     Convert.UnpackedArray

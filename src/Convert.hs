@@ -40,6 +40,7 @@ import qualified Convert.StmtBlock
 import qualified Convert.Stream
 import qualified Convert.Struct
 import qualified Convert.Typedef
+import qualified Convert.TypeOf
 import qualified Convert.UnbasedUnsized
 import qualified Convert.Unique
 import qualified Convert.UnpackedArray
@@ -72,6 +73,7 @@ phases excludes =
     , Convert.Stream.convert
     , Convert.Struct.convert
     , Convert.Typedef.convert
+    , Convert.TypeOf.convert
     , Convert.UnbasedUnsized.convert
     , Convert.Unique.convert
     , Convert.UnpackedArray.convert

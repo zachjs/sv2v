@@ -519,6 +519,8 @@ exprMapperHelpers exprMapper =
     maybeExprMapper (Just e) =
         exprMapper e >>= return . Just
 
+    typeMapper' (TypeOf expr) =
+        exprMapper expr >>= return . TypeOf
     typeMapper' t = do
         let (tf, rs) = typeRanges t
         rs' <- mapM rangeMapper rs
@@ -873,6 +875,7 @@ traverseNestedTypesM mapper = fullMapper
             types <- mapM fullMapper $ map fst fields
             let idents = map snd fields
             return $ Union p (zip types idents) r
+        tm (TypeOf expr) = return $ TypeOf expr
 
 traverseNestedTypes :: Mapper Type -> Mapper Type
 traverseNestedTypes = unmonad traverseNestedTypesM

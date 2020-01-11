@@ -434,6 +434,7 @@ Type :: { Type }
   | Identifier "::" Identifier Dimensions { Alias (Just $1) $3 $4 }
 TypeNonIdent :: { Type }
   : PartialType OptSigning Dimensions { $1 $2 $3 }
+  | "type" "(" Expr ")" { TypeOf $3 }
 PartialType :: { Signing -> [Range] -> Type }
   : NetType                                 {                        Net           $1    }
   | IntegerVectorType                       {                        IntegerVector $1    }
@@ -618,6 +619,7 @@ DeclOrStmtToken :: { DeclToken }
   | "const" PartialType { DTType $2 }
   | "{" StreamOp StreamSize Concat "}" { DTStream $2 $3           (map toLHS $4) }
   | "{" StreamOp            Concat "}" { DTStream $2 (Number "1") (map toLHS $3) }
+  | opt("var") "type" "(" Expr ")" { DTType $ \Unspecified -> \[] -> TypeOf $4 }
 
 VariablePortIdentifiers :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifier                             { [$1] }

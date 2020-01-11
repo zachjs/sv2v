@@ -42,6 +42,7 @@ data Type
     | Struct   Packing      [Field]            [Range]
     | Union    Packing      [Field]            [Range]
     | InterfaceT Identifier (Maybe Identifier) [Range]
+    | TypeOf Expr
     deriving (Eq, Ord)
 
 instance Show Type where
@@ -60,6 +61,7 @@ instance Show Type where
             showVal (x, e) = x ++ (showAssignment e)
     show (Struct p items r) = printf "struct %s{\n%s\n}%s" (showPad p) (showFields items) (showRanges r)
     show (Union  p items r) = printf  "union %s{\n%s\n}%s" (showPad p) (showFields items) (showRanges r)
+    show (TypeOf expr) = printf "type(%s)" (show expr)
 
 showFields :: [Field] -> String
 showFields items = itemsStr
@@ -92,6 +94,7 @@ typeRanges (Enum   t v r) = (Enum   t v, r)
 typeRanges (Struct p l r) = (Struct p l, r)
 typeRanges (Union  p l r) = (Union  p l, r)
 typeRanges (InterfaceT x my r) = (InterfaceT x my, r)
+typeRanges (TypeOf expr) = (nullRange $ TypeOf expr, [])
 
 nullRange :: Type -> ([Range] -> Type)
 nullRange t [] = t
