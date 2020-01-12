@@ -12,6 +12,7 @@
 module top;
     typedef logic [16:1] Word;
     Word Ram[0:9];
+    type(Ram) RamPair [2];
     integer ints [3:0];
     typedef struct packed { logic x, y, z; } T;
     logic [$size(T)-1:0] foo;
@@ -22,6 +23,8 @@ module top;
         $display($bits(foo));
 
         `EXHAUST(Ram);
+        `EXHAUST(RamPair);
+        `EXHAUST(RamPair[0]);
         `EXHAUST(Word);
         `EXHAUST(integer);
         `EXHAUST(bit);

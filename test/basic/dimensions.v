@@ -15,6 +15,26 @@ module top;
         $display(1);
         $display(160);
 
+        $display(2, 2, 10);
+        $display(0, 0, 0);
+        $display(1, 1, 9);
+        $display(1, 1, 9);
+        $display(0, 0, 0);
+        $display(-1, -1, -1);
+        $display(3);
+        $display(2);
+        $display(320);
+
+        $display(10, 10, 16);
+        $display(0, 0, 16);
+        $display(9, 9, 1);
+        $display(9, 9, 16);
+        $display(0, 0, 1);
+        $display(-1, -1, 1);
+        $display(2);
+        $display(1);
+        $display(160);
+
         $display(16, 16, 1'bx);
         $display(16, 16, 1'bx);
         $display(1, 1, 1'bx);

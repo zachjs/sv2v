@@ -51,6 +51,10 @@ convertDescription globalTypes description =
             MIPackageItem $ Comment $ "removed typedef: " ++ x
         removeTypedef other = other
         convertTypeOrExpr :: TypeOrExpr -> TypeOrExpr
+        convertTypeOrExpr (Left (TypeOf (Ident x))) =
+            if Map.member x types
+                then Left $ resolveType types (Alias Nothing x [])
+                else Left $ TypeOf (Ident x)
         convertTypeOrExpr (Right (Ident x)) =
             if Map.member x types
                 then Left $ resolveType types (Alias Nothing x [])
@@ -80,6 +84,7 @@ resolveType _ (InterfaceT     x my rs) = InterfaceT     x my rs
 resolveType _ (Enum Nothing   vals rs) = Enum Nothing   vals rs
 resolveType _ (Alias (Just ps)  st rs) = Alias (Just ps)  st rs
 resolveType _ (TypeOf            expr) = TypeOf            expr
+resolveType _ (UnpackedType  t     rs) = UnpackedType  t     rs
 resolveType types (Enum (Just t) vals rs) = Enum (Just $ resolveType types t) vals rs
 resolveType types (Struct p items rs) = Struct p (map (resolveItem types) items) rs
 resolveType types (Union  p items rs) = Union  p (map (resolveItem types) items) rs
@@ -95,6 +100,7 @@ resolveType types (Alias Nothing st rs1) =
         (Union           p l rs2) -> Union           p l $ rs1 ++ rs2
         (InterfaceT     x my rs2) -> InterfaceT     x my $ rs1 ++ rs2
         (Alias          ps x rs2) -> Alias          ps x $ rs1 ++ rs2
+        (UnpackedType  t     rs2) -> UnpackedType      t $ rs1 ++ rs2
         (IntegerAtom   kw sg    ) -> nullRange (IntegerAtom kw sg) rs1
         (NonInteger    kw       ) -> nullRange (NonInteger  kw   ) rs1
         (TypeOf             expr) -> nullRange (TypeOf       expr) rs1

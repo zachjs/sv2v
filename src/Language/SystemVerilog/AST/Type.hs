@@ -43,6 +43,7 @@ data Type
     | Union    Packing      [Field]            [Range]
     | InterfaceT Identifier (Maybe Identifier) [Range]
     | TypeOf Expr
+    | UnpackedType Type [Range] -- used internally
     deriving (Eq, Ord)
 
 instance Show Type where
@@ -62,6 +63,7 @@ instance Show Type where
     show (Struct p items r) = printf "struct %s{\n%s\n}%s" (showPad p) (showFields items) (showRanges r)
     show (Union  p items r) = printf  "union %s{\n%s\n}%s" (showPad p) (showFields items) (showRanges r)
     show (TypeOf expr) = printf "type(%s)" (show expr)
+    show (UnpackedType t rs) = printf "UnpackedType(%s, %s)" (show t) (showRanges rs)
 
 showFields :: [Field] -> String
 showFields items = itemsStr
@@ -94,7 +96,8 @@ typeRanges (Enum   t v r) = (Enum   t v, r)
 typeRanges (Struct p l r) = (Struct p l, r)
 typeRanges (Union  p l r) = (Union  p l, r)
 typeRanges (InterfaceT x my r) = (InterfaceT x my, r)
-typeRanges (TypeOf expr) = (nullRange $ TypeOf expr, [])
+typeRanges (TypeOf expr) = (UnpackedType $ TypeOf expr, [])
+typeRanges (UnpackedType t rs) = (UnpackedType t, rs)
 
 nullRange :: Type -> ([Range] -> Type)
 nullRange t [] = t

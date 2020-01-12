@@ -64,6 +64,7 @@ phases excludes =
     , Convert.KWArgs.convert
     , Convert.LogOp.convert
     , Convert.MultiplePacked.convert
+    , Convert.TypeOf.convert
     , Convert.DimensionQuery.convert
     , Convert.ParamType.convert
     , Convert.SizeCast.convert
@@ -73,7 +74,6 @@ phases excludes =
     , Convert.Stream.convert
     , Convert.Struct.convert
     , Convert.Typedef.convert
-    , Convert.TypeOf.convert
     , Convert.UnbasedUnsized.convert
     , Convert.Unique.convert
     , Convert.UnpackedArray.convert

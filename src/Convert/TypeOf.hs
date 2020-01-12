@@ -12,13 +12,13 @@
 module Convert.TypeOf (convert) where
 
 import Control.Monad.State
-import Data.Maybe (mapMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map.Strict as Map
 
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type Info = Map.Map Identifier (Type, [Range])
+type Info = Map.Map Identifier Type
 
 convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
@@ -30,34 +30,37 @@ convertDescription (description @ Part{}) =
     where
         Part _ _ _ _ _ _ items = description
         initialState = Map.fromList $ mapMaybe returnType items
-        returnType :: ModuleItem -> Maybe (Identifier, (Type, [Range]))
+        returnType :: ModuleItem -> Maybe (Identifier, Type)
         returnType (MIPackageItem (Function _ t f _ _)) =
-            Just (f, (t', []))
-            where t' = if t == Implicit Unspecified []
-                    then IntegerVector TLogic Unspecified []
-                    else t
+            if t == Implicit Unspecified []
+                -- functions with no return type implicitly return a single bit
+                then Just (f, IntegerVector TLogic Unspecified [])
+                else Just (f, t)
         returnType _ = Nothing
 convertDescription other = other
 
 traverseDeclM :: Decl -> State Info Decl
 traverseDeclM decl = do
-    case decl of
-        Variable _ t ident a _ -> modify $ Map.insert ident (t, a)
-        Param    _ t ident   _ -> modify $ Map.insert ident (t, [])
-        ParamType    _     _ _ -> return ()
     item <- traverseModuleItemM (MIPackageItem $ Decl decl)
     let MIPackageItem (Decl decl') = item
-    return decl'
+    case decl' of
+        Variable d t ident a me -> do
+            let t' = injectRanges t a
+            modify $ Map.insert ident t'
+            return $ case t' of
+                UnpackedType t'' a' -> Variable d t'' ident a' me
+                _ ->                   Variable d t'  ident [] me
+        Param    _ t ident   _ -> do
+            modify $ Map.insert ident t
+            return decl'
+        ParamType    _     _ _ -> return decl'
 
 traverseModuleItemM :: ModuleItem -> State Info ModuleItem
 traverseModuleItemM item = traverseTypesM traverseTypeM item
 
 traverseStmtM :: Stmt -> State Info Stmt
-traverseStmtM stmt = do
-    let item = Initial stmt
-    item' <- traverseModuleItemM item
-    let Initial stmt' = item'
-    return stmt'
+traverseStmtM =
+    traverseStmtExprsM $ traverseNestedExprsM $ traverseExprTypesM traverseTypeM
 
 traverseTypeM :: Type -> State Info Type
 traverseTypeM (TypeOf expr) = typeof expr
@@ -66,14 +69,23 @@ traverseTypeM other = return other
 typeof :: Expr -> State Info Type
 typeof (orig @ (Ident x)) = do
     res <- gets $ Map.lookup x
-    return $ maybe (TypeOf orig) injectRanges res
+    return $ fromMaybe (TypeOf orig) res
 typeof (orig @ (Call (Ident x) _)) = do
     res <- gets $ Map.lookup x
-    return $ maybe (TypeOf orig) injectRanges res
+    return $ fromMaybe (TypeOf orig) res
+typeof (orig @ (Bit (Ident x) _)) = do
+    res <- gets $ Map.lookup x
+    return $ maybe (TypeOf orig) popRange res
 typeof other = return $ TypeOf other
 
 -- combines a type with unpacked ranges
-injectRanges :: (Type, [Range]) -> Type
-injectRanges (t, unpacked) =
-    tf $ packed ++ unpacked
-    where (tf, packed) = typeRanges t
+injectRanges :: Type -> [Range] -> Type
+injectRanges t [] = t
+injectRanges (UnpackedType t rs) unpacked = UnpackedType t $ unpacked ++ rs
+injectRanges t unpacked = UnpackedType t unpacked
+
+-- removes the outermost range of the given type
+popRange :: Type -> Type
+popRange t =
+    tf $ tail rs
+    where (tf, rs) = typeRanges t

@@ -50,6 +50,9 @@ module Convert.Traverse
 , traverseNestedTypesM
 , traverseNestedTypes
 , collectNestedTypesM
+, traverseExprTypesM
+, traverseExprTypes
+, collectExprTypesM
 , traverseTypesM
 , traverseTypes
 , collectTypesM
@@ -422,10 +425,12 @@ traverseNestedExprsM :: Monad m => MapperM m Expr -> MapperM m Expr
 traverseNestedExprsM mapper = exprMapper
     where
         exprMapper e = mapper e >>= em
+        (_, _, _, _, typeMapper) = exprMapperHelpers exprMapper
         maybeExprMapper Nothing = return Nothing
         maybeExprMapper (Just e) =
             exprMapper e >>= return . Just
-        typeOrExprMapper (Left t) = return $ Left t
+        typeOrExprMapper (Left t) =
+            typeMapper t >>= return . Left
         typeOrExprMapper (Right e) =
             exprMapper e >>= return . Right
         exprOrRangeMapper (Left e) =
@@ -861,6 +866,7 @@ traverseNestedTypesM mapper = fullMapper
         tm (IntegerVector kw sg rs) = return $ IntegerVector kw sg rs
         tm (IntegerAtom   kw sg   ) = return $ IntegerAtom   kw sg
         tm (NonInteger    kw      ) = return $ NonInteger    kw
+        tm (TypeOf        expr    ) = return $ TypeOf        expr
         tm (InterfaceT x my r) = return $ InterfaceT x my r
         tm (Enum Nothing vals r) =
             return $ Enum Nothing vals r
@@ -875,12 +881,34 @@ traverseNestedTypesM mapper = fullMapper
             types <- mapM fullMapper $ map fst fields
             let idents = map snd fields
             return $ Union p (zip types idents) r
-        tm (TypeOf expr) = return $ TypeOf expr
+        tm (UnpackedType t r) = do
+            t' <- fullMapper t
+            return $ UnpackedType t' r
 
 traverseNestedTypes :: Mapper Type -> Mapper Type
 traverseNestedTypes = unmonad traverseNestedTypesM
 collectNestedTypesM :: Monad m => CollectorM m Type -> CollectorM m Type
 collectNestedTypesM = collectify traverseNestedTypesM
+
+traverseExprTypesM :: Monad m => MapperM m Type -> MapperM m Expr
+traverseExprTypesM mapper = exprMapper
+    where
+        typeOrExprMapper (Right e) = return $ Right e
+        typeOrExprMapper (Left t) =
+            mapper t >>= return . Left
+        exprMapper (Cast (Left t) e) =
+            mapper t >>= \t' -> return $ Cast (Left t') e
+        exprMapper (DimsFn f tore) =
+            typeOrExprMapper tore >>= return . DimsFn f
+        exprMapper (DimFn f tore e) = do
+            tore' <- typeOrExprMapper tore
+            return $ DimFn f tore' e
+        exprMapper other = return other
+
+traverseExprTypes :: Mapper Type -> Mapper Expr
+traverseExprTypes = unmonad traverseExprTypesM
+collectExprTypesM :: Monad m => CollectorM m Type -> CollectorM m Expr
+collectExprTypesM = collectify traverseExprTypesM
 
 traverseTypesM :: Monad m => MapperM m Type -> MapperM m ModuleItem
 traverseTypesM mapper item =
@@ -891,17 +919,7 @@ traverseTypesM mapper item =
         fullMapper = traverseNestedTypesM mapper
         maybeMapper Nothing = return Nothing
         maybeMapper (Just t) = fullMapper t >>= return . Just
-        typeOrExprMapper (Right e) = return $ Right e
-        typeOrExprMapper (Left t) =
-            fullMapper t >>= return . Left
-        exprMapper (Cast (Left t) e) =
-            fullMapper t >>= \t' -> return $ Cast (Left t') e
-        exprMapper (DimsFn f tore) =
-            typeOrExprMapper tore >>= return . DimsFn f
-        exprMapper (DimFn f tore e) = do
-            tore' <- typeOrExprMapper tore
-            return $ DimFn f tore' e
-        exprMapper other = return other
+        exprMapper = traverseExprTypesM fullMapper
         declMapper (Param s t x e) =
             fullMapper t >>= \t' -> return $ Param s t' x e
         declMapper (ParamType s x mt) =

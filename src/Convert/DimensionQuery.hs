@@ -11,21 +11,18 @@
  - Functions on types are trivially elaborated based on the dimensions of that
  - type, so long as it has been resolved to a primitive type.
  -
- - Functions on expressions requires a scoped traversal to determine the
- - underlying type of expression. The conversion of `$bits` on expressions
- - recursively breaks the expression into its subtypes and finds their sizes.
+ - Functions on expressions relies on the `type` operator and the `TypeOf`
+ - conversion to determine the underlying type of expression. The conversion of
+ - `$bits` on expressions recursively breaks the expression into its subtypes
+ - and finds their sizes.
  -}
 
 module Convert.DimensionQuery (convert) where
 
-import Control.Monad.State
 import Data.List (elemIndex)
-import qualified Data.Map.Strict as Map
 
 import Convert.Traverse
 import Language.SystemVerilog.AST
-
-type Info = Map.Map Identifier (Type, [Range])
 
 convert :: [AST] -> [AST]
 convert files =
@@ -36,26 +33,7 @@ convert files =
 
 convertDescription :: Description -> Description
 convertDescription =
-    scopedConversion traverseDeclM traverseModuleItemM traverseStmtM Map.empty
-
-traverseDeclM :: Decl -> State Info Decl
-traverseDeclM decl = do
-    case decl of
-        Variable _ t ident a _ -> modify $ Map.insert ident (elaborateType t, a)
-        Param    _ t ident   _ -> modify $ Map.insert ident (elaborateType t, [])
-        ParamType    _     _ _ -> return ()
-    item <- traverseModuleItemM (MIPackageItem $ Decl decl)
-    let MIPackageItem (Decl decl') = item
-    return decl'
-
-traverseModuleItemM :: ModuleItem -> State Info ModuleItem
-traverseModuleItemM item = traverseExprsM traverseExprM item
-
-traverseStmtM :: Stmt -> State Info Stmt
-traverseStmtM stmt = traverseStmtExprsM traverseExprM stmt
-
-traverseExprM :: Expr -> State Info Expr
-traverseExprM = traverseNestedExprsM $ stately convertExpr
+    traverseModuleItems $ traverseExprs $ traverseNestedExprs convertExpr
 
 -- elaborate integer atom types to have explicit dimensions
 elaborateType :: Type -> Type
@@ -74,33 +52,34 @@ elaborateType (IntegerAtom t sg) =
         atomSize TTime = 64
 elaborateType other = other
 
-convertExpr :: Info -> Expr -> Expr
+convertExpr :: Expr -> Expr
 
 -- conversion for array dimensions functions
-convertExpr info (DimsFn FnBits v) =
-    convertBits info v
-convertExpr _ (DimsFn FnUnpackedDimensions (Left _)) =
-    Number "0"
-convertExpr _ (DimsFn FnDimensions (Left t)) =
-    Number $ show $
+convertExpr (DimsFn FnBits v) =
+    convertBits v
+convertExpr (DimsFn fn (Right e)) =
+    DimsFn fn $ Left $ TypeOf e
+convertExpr (DimFn fn (Right e) d) =
+    DimFn fn (Left $ TypeOf e) d
+convertExpr (orig @ (DimsFn FnUnpackedDimensions (Left t))) =
     case t of
-        IntegerAtom _ _ -> 1
-        _ -> length $ snd $ typeRanges t
-convertExpr info (DimsFn FnUnpackedDimensions (Right (Ident x))) =
-    case Map.lookup x info of
-        Nothing -> DimsFn FnUnpackedDimensions $ Right $ Ident x
-        Just (_, rs) -> Number $ show $ length rs
-convertExpr info (DimsFn FnDimensions (Right (Ident x))) =
-    case Map.lookup x info of
-        Nothing -> DimsFn FnDimensions $ Right $ Ident x
-        Just (t, rs) -> DimsFn FnDimensions $ Left $ tf rsCombined
-            where
-                (tf, trs) = typeRanges t
-                rsCombined = rs ++ trs
+        UnpackedType _ rs -> Number $ show $ length rs
+        TypeOf{} -> orig
+        _ -> Number "0"
+convertExpr (orig @ (DimsFn FnDimensions (Left t))) =
+    case t of
+        IntegerAtom{} -> Number "1"
+        Alias{} -> orig
+        TypeOf{} -> orig
+        UnpackedType t' rs ->
+            BinOp Add
+                (Number $ show $ length rs)
+                (DimsFn FnDimensions $ Left t')
+        _ -> Number $ show $ length $ snd $ typeRanges t
 
 -- conversion for array dimension functions on types
-convertExpr _ (DimFn f (Left t) (Number str)) =
-    if dm == Nothing || isAlias t then
+convertExpr (DimFn f (Left t) (Number str)) =
+    if dm == Nothing || isUnresolved t then
         DimFn f (Left t) (Number str)
     else if d <= 0 || d > length rs then
         Number "'x"
@@ -112,80 +91,51 @@ convertExpr _ (DimFn f (Left t) (Number str)) =
         FnHigh -> endianCondExpr r (fst r) (snd r)
         FnSize -> rangeSize r
     where
-        (_, rs) = typeRanges $ elaborateType t
+        rs = case elaborateType t of
+            UnpackedType tInner rsOuter ->
+                rsOuter ++ (snd $ typeRanges $ elaborateType tInner)
+            _ -> snd $ typeRanges $ elaborateType t
         dm = readNumber str
         Just d = dm
         r = rs !! (d - 1)
-        isAlias :: Type -> Bool
-        isAlias (Alias _ _ _) = True
-        isAlias _ = False
-convertExpr _ (DimFn f (Left t) d) =
+        isUnresolved :: Type -> Bool
+        isUnresolved (Alias{}) = True
+        isUnresolved (TypeOf{}) = True
+        isUnresolved _ = False
+convertExpr (DimFn f (Left t) d) =
     DimFn f (Left t) d
 
--- conversion for array dimension functions on expression
-convertExpr info (DimFn f (Right (Ident x)) d) =
-    case Map.lookup x info of
-        Nothing -> DimFn f (Right (Ident x)) d
-        Just (t, rs) -> DimFn f (Left $ tf rsCombined) d
-            where
-                (tf, trs) = typeRanges t
-                rsCombined = rs ++ trs
-convertExpr info (DimFn f (Right (Bit (Ident x) idx)) d) =
-    case Map.lookup x info of
-        Nothing -> DimFn f (Right $ Bit (Ident x) idx) d
-        Just (t, rs) -> DimFn f (Left t') d
-            where t' = popRange t rs
-convertExpr _ (DimFn f (Right e) d) =
-    DimFn f (Right e) d
+convertExpr other = other
 
-convertExpr _ other = other
-
--- simplify a bits expression given scoped type information
-convertBits :: Info -> TypeOrExpr -> Expr
-convertBits _ (Left t) =
+-- simplify a bits expression
+convertBits :: TypeOrExpr -> Expr
+convertBits (Left t) =
     case elaborateType t of
         IntegerVector _ _ rs -> dimensionsSize rs
         Implicit        _ rs -> dimensionsSize rs
         Net           _ _ rs -> dimensionsSize rs
+        UnpackedType  t'  rs ->
+            BinOp Mul
+                (dimensionsSize rs)
+                (DimsFn FnBits $ Left t')
         _ -> DimsFn FnBits $ Left t
-convertBits info (Right e) =
+convertBits (Right e) =
     case e of
-        Ident x ->
-            case Map.lookup x info of
-                Nothing -> DimsFn FnBits $ Right e
-                Just (t, rs) -> simplify $ BinOp Mul
-                        (dimensionsSize rs)
-                        (convertBits info $ Left t)
         Concat exprs ->
             foldl (BinOp Add) (Number "0") $
-            map (convertBits info . Right) $
+            map (convertBits . Right) $
             exprs
         Range expr mode range ->
             simplify $ BinOp Mul size
-                (convertBits info $ Right $ Bit expr (Number "0"))
+                (convertBits $ Right $ Bit expr (Number "0"))
             where
                 size = case mode of
                     NonIndexed   -> rangeSize range
                     IndexedPlus  -> snd range
                     IndexedMinus -> snd range
-        Bit (Ident x) idx ->
-            case Map.lookup x info of
-                Nothing -> DimsFn FnBits $ Right $ Bit (Ident x) idx
-                Just (t, rs) ->
-                    convertBits info $ Left t'
-                    where t' = popRange t rs
-        Stream _ _ exprs -> convertBits info $ Right $ Concat exprs
+        Stream _ _ exprs -> convertBits $ Right $ Concat exprs
         Number n ->
             case elemIndex '\'' n of
                 Nothing -> Number "32"
                 Just idx -> Number $ take idx n
-        _ -> DimsFn FnBits $ Right e
-
--- combines the given type and dimensions and returns a new type with the
--- innermost range removed
-popRange :: Type -> [Range] -> Type
-popRange t rs =
-    tf $ tail rsCombined
-    where
-        (tf, trs) = typeRanges t
-        rsCombined = rs ++ trs
+        _ -> DimsFn FnBits $ Left $ TypeOf e
