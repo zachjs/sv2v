@@ -19,6 +19,7 @@ import qualified Convert.Enum
 import qualified Convert.ForDecl
 import qualified Convert.Foreach
 import qualified Convert.FuncRet
+import qualified Convert.FuncRoutine
 import qualified Convert.Inside
 import qualified Convert.Interface
 import qualified Convert.IntTypes
@@ -58,6 +59,7 @@ phases excludes =
     , selectExclude (Job.Logic    , Convert.Logic.convert)
     , Convert.ForDecl.convert
     , Convert.FuncRet.convert
+    , Convert.FuncRoutine.convert
     , Convert.EmptyArgs.convert
     , Convert.Inside.convert
     , Convert.IntTypes.convert

@@ -941,6 +941,7 @@ StmtNonBlock :: { Stmt }
   | AttributeInstance Stmt                     { StmtAttr $1 $2 }
   | ProceduralAssertionStatement               { Assertion $1 }
   | IncOrDecOperator LHS ";"                   { AsgnBlk (AsgnOp $1) $2 (Number "1") }
+  | "void" "'" "(" Expr CallArgs ")" ";"       { Subroutine $4 $5 }
 
 BlockKWPar :: { BlockKW }
   : "fork" { Par }

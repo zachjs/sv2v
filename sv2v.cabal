@@ -66,6 +66,7 @@ executable sv2v
     Convert.ForDecl
     Convert.Foreach
     Convert.FuncRet
+    Convert.FuncRoutine
     Convert.Inside
     Convert.Interface
     Convert.IntTypes

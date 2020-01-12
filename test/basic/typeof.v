@@ -6,6 +6,10 @@ module top;
             $display("f(%b) called", x);
         end
     endfunction
+    task t;
+        input x;
+        $display("t(%b) called", x);
+    endtask
 
     initial begin : block
         reg x;
@@ -14,5 +18,8 @@ module top;
         $display("%b", 32'd1);
         $display("%b", 32'd1);
         $display("%b", 32'd3);
+        x = f(1);
+        x = f(0);
+        t(1);
     end
 endmodule
