@@ -73,9 +73,22 @@ typeof (orig @ (Ident x)) = do
 typeof (orig @ (Call (Ident x) _)) = do
     res <- gets $ Map.lookup x
     return $ fromMaybe (TypeOf orig) res
-typeof (orig @ (Bit (Ident x) _)) = do
-    res <- gets $ Map.lookup x
-    return $ maybe (TypeOf orig) popRange res
+typeof (orig @ (Bit e _)) = do
+    t <- typeof e
+    return $ case t of
+        TypeOf _ -> TypeOf orig
+        _ -> popRange t
+typeof (orig @ (Range e mode r)) = do
+    t <- typeof e
+    return $ case t of
+        TypeOf _ -> TypeOf orig
+        _ -> replaceRange (lo, hi) t
+    where
+        lo = fst r
+        hi = case mode of
+            NonIndexed   -> snd r
+            IndexedPlus  -> BinOp Sub (uncurry (BinOp Add) r) (Number "1")
+            IndexedMinus -> BinOp Add (uncurry (BinOp Sub) r) (Number "1")
 typeof other = return $ TypeOf other
 
 -- combines a type with unpacked ranges
@@ -84,8 +97,17 @@ injectRanges t [] = t
 injectRanges (UnpackedType t rs) unpacked = UnpackedType t $ unpacked ++ rs
 injectRanges t unpacked = UnpackedType t unpacked
 
--- removes the outermost range of the given type
+-- removes the most significant range of the given type
 popRange :: Type -> Type
+popRange (UnpackedType t [_]) = t
 popRange t =
     tf $ tail rs
+    where (tf, rs) = typeRanges t
+
+-- replaces the most significant range of the given type
+replaceRange :: Range -> Type -> Type
+replaceRange r (UnpackedType t (_ : rs)) =
+    UnpackedType t (r : rs)
+replaceRange r t =
+    tf $ r : tail rs
     where (tf, rs) = typeRanges t

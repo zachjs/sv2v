@@ -23,6 +23,9 @@ module top;
         $display($bits(foo));
 
         `EXHAUST(Ram);
+        `EXHAUST(Ram[0+:2]);
+        `EXHAUST(Ram[1+:2]);
+        `EXHAUST(Ram[0][2-:1]);
         `EXHAUST(RamPair);
         `EXHAUST(RamPair[0]);
         `EXHAUST(Word);

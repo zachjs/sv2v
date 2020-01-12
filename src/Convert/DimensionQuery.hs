@@ -125,14 +125,6 @@ convertBits (Right e) =
             foldl (BinOp Add) (Number "0") $
             map (convertBits . Right) $
             exprs
-        Range expr mode range ->
-            simplify $ BinOp Mul size
-                (convertBits $ Right $ Bit expr (Number "0"))
-            where
-                size = case mode of
-                    NonIndexed   -> rangeSize range
-                    IndexedPlus  -> snd range
-                    IndexedMinus -> snd range
         Stream _ _ exprs -> convertBits $ Right $ Concat exprs
         Number n ->
             case elemIndex '\'' n of
