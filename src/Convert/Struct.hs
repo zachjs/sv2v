@@ -246,77 +246,12 @@ convertAsgn structs types (lhs, expr) =
 
         -- converting LHSs by looking at the innermost types first
         convertLHS :: LHS -> (Type, LHS)
-        convertLHS (LHSIdent  x) =
-            case Map.lookup x types of
-                Nothing -> (Implicit Unspecified [], LHSIdent x)
-                Just t -> (t, LHSIdent x)
-        convertLHS (LHSBit l e) =
-            case l' of
-                LHSRange lInner NonIndexed (_, loI) ->
-                    (t', LHSBit lInner (simplify $ BinOp Add loI e))
-                LHSRange lInner IndexedPlus (baseI, _) ->
-                    (t', LHSBit lInner (simplify $ BinOp Add baseI e))
-                _ -> (t', LHSBit l' e)
+        convertLHS l =
+            (t, l')
             where
-                (t, l') = convertLHS l
-                t' = dropInnerTypeRange t
-        convertLHS (LHSRange lOuter NonIndexed rOuter) =
-            case lOuter' of
-                LHSRange lInner NonIndexed (_, loI) ->
-                    (t, LHSRange lInner NonIndexed (simplify hi, simplify lo))
-                    where
-                        lo = BinOp Add loI loO
-                        hi = BinOp Add loI hiO
-                LHSRange lInner IndexedPlus (baseI, _) ->
-                    (t, LHSRange lInner IndexedPlus (simplify base, simplify len))
-                    where
-                        base = BinOp Add baseI loO
-                        len = rangeSize rOuter
-                _ -> (t, LHSRange lOuter' NonIndexed rOuter)
-            where
-                (hiO, loO) = rOuter
-                (t, lOuter') = convertLHS lOuter
-        convertLHS (LHSRange lOuter IndexedPlus (rOuter @ (baseO, lenO))) =
-            case lOuter' of
-                LHSRange lInner NonIndexed (hiI, loI) ->
-                    (t', LHSRange lInner IndexedPlus (simplify base, simplify len))
-                    where
-                        base = BinOp Add baseO $
-                            endianCondExpr (hiI, loI) loI hiI
-                        len = lenO
-                _ -> (t', LHSRange lOuter' IndexedPlus rOuter)
-            where
-                (t, lOuter') = convertLHS lOuter
-                t' = dropInnerTypeRange t
-        convertLHS (LHSRange l m r) =
-            (t', LHSRange l' m r)
-            where
-                (t, l') = convertLHS l
-                t' = dropInnerTypeRange t
-        convertLHS (LHSDot    l x ) =
-            case t of
-                InterfaceT _ _ _ -> (Implicit Unspecified [], LHSDot l' x)
-                Struct p fields [] -> undot (Struct p fields) fields
-                Union  p fields [] -> undot (Union  p fields) fields
-                Implicit sg _ -> (Implicit sg [], LHSDot l' x)
-                _ -> error $ "convertLHS encountered dot for bad type: " ++ show (t, l, x)
-            where
-                (t, l') = convertLHS l
-                undot structTf fields = case Map.lookup structTf structs of
-                    Nothing -> (fieldType, LHSDot l' x)
-                    Just (structT, m) -> (tf [tr], LHSRange l' NonIndexed r)
-                        where
-                            (tf, _) = typeRanges structT
-                            (r @ (hi, lo), base) = m Map.! x
-                            hi' = BinOp Add base $ BinOp Sub hi lo
-                            lo' = base
-                            tr = (simplify hi', simplify lo')
-                    where
-                        fieldType = lookupFieldType fields x
-        convertLHS (LHSConcat lhss) =
-            (Implicit Unspecified [], LHSConcat $ map (snd . convertLHS) lhss)
-        convertLHS (LHSStream o e lhss) =
-            (Implicit Unspecified [], LHSStream o e $ map (snd . convertLHS) lhss)
+                e = lhsToExpr l
+                (t, e') = convertSubExpr e
+                Just l' = exprToLHS e'
 
         specialTag = ':'
         defaultKey = specialTag : "default"
