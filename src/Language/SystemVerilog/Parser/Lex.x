@@ -32,6 +32,7 @@ module Language.SystemVerilog.Parser.Lex
 import System.FilePath (dropFileName)
 import System.Directory (findFile)
 import System.IO.Unsafe (unsafePerformIO)
+import Text.Read (readMaybe)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.List (span, elemIndex, dropWhileEnd)
@@ -732,21 +733,31 @@ dropWhitespace = do
                 else return()
         [] -> return ()
 
--- removes and returns a quoted string such as <foo.bar> or "foo.bar"
-takeQuotedString :: Alex String
-takeQuotedString = do
-    dropSpaces
-    ch <- takeChar
-    end <-
-        case ch of
-            '"' -> return '"'
-            '<' -> return '>'
-            _ -> lexicalError $ "bad beginning of include arg: " ++ (show ch)
-    rest <- takeThrough end
-    let res = ch : rest
-    if end == '>'
-        then lexicalError $ "library includes are not supported: " ++ res
-        else return res
+-- lex the remainder of the current line into tokens and return them, rather
+-- than storing them in the lexer state
+tokenizeLine :: Alex [Token]
+tokenizeLine = do
+    -- read in the rest of the current line
+    str <- takeUntilNewline
+    dropWhitespace
+    -- save the current lexer state
+    currInput <- alexGetInput
+    currFile <- getCurrentFile
+    currToks <- gets lsToks
+    -- parse the line into tokens (which includes macro processing)
+    modify $ \s -> s { lsToks = [] }
+    let newInput = (alexStartPos, ' ', [], str)
+    alexSetInput newInput
+    alexMonadScan
+    toks <- gets lsToks
+    -- return to the previous state
+    alexSetInput currInput
+    setCurrentFile currFile
+    modify $ \s -> s { lsToks = currToks }
+    -- remove macro boundary tokens and put the tokens in order
+    let isntMacroBoundary = \(Token t _ _ ) -> t /= MacroBoundary
+    let toks' = filter isntMacroBoundary toks
+    return $ reverse toks'
 
 -- removes and returns a decimal number
 takeNumber :: Alex Int
@@ -772,9 +783,9 @@ takeNumber = do
 peekChar :: Alex Char
 peekChar = do
     (_, _, _, str) <- alexGetInput
-    return $ if null str
-        then '\n'
-        else head str
+    if null str
+        then lexicalError "unexpected end of input"
+        else return $head str
 
 takeMacroDefinition :: Alex (String, [(String, Maybe String)])
 takeMacroDefinition = do
@@ -856,6 +867,7 @@ findUnescapedQuote ('`' : '\\' : '`' : '"' : rest) = ('\\' : '"' : start, end)
 findUnescapedQuote ('\\' : '"' : rest) = ('\\' : '"' : start, end)
     where (start, end) = findUnescapedQuote rest
 findUnescapedQuote ('"' : rest) = ("\"", rest)
+findUnescapedQuote ('`' : '"' : rest) = ("\"", rest)
 findUnescapedQuote (ch : rest) = (ch : start, end)
     where (start, end) = findUnescapedQuote rest
 
@@ -939,7 +951,10 @@ handleDirective (posOrig, _, _, strOrig) len = do
         "resetall" -> passThrough
 
         "begin_keywords" -> do
-            quotedSpec <- takeQuotedString
+            toks <- tokenizeLine
+            quotedSpec <- case toks of
+                [Token Lit_string str _] -> return str
+                _ -> lexicalError $ "unexpected tokens following `begin_keywords: " ++ show toks
             let spec = tail $ init quotedSpec
             case Map.lookup spec specMap of
                 Nothing ->
@@ -973,9 +988,16 @@ handleDirective (posOrig, _, _, strOrig) len = do
             alexMonadScan
 
         "line" -> do
-            lineNumber <- takeNumber
-            quotedFilename <- takeQuotedString
-            levelNumber <- takeNumber -- level, ignored
+            toks <- tokenizeLine
+            (lineNumber, quotedFilename, levelNumber) <-
+                case toks of
+                    [ Token Lit_number lineStr _,
+                      Token Lit_string filename _,
+                      Token Lit_number levelStr _] -> do
+                        let Just line = readMaybe lineStr :: Maybe Int
+                        let Just level = readMaybe levelStr :: Maybe Int
+                        return (line, filename, level)
+                    _ -> lexicalError $ "unexpected tokens following `begin_keywords: " ++ show toks
             let filename = init $ tail quotedFilename
             setCurrentFile filename
             (AlexPn f _ c, prev, _, str) <- alexGetInput
@@ -985,7 +1007,10 @@ handleDirective (posOrig, _, _, strOrig) len = do
                 else lexicalError "line directive invalid level number"
 
         "include" -> do
-            quotedFilename <- takeQuotedString
+            toks <- tokenizeLine
+            quotedFilename <- case toks of
+                [Token Lit_string str _] -> return str
+                _ -> lexicalError $ "unexpected tokens following `include: " ++ show toks
             inputFollow <- alexGetInput
             fileFollow <- getCurrentFile
             -- process the included file
