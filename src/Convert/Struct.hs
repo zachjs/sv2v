@@ -341,6 +341,15 @@ convertAsgn structs types (lhs, expr) =
                         isStruct (Struct{}) = True
                         isStruct _ = False
 
+        convertExpr (Struct packing fields (r : rs)) (Pattern items) =
+            if all null keys
+                then convertExpr (structTf (r : rs)) (Concat vals)
+                else Repeat (rangeSize r) [subExpr']
+            where
+                (keys, vals) = unzip items
+                subExpr = Pattern items
+                structTf = Struct packing fields
+                subExpr' = convertExpr (structTf rs) subExpr
         convertExpr (Struct packing fields (r : rs)) subExpr =
             Repeat (rangeSize r) [subExpr']
             where
