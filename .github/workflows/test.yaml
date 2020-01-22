@@ -1,6 +1,11 @@
-name: Test
-on: push
+name: Build and Test
+on:
+  push:
+  release:
+    types:
+      - created
 jobs:
+
   test:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -36,3 +41,52 @@ jobs:
         run: |
           export PATH="$PATH:$HOME/.local/bin"
           make test
+      - name: Prepare Artifact
+        if: github.event_name == 'release'
+        run: cp LICENSE NOTICE README.md bin
+      - name: Upload Artifact
+        if: github.event_name == 'release'
+        uses: actions/upload-artifact@v1
+        with:
+          name: ${{ runner.os }}
+          path: bin
+
+  release:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'release'
+    steps:
+      - run: sudo apt-get install -y tree
+      - name: Download Linux Artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: Linux
+          path: sv2v-Linux
+      - name: Download MacOS Artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: macOS
+          path: sv2v-macOS
+      - name: Create ZIPs
+        run: |
+          chmod +x */sv2v
+          zip -r sv2v-Linux ./sv2v-Linux
+          zip -r sv2v-macOS ./sv2v-macOS
+      - name: Upload Linux Release Asset
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./sv2v-Linux.zip
+          asset_name: sv2v-Linux.zip
+          asset_content_type: application/zip
+      - name: Upload MacOS Release Asset
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./sv2v-macOS.zip
+          asset_name: sv2v-macOS.zip
+          asset_content_type: application/zip
