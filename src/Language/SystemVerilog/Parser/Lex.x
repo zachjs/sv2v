@@ -787,6 +787,11 @@ peekChar = do
         then lexicalError "unexpected end of input"
         else return $head str
 
+atEOF :: Alex Bool
+atEOF = do
+    (_, _, _, str) <- alexGetInput
+    return $ null str
+
 takeMacroDefinition :: Alex (String, [(String, Maybe String)])
 takeMacroDefinition = do
     leadCh <- peekChar
@@ -1068,7 +1073,11 @@ handleDirective (posOrig, _, _, strOrig) len = do
         "define" -> do
             dropSpaces
             name <- takeString
-            defn <- takeMacroDefinition
+            defn <- do
+                eof <- atEOF
+                if eof
+                    then return ("", [])
+                    else takeMacroDefinition
             modify $ \s -> s { lsEnv = Map.insert name defn env }
             alexMonadScan
         "undef" -> do
