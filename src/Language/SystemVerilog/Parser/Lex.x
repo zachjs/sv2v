@@ -1002,7 +1002,10 @@ handleDirective (posOrig, _, _, strOrig) len = do
                         let Just line = readMaybe lineStr :: Maybe Int
                         let Just level = readMaybe levelStr :: Maybe Int
                         return (line, filename, level)
-                    _ -> lexicalError $ "unexpected tokens following `begin_keywords: " ++ show toks
+                    _ -> lexicalError $
+                            "unexpected tokens types following `line: "
+                            ++ show (map tokenName toks) ++ "; should be: "
+                            ++ show [Lit_number, Lit_string, Lit_number]
             let filename = init $ tail quotedFilename
             setCurrentFile filename
             (AlexPn f _ c, prev, _, str) <- alexGetInput

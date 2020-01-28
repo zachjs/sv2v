@@ -10,12 +10,16 @@ module Language.SystemVerilog.Parser.Tokens
     , TokenName (..)
     , Position  (..)
     , tokenString
+    , tokenName
     ) where
 
 import Text.Printf
 
 tokenString :: Token -> String
 tokenString (Token _ s _) = s
+
+tokenName :: Token -> TokenName
+tokenName (Token kw _ _) = kw
 
 data Position
     = Position String Int Int
