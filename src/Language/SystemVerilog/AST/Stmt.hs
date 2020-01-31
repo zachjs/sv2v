@@ -54,6 +54,7 @@ data Stmt
     | Continue
     | Break
     | Null
+    | CommentStmt String
     deriving Eq
 
 instance Show Stmt where
@@ -98,8 +99,15 @@ instance Show Stmt where
     show (Continue   ) = "continue;"
     show (Break      ) = "break;"
     show (Null       ) = ";"
+    show (CommentStmt c) =
+        if elem '\n' c
+            then "// " ++ show c
+            else "// " ++ c
 
 showBranch :: Stmt -> String
+showBranch (Block Seq "" [] [CommentStmt c, stmt]) =
+    '\n' : (indent $ unlines' $ map show stmts)
+    where stmts = [CommentStmt c, stmt]
 showBranch (block @ Block{}) = ' ' : show block
 showBranch stmt = '\n' : (indent $ show stmt)
 

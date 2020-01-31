@@ -194,8 +194,8 @@ traverseDeclM structs origDecl = do
             modify $ Map.insert x t
             e' <- convertDeclExpr x e
             return $ Param s t x e'
-        ParamType s x mt ->
-            return $ ParamType s x mt
+        ParamType{} -> return origDecl
+        CommentDecl{} -> return origDecl
     where
         convertDeclExpr :: Identifier -> Expr -> State Types Expr
         convertDeclExpr x e = do

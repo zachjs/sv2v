@@ -88,10 +88,11 @@ convertDescription ports orig =
             if null newItems
                 then Instance moduleName params instanceName rs bindings
                 else Generate $ map GenModuleItem $
-                    (MIPackageItem $ Comment "rewrote reg-to-output bindings") :
-                    newItems ++
+                    comment : newItems ++
                     [Instance moduleName params instanceName rs bindings']
             where
+                comment = MIPackageItem $ Decl $ CommentDecl
+                    "rewrote reg-to-output bindings"
                 (bindings', newItemsList) = unzip $ map fixBinding bindings
                 newItems = concat newItemsList
                 fixBinding :: PortBinding -> (PortBinding, [ModuleItem])

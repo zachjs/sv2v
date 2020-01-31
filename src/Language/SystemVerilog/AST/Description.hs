@@ -61,7 +61,6 @@ data PackageItem
     | Export (Maybe (Identifier, Maybe Identifier))
     | Decl Decl
     | Directive String
-    | Comment String
     deriving Eq
 
 instance Show PackageItem where
@@ -79,10 +78,6 @@ instance Show PackageItem where
     show (Export (Just (x, y))) = printf "export %s::%s;" x (fromMaybe "*" y)
     show (Decl decl) = show decl
     show (Directive str) = str
-    show (Comment c) =
-        if elem '\n' c
-            then "// " ++ show c
-            else "// " ++ c
 
 data PartKW
     = Module

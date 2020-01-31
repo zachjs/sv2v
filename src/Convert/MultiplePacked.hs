@@ -51,8 +51,7 @@ traverseDeclM (Variable dir t ident a me) = do
 traverseDeclM (Param s t ident e) = do
     t' <- traverseTypeM t [] ident
     return $ Param s t' ident e
-traverseDeclM (ParamType s ident mt) =
-    return $ ParamType s ident mt
+traverseDeclM other = return other
 
 traverseTypeM :: Type -> [Range] -> Identifier -> State Info Type
 traverseTypeM t a ident = do

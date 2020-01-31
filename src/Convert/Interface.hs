@@ -191,6 +191,7 @@ prefixModuleItems prefix =
         prefixDecl (Variable d t x a me) = Variable d t (prefix ++ x) a me
         prefixDecl (Param    s t x    e) = Param    s t (prefix ++ x)    e
         prefixDecl (ParamType  s x   mt) = ParamType  s (prefix ++ x)   mt
+        prefixDecl (CommentDecl       c) = CommentDecl                   c
         prefixExpr :: Expr -> Expr
         prefixExpr (Ident x) = Ident (prefix ++ x)
         prefixExpr other = other
@@ -229,12 +230,15 @@ lookupType _ expr =
 -- convert an interface instantiation into a series of equivalent module items
 inlineInterface :: Interface -> (Identifier, [ParamBinding], [PortBinding]) -> [ModuleItem]
 inlineInterface (ports, items) (instanceName, instanceParams, instancePorts) =
-    (:) (MIPackageItem $ Comment $ "expanded instance: " ++ instanceName) $
+    (:) comment $
     flip (++) portBindings $
     map (traverseNestedModuleItems removeModport) $
     map (traverseNestedModuleItems removeDeclDir) $
     itemsPrefixed
     where
+        comment = MIPackageItem $ Decl $ CommentDecl $
+            "expanded instance: " ++ instanceName
+
         prefix = instanceName ++ "_"
         itemsPrefixed =
             map (prefixModuleItems prefix) $
@@ -257,7 +261,7 @@ inlineInterface (ports, items) (instanceName, instanceParams, instancePorts) =
         removeDeclDir other = other
         removeModport :: ModuleItem -> ModuleItem
         removeModport (Modport x _) =
-            MIPackageItem $ Comment $ "removed modport " ++ x
+            MIPackageItem $ Decl $ CommentDecl $ "removed modport " ++ x
         removeModport other = other
 
         instanceParamMap = Map.fromList instanceParams

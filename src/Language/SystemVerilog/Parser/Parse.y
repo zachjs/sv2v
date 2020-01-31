@@ -11,15 +11,18 @@
  - the ability to easily blame/diff this file.
  -}
 {
+{-# LANGUAGE BlockArguments #-}
 module Language.SystemVerilog.Parser.Parse (parse) where
 
 import Control.Monad.Except
+import Control.Monad.State
 import Language.SystemVerilog.AST
 import Language.SystemVerilog.Parser.ParseDecl
 import Language.SystemVerilog.Parser.Tokens
 }
 
-%monad { ExceptT String IO }
+%monad { ParseState }
+%lexer { positionKeep } { TokenEOF }
 %name parse
 %tokentype { Token }
 %error { parseError }
@@ -586,40 +589,31 @@ Identifiers :: { [Identifier] }
 
 -- uses delimiter propagation hack to avoid conflicts
 DeclTokens(delim) :: { [DeclToken] }
-  : DeclToken                  delim  { [$1] }
-  | DeclToken       DeclTokens(delim) { [$1] ++ $2 }
-  | AsgnOp Expr "," DeclTokens(delim) { [DTAsgn $1 $2, DTComma] ++ $4 }
-  | AsgnOp Expr                delim  { [DTAsgn $1 $2] }
+  : DeclToken                           delim  { [$1] }
+  | DeclToken                DeclTokens(delim) { [$1] ++ $2 }
+  | Identifier ParamBindings DeclTokens(delim) {% posInject \p -> [DTIdent p $1, DTParams p $2] ++ $3 }
+  | AsgnOp Expr ","          DeclTokens(delim) {% posInject \p -> [DTAsgn p $1 $2, DTComma p] ++ $4 }
+  | AsgnOp Expr                         delim  {% posInject \p -> [DTAsgn p $1 $2] }
 DeclToken :: { DeclToken }
-  : DeclOrStmtToken   { $1 }
-  | ParameterBindings { DTParams   $1 }
-
-DeclOrStmtTokens(delim) :: { [DeclToken] }
-  : DeclOrStmtToken                  delim  { [$1] }
-  | DeclOrStmtToken DeclOrStmtTokens(delim) { [$1] ++ $2 }
-  | AsgnOp Expr "," DeclOrStmtTokens(delim) { [DTAsgn $1 $2, DTComma] ++ $4 }
-  | AsgnOp Expr                      delim  { [DTAsgn $1 $2] }
-  | IncOrDecOperator                 delim  { [DTAsgn (AsgnOp $1) (Number "1")] }
-  | "<=" opt(DelayOrEventControl) Expr "," DeclOrStmtTokens(delim) { [DTAsgnNBlk $2 $3, DTComma] ++ $5 }
-  | "<=" opt(DelayOrEventControl) Expr                      delim  { [DTAsgnNBlk $2 $3] }
-DeclOrStmtToken :: { DeclToken }
-  : ","            { DTComma }
-  | "[" "]"        { DTAutoDim }
-  | PartSelect     { DTRange    $1 }
-  | Identifier     { DTIdent    $1 }
-  | Direction      { DTDir      $1 }
-  | "[" Expr "]"   { DTBit      $2 }
-  | LHSConcat      { DTConcat   $1 }
-  | PartialType    { DTType     $1 }
-  | "." Identifier { DTDot      $2 }
-  | PortBindings   { DTInstance $1 }
-  | Signing        { DTSigning  $1 }
-  | ExplicitLifetime { DTLifetime $1 }
-  | Identifier "::" Identifier { DTPSIdent $1 $3 }
-  | "const" PartialType { DTType $2 }
-  | "{" StreamOp StreamSize Concat "}" { DTStream $2 $3           (map toLHS $4) }
-  | "{" StreamOp            Concat "}" { DTStream $2 (Number "1") (map toLHS $3) }
-  | opt("var") "type" "(" Expr ")" { DTType $ \Unspecified -> \[] -> TypeOf $4 }
+  : ","                                {% posInject \p -> DTComma    p }
+  | "[" "]"                            {% posInject \p -> DTAutoDim  p }
+  | PartSelect                         {% posInject \p -> DTRange    p $1 }
+  | Identifier                         {% posInject \p -> DTIdent    p $1 }
+  | Direction                          {% posInject \p -> DTDir      p $1 }
+  | "[" Expr "]"                       {% posInject \p -> DTBit      p $2 }
+  | LHSConcat                          {% posInject \p -> DTConcat   p $1 }
+  | PartialType                        {% posInject \p -> DTType     p $1 }
+  | "." Identifier                     {% posInject \p -> DTDot      p $2 }
+  | PortBindings                       {% posInject \p -> DTInstance p $1 }
+  | Signing                            {% posInject \p -> DTSigning  p $1 }
+  | ExplicitLifetime                   {% posInject \p -> DTLifetime p $1 }
+  | "const" PartialType                {% posInject \p -> DTType     p $2 }
+  | Identifier "::" Identifier         {% posInject \p -> DTPSIdent  p $1 $3 }
+  | "{" StreamOp StreamSize Concat "}" {% posInject \p -> DTStream   p $2 $3           (map toLHS $4) }
+  | "{" StreamOp            Concat "}" {% posInject \p -> DTStream   p $2 (Number "1") (map toLHS $3) }
+  | opt("var") "type" "(" Expr ")"     {% posInject \p -> DTType     p (\Unspecified -> \[] -> TypeOf $4) }
+  | "<=" opt(DelayOrEventControl) Expr {% posInject \p -> DTAsgnNBlk p $2 $3 }
+  | IncOrDecOperator                   {% posInject \p -> DTAsgn     p (AsgnOp $1) (Number "1") }
 
 VariablePortIdentifiers :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifier                             { [$1] }
@@ -634,9 +628,9 @@ Direction :: { Direction }
   | "output" { Output }
 
 ModuleItems :: { [ModuleItem] }
-  : {- empty -}            { [] }
-  | ModuleItems ModuleItem { $1 ++ $2 }
-  | ModuleItems ";"        { $1 }
+  : {- empty -}                    { [] }
+  | ModuleItems MITrace ModuleItem { $1 ++ [$2] ++ $3 }
+  | ModuleItems ";"                { $1 }
 
 ModuleItem :: { [ModuleItem] }
   : NonGenerateModuleItem { $1 }
@@ -768,9 +762,9 @@ LHSAsgn :: { (LHS, Expr) }
   : LHS "=" Expr { ($1, $3) }
 
 PackageItems :: { [PackageItem] }
-  : {- empty -}              { [] }
-  | PackageItems ";"         { $1 }
-  | PackageItems PackageItem { $1 ++ $2 }
+  : {- empty -}                      { [] }
+  | PackageItems ";"                 { $1 }
+  | PackageItems PITrace PackageItem { $1 ++ [$2] ++ $3 }
 PackageItem :: { [PackageItem] }
   : DeclTokens(";")    { map Decl $ parseDTsAsDecls $1 }
   | ParameterDecl(";") { map Decl $1 }
@@ -888,7 +882,7 @@ PortBinding :: { PortBinding }
   | Expr                             { ("", Just $1) }
   | ".*"                             { ("*", Nothing) }
 
-ParameterBindings :: { [ParamBinding] }
+ParamBindings :: { [ParamBinding] }
   : "#" "(" ParamBindingsInside ")" { $3 }
 ParamBindingsInside :: { [ParamBinding] }
   : ParamBinding                         { [$1] }
@@ -903,12 +897,13 @@ Stmts :: { [Stmt] }
   | Stmts Stmt  { $1 ++ [$2] }
 
 Stmt :: { Stmt }
-  : StmtAsgn    { $1 }
-  | StmtNonAsgn { $1 }
+  : StmtTrace StmtAsgn    { Block Seq "" [] [$1, $2] }
+  | StmtTrace StmtNonAsgn { $2 }
 
 StmtAsgn :: { Stmt }
   : LHS AsgnOp Expr ";"                        { AsgnBlk $2 $1 $3 }
   | LHS IncOrDecOperator ";"                   { AsgnBlk (AsgnOp $2) $1 (Number "1") }
+  | IncOrDecOperator LHS ";"                   { AsgnBlk (AsgnOp $1) $2 (Number "1") }
   | LHS "<=" opt(DelayOrEventControl) Expr ";" { Asgn $3 $1 $4 }
   | LHS          ";" { Subroutine (lhsToExpr $1) (Args [] []) }
   | LHS CallArgs ";" { Subroutine (lhsToExpr $1) $2 }
@@ -940,7 +935,6 @@ StmtNonBlock :: { Stmt }
   | "->>" Identifier ";"                       { Trigger False $2 }
   | AttributeInstance Stmt                     { StmtAttr $1 $2 }
   | ProceduralAssertionStatement               { Assertion $1 }
-  | IncOrDecOperator LHS ";"                   { AsgnBlk (AsgnOp $1) $2 (Number "1") }
   | "void" "'" "(" Expr CallArgs ")" ";"       { Subroutine $4 $5 }
 
 BlockKWPar :: { BlockKW }
@@ -980,12 +974,12 @@ IdxVarsInside :: { [Maybe Identifier] }
   | opt(Identifier) "," IdxVarsInside { $1 : $3 }
 
 DeclsAndStmts :: { ([Decl], [Stmt]) }
-  : DeclOrStmt DeclsAndStmts { combineDeclsAndStmts $1 $2 }
-  | StmtNonAsgn Stmts        { ([], $1 : $2) }
-  | {- empty -}              { ([], []) }
+  : StmtTrace DeclOrStmt DeclsAndStmts { combineDeclsAndStmts $2 $3 }
+  | StmtTrace StmtNonAsgn Stmts        { ([], $1 : $2 : $3) }
+  | StmtTrace {- empty -}              { ([], []) }
 DeclOrStmt :: { ([Decl], [Stmt]) }
-  : DeclOrStmtTokens(";") { parseDTsAsDeclOrAsgn $1 }
-  | ParameterDecl(";")    { ($1, []) }
+  : DeclTokens(";")    { parseDTsAsDeclOrStmt $1 }
+  | ParameterDecl(";") { ($1, []) }
 
 ModuleParameterDecl(delim) :: { [Decl] }
   :    ParameterDecl(delim) { $1 }
@@ -1271,12 +1265,40 @@ DimFn :: { DimFn }
   | "$increment"           { FnIncrement          }
   | "$size"                { FnSize               }
 
+MITrace :: { ModuleItem }
+  : PITrace { MIPackageItem $1 }
+PITrace :: { PackageItem }
+  : Trace { Decl $ CommentDecl $1 }
+StmtTrace :: { Stmt }
+  : Trace { CommentStmt $1 }
+Trace :: { String }
+  : position { "Trace: " ++ show $1 }
+position :: { Position }
+  : {- empty -} {% gets fst }
+
 {
 
-parseError :: [Token] -> ExceptT String IO a
+type ParseState = StateT (Position, [Token]) (ExceptT String IO)
+
+posInject :: (Position -> a) -> ParseState a
+posInject cont = do
+  pos <- gets fst
+  return $ cont pos
+
+positionKeep :: (Token -> ParseState a) -> ParseState a
+positionKeep cont = do
+  tokens <- gets snd
+  case tokens of
+    [] -> cont TokenEOF
+    tok : toks -> do
+      put (tokenPosition tok, toks)
+      cont tok
+
+parseError :: Token -> ParseState a
 parseError a = case a of
-  []              -> throwError $ "Parse error: no tokens left to parse."
-  Token t s p : _ -> throwError $ show p ++ ": Parse error: unexpected token '" ++ s ++ "' (" ++ show t ++ ")."
+  TokenEOF    -> throwError $ "Parse error: no tokens left to parse."
+  Token t s p -> throwError $ show p ++ ": Parse error: unexpected token '"
+                  ++ s ++ "' (" ++ show t ++ ")."
 
 genItemsToGenItem :: [GenItem] -> GenItem
 genItemsToGenItem [x] = x
@@ -1288,6 +1310,7 @@ combineDeclsAndStmts (a1, b1) (a2, b2) = (a1 ++ a2, b1 ++ b2)
 makeInput :: Decl -> Decl
 makeInput (Variable Local t x a me) = Variable Input t x a me
 makeInput (Variable Input t x a me) = Variable Input t x a me
+makeInput (CommentDecl c) = CommentDecl c
 makeInput other =
   error $ "unexpected non-var or non-input decl: " ++ (show other)
 

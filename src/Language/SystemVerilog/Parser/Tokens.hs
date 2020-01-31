@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {- sv2v
  - Author: Tom Hawkins <tomahawkins@gmail.com>
  - Modified by: Zachary Snow <zach@zachjs.com>
@@ -11,6 +12,8 @@ module Language.SystemVerilog.Parser.Tokens
     , Position  (..)
     , tokenString
     , tokenName
+    , tokenPosition
+    , pattern TokenEOF
     ) where
 
 import Text.Printf
@@ -20,6 +23,12 @@ tokenString (Token _ s _) = s
 
 tokenName :: Token -> TokenName
 tokenName (Token kw _ _) = kw
+
+tokenPosition :: Token -> Position
+tokenPosition (Token _ _ pos) = pos
+
+pattern TokenEOF :: Token
+pattern TokenEOF = Token MacroBoundary "" (Position "" 0 0)
 
 data Position
     = Position String Int Int

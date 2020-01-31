@@ -53,7 +53,8 @@ traverseDeclM decl = do
         Param    _ t ident   _ -> do
             modify $ Map.insert ident t
             return decl'
-        ParamType    _     _ _ -> return decl'
+        ParamType{} -> return decl'
+        CommentDecl{} -> return decl'
 
 traverseModuleItemM :: ModuleItem -> State Info ModuleItem
 traverseModuleItemM item = traverseTypesM traverseTypeM item

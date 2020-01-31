@@ -131,7 +131,7 @@ traverseModuleItemsM mapper (Part attrs extern kw lifetime name ports items) = d
             let genItems' = filter (/= GenNull) genItems
             mapM fullGenItemMapper genItems' >>= mapper . Generate
         fullMapper (MIAttr attr mi) =
-            fullMapper mi >>= return . MIAttr attr
+            fullMapper mi >>= mapper . MIAttr attr
         fullMapper other = mapper other
         fullGenItemMapper = traverseNestedGenItemsM genItemMapper
         genItemMapper (GenModuleItem moduleItem) = do
@@ -264,6 +264,7 @@ traverseSinglyNestedStmtsM fullMapper = cs
         cs (Continue) = return Continue
         cs (Break) = return Break
         cs (Null) = return Null
+        cs (CommentStmt c) = return $ CommentStmt c
 
 traverseAssertionStmtsM :: Monad m => MapperM m Stmt -> MapperM m Assertion
 traverseAssertionStmtsM mapper = assertionMapper
@@ -548,6 +549,8 @@ exprMapperHelpers exprMapper =
         a' <- mapM rangeMapper a
         me' <- maybeExprMapper me
         return $ Variable d t' x a' me'
+    declMapper (CommentDecl c) =
+        return $ CommentDecl c
 
     lhsMapper (LHSRange l m r) =
         rangeMapper r >>= return . LHSRange l m
@@ -640,8 +643,6 @@ traverseExprsM' strat exprMapper = moduleItemMapper
         return $ Generate items'
     moduleItemMapper (MIPackageItem (Directive c)) =
         return $ MIPackageItem $ Directive c
-    moduleItemMapper (MIPackageItem (Comment c)) =
-        return $ MIPackageItem $ Comment c
     moduleItemMapper (MIPackageItem (Import x y)) =
         return $ MIPackageItem $ Import x y
     moduleItemMapper (MIPackageItem (Export x)) =
@@ -744,6 +745,7 @@ traverseStmtExprsM exprMapper = flatStmtMapper
     flatStmtMapper (Continue) = return Continue
     flatStmtMapper (Break) = return Break
     flatStmtMapper (Null) = return Null
+    flatStmtMapper (CommentStmt c) = return $ CommentStmt c
 
     initsMapper (Left decls) = mapM declMapper decls >>= return . Left
     initsMapper (Right asgns) = mapM mapper asgns >>= return . Right
@@ -926,6 +928,7 @@ traverseTypesM mapper item =
             maybeMapper mt >>= \mt' -> return $ ParamType s x mt'
         declMapper (Variable d t x a me) =
             fullMapper t >>= \t' -> return $ Variable d t' x a me
+        declMapper (CommentDecl c) = return $ CommentDecl c
         miMapper (MIPackageItem (Typedef t x)) =
             fullMapper t >>= \t' -> return $ MIPackageItem $ Typedef t' x
         miMapper (MIPackageItem (Function l t x d s)) =

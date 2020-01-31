@@ -6,10 +6,12 @@ module Language.SystemVerilog.Parser
     ) where
 
 import Control.Monad.Except
+import Control.Monad.State
 import qualified Data.Map.Strict as Map
 import Language.SystemVerilog.AST (AST)
 import Language.SystemVerilog.Parser.Lex (lexFile, Env)
 import Language.SystemVerilog.Parser.Parse (parse)
+import Language.SystemVerilog.Parser.Tokens (Position(..), tokenPosition)
 
 -- parses a compilation unit given include search paths and predefined macros
 parseFiles :: [FilePath] -> [(String, String)] -> Bool -> [FilePath] -> IO (Either String [AST])
@@ -32,5 +34,9 @@ parseFile' :: [String] -> Env -> FilePath -> ExceptT String IO (AST, Env)
 parseFile' includePaths env path = do
     result <- liftIO $ lexFile includePaths env path
     (tokens, env') <- liftEither result
-    ast <- parse tokens
+    let position =
+            if null tokens
+                then Position path 1 1
+                else tokenPosition $ head tokens
+    ast <- evalStateT parse (position, tokens)
     return (ast, env')

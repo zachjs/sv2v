@@ -15,7 +15,7 @@ convert = map $ traverseDescriptions $ traverseModuleItems convertModuleItem
 convertModuleItem :: ModuleItem -> ModuleItem
 convertModuleItem (AssertionItem item) =
     Generate $
-    map (GenModuleItem . MIPackageItem . Comment) $
+    map (GenModuleItem . MIPackageItem . Decl . CommentDecl) $
         "removed an assertion item" :
         (lines $ show $ AssertionItem item)
 convertModuleItem other = traverseStmts convertStmt other

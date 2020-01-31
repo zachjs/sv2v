@@ -45,6 +45,7 @@ traverseDeclM decl = do
         Variable _ t x _ _ -> modify $ Map.insert x t
         Param    _ t x   _ -> modify $ Map.insert x t
         ParamType    _ _ _ -> return ()
+        CommentDecl      _ -> return ()
     return decl
 
 traverseModuleItemM :: ModuleItem -> ST ModuleItem

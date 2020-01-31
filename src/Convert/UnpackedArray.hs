@@ -45,10 +45,7 @@ traverseDeclM (orig @ (Variable dir _ x _ me)) = do
         then lift $ tell $ Set.singleton orig
         else return ()
     return orig
-traverseDeclM (orig @ (Param _ _ _ _)) =
-    return orig
-traverseDeclM (orig @ (ParamType _ _ _)) =
-    return orig
+traverseDeclM other = return other
 
 -- pack the given decls marked for packing
 packDecl :: DeclSet -> Decl -> Decl
@@ -59,8 +56,7 @@ packDecl decls (orig @ (Variable d t x a me)) = do
             let t' = tf $ a ++ rs
             Variable d t' x [] me
         else orig
-packDecl _ (orig @ Param{}) = orig
-packDecl _ (orig @ ParamType{}) = orig
+packDecl _ other = other
 
 
 traverseModuleItemM :: ModuleItem -> ST ModuleItem

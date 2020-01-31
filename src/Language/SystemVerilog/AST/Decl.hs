@@ -23,6 +23,7 @@ data Decl
     = Param     ParamScope Type Identifier Expr
     | ParamType ParamScope Identifier (Maybe Type)
     | Variable   Direction Type Identifier [Range] (Maybe Expr)
+    | CommentDecl String
     deriving (Eq, Ord)
 
 instance Show Decl where
@@ -30,6 +31,10 @@ instance Show Decl where
     show (Param s t x e) = printf "%s %s%s = %s;" (show s) (showPad t) x (show e)
     show (ParamType s x mt) = printf "%s type %s%s;" (show s) x (showAssignment mt)
     show (Variable d t x a me) = printf "%s%s%s%s%s;" (showPad d) (showPad t) x (showRanges a) (showAssignment me)
+    show (CommentDecl c) =
+        if elem '\n' c
+            then "// " ++ show c
+            else "// " ++ c
 
 data Direction
     = Input

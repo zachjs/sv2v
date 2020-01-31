@@ -30,7 +30,7 @@ convert =
         getTypedef _ = return ()
         removeTypedef :: Description -> Description
         removeTypedef (PackageItem (Typedef _ x)) =
-            PackageItem $ Comment $ "removed typedef: " ++ x
+            PackageItem $ Decl $ CommentDecl $ "removed typedef: " ++ x
         removeTypedef other = other
 
 convertDescription :: Types -> Description -> Description
@@ -48,7 +48,7 @@ convertDescription globalTypes description =
         getTypedef _ = return ()
         removeTypedef :: ModuleItem -> ModuleItem
         removeTypedef (MIPackageItem (Typedef _ x)) =
-            MIPackageItem $ Comment $ "removed typedef: " ++ x
+            MIPackageItem $ Decl $ CommentDecl  $ "removed typedef: " ++ x
         removeTypedef other = other
         convertTypeOrExpr :: TypeOrExpr -> TypeOrExpr
         convertTypeOrExpr (Left (TypeOf (Ident x))) =

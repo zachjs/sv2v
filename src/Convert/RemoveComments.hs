@@ -15,12 +15,49 @@ convert = map convertFile
 convertFile :: AST -> AST
 convertFile =
     traverseDescriptions (traverseModuleItems convertModuleItem) .
-    filter (not . isComment)
+    filter (not . isTopLevelComment)
 
-isComment :: Description -> Bool
-isComment (PackageItem (Comment _)) = True
-isComment _ = False
+isTopLevelComment :: Description -> Bool
+isTopLevelComment (PackageItem (Decl CommentDecl{})) = True
+isTopLevelComment _ = False
 
 convertModuleItem :: ModuleItem -> ModuleItem
-convertModuleItem (MIPackageItem (Comment _)) = Generate []
-convertModuleItem other = other
+convertModuleItem (MIAttr _ (Generate [])) = Generate []
+convertModuleItem (MIPackageItem (Decl CommentDecl{})) = Generate []
+convertModuleItem (MIPackageItem item) =
+    MIPackageItem $ convertPackageItem item
+convertModuleItem other =
+    traverseStmts (traverseNestedStmts convertStmt) other
+
+convertPackageItem :: PackageItem -> PackageItem
+convertPackageItem (Function l t x decls stmts) =
+    Function l t x decls' stmts'
+    where
+        decls' = convertDecls decls
+        stmts' = convertStmts stmts
+convertPackageItem (Task     l   x decls stmts) =
+    Task     l   x decls' stmts'
+    where
+        decls' = convertDecls decls
+        stmts' = convertStmts stmts
+convertPackageItem other = other
+
+convertStmt :: Stmt -> Stmt
+convertStmt (CommentStmt _) = Null
+convertStmt (Block kw name decls stmts) =
+    Block kw name decls' stmts
+    where decls' = convertDecls decls
+convertStmt (For (Left decls) cond incr stmt) =
+    For (Left decls') cond incr stmt
+    where decls' = convertDecls decls
+convertStmt other = other
+
+convertDecls :: [Decl] -> [Decl]
+convertDecls = filter (not . isCommentDecl)
+    where
+        isCommentDecl :: Decl -> Bool
+        isCommentDecl CommentDecl{} = True
+        isCommentDecl _ = False
+
+convertStmts :: [Stmt] -> [Stmt]
+convertStmts = map $ traverseNestedStmts convertStmt
