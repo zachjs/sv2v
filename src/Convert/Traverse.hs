@@ -630,14 +630,16 @@ traverseExprsM' strat exprMapper = moduleItemMapper
         return $ Instance m p' x r' l'
     moduleItemMapper (Modport x l) =
         mapM modportDeclMapper l >>= return . Modport x
-    moduleItemMapper (NInputGate  kw x lhs exprs) = do
+    moduleItemMapper (NInputGate  kw d x lhs exprs) = do
+        d' <- maybeExprMapper d
         exprs' <- mapM exprMapper exprs
         lhs' <- lhsMapper lhs
-        return $ NInputGate kw x lhs' exprs'
-    moduleItemMapper (NOutputGate kw x lhss expr) = do
+        return $ NInputGate kw d' x lhs' exprs'
+    moduleItemMapper (NOutputGate kw d x lhss expr) = do
+        d' <- maybeExprMapper d
         lhss' <- mapM lhsMapper lhss
         expr' <- exprMapper expr
-        return $ NOutputGate kw x lhss' expr'
+        return $ NOutputGate kw d' x lhss' expr'
     moduleItemMapper (Genvar   x) = return $ Genvar   x
     moduleItemMapper (Generate items) = do
         items' <- mapM (traverseNestedGenItemsM genItemMapper) items
@@ -769,12 +771,12 @@ traverseLHSsM' strat mapper item =
         traverseModuleItemLHSsM (Defparam lhs expr) = do
             lhs' <- mapper lhs
             return $ Defparam lhs' expr
-        traverseModuleItemLHSsM (NOutputGate kw x lhss expr) = do
+        traverseModuleItemLHSsM (NOutputGate kw d x lhss expr) = do
             lhss' <- mapM mapper lhss
-            return $ NOutputGate kw x lhss' expr
-        traverseModuleItemLHSsM (NInputGate  kw x lhs exprs) = do
+            return $ NOutputGate kw d x lhss' expr
+        traverseModuleItemLHSsM (NInputGate  kw d x lhs exprs) = do
             lhs' <- mapper lhs
-            return $ NInputGate kw x lhs' exprs
+            return $ NInputGate kw d x lhs' exprs
         traverseModuleItemLHSsM (AssertionItem (mx, a)) = do
             converted <-
                 traverseNestedStmtsM (traverseStmtLHSsM mapper) (Assertion a)

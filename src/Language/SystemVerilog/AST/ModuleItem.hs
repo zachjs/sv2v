@@ -28,7 +28,7 @@ import Language.SystemVerilog.AST.Description (PackageItem)
 import Language.SystemVerilog.AST.Expr (Expr(Ident, Nil), Range, TypeOrExpr, showRanges)
 import Language.SystemVerilog.AST.GenItem (GenItem)
 import Language.SystemVerilog.AST.LHS (LHS)
-import Language.SystemVerilog.AST.Stmt (Stmt, AssertionItem)
+import Language.SystemVerilog.AST.Stmt (Stmt, AssertionItem, Timing(Delay))
 import Language.SystemVerilog.AST.Type (Identifier)
 
 data ModuleItem
@@ -43,8 +43,8 @@ data ModuleItem
     | Initial    Stmt
     | Final      Stmt
     | MIPackageItem PackageItem
-    | NInputGate  NInputGateKW  (Maybe Identifier)  LHS [Expr]
-    | NOutputGate NOutputGateKW (Maybe Identifier) [LHS] Expr
+    | NInputGate  NInputGateKW  (Maybe Expr) Identifier  LHS [Expr]
+    | NOutputGate NOutputGateKW (Maybe Expr) Identifier [LHS] Expr
     | AssertionItem AssertionItem
     deriving Eq
 
@@ -58,8 +58,10 @@ instance Show ModuleItem where
     show (Modport     x l) = printf "modport %s(\n%s\n);" x (indent $ intercalate ",\n" $ map showModportDecl l)
     show (Initial     s  ) = printf "initial %s" (show s)
     show (Final       s  ) = printf   "final %s" (show s)
-    show (NInputGate  kw x lhs exprs) = printf "%s%s (%s, %s);" (show kw) (maybe "" (" " ++) x) (show lhs) (commas $ map show exprs)
-    show (NOutputGate kw x lhss expr) = printf "%s%s (%s, %s);" (show kw) (maybe "" (" " ++) x) (commas $ map show lhss) (show expr)
+    show (NInputGate  kw d x lhs exprs) =
+        showGate kw d x $ show lhs : map show exprs
+    show (NOutputGate kw d x lhss expr) =
+        showGate kw d x $ (map show lhss) ++ [show expr]
     show (Assign d a b) =
         printf "assign %s%s = %s;" delayStr (show a) (show b)
         where delayStr = maybe "" (\e -> "#(" ++ show e ++ ") ") d
@@ -82,6 +84,13 @@ showPort (i, arg) =
     if i == ""
         then show (fromJust arg)
         else printf ".%s(%s)" i (if isJust arg then show $ fromJust arg else "")
+
+showGate :: Show k => k -> Maybe Expr -> Identifier -> [String] -> String
+showGate kw d x args =
+    printf "%s %s%s(%s);" (show kw) delayStr nameStr (commas args)
+    where
+        delayStr = maybe "" (showPad . Delay) d
+        nameStr = showPad $ Ident x
 
 showParams :: [ParamBinding] -> String
 showParams params = indentedParenList $ map showParam params

@@ -16,6 +16,7 @@ module Language.SystemVerilog.Parser.Parse (parse) where
 
 import Control.Monad.Except
 import Control.Monad.State
+import Data.Maybe (fromMaybe)
 import Language.SystemVerilog.AST
 import Language.SystemVerilog.Parser.ParseDecl
 import Language.SystemVerilog.Parser.Tokens
@@ -649,8 +650,8 @@ NonGenerateModuleItem :: { [ModuleItem] }
   | "genvar" Identifiers ";"             { map Genvar $2 }
   | "modport" ModportItems ";"           { map (uncurry Modport) $2 }
   | NonDeclPackageItem                   { map MIPackageItem $1 }
-  | NInputGateKW  NInputGates  ";"       { map (\(a, b, c) -> NInputGate  $1 a b c) $2 }
-  | NOutputGateKW NOutputGates ";"       { map (\(a, b, c) -> NOutputGate $1 a b c) $2 }
+  | NInputGateKW  NInputGates  ";"       { map (\(a, b, c, d) -> NInputGate  $1 a b c d) $2 }
+  | NOutputGateKW NOutputGates ";"       { map (\(a, b, c, d) -> NOutputGate $1 a b c d) $2 }
   | AttributeInstance ModuleItem         { map (MIAttr $1) $2 }
   | AssertionItem                        { [AssertionItem $1] }
 
@@ -729,17 +730,17 @@ AttrSpec :: { AttrSpec }
   : Identifier "=" Expr { ($1, Just $3) }
   | Identifier          { ($1, Nothing) }
 
-NInputGates :: { [(Maybe Identifier, LHS, [Expr])] }
+NInputGates :: { [(Maybe Expr, Identifier, LHS, [Expr])] }
   : NInputGate                 { [$1] }
   | NInputGates "," NInputGate { $1 ++ [$3]}
-NOutputGates :: { [(Maybe Identifier, [LHS], Expr)] }
+NOutputGates :: { [(Maybe Expr, Identifier, [LHS], Expr)] }
   : NOutputGate                  { [$1] }
   | NOutputGates "," NOutputGate { $1 ++ [$3]}
 
-NInputGate :: { (Maybe Identifier, LHS, [Expr]) }
-  : opt(Identifier) "(" LHS "," Exprs ")" { ($1, $3, $5) }
-NOutputGate :: { (Maybe Identifier, [LHS], Expr) }
-  : opt(Identifier) "(" NOutputGateItems { ($1, fst $3, snd $3) }
+NInputGate :: { (Maybe Expr, Identifier, LHS, [Expr]) }
+  : opt(DelayControl) opt(Identifier) "(" LHS "," Exprs ")" { ($1, fromMaybe "" $2, $4, $6) }
+NOutputGate :: { (Maybe Expr, Identifier, [LHS], Expr) }
+  : opt(DelayControl) opt(Identifier) "(" NOutputGateItems { ($1, fromMaybe "" $2, fst $4, snd $4) }
 NOutputGateItems :: { ([LHS], Expr) }
   : Expr ")" { ([], $1) }
   | Expr "," NOutputGateItems { (fst $3 ++ [toLHS $1], snd $3) }
