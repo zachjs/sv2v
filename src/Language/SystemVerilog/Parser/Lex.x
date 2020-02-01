@@ -918,6 +918,34 @@ defaultMacroArgs (f : fs) (a : as) = do
 unskippableDirectives :: [String]
 unskippableDirectives = ["else", "elsif", "endif", "ifdef", "ifndef"]
 
+-- list of all of the supported directive names; used to prevent defining macros
+-- with illegal names
+directives :: [String]
+directives =
+    [ "timescale"
+    , "celldefine"
+    , "endcelldefine"
+    , "unconnected_drive"
+    , "nounconnected_drive"
+    , "default_nettype"
+    , "pragma"
+    , "resetall"
+    , "begin_keywords"
+    , "end_keywords"
+    , "__FILE__"
+    , "__LINE__"
+    , "line"
+    , "include"
+    , "ifdef"
+    , "ifndef"
+    , "else"
+    , "elsif"
+    , "endif"
+    , "define"
+    , "undef"
+    , "undefineall"
+    ]
+
 handleDirective :: Action
 handleDirective (posOrig, _, _, strOrig) len = do
     let thisTokenStr = take len strOrig
@@ -1075,7 +1103,11 @@ handleDirective (posOrig, _, _, strOrig) len = do
 
         "define" -> do
             dropSpaces
-            name <- takeString
+            name <- do
+                str <- takeString
+                if elem str directives
+                    then lexicalError $ "illegal macro name: " ++ str
+                    else return str
             defn <- do
                 eof <- atEOF
                 if eof
