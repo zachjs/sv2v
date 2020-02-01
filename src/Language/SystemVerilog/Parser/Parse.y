@@ -593,8 +593,8 @@ DeclTokens(delim) :: { [DeclToken] }
   : DeclToken                           delim  { [$1] }
   | DeclToken                DeclTokens(delim) { [$1] ++ $2 }
   | Identifier ParamBindings DeclTokens(delim) {% posInject \p -> [DTIdent p $1, DTParams p $2] ++ $3 }
-  | AsgnOp Expr ","          DeclTokens(delim) {% posInject \p -> [DTAsgn p $1 $2, DTComma p] ++ $4 }
-  | AsgnOp Expr                         delim  {% posInject \p -> [DTAsgn p $1 $2] }
+  | DeclTokenAsgn ","        DeclTokens(delim) {% posInject \p -> [$1, DTComma p] ++ $3 }
+  | DeclTokenAsgn                       delim  {% posInject \p -> [$1] }
 DeclToken :: { DeclToken }
   : ","                                {% posInject \p -> DTComma    p }
   | "[" "]"                            {% posInject \p -> DTAutoDim  p }
@@ -613,8 +613,11 @@ DeclToken :: { DeclToken }
   | "{" StreamOp StreamSize Concat "}" {% posInject \p -> DTStream   p $2 $3           (map toLHS $4) }
   | "{" StreamOp            Concat "}" {% posInject \p -> DTStream   p $2 (Number "1") (map toLHS $3) }
   | opt("var") "type" "(" Expr ")"     {% posInject \p -> DTType     p (\Unspecified -> \[] -> TypeOf $4) }
-  | "<=" opt(DelayOrEventControl) Expr {% posInject \p -> DTAsgnNBlk p $2 $3 }
-  | IncOrDecOperator                   {% posInject \p -> DTAsgn     p (AsgnOp $1) (Number "1") }
+  | "<=" opt(DelayOrEvent) Expr        {% posInject \p -> DTAsgn     p AsgnOpNonBlocking $2 $3 }
+  | IncOrDecOperator                   {% posInject \p -> DTAsgn     p (AsgnOp $1) Nothing (Number "1") }
+DeclTokenAsgn :: { DeclToken }
+  : "=" opt(DelayOrEvent) Expr {% posInject \p -> DTAsgn p AsgnOpEq $2 $3 }
+  | AsgnBinOp Expr             {% posInject \p -> DTAsgn p $1 Nothing $2 }
 
 VariablePortIdentifiers :: { [(Identifier, Maybe Expr)] }
   : VariablePortIdentifier                             { [$1] }
@@ -902,10 +905,11 @@ Stmt :: { Stmt }
   | StmtTrace StmtNonAsgn { $2 }
 
 StmtAsgn :: { Stmt }
-  : LHS AsgnOp Expr ";"                        { AsgnBlk $2 $1 $3 }
-  | LHS IncOrDecOperator ";"                   { AsgnBlk (AsgnOp $2) $1 (Number "1") }
-  | IncOrDecOperator LHS ";"                   { AsgnBlk (AsgnOp $1) $2 (Number "1") }
-  | LHS "<=" opt(DelayOrEventControl) Expr ";" { Asgn $3 $1 $4 }
+  : LHS "="  opt(DelayOrEvent) Expr ";" { Asgn AsgnOpEq $3 $1 $4 }
+  | LHS "<=" opt(DelayOrEvent) Expr ";" { Asgn AsgnOpNonBlocking $3 $1 $4 }
+  | LHS AsgnBinOp              Expr ";" { Asgn $2  Nothing $1 $3 }
+  | LHS IncOrDecOperator ";" { Asgn (AsgnOp $2) Nothing $1 (Number "1") }
+  | IncOrDecOperator LHS ";" { Asgn (AsgnOp $1) Nothing $2 (Number "1") }
   | LHS          ";" { Subroutine (lhsToExpr $1) (Args [] []) }
   | LHS CallArgs ";" { Subroutine (lhsToExpr $1) $2 }
 StmtNonAsgn :: { Stmt }
@@ -1007,9 +1011,9 @@ ClockingEvent :: { Sense }
   : "@" "(" Senses ")" { $3 }
 
 TimingControl :: { Timing }
-  : DelayOrEventControl { $1 }
-  | CycleDelay          { Cycle $1 }
-DelayOrEventControl :: { Timing }
+  : DelayOrEvent { $1 }
+  | CycleDelay   { Cycle $1 }
+DelayOrEvent :: { Timing }
   : DelayControl { Delay $1 }
   | EventControl { Event $1 }
 DelayControl :: { Expr }
@@ -1236,8 +1240,10 @@ GenvarIteration :: { (Identifier, AsgnOp, Expr) }
   | Identifier IncOrDecOperator { ($1, AsgnOp $2, Number "1") }
 
 AsgnOp :: { AsgnOp }
-  : "="    { AsgnOpEq }
-  | "+="   { AsgnOp Add }
+  : "=" { AsgnOpEq }
+  | AsgnBinOp { $1 }
+AsgnBinOp :: { AsgnOp }
+  : "+="   { AsgnOp Add }
   | "-="   { AsgnOp Sub }
   | "*="   { AsgnOp Mul }
   | "/="   { AsgnOp Div }

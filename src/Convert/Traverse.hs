@@ -244,8 +244,7 @@ traverseSinglyNestedStmtsM fullMapper = cs
             caseStmts <- mapM fullMapper $ map snd cases
             let cases' = zip (map fst cases) caseStmts
             return $ Case u kw expr cases'
-        cs (AsgnBlk op lhs expr) = return $ AsgnBlk op lhs expr
-        cs (Asgn    mt lhs expr) = return $ Asgn    mt lhs expr
+        cs (Asgn op mt lhs expr) = return $ Asgn op mt lhs expr
         cs (For a b c stmt) = fullMapper stmt >>= return . For a b c
         cs (While   e stmt) = fullMapper stmt >>= return . While   e
         cs (RepeatL e stmt) = fullMapper stmt >>= return . RepeatL e
@@ -375,12 +374,12 @@ traverseStmtLHSsM mapper = stmtMapper
         stmtMapper (Timing (Event sense) stmt) = do
             sense' <- senseMapper sense
             return $ Timing (Event sense') stmt
-        stmtMapper (Asgn (Just (Event sense)) lhs expr) = do
+        stmtMapper (Asgn op (Just (Event sense)) lhs expr) = do
             lhs' <- fullMapper lhs
             sense' <- senseMapper sense
-            return $ Asgn (Just $ Event sense') lhs' expr
-        stmtMapper (AsgnBlk op lhs expr) = fullMapper lhs >>= \lhs' -> return $ AsgnBlk op lhs' expr
-        stmtMapper (Asgn    mt lhs expr) = fullMapper lhs >>= \lhs' -> return $ Asgn    mt lhs' expr
+            return $ Asgn op (Just $ Event sense') lhs' expr
+        stmtMapper (Asgn op mt lhs expr) =
+            fullMapper lhs >>= \lhs' -> return $ Asgn op mt lhs' expr
         stmtMapper (For inits me incrs stmt) = do
             inits' <- mapInits inits
             let (lhss, asgnOps, exprs) = unzip3 incrs
@@ -708,14 +707,10 @@ traverseStmtExprsM exprMapper = flatStmtMapper
         e' <- exprMapper e
         cases' <- mapM caseMapper cases
         return $ Case u kw e' cases'
-    flatStmtMapper (AsgnBlk op lhs expr) = do
+    flatStmtMapper (Asgn op mt lhs expr) = do
         lhs' <- lhsMapper lhs
         expr' <- exprMapper expr
-        return $ AsgnBlk op lhs' expr'
-    flatStmtMapper (Asgn    mt lhs expr) = do
-        lhs' <- lhsMapper lhs
-        expr' <- exprMapper expr
-        return $ Asgn    mt lhs' expr'
+        return $ Asgn op mt lhs' expr'
     flatStmtMapper (For inits cc asgns stmt) = do
         inits' <- initsMapper inits
         cc' <- exprMapper cc
@@ -1028,12 +1023,9 @@ collectAsgnsM = collectAsgnsM' IncludeTFs
 traverseStmtAsgnsM :: Monad m => MapperM m (LHS, Expr) -> MapperM m Stmt
 traverseStmtAsgnsM mapper = stmtMapper
     where
-        stmtMapper (AsgnBlk op lhs expr) = do
+        stmtMapper (Asgn op mt lhs expr) = do
             (lhs', expr') <- mapper (lhs, expr)
-            return $ AsgnBlk op lhs' expr'
-        stmtMapper (Asgn    mt lhs expr) = do
-            (lhs', expr') <- mapper (lhs, expr)
-            return $ Asgn    mt lhs' expr'
+            return $ Asgn op mt lhs' expr'
         stmtMapper other = return other
 
 traverseStmtAsgns :: Mapper (LHS, Expr) -> Mapper Stmt

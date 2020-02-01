@@ -80,7 +80,7 @@ convertDescription ports orig =
         fixModuleItem (Assign Nothing lhs expr) =
             if Set.disjoint usedIdents origIdents
                 then Assign Nothing lhs expr
-                else AlwaysC AlwaysComb $ AsgnBlk AsgnOpEq lhs expr
+                else AlwaysC AlwaysComb $ Asgn AsgnOpEq Nothing lhs expr
             where
                 usedIdents = execWriter $ collectNestedLHSsM lhsIdents lhs
         -- rewrite port bindings to use temporary nets where necessary
@@ -109,7 +109,7 @@ convertDescription ports orig =
                         t = Net TWire Unspecified [(DimsFn FnBits $ Right expr, Number "1")]
                         items =
                             [ MIPackageItem $ Decl $ Variable Local t tmp [] Nothing
-                            , AlwaysC AlwaysComb $ AsgnBlk AsgnOpEq lhs tmpExpr]
+                            , AlwaysC AlwaysComb $ Asgn AsgnOpEq Nothing lhs tmpExpr]
                         lhs = case exprToLHS expr of
                             Just l -> l
                             Nothing ->

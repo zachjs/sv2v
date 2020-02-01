@@ -55,8 +55,7 @@ import Language.SystemVerilog.Parser.Tokens (Position(..))
 data DeclToken
     = DTComma    Position
     | DTAutoDim  Position
-    | DTAsgn     Position AsgnOp Expr
-    | DTAsgnNBlk Position (Maybe Timing) Expr
+    | DTAsgn     Position AsgnOp (Maybe Timing) Expr
     | DTRange    Position (PartSelectMode, Range)
     | DTIdent    Position Identifier
     | DTPSIdent  Position Identifier Identifier
@@ -73,9 +72,9 @@ data DeclToken
     deriving (Show, Eq)
 
 
--- entrypoints besides `parseDTsAsDeclOrStmt` use this to disallow `DTAsgnNBlk`
--- and `DTAsgn` with a binary assignment operator because we don't expect to see
--- those assignment operators in declarations
+-- entrypoints besides `parseDTsAsDeclOrStmt` use this to disallow `DTAsgn` with
+-- a non-blocking operator, binary assignment operator, or a timing control
+-- because we don't expect to see those assignment operators in declarations
 forbidNonEqAsgn :: [DeclToken] -> a -> a
 forbidNonEqAsgn tokens =
     if any isNonEqAsgn tokens
@@ -83,8 +82,8 @@ forbidNonEqAsgn tokens =
         else id
     where
         isNonEqAsgn :: DeclToken -> Bool
-        isNonEqAsgn (DTAsgnNBlk _ _ _) = True
-        isNonEqAsgn (DTAsgn _ (AsgnOp _) _) = True
+        isNonEqAsgn (DTAsgn _ op mt  _) =
+            op /= AsgnOpEq || mt /= Nothing
         isNonEqAsgn _ = False
 
 
@@ -211,8 +210,8 @@ parseDTsAsDecl tokens =
 parseDTsAsDeclOrStmt :: [DeclToken] -> ([Decl], [Stmt])
 parseDTsAsDeclOrStmt [DTIdent   pos   f] = ([], [traceStmt pos, Subroutine (Ident     f) (Args [] [])])
 parseDTsAsDeclOrStmt [DTPSIdent pos p f] = ([], [traceStmt pos, Subroutine (PSIdent p f) (Args [] [])])
-parseDTsAsDeclOrStmt (DTAsgn pos (AsgnOp op) e : tok : toks) =
-    parseDTsAsDeclOrStmt $ (tok : toks) ++ [DTAsgn pos (AsgnOp op) e]
+parseDTsAsDeclOrStmt (DTAsgn pos (AsgnOp op) mt e : tok : toks) =
+    parseDTsAsDeclOrStmt $ (tok : toks) ++ [DTAsgn pos (AsgnOp op) mt e]
 parseDTsAsDeclOrStmt tokens =
     if (isStmt (last tokens) || tripLookahead tokens) && maybeLhs /= Nothing
         then ([], [traceStmt pos, stmt])
@@ -220,14 +219,12 @@ parseDTsAsDeclOrStmt tokens =
     where
         pos = tokPos $ last tokens
         stmt = case last tokens of
-            DTAsgn     _ op e -> AsgnBlk op lhs e
-            DTAsgnNBlk _ mt e -> Asgn    mt lhs e
+            DTAsgn  _ op mt e -> Asgn op mt lhs e
             DTInstance _ args -> Subroutine (lhsToExpr lhs) (instanceToArgs args)
             _ -> error $ "invalid block item decl or stmt: " ++ (show tokens)
         maybeLhs = takeLHS $ init tokens
         Just lhs = maybeLhs
         isStmt :: DeclToken -> Bool
-        isStmt (DTAsgnNBlk{}) = True
         isStmt (DTAsgn{}) = True
         isStmt (DTInstance{}) = True
         isStmt _ = False
@@ -272,20 +269,19 @@ parseDTsAsAsgns tokens =
         lhs = case takeLHS lhsToks of
             Nothing -> error $ "could not parse as LHS: " ++ show lhsToks
             Just l -> l
-        DTAsgn _ AsgnOpEq expr : l1 = l0
+        DTAsgn _ AsgnOpEq Nothing expr : l1 = l0
         asgn = (lhs, expr)
 
         isDTAsgn :: DeclToken -> Bool
-        isDTAsgn (DTAsgn{}) = True
+        isDTAsgn (DTAsgn _ _ Nothing _) = True
         isDTAsgn _ = False
 
 isAsgnToken :: DeclToken -> Bool
-isAsgnToken (DTBit             _ _) = True
-isAsgnToken (DTConcat          _ _) = True
-isAsgnToken (DTStream      _ _ _ _) = True
-isAsgnToken (DTDot             _ _) = True
-isAsgnToken (DTAsgnNBlk      _ _ _) = True
-isAsgnToken (DTAsgn _ (AsgnOp _) _) = True
+isAsgnToken (DTBit{}   ) = True
+isAsgnToken (DTConcat{}) = True
+isAsgnToken (DTStream{}) = True
+isAsgnToken (DTDot{}   ) = True
+isAsgnToken (DTAsgn _ op _ _) = op /= AsgnOpEq
 isAsgnToken _ = False
 
 takeLHS :: [DeclToken] -> Maybe LHS
@@ -415,8 +411,8 @@ takeRanges (token : tokens) =
         DTBit   _ s               -> (asRange s : rs, rest          )
         DTAutoDim _               ->
             case rest of
-                (DTAsgn _ AsgnOpEq (Pattern l) : _) -> autoDim l
-                (DTAsgn _ AsgnOpEq (Concat  l) : _) -> autoDim l
+                (DTAsgn _ AsgnOpEq Nothing (Pattern l) : _) -> autoDim l
+                (DTAsgn _ AsgnOpEq Nothing (Concat  l) : _) -> autoDim l
                 _ ->                 ([]            , token : tokens)
         _                         -> ([]            , token : tokens)
     where
@@ -430,14 +426,16 @@ takeRanges (token : tokens) =
                 lo = Number "0"
                 hi = Number $ show (n - 1)
 
--- Matching DTAsgnNBlk here allows tripLookahead to work both for standard
--- declarations and in `parseDTsAsDeclOrStmt`, where we're checking for an
--- assignment statement. The other entry points disallow `DTAsgnNBlk`, so this
--- doesn't liberalize the parser.
+-- Matching `AsgnOpEq` and `AsgnOpNonBlocking` here allows tripLookahead to work
+-- both for standard declarations and in `parseDTsAsDeclOrStmt`, where we're
+-- checking for an assignment statement. The other entry points disallow
+-- `AsgnOpNonBlocking`, so this doesn't liberalize the parser.
 takeAsgn :: [DeclToken] -> (Maybe Expr, [DeclToken])
-takeAsgn (DTAsgn _ AsgnOpEq e : rest) = (Just e , rest)
-takeAsgn (DTAsgnNBlk    _ _ e : rest) = (Just e , rest)
-takeAsgn                        rest  = (Nothing, rest)
+takeAsgn (DTAsgn _ op Nothing e : rest) =
+    if op == AsgnOpEq || op == AsgnOpNonBlocking
+        then (Just e , rest)
+        else (Nothing, rest)
+takeAsgn rest = (Nothing, rest)
 
 takeComma :: [DeclToken] -> (Bool, [DeclToken])
 takeComma [] = (False, [])
@@ -460,8 +458,7 @@ isComma _ = False
 tokPos :: DeclToken -> Position
 tokPos (DTComma    p) = p
 tokPos (DTAutoDim  p) = p
-tokPos (DTAsgn     p _ _) = p
-tokPos (DTAsgnNBlk p _ _) = p
+tokPos (DTAsgn     p _ _ _) = p
 tokPos (DTRange    p _) = p
 tokPos (DTIdent    p _) = p
 tokPos (DTPSIdent  p _ _) = p

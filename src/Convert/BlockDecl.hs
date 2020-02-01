@@ -47,4 +47,4 @@ splitDecl (Variable d t ident a (Just e)) =
 splitDecl other = (other, Nothing)
 
 asgnStmt :: (LHS, Expr) -> Stmt
-asgnStmt = uncurry $ AsgnBlk AsgnOpEq
+asgnStmt = uncurry $ Asgn AsgnOpEq Nothing

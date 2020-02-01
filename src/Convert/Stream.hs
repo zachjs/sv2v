@@ -36,7 +36,7 @@ streamerBlock chunk size asgn output input =
     , Variable Local (IntegerAtom TInteger Unspecified) bas [] Nothing
     ]
     [ For inits cmp incr stmt
-    , AsgnBlk AsgnOpEq (LHSIdent bas) (Ident idx)
+    , Asgn AsgnOpEq Nothing (LHSIdent bas) (Ident idx)
     , For inits cmp2 incr2 stmt2
     , asgn output (Ident out)
     ]
@@ -55,23 +55,21 @@ streamerBlock chunk size asgn output input =
         incr = [(LHSIdent idx, AsgnOp Add, chunk)]
         lhs = LHSRange (LHSIdent out) IndexedMinus (BinOp Sub hi (Ident idx), chunk)
         expr = Range (Ident inp) IndexedPlus (Ident idx, chunk)
-        stmt = AsgnBlk AsgnOpEq lhs expr
+        stmt = Asgn AsgnOpEq Nothing lhs expr
         -- final chunk loop
         cmp2 = BinOp Lt (Ident idx) (BinOp Sub size (Ident bas))
         incr2 = [(LHSIdent idx, AsgnOp Add, Number "1")]
         lhs2 = LHSBit (LHSIdent out) (Ident idx)
         expr2 = Bit (Ident inp) (BinOp Add (Ident idx) (Ident bas))
-        stmt2 = AsgnBlk AsgnOpEq lhs2 expr2
+        stmt2 = Asgn AsgnOpEq Nothing lhs2 expr2
 
 streamerBlockName :: Expr -> Expr -> Identifier
 streamerBlockName chunk size =
     "_sv2v_strm_" ++ shortHash (chunk, size)
 
 traverseStmtM :: Stmt -> Writer Funcs Stmt
-traverseStmtM (AsgnBlk op lhs expr) =
-    traverseAsgnM (lhs, expr) (AsgnBlk op)
-traverseStmtM (Asgn mt lhs expr) =
-    traverseAsgnM (lhs, expr) (Asgn mt)
+traverseStmtM (Asgn op mt lhs expr) =
+    traverseAsgnM (lhs, expr) (Asgn op mt)
 traverseStmtM other = return other
 
 traverseAsgnM :: (LHS, Expr) -> (LHS -> Expr -> Stmt) -> Writer Funcs Stmt

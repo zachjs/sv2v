@@ -100,11 +100,13 @@ instance Show BinOp where
 
 data AsgnOp
     = AsgnOpEq
+    | AsgnOpNonBlocking
     | AsgnOp BinOp
     deriving (Eq, Ord)
 
 instance Show AsgnOp where
     show AsgnOpEq = "="
+    show AsgnOpNonBlocking = "<="
     show (AsgnOp op) = (show op) ++ "="
 
 data StreamOp

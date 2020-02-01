@@ -101,7 +101,7 @@ addJumpStateDeclStmt stmt =
     where (decls, [stmt']) = addJumpStateDeclTF [] [stmt]
 
 removeJumpState :: Stmt -> Stmt
-removeJumpState (orig @ (AsgnBlk _ (LHSIdent ident) _)) =
+removeJumpState (orig @ (Asgn _ _ (LHSIdent ident) _)) =
     if ident == jumpState
         then Null
         else orig
@@ -298,4 +298,4 @@ assertMsg True _ = return ()
 assertMsg False msg = error msg
 
 asgn :: Identifier -> Expr -> Stmt
-asgn x e = AsgnBlk AsgnOpEq (LHSIdent x) e
+asgn x e = Asgn AsgnOpEq Nothing (LHSIdent x) e

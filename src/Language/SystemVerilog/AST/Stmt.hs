@@ -38,8 +38,7 @@ data Stmt
     | Block   BlockKW Identifier [Decl] [Stmt]
     | Case    ViolationCheck CaseKW Expr [Case]
     | For     (Either [Decl] [(LHS, Expr)]) Expr [(LHS, AsgnOp, Expr)] Stmt
-    | AsgnBlk AsgnOp LHS Expr
-    | Asgn    (Maybe Timing) LHS Expr
+    | Asgn    AsgnOp (Maybe Timing) LHS Expr
     | While   Expr Stmt
     | RepeatL Expr Stmt
     | DoWhile Expr Stmt
@@ -83,8 +82,7 @@ instance Show Stmt where
             showAssign (l, op, e) = printf "%s %s %s" (show l) (show op) (show e)
     show (Subroutine e a) = printf "%s%s;" (show e) aStr
         where aStr = if a == Args [] [] then "" else show a
-    show (AsgnBlk o v e) = printf "%s %s %s;" (show v) (show o) (show e)
-    show (Asgn    t v e) = printf "%s <= %s%s;" (show v) (maybe "" showPad t) (show e)
+    show (Asgn  o t v e) = printf "%s %s %s%s;" (show v) (show o) (maybe "" showPad t) (show e)
     show (While   e s) = printf  "while (%s) %s" (show e) (show s)
     show (RepeatL e s) = printf "repeat (%s) %s" (show e) (show s)
     show (DoWhile e s) = printf "do %s while (%s);" (show s) (show e)
@@ -134,7 +132,6 @@ showElseBranch (stmt @ If{}) = ' ' : show stmt
 showElseBranch stmt = showBranch stmt
 
 showShortBranch :: Stmt -> String
-showShortBranch (stmt @ AsgnBlk{}) = ' ' : show stmt
 showShortBranch (stmt @ Asgn{}) = ' ' : show stmt
 showShortBranch stmt = showBranch stmt
 

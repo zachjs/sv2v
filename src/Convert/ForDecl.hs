@@ -80,7 +80,7 @@ splitDecl other =
     error $ "invalid for loop decl: " ++ show other
 
 asgnStmt :: (LHS, Expr) -> Stmt
-asgnStmt = uncurry $ AsgnBlk AsgnOpEq
+asgnStmt = uncurry $ Asgn AsgnOpEq Nothing
 
 dummyDecl :: Maybe Expr -> Decl
 dummyDecl = Variable Local (IntegerAtom TInteger Unspecified) "_sv2v_dummy" []

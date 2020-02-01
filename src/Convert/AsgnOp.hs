@@ -32,6 +32,6 @@ convertStmt (For inits cc asgns stmt) =
         convertAsgn (lhs, AsgnOp op, expr) =
             (lhs, AsgnOpEq, BinOp op (lhsToExpr lhs) expr)
         convertAsgn other = other
-convertStmt (AsgnBlk (AsgnOp op) lhs expr) =
-    AsgnBlk AsgnOpEq lhs (BinOp op (lhsToExpr lhs) expr)
+convertStmt (Asgn (AsgnOp op) mt lhs expr) =
+    Asgn AsgnOpEq mt lhs (BinOp op (lhsToExpr lhs) expr)
 convertStmt other = other
