@@ -141,6 +141,7 @@ traverseModuleItemsM mapper (Part attrs extern kw lifetime name ports items) = d
                 _ -> GenModuleItem moduleItem'
         genItemMapper (GenIf (Number "1") s _) = return s
         genItemMapper (GenIf (Number "0") _ s) = return s
+        genItemMapper (GenBlock "" [item]) = return item
         genItemMapper (GenBlock _ []) = return GenNull
         genItemMapper other = return other
         breakGenerate :: ModuleItem -> [ModuleItem]
