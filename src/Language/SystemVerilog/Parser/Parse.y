@@ -522,6 +522,7 @@ PartHeader :: { [Attr] -> Bool -> PartKW -> [ModuleItem] -> Description }
 
 ModuleKW :: { PartKW }
   : "module" { Module }
+  | "macromodule" { Module }
 InterfaceKW :: { PartKW }
   : "interface" { Interface }
 
