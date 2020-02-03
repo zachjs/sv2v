@@ -114,5 +114,26 @@ module top;
         $display(2);
         $display(1);
         $display(128);
+
+        $display(3, 3, 8);
+        $display(0, 0, 7);
+        $display(2, 2, 0);
+        $display(2, 2, 7);
+        $display(0, 0, 0);
+        $display(-1, -1, 1);
+        $display(2);
+        $display(1);
+        $display(24);
+
+        $display(3, 3, 8);
+        $display(0, 0, 7);
+        $display(2, 2, 0);
+        $display(2, 2, 7);
+        $display(0, 0, 0);
+        $display(-1, -1, 1);
+        $display(2);
+        $display(1);
+        $display(24);
+
     end
 endmodule

@@ -16,6 +16,8 @@ module top;
     integer ints [3:0];
     typedef struct packed { logic x, y, z; } T;
     logic [$size(T)-1:0] foo;
+    typedef byte unpacked_t [3];
+    unpacked_t unpacked;
     initial begin
         $display($size(Word));
         $display($size(Ram,2));
@@ -33,5 +35,7 @@ module top;
         `EXHAUST(bit);
         `EXHAUST(byte);
         `EXHAUST(ints);
+        `EXHAUST(unpacked_t);
+        `EXHAUST(unpacked);
     end
 endmodule
