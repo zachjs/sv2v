@@ -297,7 +297,15 @@ systemIdentifier   { Token Id_system       _ _ }
 number             { Token Lit_number      _ _ }
 string             { Token Lit_string      _ _ }
 time               { Token Lit_time        _ _ }
-directive          { Token Spe_Directive   _ _ }
+
+"`celldefine"          { Token Dir_celldefine _ _ }
+"`endcelldefine"       { Token Dir_endcelldefine _ _ }
+"`unconnected_drive"   { Token Dir_unconnected_drive _ _ }
+"`nounconnected_drive" { Token Dir_nounconnected_drive _ _ }
+"`default_nettype"     { Token Dir_default_nettype _ _ }
+"`resetall"            { Token Dir_resetall _ _ }
+"`begin_keywords"      { Token Dir_begin_keywords _ _ }
+"`end_keywords"        { Token Dir_end_keywords _ _ }
 
 "("                { Token Sym_paren_l _ _ }
 ")"                { Token Sym_paren_r _ _ }
@@ -797,7 +805,18 @@ TimeunitsDeclaration :: { [PackageItem] }
   | "timeprecision" Time     ";" { [] }
 
 Directive :: { String }
-  : directive { tokenString $1 }
+  : "`celldefine"          { tokenString $1 }
+  | "`endcelldefine"       { tokenString $1 }
+  | "`unconnected_drive" Drive { tokenString $1 ++ " " ++ $2 }
+  | "`nounconnected_drive" { tokenString $1 }
+  | "`default_nettype" DefaultNetType { tokenString $1 ++ " " ++ $2 }
+  | "`resetall"            { tokenString $1 }
+Drive :: { String }
+  : "pull0" { tokenString $1 }
+  | "pull1" { tokenString $1 }
+DefaultNetType :: { String }
+  : NetType { show $1 }
+  | Identifier { $1 }
 
 PackageImportItems :: { [(Identifier, Maybe Identifier)] }
   : PackageImportItem                        { [$1] }

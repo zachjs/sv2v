@@ -28,7 +28,7 @@ tokenPosition :: Token -> Position
 tokenPosition (Token _ _ pos) = pos
 
 pattern TokenEOF :: Token
-pattern TokenEOF = Token MacroBoundary "" (Position "" 0 0)
+pattern TokenEOF = Token Unknown "" (Position "" 0 0)
 
 data Position
     = Position String Int Int
@@ -391,7 +391,13 @@ data TokenName
     | Sym_amp_amp_amp
     | Sym_lt_lt_lt_eq
     | Sym_gt_gt_gt_eq
-    | Spe_Directive
+    | Dir_celldefine
+    | Dir_endcelldefine
+    | Dir_unconnected_drive
+    | Dir_nounconnected_drive
+    | Dir_default_nettype
+    | Dir_resetall
+    | Dir_begin_keywords
+    | Dir_end_keywords
     | Unknown
-    | MacroBoundary
     deriving (Show, Eq, Ord)

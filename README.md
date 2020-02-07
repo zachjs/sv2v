@@ -96,7 +96,7 @@ will be given to issues which include examples or test cases.
 
 ## SystemVerilog Front End
 
-This project contains a preprocessor and lexer, a parser, and an abstract syntax
+This project contains a preprocessor, lexer, and parser, and an abstract syntax
 tree representation for a subset of the SystemVerilog specification. The parser
 is not very strict. The AST allows for the representation of syntactically (and
 semantically) invalid Verilog. The goal is to be more general in the

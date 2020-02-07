@@ -9,8 +9,9 @@ import Control.Monad.Except
 import Control.Monad.State
 import qualified Data.Map.Strict as Map
 import Language.SystemVerilog.AST (AST)
-import Language.SystemVerilog.Parser.Lex (lexFile, Env)
+import Language.SystemVerilog.Parser.Lex (lexStr)
 import Language.SystemVerilog.Parser.Parse (parse)
+import Language.SystemVerilog.Parser.Preprocess (preprocess, Env)
 import Language.SystemVerilog.Parser.Tokens (Position(..), tokenPosition)
 
 -- parses a compilation unit given include search paths and predefined macros
@@ -32,8 +33,10 @@ parseFiles' includePaths env siloed (path : paths) = do
 -- the file path
 parseFile' :: [String] -> Env -> FilePath -> ExceptT String IO (AST, Env)
 parseFile' includePaths env path = do
-    result <- liftIO $ lexFile includePaths env path
-    (tokens, env') <- liftEither result
+    preResult <- liftIO $ preprocess includePaths env path
+    (contents, env') <- liftEither preResult
+    result <- liftIO $ uncurry lexStr $ unzip contents
+    tokens <- liftEither result
     let position =
             if null tokens
                 then Position path 1 1

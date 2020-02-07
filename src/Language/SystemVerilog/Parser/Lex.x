@@ -3,40 +3,22 @@
  - Author: Zachary Snow <zach@zachjs.com>
  - Original Lexer Author: Tom Hawkins <tomahawkins@gmail.com>
  -
- - Combined source lexing and preprocessing
+ - SystemVerilog Lexer
  -
- - These procedures are combined so that we can simultaneously process macros in
- - a sane way (something analogous to character-by-character) and have our
- - lexemes properly tagged with source file positions.
- -
- - The scariest piece of this module is the use of `unsafePerformIO`. We want to
- - be able to search for and read files whenever we see an include directive.
- - Trying to thread the IO Monad through alex's interface would be very
- - convoluted. The operations performed are not effectful, and are type safe.
- -
- - It may be possible to separate the preprocessor from the lexer by having a
- - preprocessor which produces location annotations. This could improve error
- - messaging and remove the include file and macro boundary hacks.
+ - All preprocessor directives are handled separately by the preprocessor. The
+ - `begin_keywords` and `end_keywords` lexer directives are handled here.
  -}
 
+-- This pragma gets rid of a warning caused by alex 3.2.5.
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
--- The above pragma gets rid of annoying warning caused by alex 3.2.4. This has
--- been fixed on their development branch, so this can be removed once they roll
--- a new release. (no new release as of 3/29/2018)
 
 module Language.SystemVerilog.Parser.Lex
-    ( lexFile
-    , Env
+    ( lexStr
     ) where
 
-import System.FilePath (dropFileName)
-import System.Directory (findFile)
-import System.IO.Unsafe (unsafePerformIO)
-import Text.Read (readMaybe)
+import Control.Monad.Except
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import Data.List (span, elemIndex, dropWhileEnd)
-import Data.Maybe (isJust, fromJust)
 
 import Language.SystemVerilog.Parser.Keywords (specMap)
 import Language.SystemVerilog.Parser.Tokens
@@ -111,15 +93,6 @@ import Language.SystemVerilog.Parser.Tokens
 @escapedIdentifier = "\" ($printable # $white)+ $white
 @simpleIdentifier  = [a-zA-Z_] [a-zA-Z0-9_\$]*
 @systemIdentifier = "$" [a-zA-Z0-9_\$]+
-
--- Comments
-
-@commentBlock = "/*"
-@commentLine = "//"
-
--- Directives
-
-@directive = "`" @simpleIdentifier
 
 -- Whitespace
 
@@ -486,119 +459,81 @@ tokens :-
     "<<<="             { tok Sym_lt_lt_lt_eq }
     ">>>="             { tok Sym_gt_gt_gt_eq }
 
-    @directive         { handleDirective }
-    @commentLine       { removeUntil "\n" }
-    @commentBlock      { removeUntil "*/" }
+    "`celldefine"          { tok Dir_celldefine }
+    "`endcelldefine"       { tok Dir_endcelldefine }
+    "`unconnected_drive"   { tok Dir_unconnected_drive }
+    "`nounconnected_drive" { tok Dir_nounconnected_drive }
+    "`default_nettype"     { tok Dir_default_nettype }
+    "`resetall"            { tok Dir_resetall }
+    "`begin_keywords"      { tok Dir_begin_keywords }
+    "`end_keywords"        { tok Dir_end_keywords }
 
     $white             ;
 
     .                  { tok Unknown }
 
 {
-
--- our actions don't return any data
-type Action = AlexInput -> Int -> Alex ()
-
--- keeps track of the state of an if-else cascade level
-data Cond
-    = CurrentlyTrue
-    | PreviouslyTrue
-    | NeverTrue
-    deriving (Eq, Show)
-
--- map from macro to definition, plus arguments
-type Env = Map.Map String (String, [(String, Maybe String)])
-
 -- our custom lexer state
 data AlexUserState = LS
-    { lsToks         :: [Token] -- tokens read so far, *in reverse order* for efficiency
-    , lsCurrFile     :: FilePath -- currently active filename
-    , lsEnv          :: Env -- active macro definitions
-    , lsCondStack    :: [Cond] -- if-else cascade state
-    , lsIncludePaths :: [FilePath] -- folders to search for includes
-    , lsSpecStack    :: [Set.Set TokenName] -- stack of non-keyword token names
+    { lsToks      :: [Token] -- tokens read so far, *in reverse order* for efficiency
+    , lsPositions :: [Position] -- character positions in reverse order
     } deriving (Eq, Show)
 
--- this initial user state does not contain the initial filename, environment,
--- or include paths; alex requires that this be defined; we override it before
--- we begin the actual lexing procedure
+-- this initial user state does not contain the initial token positions; alex
+-- requires that this be defined; we override it before we begin the actual
+-- lexing procedure
 alexInitUserState :: AlexUserState
-alexInitUserState = LS [] "" Map.empty [] [] []
+alexInitUserState = LS [] []
 
--- public-facing lexer entrypoint
-lexFile :: [String] -> Env -> FilePath -> IO (Either String ([Token], Env))
-lexFile includePaths env path = do
-    str <-
-        if path == "-"
-            then getContents
-            else readFile path >>= return . normalize
-    let result = runAlex str $ setEnv >> alexMonadScan >> get
+-- lexer entrypoint
+lexStr :: String -> [Position] -> IO (Either String [Token])
+lexStr chars positions = do
+    let setEnv = modify $ \s -> s { lsPositions = reverse positions }
+    let result = runAlex chars $ setEnv >> alexMonadScan >> get
     return $ case result of
         Left msg -> Left msg
         Right finalState ->
-            if not $ null $ lsCondStack finalState then
-                Left $ path ++ ": unfinished conditional directives: " ++
-                    (show $ length $ lsCondStack finalState)
-            else if not $ null $ lsSpecStack finalState then
-                Left $ path ++ ": unterminated begin_keywords blocks: " ++
-                    (show $ length $ lsSpecStack finalState)
-            else
-                Right (finalToks, lsEnv finalState)
-            where
-                finalToks = coalesce $ combineBoundaries $
-                    reverse $ lsToks finalState
-    where
-        setEnv = do
-            modify $ \s -> s
-                { lsEnv = env
-                , lsIncludePaths = includePaths
-                , lsCurrFile = path
-                }
+            runExcept $ postProcess [] tokens
+            where tokens = reverse $ lsToks finalState
 
--- combines identifiers and numbers that cross macro boundaries
-coalesce :: [Token] -> [Token]
-coalesce [] = []
-coalesce (Token MacroBoundary _ _ : rest) = coalesce rest
-coalesce (Token t1 str1 pn1 : Token MacroBoundary _ _ : Token t2 str2 pn2 : rest) =
-    case (t1, t2, immediatelyFollows) of
-        (Lit_number, Lit_number, _) ->
-            Token t1 (str1 ++ str2) pn1 : (coalesce rest)
-        (Id_simple, Id_simple, True) ->
-            Token t1 (str1 ++ str2) pn1 : (coalesce rest)
-        _ ->
-            Token t1 str1 pn1 : (coalesce $ Token t2 str2 pn2 : rest)
+-- process begin/end keywords directives
+postProcess :: [Set.Set TokenName] -> [Token] -> Except String [Token]
+postProcess stack [] =
+    if null stack
+        then return []
+        else throwError $ "unterminated begin_keywords blocks: " ++ show stack
+postProcess stack (Token Dir_begin_keywords _ pos : ts) =
+    case ts of
+        Token Lit_string quotedSpec _ : ts' ->
+            case Map.lookup spec specMap of
+                Nothing -> throwError $ show pos
+                    ++ ": invalid keyword set name: " ++ show spec
+                Just set -> postProcess (set : stack) ts'
+            where spec = tail $ init quotedSpec
+        _ -> throwError $ show pos ++ ": begin_keywords not followed by string"
+postProcess stack (Token Dir_end_keywords _ pos : ts) =
+    case stack of
+        (_ : stack') -> postProcess stack' ts
+        [] -> throwError $ show pos ++ ": unmatched end_keywords"
+postProcess [] (t : ts) = do
+    ts' <- postProcess [] ts
+    return $ t : ts'
+postProcess stack (t : ts) = do
+    ts' <- postProcess stack ts
+    return $ t' : ts'
     where
-        Position _ l1 c1 = pn1
-        Position _ l2 c2 = pn2
-        apn1 = AlexPn 0 l1 c1
-        apn2 = AlexPn (length str1) l2 c2
-        immediatelyFollows = apn2 == foldl alexMove apn1 str1
-coalesce (x : xs) = x : coalesce xs
-
-combineBoundaries :: [Token] -> [Token]
-combineBoundaries [] = []
-combineBoundaries (Token MacroBoundary s p : Token MacroBoundary _ _ : rest) =
-    combineBoundaries $ Token MacroBoundary s p : rest
-combineBoundaries (x : xs) = x : combineBoundaries xs
+        Token tokId str pos = t
+        t' = if Set.member tokId (head stack)
+                then Token Id_simple ('_' : str) pos
+                else t
 
 -- invoked by alexMonadScan
 alexEOF :: Alex ()
 alexEOF = return ()
 
--- raises an alexError with the current file position appended
-lexicalError :: String -> Alex a
-lexicalError msg = do
-    (pn, _, _, _) <- alexGetInput
-    pos <- toTokPos pn
-    alexError $ show pos ++ ": Lexical error: " ++ msg
-
 -- get the current user state
 get :: Alex AlexUserState
 get = Alex $ \s -> Right (s, alex_ust s)
-
--- get the current user state and apply a function to it
-gets :: (AlexUserState -> a) -> Alex a
-gets f = get >>= return . f
 
 -- apply a transformation to the current user state
 modify :: (AlexUserState -> AlexUserState) -> Alex ()
@@ -606,595 +541,17 @@ modify f = Alex func
     where func s = Right (s { alex_ust = new }, ())
             where new = f (alex_ust s)
 
--- helpers specifically accessing the current file state
-getCurrentFile :: Alex String
-getCurrentFile = gets lsCurrFile
-setCurrentFile :: String -> Alex ()
-setCurrentFile x = modify $ \s -> s { lsCurrFile = x }
-
--- find the given file for inclusion
-includeSearch :: FilePath -> Alex FilePath
-includeSearch file = do
-    base <- getCurrentFile
-    includePaths <- gets lsIncludePaths
-    let directories = dropFileName base : includePaths
-    let result = unsafePerformIO $ findFile directories file
-    case result of
-        Just path -> return path
-        Nothing -> lexicalError $ "Could not find file " ++ show file ++
-                        ", included from " ++ show base
-
--- read in the given file
-loadFile :: FilePath -> Alex String
-loadFile = return . normalize . unsafePerformIO . readFile
-
--- removes carriage returns before newlines
-normalize :: String -> String
-normalize ('\r' : '\n' : rest) = '\n' : (normalize rest)
-normalize (ch : chs) = ch : (normalize chs)
-normalize [] = []
-
-isIdentChar :: Char -> Bool
-isIdentChar ch =
-    ('a' <= ch && ch <= 'z') ||
-    ('A' <= ch && ch <= 'Z') ||
-    ('0' <= ch && ch <= '9') ||
-    (ch == '_') || (ch == '$')
-
-takeString :: Alex String
-takeString = do
-    (pos, _, _, str) <- alexGetInput
-    let (x, rest) = span isIdentChar str
-    let lastChar = if null x then ' ' else last x
-    alexSetInput (foldl alexMove pos x, lastChar, [], rest)
-    return x
-
-toTokPos :: AlexPosn -> Alex Position
-toTokPos (AlexPn _ l c) = do
-    file <- getCurrentFile
-    return $ Position file l c
-
--- read tokens after the name until the first (un-escaped) newline
-takeUntilNewline :: Alex String
-takeUntilNewline = do
-    (pos, _, _, str) <- alexGetInput
-    case str of
-        []                 -> return ""
-        '\n' :        _    -> do
-            return ""
-        '/' : '/' : _ -> do
-            remainder <- takeThrough '\n'
-            case last $ init remainder of
-                '\\' -> takeUntilNewline >>= return . (' ' :)
-                _ -> return ""
-        '\\' : '\n' : rest -> do
-            let newPos = alexMove (alexMove pos '\\') '\n'
-            alexSetInput (newPos, '\n', [], rest)
-            takeUntilNewline >>= return . (' ' :)
-        ch   :        rest -> do
-            let newPos = alexMove pos ch
-            alexSetInput (newPos, ch, [], rest)
-            takeUntilNewline >>= return . (ch :)
-
--- select characters up to and including the given character
-takeThrough :: Char -> Alex String
-takeThrough goal = do
+getPosition :: Int -> Alex Position
+getPosition lookback = do
     (_, _, _, str) <- alexGetInput
-    if null str
-        then lexicalError $
-                "unexpected end of input, looking for " ++ (show goal)
-        else do
-            ch <- takeChar
-            if ch == goal
-                then return [ch]
-                else do
-                    rest <- takeThrough goal
-                    return $ ch : rest
+    positions <- get >>= return . lsPositions
+    return $ positions !! (lookback + length str)
 
--- pop one character from the input stream
-takeChar :: Alex Char
-takeChar = do
-    (pos, _, _, str) <- alexGetInput
-    (ch, chs) <-
-        if null str
-            then lexicalError "unexpected end of input"
-            else return (head str, tail str)
-    let newPos = alexMove pos ch
-    alexSetInput (newPos, ch, [], chs)
-    return ch
-
--- drop spaces in the input until a non-space is reached or EOF
-dropSpaces :: Alex ()
-dropSpaces = do
-    (pos, _, _, str) <- alexGetInput
-    if null str then
-        return ()
-    else do
-        let ch : rest = str
-        if ch == '\t' || ch == ' ' then do
-            alexSetInput (alexMove pos ch, ch, [], tail str)
-            dropSpaces
-        else
-            return ()
-
-isWhitespaceChar :: Char -> Bool
-isWhitespaceChar ch = elem ch [' ', '\t', '\n']
-
--- drop all leading whitespace in the input
-dropWhitespace :: Alex ()
-dropWhitespace = do
-    (pos, _, _, str) <- alexGetInput
-    case str of
-        ch : chs ->
-            if isWhitespaceChar ch
-                then do
-                    alexSetInput (alexMove pos ch, ch, [], chs)
-                    dropWhitespace
-                else return()
-        [] -> return ()
-
--- lex the remainder of the current line into tokens and return them, rather
--- than storing them in the lexer state
-tokenizeLine :: Alex [Token]
-tokenizeLine = do
-    -- read in the rest of the current line
-    str <- takeUntilNewline
-    dropWhitespace
-    -- save the current lexer state
-    currInput <- alexGetInput
-    currFile <- getCurrentFile
-    currToks <- gets lsToks
-    -- parse the line into tokens (which includes macro processing)
-    modify $ \s -> s { lsToks = [] }
-    let newInput = (alexStartPos, ' ', [], str)
-    alexSetInput newInput
-    alexMonadScan
-    toks <- gets lsToks
-    -- return to the previous state
-    alexSetInput currInput
-    setCurrentFile currFile
-    modify $ \s -> s { lsToks = currToks }
-    -- remove macro boundary tokens and put the tokens in order
-    let isntMacroBoundary = \(Token t _ _ ) -> t /= MacroBoundary
-    let toks' = filter isntMacroBoundary toks
-    return $ reverse toks'
-
--- removes and returns a decimal number
-takeNumber :: Alex Int
-takeNumber = do
-    dropSpaces
-    leadCh <- peekChar
-    if '0' <= leadCh && leadCh <= '9'
-        then step 0
-        else lexicalError $ "expected number, but found unexpected char: "
-                ++ show leadCh
-    where
-        step number = do
-            ch <- takeChar
-            if ch == ' ' || ch == '\n' then
-                return number
-            else if '0' <= ch && ch <= '9' then do
-                let digit = ord ch - ord '0'
-                step $ number * 10 + digit
-            else
-                lexicalError $ "unexpected char while reading number: "
-                    ++ show ch
-
-peekChar :: Alex Char
-peekChar = do
-    (_, _, _, str) <- alexGetInput
-    if null str
-        then lexicalError "unexpected end of input"
-        else return $head str
-
-atEOF :: Alex Bool
-atEOF = do
-    (_, _, _, str) <- alexGetInput
-    return $ null str
-
-takeMacroDefinition :: Alex (String, [(String, Maybe String)])
-takeMacroDefinition = do
-    leadCh <- peekChar
-    if leadCh /= '('
-        then do
-            body <- takeUntilNewline
-            return (body, [])
-        else do
-            args <- takeMacroArguments
-            body <- takeUntilNewline
-            argsWithDefaults <- mapM splitArg args
-            if null args
-                then lexicalError "macros cannot have 0 args"
-                else return (body, argsWithDefaults)
-    where
-        splitArg :: String -> Alex (String, Maybe String)
-        splitArg [] = lexicalError "macro defn. empty argument"
-        splitArg str = do
-            let (name, rest) = span isIdentChar str
-            if null name || not (all isIdentChar name) then
-                lexicalError $ "invalid macro arg name: " ++ show name
-            else if null rest then
-                return (name, Nothing)
-            else do
-                let trimmed = dropWhile isWhitespaceChar rest
-                let leadCh = head trimmed
-                if leadCh /= '='
-                then lexicalError $ "bad char after arg name: " ++ (show leadCh)
-                else return (name, Just $ tail trimmed)
-
--- commas and right parens are forbidden outside matched pairs of: (), [], {},
--- "", except to delimit arguments or end the list of arguments; see 22.5.1
-takeMacroArguments :: Alex [String]
-takeMacroArguments = do
-    dropWhitespace
-    leadCh <- takeChar
-    if leadCh == '('
-        then argLoop
-        else lexicalError $ "expected begining of macro arguments, but found "
-                ++ show leadCh
-    where
-        argLoop :: Alex [String]
-        argLoop = do
-            dropWhitespace
-            (arg, isEnd) <- loop "" []
-            let arg' = dropWhileEnd isWhitespaceChar arg
-            if isEnd
-                then return [arg']
-                else do
-                    rest <- argLoop
-                    return $ arg' : rest
-        loop :: String -> [Char] -> Alex (String, Bool)
-        loop curr stack = do
-            ch <- takeChar
-            case (stack, ch) of
-                (      s,'\\') -> do
-                    ch2 <- takeChar
-                    loop (curr ++ [ch, ch2]) s
-                ([     ], ',') -> return (curr, False)
-                ([     ], ')') -> return (curr, True)
-
-                ('"' : s, '"') -> loop (curr ++ [ch]) s
-                (      s, '"') -> loop (curr ++ [ch]) ('"' : s)
-                ('[' : s, ']') -> loop (curr ++ [ch]) s
-                (      s, '[') -> loop (curr ++ [ch]) ('[' : s)
-                ('(' : s, ')') -> loop (curr ++ [ch]) s
-                (      s, '(') -> loop (curr ++ [ch]) ('(' : s)
-                ('{' : s, '}') -> loop (curr ++ [ch]) s
-                (      s, '{') -> loop (curr ++ [ch]) ('{' : s)
-
-                (      s,'\n') -> loop (curr ++ [' ']) s
-                (      s, _  ) -> loop (curr ++ [ch ]) s
-
-findUnescapedQuote :: String -> (String, String)
-findUnescapedQuote [] = ([], [])
-findUnescapedQuote ('`' : '\\' : '`' : '"' : rest) = ('\\' : '"' : start, end)
-    where (start, end) = findUnescapedQuote rest
-findUnescapedQuote ('\\' : '"' : rest) = ('\\' : '"' : start, end)
-    where (start, end) = findUnescapedQuote rest
-findUnescapedQuote ('"' : rest) = ("\"", rest)
-findUnescapedQuote ('`' : '"' : rest) = ("\"", rest)
-findUnescapedQuote (ch : rest) = (ch : start, end)
-    where (start, end) = findUnescapedQuote rest
-
--- substitute in the arguments for a macro expension
-substituteArgs :: String -> [String] -> [String] -> String
-substituteArgs "" _ _ = ""
-substituteArgs ('`' : '`' : body) names args =
-    substituteArgs body names args
-substituteArgs ('"' : body) names args =
-    '"' : start ++ substituteArgs rest names args
-    where (start, rest) = findUnescapedQuote body
-substituteArgs ('\\' : '"' : body) names args =
-    '\\' : '"' : substituteArgs body names args
-substituteArgs ('`' : '"' : body) names args =
-    '"' : substituteArgs (init start) names args
-    ++ '"' : substituteArgs rest names args
-    where (start, rest) = findUnescapedQuote body
-substituteArgs body names args =
-    case span isIdentChar body of
-        ([], _) -> head body : substituteArgs (tail body) names args
-        (ident, rest) ->
-            case elemIndex ident names of
-                Nothing -> ident ++ substituteArgs rest names args
-                Just idx -> (args !! idx) ++ substituteArgs rest names args
-
-defaultMacroArgs :: [Maybe String] -> [String] -> Alex [String]
-defaultMacroArgs [] [] = return []
-defaultMacroArgs [] _ = lexicalError "too many macro arguments given"
-defaultMacroArgs defaults [] = do
-    if all isJust defaults
-        then return $ map fromJust defaults
-        else lexicalError "too few macro arguments given"
-defaultMacroArgs (f : fs) (a : as) = do
-    let arg = if a == "" && isJust f
-            then fromJust f
-            else a
-    args <- defaultMacroArgs fs as
-    return $ arg : args
-
--- directives that must always be processed even if the current code block is
--- being excluded; we have to process conditions so we can match them up with
--- their ending tag, even if they're being skipped
-unskippableDirectives :: [String]
-unskippableDirectives = ["else", "elsif", "endif", "ifdef", "ifndef"]
-
--- list of all of the supported directive names; used to prevent defining macros
--- with illegal names
-directives :: [String]
-directives =
-    [ "timescale"
-    , "celldefine"
-    , "endcelldefine"
-    , "unconnected_drive"
-    , "nounconnected_drive"
-    , "default_nettype"
-    , "pragma"
-    , "resetall"
-    , "begin_keywords"
-    , "end_keywords"
-    , "__FILE__"
-    , "__LINE__"
-    , "line"
-    , "include"
-    , "ifdef"
-    , "ifndef"
-    , "else"
-    , "elsif"
-    , "endif"
-    , "define"
-    , "undef"
-    , "undefineall"
-    ]
-
-handleDirective :: Action
-handleDirective (posOrig, _, _, strOrig) len = do
-    let thisTokenStr = take len strOrig
-    let directive = tail $ thisTokenStr
-    let newPos = foldl alexMove posOrig thisTokenStr
-    alexSetInput (newPos, last thisTokenStr, [], drop len strOrig)
-
-    env <- gets lsEnv
-    tempInput <- alexGetInput
-    let dropUntilNewline = removeUntil "\n" tempInput 0
-    let passThrough = do
-            rest <- takeUntilNewline
-            let str = '`' : directive ++ rest
-            tok Spe_Directive (posOrig, ' ', [], strOrig) (length str)
-
-    condStack <- gets lsCondStack
-    if any (/= CurrentlyTrue) condStack
-        && not (elem directive unskippableDirectives)
-    then alexMonadScan
-    else case directive of
-
-        "timescale" -> dropUntilNewline
-
-        "celldefine" -> passThrough
-        "endcelldefine" -> passThrough
-
-        "unconnected_drive" -> passThrough
-        "nounconnected_drive" -> passThrough
-
-        "default_nettype" -> passThrough
-        "pragma" -> do
-            leadCh <- peekChar
-            if leadCh == '\n' || leadCh == '\r'
-                then lexicalError "pragma directive cannot be empty"
-                else passThrough
-        "resetall" -> passThrough
-
-        "begin_keywords" -> do
-            toks <- tokenizeLine
-            quotedSpec <- case toks of
-                [Token Lit_string str _] -> return str
-                _ -> lexicalError $ "unexpected tokens following `begin_keywords: " ++ show toks
-            let spec = tail $ init quotedSpec
-            case Map.lookup spec specMap of
-                Nothing ->
-                    lexicalError $ "invalid keyword set name: " ++ show spec
-                Just set -> do
-                    specStack <- gets lsSpecStack
-                    modify $ \s -> s { lsSpecStack = set : specStack }
-                    dropWhitespace
-                    alexMonadScan
-        "end_keywords" -> do
-            specStack <- gets lsSpecStack
-            if null specStack
-                then
-                    lexicalError "unexpected end_keywords before begin_keywords"
-                else do
-                    modify $ \s -> s { lsSpecStack = tail specStack }
-                    dropWhitespace
-                    alexMonadScan
-
-        "__FILE__" -> do
-            tokPos <- toTokPos posOrig
-            currFile <- gets lsCurrFile
-            let tokStr = show currFile
-            modify $ push $ Token Lit_string tokStr tokPos
-            alexMonadScan
-        "__LINE__" -> do
-            tokPos <- toTokPos posOrig
-            let Position _ currLine _ = tokPos
-            let tokStr = show currLine
-            modify $ push $ Token Lit_number tokStr tokPos
-            alexMonadScan
-
-        "line" -> do
-            toks <- tokenizeLine
-            (lineNumber, quotedFilename, levelNumber) <-
-                case toks of
-                    [ Token Lit_number lineStr _,
-                      Token Lit_string filename _,
-                      Token Lit_number levelStr _] -> do
-                        let Just line = readMaybe lineStr :: Maybe Int
-                        let Just level = readMaybe levelStr :: Maybe Int
-                        return (line, filename, level)
-                    _ -> lexicalError $
-                            "unexpected tokens types following `line: "
-                            ++ show (map tokenName toks) ++ "; should be: "
-                            ++ show [Lit_number, Lit_string, Lit_number]
-            let filename = init $ tail quotedFilename
-            setCurrentFile filename
-            (AlexPn f _ c, prev, _, str) <- alexGetInput
-            alexSetInput (AlexPn f (lineNumber + 1) c, prev, [], str)
-            if 0 <= levelNumber && levelNumber <= 2
-                then alexMonadScan
-                else lexicalError "line directive invalid level number"
-
-        "include" -> do
-            toks <- tokenizeLine
-            quotedFilename <- case toks of
-                [Token Lit_string str _] -> return str
-                _ -> lexicalError $ "unexpected tokens following `include: " ++ show toks
-            inputFollow <- alexGetInput
-            fileFollow <- getCurrentFile
-            -- process the included file
-            let filename = init $ tail quotedFilename
-            path <- includeSearch filename
-            content <- loadFile path
-            let inputIncluded = (alexStartPos, ' ', [], content)
-            setCurrentFile path
-            alexSetInput inputIncluded
-            alexMonadScan
-            -- resume processing the original file
-            setCurrentFile fileFollow
-            alexSetInput inputFollow
-            alexMonadScan
-
-        "ifdef" -> do
-            dropSpaces
-            name <- takeString
-            let newCond = if Map.member name env
-                    then CurrentlyTrue
-                    else NeverTrue
-            modify $ \s -> s { lsCondStack = newCond : condStack }
-            alexMonadScan
-        "ifndef" -> do
-            dropSpaces
-            name <- takeString
-            let newCond = if Map.notMember name env
-                    then CurrentlyTrue
-                    else NeverTrue
-            modify $ \s -> s { lsCondStack = newCond : condStack }
-            alexMonadScan
-        "else" -> do
-            let newCond = if head condStack == NeverTrue
-                    then CurrentlyTrue
-                    else NeverTrue
-            modify $ \s -> s { lsCondStack = newCond : tail condStack }
-            alexMonadScan
-        "elsif" -> do
-            dropSpaces
-            name <- takeString
-            let currCond = head condStack
-            let newCond =
-                    if currCond /= NeverTrue then
-                        PreviouslyTrue
-                    else if Map.member name env then
-                        CurrentlyTrue
-                    else
-                        NeverTrue
-            modify $ \s -> s { lsCondStack = newCond : tail condStack }
-            alexMonadScan
-        "endif" -> do
-            modify $ \s -> s { lsCondStack = tail condStack }
-            alexMonadScan
-
-        "define" -> do
-            dropSpaces
-            name <- do
-                str <- takeString
-                if elem str directives
-                    then lexicalError $ "illegal macro name: " ++ str
-                    else return str
-            defn <- do
-                eof <- atEOF
-                if eof
-                    then return ("", [])
-                    else takeMacroDefinition
-            modify $ \s -> s { lsEnv = Map.insert name defn env }
-            alexMonadScan
-        "undef" -> do
-            dropSpaces
-            name <- takeString
-            modify $ \s -> s { lsEnv = Map.delete name env }
-            alexMonadScan
-        "undefineall" -> do
-            modify $ \s -> s { lsEnv = Map.empty }
-            alexMonadScan
-
-        _ -> do
-            case Map.lookup directive env of
-                Nothing -> lexicalError $ "Undefined macro: " ++ directive
-                Just (body, formalArgs) -> do
-                    (AlexPn _ l c, _, _, _) <- alexGetInput
-                    replacement <- if null formalArgs
-                        then return body
-                        else do
-                            actualArgs <- takeMacroArguments
-                            defaultedArgs <- defaultMacroArgs (map snd formalArgs) actualArgs
-                            return $ substituteArgs body (map fst formalArgs) defaultedArgs
-                    -- save our current state
-                    currInput <- alexGetInput
-                    currToks <- gets lsToks
-                    modify $ \s -> s { lsToks = [] }
-                    -- lex the macro expansion, preserving the file and line
-                    alexSetInput (AlexPn 0 l 0, ' ', [], replacement)
-                    alexMonadScan
-                    -- re-tag and save tokens from the macro expansion
-                    newToks <- gets lsToks
-                    currFile <- getCurrentFile
-                    let loc = "macro expansion of " ++ directive ++ " at " ++ currFile
-                    let pos = Position loc l (c - length directive - 1)
-                    let reTag (Token a b _) = Token a b pos
-                    let boundary = Token MacroBoundary "" (Position "" 0 0)
-                    let boundedToks = boundary : (map reTag newToks) ++ boundary : currToks
-                    modify $ \s -> s { lsToks = boundedToks }
-                    -- continue lexing after the macro
-                    alexSetInput currInput
-                    alexMonadScan
-
--- remove characters from the input until the pattern is reached
-removeUntil :: String -> Action
-removeUntil pattern _ _ = loop
-    where
-        patternLen = length pattern
-        wantNewline = pattern == "\n"
-        loop = do
-            (pos, _, _, str) <- alexGetInput
-            let found = (null str && wantNewline)
-                     || pattern == take patternLen str
-            let nextPos = alexMove pos (head str)
-            let afterPos = if wantNewline
-                    then alexMove pos '\n'
-                    else foldl alexMove pos pattern
-            let (newPos, newStr) = if found
-                    then (afterPos, drop patternLen str)
-                    else (nextPos, drop 1 str)
-            if not found && null str
-                then lexicalError $ "Reached EOF while looking for: " ++
-                        show pattern
-                else do
-                    alexSetInput (newPos, ' ', [], newStr)
-                    if found
-                        then alexMonadScan
-                        else loop
-
-push :: Token -> AlexUserState -> AlexUserState
-push t s = s { lsToks = t : (lsToks s) }
-
-tok :: TokenName -> Action
-tok tokId (pos, _, _, input) len = do
+tok :: TokenName -> AlexInput -> Int -> Alex ()
+tok tokId (_, _, _, input) len = do
     let tokStr = take len input
-    tokPos <- toTokPos pos
-    condStack <- gets lsCondStack
-    () <- if any (/= CurrentlyTrue) condStack
-        then return ()
-        else do
-            specStack <- gets lsSpecStack
-            if null specStack || Set.notMember tokId (head specStack)
-                then modify (push $ Token tokId tokStr tokPos)
-                else modify (push $ Token Id_simple ('_' : tokStr) tokPos)
+    tokPos <- getPosition (len - 1)
+    let t = Token tokId tokStr tokPos
+    modify $ \s -> s { lsToks = t : (lsToks s) }
     alexMonadScan
 }
