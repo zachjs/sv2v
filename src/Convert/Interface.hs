@@ -80,7 +80,10 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                 Nothing -> orig
             where
                 InterfaceT interfaceName (Just _) [] = t
-                interfaceItems = snd $ interfaces Map.! interfaceName
+                interfaceItems =
+                    case Map.lookup interfaceName interfaces of
+                        Just res -> snd res
+                        Nothing -> error $ "could not find interface " ++ show interfaceName
                 mapper (dir, port, expr) =
                     Variable dir mpt (ident ++ "_" ++ port) mprs Nothing
                     where (mpt, mprs) = lookupType interfaceItems (fromJust expr)
@@ -133,7 +136,11 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                     expandPortBinding moduleName (portName, Just newExpr)
                     where
                         InterfaceT _ (Just modportName) [] =
-                            modules Map.! (moduleName, portName)
+                            case Map.lookup (moduleName, portName) modules of
+                                Just t -> t
+                                Nothing -> error $ "could not find port "
+                                    ++ show portName ++ " in module "
+                                    ++ show moduleName
                         newExpr = Dot (Ident ident) modportName
                 (_, Just decls) ->
                     -- modport directly bound to a modport
