@@ -66,6 +66,7 @@ module top;
 
     logic [0:31] c;
     generate
+        ;
         for (genvar n = 0; n < 32; n = n + 1)
             assign c[n] = n & 1;
     endgenerate

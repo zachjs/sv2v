@@ -1227,6 +1227,7 @@ GenItemOrNull :: { GenItem }
 
 GenItems :: { [GenItem] }
   : {- empty -}      { [] }
+  | GenItems ";"     { $1 }
   | GenItems GenItem { $1 ++ [$2] }
 
 GenItem :: { GenItem }
