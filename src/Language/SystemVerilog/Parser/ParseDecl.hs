@@ -105,9 +105,21 @@ parseDTsAsPortDecls pieces =
             length pieces == length commaIdxs + length identIdxs
 
         simpleIdents = map extractIdent $ filter isIdent pieces
-        declarations = parseDTsAsDecls pieces
+        declarations = propagateDirections Input $ parseDTsAsDecls pieces
 
         extractIdent = \(DTIdent _ x) -> x
+
+        propagateDirections :: Direction -> [Decl] -> [Decl]
+        propagateDirections dir (decl @ (Variable _ InterfaceT{} _ _ _) : decls) =
+            decl : propagateDirections dir decls
+        propagateDirections lastDir (Variable currDir t x a me : decls) =
+            decl : propagateDirections dir decls
+            where
+                decl = Variable dir t x a me
+                dir = if currDir == Local then lastDir else currDir
+        propagateDirections dir (decl : decls) =
+            decl : propagateDirections dir decls
+        propagateDirections _ [] = []
 
         portNames :: [Decl] -> [Identifier]
         portNames items = mapMaybe portName items
