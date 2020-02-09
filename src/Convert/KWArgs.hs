@@ -24,11 +24,13 @@ convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription description =
-    traverseModuleItems
-        (traverseExprs $ traverseNestedExprs $ convertExpr tfs)
-        description
-    where
-        tfs = execWriter $ collectModuleItemsM collectTF description
+    traverseModuleItems (convertModuleItem tfs) description
+    where tfs = execWriter $ collectModuleItemsM collectTF description
+
+convertModuleItem :: TFs -> ModuleItem -> ModuleItem
+convertModuleItem tfs =
+    (traverseExprs $ traverseNestedExprs $ convertExpr tfs) .
+    (traverseStmts $ convertStmt tfs)
 
 collectTF :: ModuleItem -> Writer TFs ()
 collectTF (MIPackageItem (Function _ _ f decls _)) = collectTFDecls f decls
@@ -44,12 +46,22 @@ collectTFDecls name decls =
         getInput _ = Nothing
 
 convertExpr :: TFs -> Expr -> Expr
-convertExpr _ (orig @ (Call _ (Args _ []))) = orig
-convertExpr tfs (Call (Ident func) (Args pnArgs kwArgs)) =
+convertExpr tfs (Call expr args) =
+    convertInvoke tfs Call expr args
+convertExpr _ other = other
+
+convertStmt :: TFs -> Stmt -> Stmt
+convertStmt tfs (Subroutine expr args) =
+    convertInvoke tfs Subroutine expr args
+convertStmt _ other = other
+
+convertInvoke :: TFs -> (Expr -> Args -> a) -> Expr -> Args -> a
+convertInvoke tfs constructor (Ident func) (Args pnArgs (kwArgs @ (_ : _))) =
     case tfs Map.!? func of
-        Nothing -> Call (Ident func) (Args pnArgs kwArgs)
-        Just ordered -> Call (Ident func) (Args args [])
+        Nothing -> constructor (Ident func) (Args pnArgs kwArgs)
+        Just ordered -> constructor (Ident func) (Args args [])
             where
                 args = pnArgs ++ (map snd $ sortOn position kwArgs)
                 position (x, _) = elemIndex x ordered
-convertExpr _ other = other
+convertInvoke _ constructor expr args =
+    constructor expr args
