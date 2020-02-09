@@ -57,7 +57,7 @@ convert files =
         explodeDescription other = [other]
 
         -- remove or rewrite source modules that are no longer needed
-        files''' = map (uniq . concatMap replaceDefault) files''
+        files''' = map (\a -> concatMap (replaceDefault a) a) files''
         (usageMapRaw, usedTypedModulesRaw) =
             execWriter $ mapM (mapM collectUsageInfoM) files''
         usageMap = Map.unionsWith Set.union $ map (uncurry Map.singleton)
@@ -82,8 +82,8 @@ convert files =
                         then tell (Set.empty, Set.singleton m)
                         else tell (Set.singleton m, Set.empty)
         collectModuleItemM _ = return ()
-        replaceDefault :: Description -> [Description]
-        replaceDefault (part @ (Part _ _ _ _ name _ _)) =
+        replaceDefault :: [Description] -> Description -> [Description]
+        replaceDefault existing (part @ (Part _ _ _ _ name _ _)) =
             if Map.notMember name info then
                 [part]
             else if Map.null maybeTypeMap then
@@ -93,6 +93,7 @@ convert files =
             else if all isNothing maybeTypeMap then
                 []
             else
+                filter (not . flip elem existing) $
                 (:) (removeDefaultTypeParams part) $
                 if isNothing typeMap
                     then []
@@ -100,7 +101,7 @@ convert files =
             where
                 maybeTypeMap = snd $ info Map.! name
                 typeMap = defaultInstance maybeTypeMap
-        replaceDefault other = [other]
+        replaceDefault _ other = [other]
 
         removeDefaultTypeParams :: Description -> Description
         removeDefaultTypeParams (part @ Part{}) =
