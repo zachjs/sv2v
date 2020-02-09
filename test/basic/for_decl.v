@@ -79,6 +79,7 @@ module top;
     generate
         for (n = 0; n < 32; n = n + 1)
             assign c[n] = n & 1;
+        for (n = 0; n < 32; n = n + 1) begin end
     endgenerate
 
 endmodule

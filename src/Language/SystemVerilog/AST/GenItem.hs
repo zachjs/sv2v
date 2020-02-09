@@ -45,7 +45,7 @@ instance Show GenItem where
             x1 (show e1)
             (show c)
             x2 (show o2) (show e2)
-            (show s)
+            (if s == GenNull then "begin end" else show s)
     show (GenNull) = ";"
     show (GenModuleItem item) = show item
 

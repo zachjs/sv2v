@@ -69,6 +69,7 @@ module top;
         ;
         for (genvar n = 0; n < 32; n = n + 1)
             assign c[n] = n & 1;
+        for (genvar m = 0; m < 32; m = m + 1) begin end
     endgenerate
 
 endmodule
