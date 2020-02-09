@@ -6,6 +6,7 @@
 
 module Convert.Interface (convert) where
 
+import Data.List (lookup)
 import Data.Maybe (fromJust, mapMaybe)
 import Control.Monad.Writer
 import qualified Data.Map.Strict as Map
@@ -18,7 +19,7 @@ type Instances = Map.Map Identifier Identifier
 type Interface = ([Identifier], [ModuleItem])
 type Interfaces = Map.Map Identifier Interface
 type Modports = Map.Map Identifier [ModportDecl]
-type Modules = Map.Map (Identifier, Identifier) Type
+type Modules = Map.Map Identifier [(Identifier, Type)]
 
 convert :: [AST] -> [AST]
 convert =
@@ -32,11 +33,13 @@ convert =
         collectDesc (orig @ (Part _ False kw _ name ports items)) = do
             if kw == Interface
                 then tell (Map.singleton name (ports, items), Map.empty)
-                else collectModuleItemsM (collectDeclsM collectDecl) orig
+                else tell (Map.empty, Map.singleton name decls)
             where
-                collectDecl :: Decl -> Writer (Interfaces, Modules) ()
+                decls = execWriter $
+                    collectModuleItemsM (collectDeclsM collectDecl) orig
+                collectDecl :: Decl -> Writer [(Identifier, Type)] ()
                 collectDecl (Variable _ t ident _ _) =
-                    tell (Map.empty, Map.singleton (name, ident) t)
+                    tell [(ident, t)]
                 collectDecl _ = return ()
         collectDesc _ = return ()
         isInterface :: Description -> Bool
@@ -95,7 +98,7 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                     Generate $ map GenModuleItem $
                         inlineInterface interface (ident, params, expandedPorts)
                 Nothing -> Instance part params ident Nothing expandedPorts
-            where expandedPorts = concatMap (expandPortBinding part) instancePorts
+            where expandedPorts = concatMap (uncurry $ expandPortBinding part) (zip instancePorts [0..])
         mapInterface (orig @ (MIPackageItem (Function _ _ _ decls _))) =
             convertTF decls orig
         mapInterface (orig @ (MIPackageItem (Task _ _ decls _))) =
@@ -114,8 +117,8 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                 declVarIdent (Variable _ _ x _ _) = Just x
                 declVarIdent _ = Nothing
 
-        expandPortBinding :: Identifier -> PortBinding -> [PortBinding]
-        expandPortBinding _ (origBinding @ (portName, Just (Dot (Ident instanceName) modportName))) =
+        expandPortBinding :: Identifier -> PortBinding -> Int -> [PortBinding]
+        expandPortBinding _ (origBinding @ (portName, Just (Dot (Ident instanceName) modportName))) _ =
             -- expand instance modport bound to a modport
             if Map.member instanceName instances && modportDecls /= Nothing
                 then map mapper $ fromJust modportDecls
@@ -128,18 +131,27 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                 prefixExpr :: Expr -> Expr
                 prefixExpr (Ident x) = Ident (instanceName ++ "_" ++ x)
                 prefixExpr other = other
-        expandPortBinding moduleName (origBinding @ (portName, Just (Ident ident))) =
+        expandPortBinding moduleName (origBinding @ (portName, Just (Ident ident))) idx =
             case (instances Map.!? ident, modports Map.!? ident) of
                 (Nothing, Nothing) -> [origBinding]
                 (Just _, _) ->
                     -- given entire interface, but just bound to a modport
-                    expandPortBinding moduleName (portName, Just newExpr)
+                    expandPortBinding moduleName (portName', Just newExpr) idx
                     where
-                        InterfaceT _ (Just modportName) [] =
-                            case Map.lookup (moduleName, portName) modules of
-                                Just t -> t
-                                Nothing -> error $ "could not find port "
-                                    ++ show portName ++ " in module "
+                        (portName', InterfaceT _ (Just modportName) []) =
+                            case (portName, Map.lookup moduleName modules) of
+                                ("", Just decls) ->
+                                    if idx < length decls
+                                        then decls !! idx
+                                        else error $ "could not infer port "
+                                            ++ show origBinding ++ " in module "
+                                            ++ show moduleName
+                                (_, Just decls) -> case lookup portName decls of
+                                    Nothing -> error $ "could not find port "
+                                        ++ show portName ++ " in module "
+                                        ++ show moduleName
+                                    Just t -> (portName, t)
+                                (_, Nothing) -> error $ "could not find module "
                                     ++ show moduleName
                         newExpr = Dot (Ident ident) modportName
                 (_, Just decls) ->
@@ -149,7 +161,7 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                         mapper (_, x, _) =
                             ( portName ++ "_" ++ x
                             , Just $ Dot (Ident ident) x )
-        expandPortBinding _ other = [other]
+        expandPortBinding _ other _ = [other]
 
         lookupModport :: Identifier -> Identifier -> Maybe [ModportDecl]
         lookupModport interfaceName =
@@ -200,6 +212,7 @@ prefixModuleItems prefix =
         prefixDecl (ParamType  s x   mt) = ParamType  s (prefix ++ x)   mt
         prefixDecl (CommentDecl       c) = CommentDecl                   c
         prefixExpr :: Expr -> Expr
+        prefixExpr (Ident ('$' : x)) = Ident $ '$' : x
         prefixExpr (Ident x) = Ident (prefix ++ x)
         prefixExpr other = other
         prefixLHS :: LHS -> LHS
