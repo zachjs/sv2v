@@ -7,7 +7,6 @@
 module Convert.NestPI (convert) where
 
 import Control.Monad.Writer
-import Data.List (isPrefixOf)
 import Data.List.Unique (complex)
 import qualified Data.Set as Set
 
@@ -56,10 +55,8 @@ convertDescription pis (orig @ Part{}) =
             , collectTypesM $ collectNestedTypesM collectTypenamesM
             , collectExprsM $ collectNestedExprsM collectIdentsM
             ]
-        neededPIs = Set.difference
-            (Set.union usedPIs $
-                Set.filter (isPrefixOf "import ") $ Set.fromList $ map fst pis)
-            existingPIs
+        neededPIs = Set.difference (Set.union usedPIs imports) existingPIs
+        imports = Set.fromList $ map fst $ filter (isImport . snd) pis
         uniq l = l' where (l', _, _) = complex l
         newItems = uniq $ map MIPackageItem $ map snd $
             filter (\(x, _) -> Set.member x neededPIs) pis
@@ -108,3 +105,7 @@ piName (Decl (CommentDecl          _)) = Nothing
 piName (Import x y) = Just $ show $ Import x y
 piName (Export    _) = Nothing
 piName (Directive _) = Nothing
+
+isImport :: PackageItem -> Bool
+isImport Import{} = True
+isImport _ = False
