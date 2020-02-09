@@ -220,6 +220,8 @@ isSimpleType (IntegerVector _ _ _) = True
 isSimpleType (IntegerAtom   _ _  ) = True
 isSimpleType (NonInteger    _    ) = True
 isSimpleType (Net           _ _ _) = True
+isSimpleType (Struct   _ fields _) = all (isSimpleType . fst) fields
+isSimpleType (Union    _ fields _) = all (isSimpleType . fst) fields
 isSimpleType _ = False
 
 -- attempt to rewrite instantiations with type parameters
@@ -235,7 +237,7 @@ convertModuleItemM info (orig @ (Instance m bindings x r p)) =
     else if any (not . isSimpleType) resolvedTypes then do
         let defaults = Map.map Left resolvedTypes
         let bindingsDefaulted = Map.toList $ Map.union bindingsMap defaults
-        if isDefaultName m
+        if isDefaultName m || bindingsDefaulted /= Map.toList bindingsMap
             then return $ Instance m bindingsNamed x r p
             else return $ Instance (moduleDefaultName m) bindingsDefaulted x r p
     else do

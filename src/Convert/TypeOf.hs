@@ -51,7 +51,10 @@ traverseDeclM decl = do
                 UnpackedType t'' a' -> Variable d t'' ident a' me
                 _ ->                   Variable d t'  ident [] me
         Param    _ t ident   _ -> do
-            modify $ Map.insert ident t
+            let t' = if t == Implicit Unspecified []
+                        then IntegerAtom TInteger Unspecified
+                        else t
+            modify $ Map.insert ident t'
             return decl'
         ParamType{} -> return decl'
         CommentDecl{} -> return decl'

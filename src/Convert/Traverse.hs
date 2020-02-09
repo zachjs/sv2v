@@ -9,6 +9,7 @@ module Convert.Traverse
 , Mapper
 , CollectorM
 , TFStrategy (..)
+, TypeStrategy (..)
 , unmonad
 , collectify
 , traverseDescriptionsM
@@ -53,6 +54,9 @@ module Convert.Traverse
 , traverseExprTypesM
 , traverseExprTypes
 , collectExprTypesM
+, traverseTypesM'
+, traverseTypes'
+, collectTypesM'
 , traverseTypesM
 , traverseTypes
 , collectTypesM
@@ -99,6 +103,11 @@ type CollectorM m t = t -> m ()
 data TFStrategy
     = IncludeTFs
     | ExcludeTFs
+    deriving Eq
+
+data TypeStrategy
+    = IncludeParamTypes
+    | ExcludeParamTypes
     deriving Eq
 
 unmonad :: (MapperM (State ()) a -> MapperM (State ()) b) -> Mapper a -> Mapper b
@@ -910,8 +919,8 @@ traverseExprTypes = unmonad traverseExprTypesM
 collectExprTypesM :: Monad m => CollectorM m Type -> CollectorM m Expr
 collectExprTypesM = collectify traverseExprTypesM
 
-traverseTypesM :: Monad m => MapperM m Type -> MapperM m ModuleItem
-traverseTypesM mapper item =
+traverseTypesM' :: Monad m => TypeStrategy -> MapperM m Type -> MapperM m ModuleItem
+traverseTypesM' strategy mapper item =
     miMapper item >>=
     traverseDeclsM declMapper >>=
     traverseExprsM (traverseNestedExprsM exprMapper)
@@ -938,14 +947,23 @@ traverseTypesM mapper item =
             return $ Instance m params' x r p
             where
                 mapParam (i, Left t) =
-                    fullMapper t >>= \t' -> return (i, Left t')
+                    if strategy == IncludeParamTypes
+                        then fullMapper t >>= \t' -> return (i, Left t')
+                        else return (i, Left t)
                 mapParam (i, Right e) = return $ (i, Right e)
         miMapper other = return other
 
+traverseTypes' :: TypeStrategy -> Mapper Type -> Mapper ModuleItem
+traverseTypes' strategy = unmonad $ traverseTypesM' strategy
+collectTypesM' :: Monad m => TypeStrategy -> CollectorM m Type -> CollectorM m ModuleItem
+collectTypesM' strategy = collectify $ traverseTypesM' strategy
+
+traverseTypesM :: Monad m => MapperM m Type -> MapperM m ModuleItem
+traverseTypesM = traverseTypesM' IncludeParamTypes
 traverseTypes :: Mapper Type -> Mapper ModuleItem
-traverseTypes = unmonad traverseTypesM
+traverseTypes = traverseTypes' IncludeParamTypes
 collectTypesM :: Monad m => CollectorM m Type -> CollectorM m ModuleItem
-collectTypesM = collectify traverseTypesM
+collectTypesM = collectTypesM' IncludeParamTypes
 
 traverseGenItemsM :: Monad m => MapperM m GenItem -> MapperM m ModuleItem
 traverseGenItemsM mapper = moduleItemMapper

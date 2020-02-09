@@ -27,7 +27,7 @@ convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription (description @ Part{}) =
-    traverseModuleItems (traverseTypes $ convertType structs) $
+    traverseModuleItems (traverseTypes' ExcludeParamTypes $ convertType structs) $
     Part attrs extern kw lifetime name ports (items ++ funcs)
     where
         description' @ (Part attrs extern kw lifetime name ports items) =
@@ -53,8 +53,11 @@ convertDescription (description @ Part{}) =
         traverseStmtM :: Stmt -> State Types Stmt
         traverseStmtM (Subroutine expr args) = do
             stateTypes <- get
-            return $ Subroutine expr $
-                convertCall structs stateTypes expr args
+            let stmt' = Subroutine expr $ convertCall
+                            structs stateTypes expr args
+            traverseStmtLHSsM  traverseLHSM  stmt' >>=
+                traverseStmtExprsM traverseExprM   >>=
+                traverseStmtAsgnsM traverseAsgnM
         traverseStmtM stmt =
             traverseStmtLHSsM  traverseLHSM  stmt >>=
             traverseStmtExprsM traverseExprM      >>=
