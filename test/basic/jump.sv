@@ -106,4 +106,12 @@ module top;
             $display("Loop B:", i);
         end
 
+    always #1
+        for (int i = 0; i < 10; ++i) begin
+            $display("Loop C-1:", i);
+            break;
+            $display("UNREACHABLE ", `__LINE__);
+        end
+    initial #5 $finish;
+
 endmodule

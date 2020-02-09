@@ -80,4 +80,13 @@ module top;
         end
     end
 
+    always #1 begin : loop_c
+        integer i;
+        for (i = 0; i < 10; ++i) begin
+            $display("Loop C-1:", i);
+            i = 10;
+        end
+    end
+    initial #5 $finish;
+
 endmodule

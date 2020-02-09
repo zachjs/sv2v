@@ -62,6 +62,8 @@ convertModuleItem (AlwaysC kw stmt) = convertMIStmt (AlwaysC kw) stmt
 convertModuleItem other = other
 
 convertMIStmt :: (Stmt -> ModuleItem) -> Stmt -> ModuleItem
+convertMIStmt constructor (Timing c stmt) =
+    convertMIStmt (constructor . Timing c) stmt
 convertMIStmt constructor stmt =
     constructor stmt''
     where
