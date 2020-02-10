@@ -22,6 +22,8 @@ convert =
     )
 
 convertGenItem :: GenItem -> GenItem
+convertGenItem (GenFor (True, _, _) _ _ GenNull) = GenNull
+convertGenItem (GenFor (True, _, _) _ _ (GenBlock _ [])) = GenNull
 convertGenItem (GenFor (True, x, e) a b c) =
     GenBlock "" genItems
     where
