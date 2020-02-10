@@ -171,6 +171,7 @@ readNumber n =
     readMaybe n' :: Maybe Int
     where
         n' = case n of
+            '3' : '2' : '\'' : 'd' : rest -> rest
             '\'' : 'd' : rest -> rest
             _ -> n
 

@@ -73,6 +73,8 @@ convertExpr info (Mux cc aa bb) =
         after = simplify before
 convertExpr _ (other @ Repeat{}) = traverseNestedExprs simplify other
 convertExpr _ (other @ Concat{}) = simplify other
+convertExpr _ (other @ BinOp{}) = simplify other
+convertExpr _ (other @ UniOp{}) = simplify other
 convertExpr _ other = other
 
 substitute :: Info -> Expr -> Expr
