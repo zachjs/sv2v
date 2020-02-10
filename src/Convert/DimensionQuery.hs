@@ -114,6 +114,11 @@ convertBits (Left t) =
         IntegerVector _ _ rs -> dimensionsSize rs
         Implicit        _ rs -> dimensionsSize rs
         Net           _ _ rs -> dimensionsSize rs
+        Struct   _ fields rs ->
+            BinOp Mul
+                (dimensionsSize rs)
+                (foldl (BinOp Add) (Number "0") fieldSizes)
+            where fieldSizes = map (DimsFn FnBits . Left . fst) fields
         UnpackedType  t'  rs ->
             BinOp Mul
                 (dimensionsSize rs)
