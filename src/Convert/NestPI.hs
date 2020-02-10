@@ -7,13 +7,13 @@
 module Convert.NestPI (convert) where
 
 import Control.Monad.Writer
-import Data.List.Unique (complex)
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type PIs = [(Identifier, PackageItem)]
+type PIs = Map.Map Identifier PackageItem
 type Idents = Set.Set Identifier
 
 convert :: [AST] -> [AST]
@@ -39,7 +39,7 @@ collectDescriptionM :: Description -> Writer PIs ()
 collectDescriptionM (PackageItem item) = do
     case piName item of
         Nothing -> return ()
-        Just ident -> tell [(ident, item)]
+        Just ident -> tell $ Map.singleton ident item
 collectDescriptionM _ = return ()
 
 -- nests packages items missing from modules
@@ -56,10 +56,9 @@ convertDescription pis (orig @ Part{}) =
             , collectExprsM $ collectNestedExprsM collectIdentsM
             ]
         neededPIs = Set.difference (Set.union usedPIs imports) existingPIs
-        imports = Set.fromList $ map fst $ filter (isImport . snd) pis
-        uniq l = l' where (l', _, _) = complex l
-        newItems = uniq $ map MIPackageItem $ map snd $
-            filter (\(x, _) -> Set.member x neededPIs) pis
+        imports = Map.keysSet $ Map.filter isImport pis
+        newItems = map MIPackageItem $ Map.elems $
+            Map.restrictKeys pis neededPIs
         -- place data declarations at the beginning to obey declaration
         -- ordering; everything else can go at the end
         newItemsBefore = filter isDecl newItems
