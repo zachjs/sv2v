@@ -57,7 +57,6 @@ phases excludes =
     , Convert.Assertion.convert
     , Convert.BlockDecl.convert
     , selectExclude (Job.Logic    , Convert.Logic.convert)
-    , Convert.ForDecl.convert
     , Convert.FuncRet.convert
     , Convert.FuncRoutine.convert
     , Convert.EmptyArgs.convert
@@ -88,6 +87,7 @@ phases excludes =
     , Convert.Jump.convert
     , Convert.Foreach.convert
     , selectExclude (Job.Interface, Convert.Interface.convert)
+    , Convert.ForDecl.convert
     , selectExclude (Job.Always   , Convert.AlwaysKW.convert)
     , selectExclude (Job.Succinct , Convert.RemoveComments.convert)
     ]

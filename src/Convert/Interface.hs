@@ -199,38 +199,51 @@ convertDescription _ _ other = other
 
 
 -- add a prefix to all standard identifiers in a module item
-prefixModuleItems :: Identifier -> ModuleItem -> ModuleItem
+prefixModuleItems :: (Identifier -> Identifier) -> ModuleItem -> ModuleItem
 prefixModuleItems prefix =
-    prefixMIPackageItem .
+    prefixOtherItem .
     traverseDecls prefixDecl .
     traverseExprs (traverseNestedExprs prefixExpr) .
     traverseLHSs  (traverseNestedLHSs  prefixLHS )
     where
         prefixDecl :: Decl -> Decl
-        prefixDecl (Variable d t x a me) = Variable d t (prefix ++ x) a me
-        prefixDecl (Param    s t x    e) = Param    s t (prefix ++ x)    e
-        prefixDecl (ParamType  s x   mt) = ParamType  s (prefix ++ x)   mt
-        prefixDecl (CommentDecl       c) = CommentDecl                   c
+        prefixDecl (Variable d t x a me) = Variable d t (prefix x) a me
+        prefixDecl (Param    s t x    e) = Param    s t (prefix x)    e
+        prefixDecl (ParamType  s x   mt) = ParamType  s (prefix x)   mt
+        prefixDecl (CommentDecl       c) = CommentDecl                c
         prefixExpr :: Expr -> Expr
-        prefixExpr (Ident ('$' : x)) = Ident $ '$' : x
-        prefixExpr (Ident x) = Ident (prefix ++ x)
+        prefixExpr (Ident x) = Ident (prefix x)
         prefixExpr other = other
         prefixLHS :: LHS -> LHS
-        prefixLHS (LHSIdent x) = LHSIdent (prefix ++ x)
+        prefixLHS (LHSIdent x) = LHSIdent (prefix x)
         prefixLHS other = other
-        prefixMIPackageItem (MIPackageItem item) =
+        prefixOtherItem (MIPackageItem item) =
             MIPackageItem $ prefixPackageItem prefix item
-        prefixMIPackageItem other = other
+        prefixOtherItem (Genvar x) = Genvar $ prefix x
+        prefixOtherItem other = other
 
 -- add a prefix to all standard identifiers in a package item
-prefixPackageItem :: Identifier -> PackageItem -> PackageItem
+prefixPackageItem :: (Identifier -> Identifier) -> PackageItem -> PackageItem
 prefixPackageItem prefix (Function lifetime t x decls stmts) =
     Function lifetime t x' decls stmts
-    where x' = prefix ++ x
+    where x' = prefix x
 prefixPackageItem prefix (Task     lifetime   x decls stmts) =
     Task     lifetime   x' decls stmts
-    where x' = prefix ++ x
+    where x' = prefix x
 prefixPackageItem _ other = other
+
+-- collect all identifiers defined within a module item
+collectIdentsM :: ModuleItem -> Writer (Set.Set Identifier) ()
+collectIdentsM (MIPackageItem (Function _ _ x _ _)) = tell $ Set.singleton x
+collectIdentsM (MIPackageItem (Task     _   x _ _)) = tell $ Set.singleton x
+collectIdentsM (Genvar x) = tell $ Set.singleton x
+collectIdentsM item = collectDeclsM collectDecl item
+    where
+        collectDecl :: Decl -> Writer (Set.Set Identifier) ()
+        collectDecl (Variable _ _ x _ _) = tell $ Set.singleton x
+        collectDecl (Param    _ _ x   _) = tell $ Set.singleton x
+        collectDecl (ParamType  _ x   _) = tell $ Set.singleton x
+        collectDecl (CommentDecl      _) = return ()
 
 lookupType :: [ModuleItem] -> Expr -> (Type, [Range])
 lookupType items (Ident ident) =
@@ -258,10 +271,16 @@ inlineInterface (ports, items) (instanceName, instanceParams, instancePorts) =
     where
         comment = MIPackageItem $ Decl $ CommentDecl $
             "expanded instance: " ++ instanceName
-
         prefix = instanceName ++ "_"
+        idents = execWriter $
+            mapM (collectNestedModuleItemsM collectIdentsM) items
+        prefixIfNecessary :: Identifier -> Identifier
+        prefixIfNecessary x =
+            if Set.member x idents
+                then prefix ++ x
+                else x
         itemsPrefixed =
-            map (prefixModuleItems prefix) $
+            map (traverseNestedModuleItems $ prefixModuleItems prefixIfNecessary) $
             map (traverseDecls overrideParam) $
             items
         origInstancePortNames = map fst instancePorts
