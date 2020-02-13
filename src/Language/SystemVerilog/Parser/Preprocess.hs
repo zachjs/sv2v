@@ -15,7 +15,7 @@ module Language.SystemVerilog.Parser.Preprocess
 import Control.Monad.Except
 import Control.Monad.State
 import Data.Char (ord)
-import Data.List (span, elemIndex, dropWhileEnd, splitAt, tails, isPrefixOf, findIndex)
+import Data.List (span, dropWhileEnd, splitAt, tails, isPrefixOf, findIndex)
 import Data.Maybe (isJust, fromJust)
 import System.Directory (findFile)
 import System.FilePath (dropFileName)
@@ -35,6 +35,7 @@ data PP = PP
     , ppEnv          :: Env -- active macro definitions
     , ppCondStack    :: [Cond] -- if-else cascade state
     , ppIncludePaths :: [FilePath] -- folders to search for includes
+    , ppMacroStack   :: [[(String, String)]] -- arguments for in-progress macro expansions
     } deriving (Eq, Show)
 
 -- keeps track of the state of an if-else cascade level
@@ -51,7 +52,7 @@ preprocess includePaths env path = do
         if path == "-"
             then getContents
             else loadFile path
-    let initialState = PP contents [] (Position path 1 1) path env [] includePaths
+    let initialState = PP contents [] (Position path 1 1) path env [] includePaths []
     result <- runExceptT $ execStateT preprocessInput initialState
     return $ case result of
         Left msg -> Left msg
@@ -124,6 +125,11 @@ getCondStack :: PPS [Cond]
 getCondStack = gets ppCondStack
 setCondStack :: [Cond] -> PPS ()
 setCondStack x = modify $ \s -> s { ppCondStack = x }
+-- macro stack accessors
+getMacroStack :: PPS [[(String, String)]]
+getMacroStack = gets ppMacroStack
+setMacroStack :: [[(String, String)]] -> PPS ()
+setMacroStack x = modify $ \s -> s { ppMacroStack = x }
 -- combined input and position accessors
 setBuffer :: (String, Position) -> PPS ()
 setBuffer (x, p) = do
@@ -254,6 +260,7 @@ takeMacroDefinition = do
             return (body, [])
         else do
             args <- takeMacroArguments
+            dropSpaces
             body <- takeUntilNewline
             argsWithDefaults <- mapM splitArg args
             if null args
@@ -282,7 +289,7 @@ takeMacroArguments = do
     dropWhitespace
     leadCh <- takeChar
     if leadCh == '('
-        then argLoop
+        then argLoop >>= mapM preprocessString
         else lexicalError $ "expected begining of macro arguments, but found "
                 ++ show leadCh
     where
@@ -317,39 +324,6 @@ takeMacroArguments = do
 
                 (      s,'\n') -> loop (curr ++ [' ']) s
                 (      s, _  ) -> loop (curr ++ [ch ]) s
-
-findUnescapedQuote :: String -> (String, String)
-findUnescapedQuote [] = ([], [])
-findUnescapedQuote ('`' : '\\' : '`' : '"' : rest) = ('\\' : '"' : start, end)
-    where (start, end) = findUnescapedQuote rest
-findUnescapedQuote ('\\' : '"' : rest) = ('\\' : '"' : start, end)
-    where (start, end) = findUnescapedQuote rest
-findUnescapedQuote ('"' : rest) = ("\"", rest)
-findUnescapedQuote ('`' : '"' : rest) = ("\"", rest)
-findUnescapedQuote (ch : rest) = (ch : start, end)
-    where (start, end) = findUnescapedQuote rest
-
--- substitute in the arguments for a macro expansion
-substituteArgs :: String -> [String] -> [String] -> String
-substituteArgs "" _ _ = ""
-substituteArgs ('`' : '`' : body) names args =
-    substituteArgs body names args
-substituteArgs ('"' : body) names args =
-    '"' : start ++ substituteArgs rest names args
-    where (start, rest) = findUnescapedQuote body
-substituteArgs ('\\' : '"' : body) names args =
-    '\\' : '"' : substituteArgs body names args
-substituteArgs ('`' : '"' : body) names args =
-    '"' : substituteArgs (init start) names args
-    ++ '"' : substituteArgs rest names args
-    where (start, rest) = findUnescapedQuote body
-substituteArgs body names args =
-    case span isIdentChar body of
-        ([], _) -> head body : substituteArgs (tail body) names args
-        (ident, rest) ->
-            case elemIndex ident names of
-                Nothing -> ident ++ substituteArgs rest names args
-                Just idx -> (args !! idx) ++ substituteArgs rest names args
 
 defaultMacroArgs :: [Maybe String] -> [String] -> PPS [String]
 defaultMacroArgs [] [] = return []
@@ -435,25 +409,154 @@ directives =
 preprocessInput :: PPS ()
 preprocessInput = do
     str <- getInput
+    macroStack <- getMacroStack
     case str of
         '/' : '/' : _ -> removeThrough "\n"
         '/' : '*' : _ -> removeThrough "*/"
-        '`' : _ -> handleDirective
-        ch : chs -> do
-            pos <- getPosition
-            advancePosition ch
-            setInput chs
-            condStack <- getCondStack
-            if any (/= CurrentlyTrue) condStack
-                then return ()
-                else pushChar ch pos
+        '`' : '"' : _ -> handleBacktickString
+        '"' : _ -> handleString
+        '`' : '`' : _ -> do
+            if null macroStack
+                then do
+                    consume
+                    consume
+                else do
+                    '`' <- takeChar
+                    '`' <- takeChar
+                    return ()
+        '`' : _ -> handleDirective False
+        _ : _ -> consumeWithSubstitution
         [] -> return ()
     if str == []
         then return ()
         else preprocessInput
 
-handleDirective :: PPS ()
-handleDirective = do
+-- if we are expanding a macro, and the leading tokens form an identifier, then
+-- attempt to replace that identifier with the arguments of this macro, if
+-- applicable; otherwise, just consume the top character
+consumeWithSubstitution :: PPS ()
+consumeWithSubstitution = do
+    str <- getInput
+    macroStack <- getMacroStack
+    if null macroStack then
+        consume
+    else do
+        let (ident, rest) = span isIdentChar str
+        if null ident then
+            consume
+        else do
+            pos <- getPosition
+            let args = head macroStack
+            let chars = case lookup ident args of
+                            Nothing -> ident
+                            Just val -> val
+            pushChars chars pos
+            advancePositions ident
+            setInput rest
+
+-- consume takes the lead input character and pushes it into the output,
+-- advancing the position state and removing the lead character from the input
+consume :: PPS ()
+consume = do
+    ch : chs <- getInput
+    pos <- getPosition
+    advancePosition ch
+    setInput chs
+    pushChar ch pos
+
+-- preprocess a leading string literal; this routine is largely necessary to
+-- avoid doing any macro or directive related manipulations within standard
+-- string literals; it also handles escaped newlines in the string
+handleString :: PPS ()
+handleString = do
+    consume
+    loop
+    where
+        -- processes the remainder of a standard string literal
+        loop :: PPS ()
+        loop = do
+            input <- getInput
+            case input of
+                '"' : _ -> do
+                    consume
+                    -- end of loop!
+                '\\' : '\n' : _ -> do
+                    '\\' <- takeChar
+                    '\n' <- takeChar
+                    loop
+                '\\' : '\\' : _ -> do
+                    consume
+                    consume
+                    loop
+                '\\' : '"' : _ -> do
+                    consume
+                    consume
+                    loop
+                _ : _ -> do
+                    consume
+                    loop
+                [] -> lexicalError "unterminated string literal"
+
+-- preprocess a "backtick string", which begins and ends with a backtick
+-- followed by a slash (`"), and withing which macros can be invoked as normal;
+-- otherwise, normal string literal rules apply, except that unescaped quotes
+-- are forbidden, and backticks must be escaped using a backslash to avoid being
+-- interpreted as a macro or marking the end of a string
+handleBacktickString :: PPS ()
+handleBacktickString = do
+    '`' <- takeChar
+    consume
+    loop
+    where
+        -- processes the remainder of a leading backtick string, up to and
+        -- including the ending `"
+        loop :: PPS ()
+        loop = do
+            input <- getInput
+            macroStack <- getMacroStack
+            case input of
+                '`' : '"' : _ -> do
+                    '`' <- takeChar
+                    consume -- ending quote
+                    -- end of loop!
+                '\\' : '`' : _ -> do
+                    '\\' <- takeChar
+                    consume -- now un-escaped backtick
+                    loop
+                '\\' : '\\' : _ -> do
+                    consume
+                    consume
+                    loop
+                '\\' : '"' : _ -> do
+                    consume
+                    consume
+                    loop
+                '\\' : '\n' : _ -> do
+                    '\\' <- takeChar
+                    '\n' <- takeChar
+                    loop
+                '`' : '\\' : '`' : '"' : _ -> do
+                    '`' <- takeChar
+                    consume
+                    '`' <- takeChar
+                    consume
+                    if null macroStack
+                        then lexicalError "`\\`\" is not allowed outside of macros"
+                        else loop
+                '`' : _ -> do
+                    handleDirective True
+                    loop
+                '"' : _ ->
+                    if null macroStack
+                        then lexicalError "unescaped quote in backtick string"
+                        else consume -- end of loop!
+                _ : _ -> do
+                    consumeWithSubstitution
+                    loop
+                [] -> lexicalError "unterminated backtick string"
+
+handleDirective :: Bool -> PPS ()
+handleDirective macrosOnly = do
     directivePos <- getPosition
     '`' <- takeChar
     directive <- takeIdentifier
@@ -461,14 +564,15 @@ handleDirective = do
     -- helper for directives which are not operated on
     let passThrough = do
             pushChar '`' directivePos
-            _ <- mapM (flip pushChar directivePos) directive
-            return ()
+            pushChars directive directivePos
 
     env <- getEnv
     condStack <- getCondStack
     if any (/= CurrentlyTrue) condStack
-        && not (elem directive unskippableDirectives)
-    then return ()
+        && not (elem directive unskippableDirectives) then
+        return ()
+    else if macrosOnly && elem directive directives then
+        lexicalError "compiler directives are forbidden inside strings"
     else case directive of
 
         "timescale" -> removeThrough "\n"
@@ -585,22 +689,27 @@ handleDirective = do
             case Map.lookup directive env of
                 Nothing -> lexicalError $ "Undefined macro: " ++ directive
                 Just (body, formalArgs) -> do
-                    replacement <- if null formalArgs
-                        then return body
+                    (names, args) <- if null formalArgs
+                        then return ([], [])
                         else do
                             actualArgs <- takeMacroArguments
                             defaultedArgs <- defaultMacroArgs (map snd formalArgs) actualArgs
-                            return $ substituteArgs body (map fst formalArgs) defaultedArgs
+                            return (map fst formalArgs, defaultedArgs)
                     -- save our current state
                     currFile <- getFilePath
+                    macroStack <- getMacroStack
                     bufFollow <- getBuffer
                     -- lex the macro expansion, preserving the file and line
                     let Position _ l c = snd bufFollow
                     let loc = "macro expansion of " ++ directive ++ " at " ++ currFile
                     let pos = Position loc l (c - length directive - 1)
-                    setBuffer (replacement, pos)
+                    setMacroStack $ (zip names args) : macroStack
+                    setBuffer (body, pos)
                     preprocessInput
+                    "" <- getInput
+                    setMacroStack $ error $ show $ (zip names args) : macroStack
                     -- return to the rest of the input
+                    setMacroStack macroStack
                     setBuffer bufFollow
 
 -- inserts the given string into the output at the given position
@@ -633,6 +742,26 @@ lineLookahead = do
     setOutput outputOrig
     setCondStack condStackOrig
 
+-- run the given string through the current preprocessor state, but out of band
+preprocessString :: String -> PPS String
+preprocessString str = do
+    -- save the state
+    outputOrig <- gets ppOutput
+    condStackOrig <- getCondStack
+    bufferOrig <- getBuffer
+    -- process the line
+    setOutput []
+    setCondStack []
+    setInput str
+    preprocessInput
+    outputAfter <- getOutput
+    -- restore the previous state
+    setBuffer bufferOrig
+    setOutput outputOrig
+    setCondStack condStackOrig
+    -- get the result characters
+    return $ reverse $ map fst outputAfter
+
 -- update the position in the preprocessor state according to the movement of
 -- the given character
 advancePosition :: Char -> PPS ()
@@ -652,8 +781,17 @@ advancePositions str = do
 -- adds a character (and its position) to the output state
 pushChar :: Char -> Position -> PPS ()
 pushChar c p = do
-    output <- getOutput
-    setOutput $ (c, p) : output
+    condStack <- getCondStack
+    if any (/= CurrentlyTrue) condStack
+        then return ()
+        else do
+            output <- getOutput
+            setOutput $ (c, p) : output
+-- adds a sequence of characters all at the same given position
+pushChars :: String -> Position -> PPS ()
+pushChars s p = do
+    _ <- mapM (flip pushChar p) s
+    return ()
 
 -- search for a pattern in the input and remove remove characters up to and
 -- including the first occurrence of the pattern
