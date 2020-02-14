@@ -2,8 +2,8 @@
  - Author: Zachary Snow <zach@zachjs.com>
  -
  - Conversion for any unpacked array which must be packed because it is: A) a
- - port; B) is bound to a port; or C) is assigned a value in a single
- - assignment.
+ - port; B) is bound to a port; C) is assigned a value in a single assignment;
+ - or D) is assigned to an unpacked array which itself mus be packed.
  -
  - The scoped nature of declarations makes this challenging. While scoping is
  - obeyed in general, any of a set of *equivalent* declarations within a module
@@ -64,6 +64,7 @@ traverseModuleItemM item =
     traverseModuleItemM' item
     >>= traverseLHSsM  traverseLHSM
     >>= traverseExprsM traverseExprM
+    >>= traverseAsgnsM traverseAsgnM
 
 traverseModuleItemM' :: ModuleItem -> ST ModuleItem
 traverseModuleItemM' (Instance a b c d bindings) = do
@@ -80,7 +81,8 @@ traverseModuleItemM' other = return other
 traverseStmtM :: Stmt -> ST Stmt
 traverseStmtM stmt =
     traverseStmtLHSsM  traverseLHSM  stmt >>=
-    traverseStmtExprsM traverseExprM
+    traverseStmtExprsM traverseExprM >>=
+    traverseStmtAsgnsM traverseAsgnM
 
 traverseExprM :: Expr -> ST Expr
 traverseExprM = return
@@ -90,6 +92,13 @@ traverseLHSM (LHSIdent x) = do
     flatUsageM x
     return $ LHSIdent x
 traverseLHSM other = return other
+
+traverseAsgnM :: (LHS, Expr) -> ST (LHS, Expr)
+traverseAsgnM (LHSIdent x, Ident y) = do
+    flatUsageM x
+    flatUsageM y
+    return (LHSIdent x, Ident y)
+traverseAsgnM other = return other
 
 flatUsageM :: Identifier -> ST ()
 flatUsageM x = do
