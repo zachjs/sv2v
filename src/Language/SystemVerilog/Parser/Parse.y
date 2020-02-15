@@ -421,6 +421,7 @@ time               { Token Lit_time        _ _ }
 %left  "*" "/" "%"
 %left  "**"
 %right REDUCE_OP "!" "~" "++" "--"
+%left "'"
 %left  "(" ")" "[" "]" "." "::"
 
 %%
@@ -1140,13 +1141,10 @@ Expr :: { Expr }
   | "{" Expr Concat "}"         { Repeat $2 $3 }
   | Concat                      { Concat $1 }
   | Expr "?" Expr ":" Expr      { Mux $1 $3 $5 }
-  | CastingType "'" "(" Expr ")" { Cast (Left            $1) $4 }
-  | Number      "'" "(" Expr ")" { Cast (Right $ Number  $1) $4 }
-  | "(" Expr ")" "'""(" Expr ")" { Cast (Right           $2) $6 }
-  |                 Identifier  "'" "(" Expr ")" { Cast (Right $ Ident   $1   ) $4 }
-  | Identifier "::" Identifier  "'" "(" Expr ")" { Cast (Right $ PSIdent $1 $3) $6 }
   | Expr "." Identifier         { Dot $1 $3 }
   | "'" "{" PatternItems "}"    { Pattern $3 }
+  | CastingType "'" "(" Expr ")" { Cast (Left  $1) $4 }
+  | Expr        "'" "(" Expr ")" { Cast (Right $1) $4 }
   | "{" StreamOp StreamSize Concat "}" { Stream $2 $3           $4 }
   | "{" StreamOp            Concat "}" { Stream $2 (Number "1") $3 }
   | Expr "inside" "{" OpenRangeList "}" { Inside $1 $4 }
