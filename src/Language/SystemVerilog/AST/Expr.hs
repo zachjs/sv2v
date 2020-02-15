@@ -75,8 +75,8 @@ instance Show Expr where
     show (Repeat  e l  ) = printf "{%s {%s}}"  (show e) (commas $ map show l)
     show (Concat  l    ) = printf "{%s}"                (commas $ map show l)
     show (Stream  o e l) = printf "{%s %s%s}"  (show o) (show e) (show $ Concat l)
-    show (UniOp   o e  ) = printf "%s%s"       (show o) (show e)
-    show (BinOp   o a b) = printf "(%s %s %s)" (show a) (show o) (show b)
+    show (UniOp   o e  ) = printf "%s%s"       (show o) (showUniOpPrec e)
+    show (BinOp   o a b) = printf "%s %s %s"   (showBinOpPrec a) (show o) (showBinOpPrec b)
     show (Dot     e n  ) = printf "%s.%s"      (show e) n
     show (Mux     c a b) = printf "(%s ? %s : %s)" (show c) (show a) (show b)
     show (Call    e l  ) = printf "%s%s"       (show e) (show l)
@@ -174,6 +174,15 @@ readNumber n =
             '3' : '2' : '\'' : 'd' : rest -> rest
             '\'' : 'd' : rest -> rest
             _ -> n
+
+showUniOpPrec :: Expr -> String
+showUniOpPrec (e @ UniOp{}) = printf "(%s)" (show e)
+showUniOpPrec (e @ BinOp{}) = printf "(%s)" (show e)
+showUniOpPrec e = show e
+
+showBinOpPrec :: Expr -> String
+showBinOpPrec (e @ BinOp{}) = printf "(%s)" (show e)
+showBinOpPrec e = show e
 
 -- basic expression simplfication utility to help us generate nicer code in the
 -- common case of ranges like `[FOO-1:0]`
