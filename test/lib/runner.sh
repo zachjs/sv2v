@@ -2,15 +2,17 @@
 
 SCRIPT_DIR=`dirname "${BASH_SOURCE[0]}"`
 
-tests=`ls *.sv | sed -e "s_\.sv\\\$__"`
+tests=(`ls *.sv | sed -e "s_\.sv\\\$__"`)
 
 if [ $1 ]; then
-    tests=$1
-    shift
-    if [ ! -f $tests.sv ]; then
-        echo "Could not find $tests.sv"
-        exit 1
-    fi
+    tests=("$@")
+    shift ${#tests[@]}
+    for test in $tests; do
+        if [ ! -f $test.sv ]; then
+            echo "Could not find $test.sv"
+            exit 1
+        fi
+    done
 fi
 
 addTest() {
@@ -20,7 +22,7 @@ addTest() {
 }
 
 suite() {
-    for test in $tests; do
+    for test in "${tests[@]}"; do
         addTest $test
     done
 }
