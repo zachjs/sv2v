@@ -35,6 +35,14 @@ typedef enum int {
     I_1, I_2
 } EnumI;
 
+typedef enum int {
+    J_1, J_2, J_3
+} EnumJ;
+
+typedef enum int {
+    Z_1, Z_2, Z_3
+} EnumZ;
+
 `define PRINT(name, val) \
     dummy``name = name``_``val; \
     $display("%h %h %0d %0d", \
@@ -94,4 +102,25 @@ module top;
         `PRINT_UNSIZED(I, 2)
 
     end
+
+    parameter USE_J = 1;
+    generate
+        if (USE_J) begin
+            EnumJ dummyJ;
+            initial begin
+                `PRINT(J, 1)
+                `PRINT(J, 2)
+                `PRINT(J, 3)
+            end
+        end
+        else begin
+            EnumZ dummyZ;
+            initial begin
+                `PRINT(Z, 1)
+                `PRINT(Z, 2)
+                `PRINT(Z, 3)
+            end
+        end
+    endgenerate
+
 endmodule

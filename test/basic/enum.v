@@ -58,5 +58,26 @@ module top;
         `PRINT_UNSIZED(I, 'b1)
 
     end
+
+    parameter USE_J = 1;
+    generate
+        if (USE_J) begin
+            reg [31:0] dummyJ;
+            initial begin
+                `PRINT(J, 0)
+                `PRINT(J, 1)
+                `PRINT(J, 2)
+            end
+        end
+        else begin
+            reg [31:0] dummyZ;
+            initial begin
+                `PRINT(Z, 0)
+                `PRINT(Z, 1)
+                `PRINT(Z, 2)
+            end
+        end
+    endgenerate
+
 endmodule
 

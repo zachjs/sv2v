@@ -83,8 +83,9 @@ convergeUsage items enums =
         (usedEnums, unusedEnums) = partition isUsed enums
         enumItems = map MIPackageItem $ map toItem usedEnums
         isUsed ((_, x), _) = Set.member x usedIdents
-        usedIdents = execWriter $
-            mapM (collectExprsM $ collectNestedExprsM collectIdent) $ items
+        usedIdents = execWriter $ mapM collectModuleItemM items
+        collectModuleItemM = collectNestedModuleItemsM $ collectExprsM $
+            collectNestedExprsM collectIdent
         collectIdent :: Expr -> Writer Idents ()
         collectIdent (Ident x) = tell $ Set.singleton x
         collectIdent _ = return ()
