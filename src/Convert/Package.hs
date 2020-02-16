@@ -53,7 +53,7 @@ convertFile :: Packages -> AST -> AST
 convertFile packages ast =
     (++) globalItems $
     filter (not . isCollected) $
-    traverseDescriptions (traverseDescription packages) $
+    concatMap (traverseDescription packages) $
     ast
     where
         globalItems = map PackageItem $
@@ -127,11 +127,20 @@ collectDescriptionM (Package _ name items) =
         isImport _ = False
 collectDescriptionM _ = return ()
 
-traverseDescription :: Packages -> Description -> Description
-traverseDescription packages description =
-    traverseModuleItems (traverseModuleItem existingItemNames packages)
-    description
+traverseDescription :: Packages -> Description -> [Description]
+traverseDescription packages (PackageItem (Import x y)) =
+    map (\(MIPackageItem item) -> PackageItem item) items
     where
+        orig = Part [] False Module Inherit "DNE" []
+            [MIPackageItem $ Import x y]
+        [orig'] = traverseDescription packages orig
+        Part [] False Module Inherit "DNE" [] items = orig'
+traverseDescription packages description =
+    [description']
+    where
+        description' = traverseModuleItems
+            (traverseModuleItem existingItemNames packages)
+            description
         existingItemNames = execWriter $
             collectModuleItemsM writePIName description
         writePIName :: ModuleItem -> Writer Idents ()

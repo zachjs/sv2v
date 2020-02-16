@@ -31,6 +31,7 @@ convert =
                     (traverseDescriptions . convertDescription)
                     curr
         isPI :: Description -> Bool
+        isPI (PackageItem Import{}) = False
         isPI (PackageItem item) = piName item /= Nothing
         isPI _ = False
 
@@ -55,8 +56,7 @@ convertDescription pis (orig @ Part{}) =
             , collectTypesM $ collectNestedTypesM collectTypenamesM
             , collectExprsM $ collectNestedExprsM collectIdentsM
             ]
-        neededPIs = Set.difference (Set.union usedPIs imports) existingPIs
-        imports = Map.keysSet $ Map.filter isImport pis
+        neededPIs = Set.difference usedPIs existingPIs
         newItems = map MIPackageItem $ Map.elems $
             Map.restrictKeys pis neededPIs
         -- place data declarations at the beginning to obey declaration
@@ -104,7 +104,3 @@ piName (Decl (CommentDecl          _)) = Nothing
 piName (Import x y) = Just $ show $ Import x y
 piName (Export    _) = Nothing
 piName (Directive _) = Nothing
-
-isImport :: PackageItem -> Bool
-isImport Import{} = True
-isImport _ = False
