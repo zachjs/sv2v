@@ -93,8 +93,8 @@ combineRanges r1 r2 = r
         combine (s1, e1) (s2, e2) =
             (simplify upper, simplify lower)
             where
-                size1 = rangeSize (s1, e1)
-                size2 = rangeSize (s2, e2)
+                size1 = rangeSizeHiLo (s1, e1)
+                size2 = rangeSizeHiLo (s2, e2)
                 lower = BinOp Add e2 (BinOp Mul e1 size2)
                 upper = BinOp Add (BinOp Mul size1 size2)
                             (BinOp Sub lower (Number "1"))

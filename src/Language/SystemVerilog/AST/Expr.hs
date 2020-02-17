@@ -19,6 +19,7 @@ module Language.SystemVerilog.AST.Expr
     , showExprOrRange
     , simplify
     , rangeSize
+    , rangeSizeHiLo
     , endianCondExpr
     , endianCondRange
     , dimensionsSize
@@ -274,8 +275,12 @@ rangeSize :: Range -> Expr
 rangeSize (s, e) =
     endianCondExpr (s, e) a b
     where
-        a = simplify $ BinOp Add (BinOp Sub s e) (Number "1")
-        b = simplify $ BinOp Add (BinOp Sub e s) (Number "1")
+        a = rangeSizeHiLo (s, e)
+        b = rangeSizeHiLo (e, s)
+
+rangeSizeHiLo :: Range -> Expr
+rangeSizeHiLo (hi, lo) =
+    simplify $ BinOp Add (BinOp Sub hi lo) (Number "1")
 
 -- chooses one or the other expression based on the endianness of the given
 -- range; [hi:lo] chooses the first expression
