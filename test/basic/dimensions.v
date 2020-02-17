@@ -115,6 +115,16 @@ module top;
         $display(1);
         $display(128);
 
+        $display(4, 4, 32);
+        $display(0, 0, 31);
+        $display(3, 3, 0);
+        $display(3, 3, 31);
+        $display(0, 0, 0);
+        $display(-1, -1, 1);
+        $display(2);
+        $display(1);
+        $display(128);
+
         $display(3, 3, 8);
         $display(0, 0, 7);
         $display(2, 2, 0);
@@ -134,6 +144,46 @@ module top;
         $display(2);
         $display(1);
         $display(24);
+
+        $display(4, 4, 1'bx);
+        $display(3, 3, 1'bx);
+        $display(0, 0, 1'bx);
+        $display(3, 3, 1'bx);
+        $display(0, 0, 1'bx);
+        $display(1, 1, 1'bx);
+        $display(1);
+        $display(0);
+        $display(4);
+
+        $display(4, 4, 1'bx);
+        $display(3, 3, 1'bx);
+        $display(0, 0, 1'bx);
+        $display(3, 3, 1'bx);
+        $display(0, 0, 1'bx);
+        $display(1, 1, 1'bx);
+        $display(1);
+        $display(0);
+        $display(4);
+
+        $display(2, 2, 32);
+        $display(1, 1, 31);
+        $display(0, 0, 0);
+        $display(1, 1, 31);
+        $display(0, 0, 0);
+        $display(1, 1, 1);
+        $display(2);
+        $display(1);
+        $display(64);
+
+        $display(2, 2, 32);
+        $display(0, 0, 31);
+        $display(1, 1, 0);
+        $display(1, 1, 31);
+        $display(0, 0, 0);
+        $display(-1, -1, 1);
+        $display(2);
+        $display(1);
+        $display(64);
 
     end
 endmodule

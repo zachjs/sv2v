@@ -14,6 +14,7 @@ module top;
     Word Ram[0:9];
     type(Ram) RamPair [2];
     integer ints [3:0];
+    integer ints_rev [0:3];
     typedef struct packed { logic x, y, z; } T;
     logic [$size(T)-1:0] foo;
     typedef byte unpacked_t [3];
@@ -35,7 +36,12 @@ module top;
         `EXHAUST(bit);
         `EXHAUST(byte);
         `EXHAUST(ints);
+        `EXHAUST(ints_rev);
         `EXHAUST(unpacked_t);
         `EXHAUST(unpacked);
+        `EXHAUST(type(foo[3:0]));
+        `EXHAUST(type(ints[2][3:0]));
+        `EXHAUST(type(ints[1:0]));
+        `EXHAUST(type(ints_rev[0:1]));
     end
 endmodule

@@ -104,14 +104,18 @@ injectRanges t unpacked = UnpackedType t unpacked
 -- removes the most significant range of the given type
 popRange :: Type -> Type
 popRange (UnpackedType t [_]) = t
+popRange (IntegerAtom TInteger sg) =
+    IntegerVector TLogic sg []
 popRange t =
-    tf $ tail rs
-    where (tf, rs) = typeRanges t
+    tf rs
+    where (tf, _ : rs) = typeRanges t
 
 -- replaces the most significant range of the given type
 replaceRange :: Range -> Type -> Type
 replaceRange r (UnpackedType t (_ : rs)) =
     UnpackedType t (r : rs)
+replaceRange r (IntegerAtom TInteger sg) =
+    IntegerVector TLogic sg [r]
 replaceRange r t =
-    tf $ r : tail rs
-    where (tf, rs) = typeRanges t
+    tf (r : rs)
+    where (tf, _ : rs) = typeRanges t
