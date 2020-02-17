@@ -196,70 +196,86 @@ traverseExpr typeMap =
                 then Ident $ tail x
                 else Ident x
         rewriteExpr (orig @ (Bit (Bit expr idxInner) idxOuter)) =
-            if isJust maybeDims
+            if isJust maybeDims && expr == rewriteExpr expr
                 then Bit expr' idx'
                 else orig
             where
-                maybeDims = dims $ rewriteExpr expr
+                maybeDims = dims expr
                 Just (dimInner, dimOuter, expr') = maybeDims
                 idxInner' = orientIdx dimInner idxInner
                 idxOuter' = orientIdx dimOuter idxOuter
                 base = BinOp Mul idxInner' (rangeSize dimOuter)
                 idx' = simplify $ BinOp Add base idxOuter'
         rewriteExpr (orig @ (Bit expr idx)) =
-            if isJust maybeDims
+            if isJust maybeDims && expr == rewriteExpr expr
                 then Range expr' mode' range'
                 else orig
             where
-                maybeDims = dims $ rewriteExpr expr
+                maybeDims = dims expr
                 Just (dimInner, dimOuter, expr') = maybeDims
                 mode' = IndexedPlus
                 idx' = orientIdx dimInner idx
                 len = rangeSize dimOuter
                 base = BinOp Add (endianCondExpr dimOuter (snd dimOuter) (fst dimOuter)) (BinOp Mul idx' len)
                 range' = (simplify base, simplify len)
-        rewriteExpr (orig @ (Range (Bit expr idxInner) modeOuter rangeOuter)) =
-            if isJust maybeDims
-                then Range expr' mode' range'
+        rewriteExpr (orig @ (Range (Bit expr idxInner) NonIndexed rangeOuter)) =
+            if isJust maybeDims && expr == rewriteExpr expr
+                then endianCondExpr rangeOuter
+                        (rewriteExpr $ Range exprOuter IndexedMinus range)
+                        (rewriteExpr $ Range exprOuter IndexedPlus  range)
                 else orig
             where
-                maybeDims = dims $ rewriteExpr expr
+                maybeDims = dims expr
+                exprOuter = Bit expr idxInner
+                base = fst rangeOuter
+                len = rangeSize rangeOuter
+                range = (base, len)
+        rewriteExpr (orig @ (Range (Bit expr idxInner) modeOuter rangeOuter)) =
+            if isJust maybeDims && expr == rewriteExpr expr
+                then endianCondExpr dimOuter
+                        (Range expr' modeDec range')
+                        (Range expr' modeInc range')
+                else orig
+            where
+                maybeDims = dims expr
                 Just (dimInner, dimOuter, expr') = maybeDims
-                mode' = IndexedPlus
                 idxInner' = orientIdx dimInner idxInner
-                rangeOuterReverseIndexed =
-                    (BinOp Add (fst rangeOuter) (BinOp Sub (snd rangeOuter)
-                    (Number "1")), snd rangeOuter)
-                (baseOuter, lenOuter) =
+                (modeDec, modeInc) =
                     case modeOuter of
-                        IndexedPlus ->
-                            endianCondRange dimOuter rangeOuter rangeOuterReverseIndexed
-                        IndexedMinus ->
-                            endianCondRange dimOuter rangeOuterReverseIndexed rangeOuter
-                        NonIndexed ->
-                            (endianCondExpr dimOuter (snd rangeOuter) (fst rangeOuter), rangeSize rangeOuter)
-                idxOuter' = orientIdx dimOuter baseOuter
+                        IndexedPlus  -> (IndexedPlus , IndexedMinus)
+                        IndexedMinus -> (IndexedMinus, IndexedPlus )
+                        NonIndexed   -> error "invariant violated"
+                (baseOuter, lenOuter) = rangeOuter
+                baseOuter' = orientIdx dimOuter baseOuter
                 start = BinOp Mul idxInner' (rangeSize dimOuter)
-                base = simplify $ BinOp Add start idxOuter'
+                base = simplify $ BinOp Add start baseOuter'
                 len = lenOuter
                 range' = (base, len)
-        rewriteExpr (orig @ (Range expr mode range)) =
-            if isJust maybeDims
-                then Range expr' mode' range'
+        rewriteExpr (orig @ (Range expr NonIndexed range)) =
+            if isJust maybeDims && expr == rewriteExpr expr
+                then endianCondExpr range
+                        (rewriteExpr $ Range expr IndexedMinus range')
+                        (rewriteExpr $ Range expr IndexedPlus  range')
                 else orig
             where
-                maybeDims = dims $ rewriteExpr expr
+                maybeDims = dims expr
+                base = fst range
+                len = rangeSize range
+                range' = (base, len)
+        rewriteExpr (orig @ (Range expr mode range)) =
+            if isJust maybeDims && expr == rewriteExpr expr
+                then Range expr' mode range'
+                else orig
+            where
+                maybeDims = dims expr
                 Just (_, dimOuter, expr') = maybeDims
-                mode' = mode
-                size = rangeSize dimOuter
-                base = endianCondExpr dimOuter (snd dimOuter) (fst dimOuter)
-                range' =
+                sizeOuter = rangeSize dimOuter
+                base = BinOp Add (BinOp Mul sizeOuter (fst range)) start
+                len = BinOp Mul sizeOuter (snd range)
+                range' = (base, len)
+                start =
                     case mode of
-                        NonIndexed   ->
-                            (simplify hi, simplify lo)
-                            where
-                                lo = BinOp Mul size (snd range)
-                                hi = BinOp Sub (BinOp Add lo (BinOp Mul (rangeSize range) size)) (Number "1")
-                        IndexedPlus  -> (BinOp Add (BinOp Mul size (fst range)) base, BinOp Mul size (snd range))
-                        IndexedMinus -> (BinOp Add (BinOp Mul size (fst range)) base, BinOp Mul size (snd range))
+                        IndexedPlus  -> endianCondExpr dimOuter (snd dimOuter) (fst dimOuter)
+                        IndexedMinus -> endianCondExpr dimOuter (fst dimOuter) (snd dimOuter)
+                        NonIndexed   -> error "invariant violated"
         rewriteExpr other = other

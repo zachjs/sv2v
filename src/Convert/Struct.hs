@@ -385,52 +385,87 @@ convertAsgn structs types (lhs, expr) =
                 Nothing -> (Implicit Unspecified [], Ident x)
                 Just t -> (t, Ident x)
         convertSubExpr (Dot e x) =
-            case subExprType of
-                Struct p fields [] -> undot (Struct p fields) fields
-                Union  p fields [] -> undot (Union  p fields) fields
-                _ -> (Implicit Unspecified [], Dot e' x)
+            if maybeFields == Nothing
+                then (Implicit Unspecified [], Dot e' x)
+                else if Map.notMember structTf structs
+                        then (fieldType, Dot e' x)
+                        else (dropInnerTypeRange fieldType, undotted)
             where
                 (subExprType, e') = convertSubExpr e
-                undot structTf fields =
-                    if Map.notMember structTf structs
-                        then (fieldType, Dot e' x)
-                        else (fieldType, Range  e' NonIndexed r)
-                    where
-                        fieldType = lookupFieldType fields x
-                        r = lookupUnstructRange structTf x
-        convertSubExpr (Range eOuter NonIndexed (rOuter @ (hiO, loO))) =
-            -- VCS doesn't allow ranges to be cascaded, so we need to combine
-            -- nested Ranges into a single range. My understanding of the
-            -- semantics are that a range returns a new, zero-indexed sub-range.
-            case eOuter' of
-                Range eInner NonIndexed (_, loI) ->
-                    (t', Range eInner NonIndexed (simplify hi, simplify lo))
-                    where
-                        lo = BinOp Add loI loO
-                        hi = BinOp Add loI hiO
-                Range eInner IndexedPlus (baseI, _) ->
-                    (t', Range eInner IndexedPlus (simplify base, simplify len))
-                    where
-                        base = BinOp Add baseI loO
-                        len = rangeSize rOuter
-                _ -> (t', Range eOuter' NonIndexed rOuter)
+                maybeFields = getFields subExprType
+                Just (structTf, fields) = maybeFields
+                (fieldType, bounds, dims) = lookupFieldInfo structTf fields x
+                len = rangeSize bounds
+                [dim] = dims
+                undotted = if null dims || rangeSize dim == Number "1"
+                    then Bit e' (fst bounds)
+                    else endianCondExpr dim
+                        (Range e' IndexedMinus (fst bounds, len))
+                        (Range e' IndexedPlus  (snd bounds, len))
+        convertSubExpr (Range (Dot e x) NonIndexed rOuter) =
+            if maybeFields == Nothing
+                then (Implicit Unspecified [], orig')
+                else if Map.notMember structTf structs
+                        then (fieldType, orig')
+                        else (dropInnerTypeRange fieldType, undotted)
             where
-                (t, eOuter') = convertSubExpr eOuter
-                t' = dropInnerTypeRange t
-        convertSubExpr (Range eOuter IndexedPlus (rOuter @ (baseO, lenO))) =
-            case eOuter' of
-                Range eInner NonIndexed (hiI, loI) ->
-                    (t', Range eInner IndexedPlus (simplify base, simplify len))
-                    where
-                        base = BinOp Add baseO $
-                            endianCondExpr (hiI, loI) loI hiI
-                        len = lenO
-                _ -> (t', Range eOuter' IndexedPlus rOuter)
+                orig' = Range (Dot e' x) NonIndexed rOuter
+                (subExprType, e') = convertSubExpr e
+                maybeFields = getFields subExprType
+                Just (structTf, fields) = maybeFields
+                (fieldType, bounds, dims) = lookupFieldInfo structTf fields x
+                [dim] = dims
+                undotted = Range e' NonIndexed $
+                    endianCondRange dim rangeLeft rangeRight
+                rangeLeft =
+                    ( BinOp Sub (fst bounds) $ BinOp Sub (fst dim) (fst rOuter)
+                    , BinOp Sub (fst bounds) $ BinOp Sub (fst dim) (snd rOuter) )
+                rangeRight =
+                    ( BinOp Add (snd bounds) $ BinOp Sub (snd dim) (fst rOuter)
+                    , BinOp Add (snd bounds) $ BinOp Sub (snd dim) (snd rOuter) )
+        convertSubExpr (Range (Dot e x) mode (baseO, lenO)) =
+            if maybeFields == Nothing
+                then (Implicit Unspecified [], orig')
+                else if Map.notMember structTf structs
+                        then (fieldType, orig')
+                        else (dropInnerTypeRange fieldType, undotted)
             where
-                (t, eOuter') = convertSubExpr eOuter
+                orig' = Range (Dot e' x) mode (baseO, lenO)
+                (subExprType, e') = convertSubExpr e
+                maybeFields = getFields subExprType
+                Just (structTf, fields) = maybeFields
+                (fieldType, bounds, dims) = lookupFieldInfo structTf fields x
+                [dim] = dims
+                baseLeft  = BinOp Sub (fst bounds) $ BinOp Sub (fst dim) baseO
+                baseRight = BinOp Add (snd bounds) $ BinOp Sub (snd dim) baseO
+                undotted = endianCondExpr dim
+                    (Range e' mode      (baseLeft , lenO))
+                    (Range e' otherMode (baseRight, lenO))
+                otherMode = if mode == IndexedPlus
+                    then IndexedMinus
+                    else IndexedPlus
+        convertSubExpr (Range e mode r) =
+            (t', Range e' mode r)
+            where
+                (t, e') = convertSubExpr e
                 t' = dropInnerTypeRange t
-        convertSubExpr (Range e m r) =
-            (t', Range e' m r)
+        convertSubExpr (Bit (Dot e x) i) =
+            if maybeFields == Nothing
+                then (Implicit Unspecified [], Bit (Dot e' x) i)
+                else if Map.notMember structTf structs
+                        then (fieldType, Bit (Dot e' x) i)
+                        else (dropInnerTypeRange fieldType, Bit e' i')
+            where
+                (subExprType, e') = convertSubExpr e
+                maybeFields = getFields subExprType
+                Just (structTf, fields) = maybeFields
+                (fieldType, bounds, dims) = lookupFieldInfo structTf fields x
+                [dim] = dims
+                iLeft  = BinOp Sub (fst bounds) $ BinOp Sub (fst dim) i
+                iRight = BinOp Add (snd bounds) $ BinOp Sub (snd dim) i
+                i' = endianCondExpr dim iLeft iRight
+        convertSubExpr (Bit e i) =
+            (t', Bit e' i)
             where
                 (t, e') = convertSubExpr e
                 t' = dropInnerTypeRange t
@@ -446,17 +481,6 @@ convertAsgn structs types (lhs, expr) =
             where
                 (_, e1') = convertSubExpr e1
                 (_, e2') = convertSubExpr e2
-        convertSubExpr (Bit e i) =
-            case e' of
-                Range eInner NonIndexed (_, loI) ->
-                    (t', Bit eInner (simplify $ BinOp Add loI i'))
-                Range eInner IndexedPlus (baseI, _) ->
-                    (t', Bit eInner (simplify $ BinOp Add baseI i'))
-                _ -> (t', Bit e' i')
-            where
-                (t, e') = convertSubExpr e
-                t' = dropInnerTypeRange t
-                (_, i') = convertSubExpr i
         convertSubExpr (Call e args) =
             (retType, Call e $ convertCall structs types e' args)
             where
@@ -540,6 +564,22 @@ convertAsgn structs types (lhs, expr) =
         lookupFieldType :: [(Type, Identifier)] -> Identifier -> Type
         lookupFieldType fields fieldName = fieldMap Map.! fieldName
             where fieldMap = Map.fromList $ map swap fields
+
+        -- get the fields and type function of a struct or union
+        getFields :: Type -> Maybe ([Range] -> Type, [Field])
+        getFields (Struct p fields []) = Just (Struct p fields, fields)
+        getFields (Union  p fields []) = Just (Union  p fields, fields)
+        getFields _ = Nothing
+
+        -- get the field type, flattended bounds, and original type dimensions
+        lookupFieldInfo :: ([Range] -> Type) -> [Field] -> Identifier
+            -> (Type, Range, [Range])
+        lookupFieldInfo structTf fields x =
+            (fieldType, bounds, dims)
+            where
+                fieldType = lookupFieldType fields x
+                bounds = lookupUnstructRange structTf x
+                dims = snd $ typeRanges fieldType
 
 -- attempts to convert based on the assignment-like contexts of TF arguments
 convertCall :: Structs -> Types -> Expr -> Args -> Args
