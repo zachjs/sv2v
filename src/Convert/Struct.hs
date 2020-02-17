@@ -271,6 +271,19 @@ convertAsgn structs types (lhs, expr) =
         convertExpr (IntegerVector t sg (r:rs)) (Pattern [(":default", e)]) =
             Repeat (rangeSize r) [e']
             where e' = convertExpr (IntegerVector t sg rs) e
+        -- TODO: This is a conversion for concat array literals with elements
+        -- that are unsized numbers. This probably belongs somewhere else.
+        convertExpr (t @ IntegerVector{}) (Concat exprs) =
+            if all isUnsizedNumber exprs
+                then Concat exprs'
+                else Concat exprs
+            where
+                size = DimsFn FnBits (Left $ dropInnerTypeRange t)
+                caster = Cast (Right size)
+                exprs' = map caster exprs
+                isUnsizedNumber :: Expr -> Bool
+                isUnsizedNumber (Number n) = not $ elem '\'' n
+                isUnsizedNumber _ = False
         convertExpr (Struct packing fields (_:rs)) (Concat exprs) =
             Concat $ map (convertExpr (Struct packing fields rs)) exprs
         convertExpr (Struct packing fields (_:rs)) (Bit e _) =
