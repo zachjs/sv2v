@@ -59,7 +59,23 @@ traverseExprM =
     traverseNestedExprsM convertExprM
     where
         convertExprM :: Expr -> ST Expr
-        convertExprM (Cast (Right s) e) = do
+        convertExprM (Cast (Right (Number s)) (Number n)) =
+            case (readNumber s, readNumber n) of
+                (Just s', Just n') ->
+                    return $ Number str
+                    where
+                        str = (show size) ++ "'d"  ++ (show num)
+                        size = s'
+                        num = n' `mod` (2 ^ s')
+                _ -> convertCastM (Number s) (Number n)
+        convertExprM (orig @ (Cast (Right DimsFn{}) _)) =
+            return orig
+        convertExprM (Cast (Right s) e) =
+            convertCastM s e
+        convertExprM other = return other
+
+        convertCastM :: Expr -> Expr -> ST Expr
+        convertCastM s e = do
             typeMap <- get
             case exprSigning typeMap e of
                 Just sg -> do
@@ -68,7 +84,6 @@ traverseExprM =
                     let args = Args [Just e] []
                     return $ Call (Ident f) args
                 _ -> return $ Cast (Right s) e
-        convertExprM other = return other
 
 
 castFn :: Expr -> Signing -> Description
