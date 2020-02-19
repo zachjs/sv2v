@@ -27,7 +27,7 @@ module Convert.MultiplePacked (convert) where
 
 import Control.Monad.State
 import Data.Tuple (swap)
-import Data.Maybe (isJust, fromJust)
+import Data.Maybe (isJust)
 import qualified Data.Map.Strict as Map
 
 import Convert.Traverse
@@ -118,7 +118,10 @@ traverseLHSM :: LHS -> State Info LHS
 traverseLHSM lhs = do
     let expr = lhsToExpr lhs
     expr' <- traverseExprM expr
-    return $ fromJust $ exprToLHS expr'
+    case exprToLHS expr' of
+        Just lhs' -> return lhs'
+        Nothing -> error $ "multi-packed conversion created non-LHS from "
+            ++ (show expr) ++ " to " ++ (show expr')
 
 traverseExpr :: Info -> Expr -> Expr
 traverseExpr typeMap =
@@ -220,46 +223,45 @@ traverseExpr typeMap =
                 range' = (simplify base, simplify len)
         rewriteExpr (orig @ (Range (Bit expr idxInner) NonIndexed rangeOuter)) =
             if isJust maybeDims && expr == rewriteExpr expr
-                then endianCondExpr rangeOuter
-                        (rewriteExpr $ Range exprOuter IndexedMinus range)
-                        (rewriteExpr $ Range exprOuter IndexedPlus  range)
+                then rewriteExpr $ Range exprOuter IndexedMinus range
                 else orig
             where
                 maybeDims = dims expr
                 exprOuter = Bit expr idxInner
-                base = fst rangeOuter
+                baseDec = fst rangeOuter
+                baseInc = BinOp Sub (BinOp Add baseDec len) (Number "1")
+                base = endianCondExpr rangeOuter baseDec baseInc
                 len = rangeSize rangeOuter
                 range = (base, len)
         rewriteExpr (orig @ (Range (Bit expr idxInner) modeOuter rangeOuter)) =
             if isJust maybeDims && expr == rewriteExpr expr
-                then endianCondExpr dimOuter
-                        (Range expr' modeDec range')
-                        (Range expr' modeInc range')
+                then Range expr' modeOuter range'
                 else orig
             where
                 maybeDims = dims expr
                 Just (dimInner, dimOuter, expr') = maybeDims
                 idxInner' = orientIdx dimInner idxInner
-                (modeDec, modeInc) =
-                    case modeOuter of
-                        IndexedPlus  -> (IndexedPlus , IndexedMinus)
-                        IndexedMinus -> (IndexedMinus, IndexedPlus )
-                        NonIndexed   -> error "invariant violated"
                 (baseOuter, lenOuter) = rangeOuter
                 baseOuter' = orientIdx dimOuter baseOuter
                 start = BinOp Mul idxInner' (rangeSize dimOuter)
-                base = simplify $ BinOp Add start baseOuter'
+                baseDec = BinOp Add start baseOuter'
+                baseInc = case modeOuter of
+                    IndexedPlus  -> BinOp Add (BinOp Sub baseDec len) one
+                    IndexedMinus -> BinOp Sub (BinOp Add baseDec len) one
+                    NonIndexed   -> error "invariant violated"
+                base = endianCondExpr dimOuter baseDec baseInc
                 len = lenOuter
                 range' = (base, len)
+                one = Number "1"
         rewriteExpr (orig @ (Range expr NonIndexed range)) =
             if isJust maybeDims && expr == rewriteExpr expr
-                then endianCondExpr range
-                        (rewriteExpr $ Range expr IndexedMinus range')
-                        (rewriteExpr $ Range expr IndexedPlus  range')
+                then rewriteExpr $ Range expr IndexedMinus range'
                 else orig
             where
                 maybeDims = dims expr
-                base = fst range
+                baseDec = fst range
+                baseInc = BinOp Sub (BinOp Add baseDec len) (Number "1")
+                base = endianCondExpr range baseDec baseInc
                 len = rangeSize range
                 range' = (base, len)
         rewriteExpr (orig @ (Range expr mode range)) =

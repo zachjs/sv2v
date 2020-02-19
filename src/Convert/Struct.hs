@@ -250,11 +250,13 @@ convertAsgn structs types (lhs, expr) =
         -- converting LHSs by looking at the innermost types first
         convertLHS :: LHS -> (Type, LHS)
         convertLHS l =
-            (t, l')
+            case exprToLHS e' of
+                Just l' -> (t, l')
+                Nothing -> error $ "struct conversion created non-LHS from "
+                    ++ (show e) ++ " to " ++ (show e')
             where
                 e = lhsToExpr l
                 (t, e') = convertSubExpr e
-                Just l' = exprToLHS e'
 
         specialTag = ':'
         defaultKey = specialTag : "default"
@@ -395,13 +397,12 @@ convertAsgn structs types (lhs, expr) =
                 maybeFields = getFields subExprType
                 Just (structTf, fields) = maybeFields
                 (fieldType, bounds, dims) = lookupFieldInfo structTf fields x
+                base = fst bounds
                 len = rangeSize bounds
                 [dim] = dims
                 undotted = if null dims || rangeSize dim == Number "1"
                     then Bit e' (fst bounds)
-                    else endianCondExpr dim
-                        (Range e' IndexedMinus (fst bounds, len))
-                        (Range e' IndexedPlus  (snd bounds, len))
+                    else Range e' IndexedMinus (base, len)
         convertSubExpr (Range (Dot e x) NonIndexed rOuter) =
             if maybeFields == Nothing
                 then (Implicit Unspecified [], orig')
@@ -438,12 +439,14 @@ convertAsgn structs types (lhs, expr) =
                 [dim] = dims
                 baseLeft  = BinOp Sub (fst bounds) $ BinOp Sub (fst dim) baseO
                 baseRight = BinOp Add (snd bounds) $ BinOp Sub (snd dim) baseO
-                undotted = endianCondExpr dim
-                    (Range e' mode      (baseLeft , lenO))
-                    (Range e' otherMode (baseRight, lenO))
-                otherMode = if mode == IndexedPlus
-                    then IndexedMinus
-                    else IndexedPlus
+                baseDec = baseLeft
+                baseInc = case mode of
+                    IndexedPlus  -> BinOp Add (BinOp Sub baseRight lenO) one
+                    IndexedMinus -> BinOp Sub (BinOp Add baseRight lenO) one
+                    NonIndexed   -> error "invariant violated"
+                base = endianCondExpr dim baseDec baseInc
+                undotted = Range e' mode (base, lenO)
+                one = Number "1"
         convertSubExpr (Range e mode r) =
             (t', Range e' mode r)
             where
