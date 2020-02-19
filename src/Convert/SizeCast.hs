@@ -72,19 +72,25 @@ traverseExprM =
             return orig
         convertExprM (Cast (Right s) e) =
             convertCastM s e
+        convertExprM (Cast (Left (IntegerVector _ Signed rs)) e) =
+            convertCastWithSigningM (dimensionsSize rs) e Signed
+        convertExprM (Cast (Left (IntegerVector _ _ rs)) e) =
+            convertExprM $ Cast (Right $ dimensionsSize rs) e
         convertExprM other = return other
 
         convertCastM :: Expr -> Expr -> ST Expr
         convertCastM s e = do
             typeMap <- get
             case exprSigning typeMap e of
-                Just sg -> do
-                    lift $ tell $ Set.singleton (s, sg)
-                    let f = castFnName s sg
-                    let args = Args [Just e] []
-                    return $ Call (Ident f) args
+                Just sg -> convertCastWithSigningM s e sg
                 _ -> return $ Cast (Right s) e
 
+        convertCastWithSigningM :: Expr -> Expr -> Signing -> ST Expr
+        convertCastWithSigningM s e sg = do
+            lift $ tell $ Set.singleton (s, sg)
+            let f = castFnName s sg
+            let args = Args [Just e] []
+            return $ Call (Ident f) args
 
 castFn :: Expr -> Signing -> Description
 castFn e sg =

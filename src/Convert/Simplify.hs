@@ -66,7 +66,7 @@ convertExpr info (Call (Ident "$clog2") (Args [Just e] [])) =
         clog2' = simplify clog2
 convertExpr info (Mux cc aa bb) =
     if before == after
-        then Mux cc aa bb
+        then simplify $ Mux cc aa bb
         else simplify $ Mux after aa bb
     where
         before = substitute info cc

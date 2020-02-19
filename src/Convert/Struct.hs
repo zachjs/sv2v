@@ -275,16 +275,20 @@ convertAsgn structs types (lhs, expr) =
             where e' = convertExpr (IntegerVector t sg rs) e
         -- TODO: This is a conversion for concat array literals with elements
         -- that are unsized numbers. This probably belongs somewhere else.
+        convertExpr (t @ IntegerVector{}) (Pattern items) =
+            if all (null . fst) items
+                then convertExpr t $ Concat $ map snd items
+                else Pattern items
         convertExpr (t @ IntegerVector{}) (Concat exprs) =
             if all isUnsizedNumber exprs
                 then Concat exprs'
                 else Concat exprs
             where
-                size = DimsFn FnBits (Left $ dropInnerTypeRange t)
-                caster = Cast (Right size)
+                caster = Cast (Left $ dropInnerTypeRange t)
                 exprs' = map caster exprs
                 isUnsizedNumber :: Expr -> Bool
                 isUnsizedNumber (Number n) = not $ elem '\'' n
+                isUnsizedNumber (UniOp UniSub e) = isUnsizedNumber e
                 isUnsizedNumber _ = False
         convertExpr (Struct packing fields (_:rs)) (Concat exprs) =
             Concat $ map (convertExpr (Struct packing fields rs)) exprs

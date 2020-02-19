@@ -64,11 +64,8 @@ convertDescription' description =
     (description', enumPairs)
     where
         -- replace and collect the enum types in this description
-        (description', enums) =
-            runWriter $
-            traverseModuleItemsM (traverseTypesM traverseType) $
-            traverseModuleItems (traverseExprs $ traverseNestedExprs traverseExpr) $
-            description
+        (description', enums) = runWriter $
+            traverseModuleItemsM (traverseTypesM traverseType) description
         -- convert the collected enums into their corresponding localparams
         enumPairs = concatMap enumVals $ Set.toList enums
 
@@ -125,13 +122,6 @@ traverseType other = return other
 
 simplifyRange :: Range -> Range
 simplifyRange (a, b) = (simplify a, simplify b)
-
--- drop any enum type casts in favor of implicit conversion from the
--- converted type
-traverseExpr :: Expr -> Expr
-traverseExpr (Cast (Left (IntegerVector _ _ _)) e) = e
-traverseExpr (Cast (Left (Enum _ _ _)) e) = e
-traverseExpr other = other
 
 enumVals :: EnumInfo -> [EnumItem]
 enumVals (mr, l) =

@@ -93,6 +93,7 @@ typeof (orig @ (Range e mode r)) = do
             NonIndexed   -> snd r
             IndexedPlus  -> BinOp Sub (uncurry (BinOp Add) r) (Number "1")
             IndexedMinus -> BinOp Add (uncurry (BinOp Sub) r) (Number "1")
+typeof (BinOp Add e Number{}) = typeof e
 typeof other = return $ TypeOf other
 
 -- combines a type with unpacked ranges
