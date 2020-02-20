@@ -460,7 +460,7 @@ convertAsgn structs types (lhs, expr) =
             if maybeFields == Nothing
                 then (Implicit Unspecified [], Bit (Dot e' x) i)
                 else if Map.notMember structTf structs
-                        then (fieldType, Bit (Dot e' x) i)
+                        then (dropInnerTypeRange fieldType, Bit (Dot e' x) i)
                         else (dropInnerTypeRange fieldType, Bit e' i')
             where
                 (subExprType, e') = convertSubExpr e
