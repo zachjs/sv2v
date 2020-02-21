@@ -91,7 +91,7 @@ module Convert.Traverse
 , traverseFiles
 ) where
 
-import Data.Functor.Identity (runIdentity)
+import Data.Functor.Identity (Identity, runIdentity)
 import Control.Monad.State
 import Control.Monad.Writer
 import Language.SystemVerilog.AST
@@ -110,9 +110,8 @@ data TypeStrategy
     | ExcludeParamTypes
     deriving Eq
 
-unmonad :: (MapperM (State ()) a -> MapperM (State ()) b) -> Mapper a -> Mapper b
-unmonad traverser mapper thing =
-    evalState (traverser (return . mapper) thing) ()
+unmonad :: (MapperM Identity a -> MapperM Identity b) -> Mapper a -> Mapper b
+unmonad traverser mapper = runIdentity . traverser (return . mapper)
 
 collectify :: Monad m => (MapperM m a -> MapperM m b) -> CollectorM m a -> CollectorM m b
 collectify traverser collector thing =
@@ -120,69 +119,40 @@ collectify traverser collector thing =
     where mapper x = collector x >>= \() -> return x
 
 traverseDescriptionsM :: Monad m => MapperM m Description -> MapperM m AST
-traverseDescriptionsM mapper descriptions =
-    mapM mapper descriptions
-
+traverseDescriptionsM = mapM
 traverseDescriptions :: Mapper Description -> Mapper AST
-traverseDescriptions = unmonad traverseDescriptionsM
+traverseDescriptions = map
 collectDescriptionsM :: Monad m => CollectorM m Description -> CollectorM m AST
 collectDescriptionsM = collectify traverseDescriptionsM
 
+breakGenerate :: ModuleItem -> [ModuleItem]
+breakGenerate (Generate genItems) =
+    if all isGenModuleItem genItems
+        then map (\(GenModuleItem item) -> item) genItems
+        else [Generate genItems]
+    where
+        isGenModuleItem :: GenItem -> Bool
+        isGenModuleItem (GenModuleItem _) = True
+        isGenModuleItem _ = False
+breakGenerate other = [other]
+
 traverseModuleItemsM :: Monad m => MapperM m ModuleItem -> MapperM m Description
 traverseModuleItemsM mapper (Part attrs extern kw lifetime name ports items) = do
-    items' <- mapM fullMapper items
+    items' <- mapM (traverseNestedModuleItemsM mapper) items
     let items'' = concatMap breakGenerate items'
     return $ Part attrs extern kw lifetime name ports items''
     where
-        fullMapper (Generate [GenBlock "" genItems]) =
-            mapM fullGenItemMapper genItems >>= mapper . Generate
-        fullMapper (Generate genItems) = do
-            let genItems' = filter (/= GenNull) genItems
-            mapM fullGenItemMapper genItems' >>= mapper . Generate
-        fullMapper (MIAttr attr mi) =
-            fullMapper mi >>= mapper . MIAttr attr
-        fullMapper other = mapper other
-        fullGenItemMapper = traverseNestedGenItemsM genItemMapper
-        genItemMapper (GenModuleItem moduleItem) = do
-            moduleItem' <- fullMapper moduleItem
-            return $ case moduleItem' of
-                Generate subItems -> GenBlock "" subItems
-                _ -> GenModuleItem moduleItem'
-        genItemMapper (GenIf (Number "1") s _) = return s
-        genItemMapper (GenIf (Number "0") _ s) = return s
-        genItemMapper (GenBlock "" [item]) = return item
-        genItemMapper (GenBlock _ []) = return GenNull
-        genItemMapper other = return other
-        breakGenerate :: ModuleItem -> [ModuleItem]
-        breakGenerate (Generate genItems) =
-            if all isGenModuleItem genItems
-                then map (\(GenModuleItem item) -> item) genItems
-                else [Generate genItems]
-            where
-                isGenModuleItem :: GenItem -> Bool
-                isGenModuleItem (GenModuleItem _) = True
-                isGenModuleItem _ = False
-        breakGenerate other = [other]
 traverseModuleItemsM mapper (PackageItem packageItem) = do
     let item = MIPackageItem packageItem
-    converted <-
-        traverseModuleItemsM mapper (Part [] False Module Inherit "DNE" [] [item])
-    let item' = case converted of
-            Part [] False Module Inherit "DNE" [] [newItem] -> newItem
-            _ -> error $ "redirected PackageItem traverse failed: "
-                    ++ show converted
+    item' <- traverseNestedModuleItemsM mapper item
     return $ case item' of
         MIPackageItem packageItem' -> PackageItem packageItem'
         other -> error $ "encountered bad package module item: " ++ show other
 traverseModuleItemsM mapper (Package lifetime name packageItems) = do
     let items = map MIPackageItem packageItems
-    converted <-
-        traverseModuleItemsM mapper (Part [] False Module Inherit "DNE" [] items)
-    let items' = case converted of
-            Part [] False Module Inherit "DNE" [] newItems -> newItems
-            _ -> error $ "redirected Package traverse failed: "
-                    ++ show converted
-    return $ Package lifetime name $ map (\(MIPackageItem item) -> item) items'
+    items' <- mapM (traverseNestedModuleItemsM mapper) items
+    let items'' = concatMap breakGenerate items'
+    return $ Package lifetime name $ map (\(MIPackageItem item) -> item) items''
 
 traverseModuleItems :: Mapper ModuleItem -> Mapper Description
 traverseModuleItems = unmonad traverseModuleItemsM
@@ -1052,16 +1022,27 @@ collectStmtAsgnsM :: Monad m => CollectorM m (LHS, Expr) -> CollectorM m Stmt
 collectStmtAsgnsM = collectify traverseStmtAsgnsM
 
 traverseNestedModuleItemsM :: Monad m => MapperM m ModuleItem -> MapperM m ModuleItem
-traverseNestedModuleItemsM mapper item = do
-    converted <-
-        traverseModuleItemsM mapper (Part [] False Module Inherit "DNE" [] [item])
-    let items' = case converted of
-            Part [] False Module Inherit "DNE" [] newItems -> newItems
-            _ -> error $ "redirected NestedModuleItems traverse failed: "
-                    ++ show converted
-    return $ case items' of
-        [item'] -> item'
-        _ -> Generate $ map GenModuleItem items'
+traverseNestedModuleItemsM mapper = fullMapper
+    where
+        fullMapper (Generate [GenBlock "" genItems]) =
+            mapM fullGenItemMapper genItems >>= mapper . Generate
+        fullMapper (Generate genItems) = do
+            let genItems' = filter (/= GenNull) genItems
+            mapM fullGenItemMapper genItems' >>= mapper . Generate
+        fullMapper (MIAttr attr mi) =
+            fullMapper mi >>= mapper . MIAttr attr
+        fullMapper other = mapper other
+        fullGenItemMapper = traverseNestedGenItemsM genItemMapper
+        genItemMapper (GenModuleItem moduleItem) = do
+            moduleItem' <- fullMapper moduleItem
+            return $ case moduleItem' of
+                Generate subItems -> GenBlock "" subItems
+                _ -> GenModuleItem moduleItem'
+        genItemMapper (GenIf (Number "1") s _) = return s
+        genItemMapper (GenIf (Number "0") _ s) = return s
+        genItemMapper (GenBlock "" [item]) = return item
+        genItemMapper (GenBlock _ []) = return GenNull
+        genItemMapper other = return other
 
 traverseNestedModuleItems :: Mapper ModuleItem -> Mapper ModuleItem
 traverseNestedModuleItems = unmonad traverseNestedModuleItemsM
