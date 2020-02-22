@@ -476,18 +476,6 @@ convertAsgn structs types (lhs, expr) =
             where
                 (t, e') = convertSubExpr e
                 t' = dropInnerTypeRange t
-        convertSubExpr (Concat exprs) =
-            (Implicit Unspecified [], Concat $ map (snd . convertSubExpr) exprs)
-        convertSubExpr (Stream o e exprs) =
-            (Implicit Unspecified [], Stream o e' exprs')
-            where
-                e' = (snd . convertSubExpr) e
-                exprs' = map (snd . convertSubExpr) exprs
-        convertSubExpr (BinOp op e1 e2) =
-            (Implicit Unspecified [], BinOp op e1' e2')
-            where
-                (_, e1') = convertSubExpr e1
-                (_, e2') = convertSubExpr e2
         convertSubExpr (Call e args) =
             (retType, Call e $ convertCall structs types e' args)
             where
@@ -497,36 +485,8 @@ convertAsgn structs types (lhs, expr) =
                         Nothing -> Implicit Unspecified []
                         Just t -> t
                     _ -> Implicit Unspecified []
-        convertSubExpr (String s) = (Implicit Unspecified [], String s)
-        convertSubExpr (Number n) = (Implicit Unspecified [], Number n)
-        convertSubExpr (Time   n) = (Implicit Unspecified [], Time   n)
-        convertSubExpr (PSIdent x y) = (Implicit Unspecified [], PSIdent x y)
-        convertSubExpr (Repeat e es) =
-            (Implicit Unspecified [], Repeat e' es')
-            where
-                (_, e') = convertSubExpr e
-                es' = map (snd . convertSubExpr) es
-        convertSubExpr (UniOp op e) =
-            (Implicit Unspecified [], UniOp op e')
-            where (_, e') = convertSubExpr e
-        convertSubExpr (Mux a b c) =
-            (t, Mux a' b' c')
-            where
-                (_, a') = convertSubExpr a
-                (t, b') = convertSubExpr b
-                (_, c') = convertSubExpr c
         convertSubExpr (Cast (Left t) sub) =
             (t, Cast (Left t) (snd $ convertSubExpr sub))
-        convertSubExpr (Cast (Right e) sub) =
-            (Implicit Unspecified [], Cast (Right e) (snd $ convertSubExpr sub))
-        convertSubExpr (DimsFn f tore) =
-            (Implicit Unspecified [], DimsFn f tore')
-            where tore' = convertTypeOrExpr tore
-        convertSubExpr (DimFn f tore e) =
-            (Implicit Unspecified [], DimFn f tore' e')
-            where
-                tore' = convertTypeOrExpr tore
-                e' = snd $ convertSubExpr e
         convertSubExpr (Pattern items) =
             if all (== "") $ map fst items'
                 then (Implicit Unspecified [], Concat $ map snd items')
@@ -534,29 +494,14 @@ convertAsgn structs types (lhs, expr) =
             where
                 items' = map mapItem items
                 mapItem (mx, e) = (mx, snd $ convertSubExpr e)
-        convertSubExpr (Inside e l) =
-            (t, Inside e' l')
-            where
-                t = IntegerVector TLogic Unspecified []
-                (_, e') = convertSubExpr e
-                l' = map mapItem l
-                mapItem :: ExprOrRange -> ExprOrRange
-                mapItem (Left a) = Left $ snd $ convertSubExpr a
-                mapItem (Right (a, b)) = Right (a', b')
-                    where
-                        (_, a') = convertSubExpr a
-                        (_, b') = convertSubExpr b
-        convertSubExpr (MinTypMax a b c) =
-            (t, MinTypMax a' b' c')
+        convertSubExpr (Mux a b c) =
+            (t, Mux a' b' c')
             where
                 (_, a') = convertSubExpr a
                 (t, b') = convertSubExpr b
                 (_, c') = convertSubExpr c
-        convertSubExpr Nil = (Implicit Unspecified [], Nil)
-
-        convertTypeOrExpr :: TypeOrExpr -> TypeOrExpr
-        convertTypeOrExpr (Left t) = Left t
-        convertTypeOrExpr (Right e) = Right $ snd $ convertSubExpr e
+        convertSubExpr other =
+            (Implicit Unspecified [], other)
 
         -- lookup the range of a field in its unstructured type
         lookupUnstructRange :: TypeFunc -> Identifier -> Range
