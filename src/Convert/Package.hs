@@ -84,7 +84,7 @@ prefixPackageItem packageName idents item =
         prefix :: Identifier -> Identifier
         prefix x =
             if Set.member x idents
-                then packageName ++ "_" ++ x
+                then packageName ++ '_' : x
                 else x
         item' = case item of
             Function       a b x c d  -> Function       a b (prefix x) c d
