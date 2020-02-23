@@ -50,7 +50,7 @@ defaultJob = Job
     , verbose = nam "verbose" &= help "Retain certain conversion artifacts"
     }
     &= program "sv2v"
-    &= summary ("sv2v v0.0.1 (" ++ shortGitHash ++ ")")
+    &= summary ("sv2v v0.0.2 (" ++ shortGitHash ++ ")")
     &= details [ "sv2v converts SystemVerilog to Verilog."
                , "More info: https://github.com/zachjs/sv2v"
                , "(C) 2019-2020 Zachary Snow, 2011-2015 Tom Hawkins" ]

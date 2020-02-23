@@ -35,7 +35,11 @@ All of sv2v's dependencies are free and open-source.
 
 ### Pre-built binaries
 
-We plan on releasing pre-built binaries in the future.
+Binaries for Linux and macOS are available on the [releases page]. If your
+system is not covered, or you would like to build the latest commit, simple
+instructions for building from source are below.
+
+[releases page]: https://github.com/zachjs/sv2v/releases
 
 ### Building from source
 

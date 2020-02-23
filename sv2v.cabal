@@ -1,5 +1,5 @@
 name: sv2v
-version: 0.0.1
+version: 0.0.2
 synopsis: SystemVerilog to Verilog conversion
 description:
   A tool for coverting SystemVerilog to Verilog. Originally forked from the
