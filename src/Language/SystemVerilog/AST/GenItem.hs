@@ -22,7 +22,7 @@ import {-# SOURCE #-} Language.SystemVerilog.AST.ModuleItem (ModuleItem)
 data GenItem
     = GenBlock Identifier [GenItem]
     | GenCase  Expr [GenCase]
-    | GenFor   (Bool, Identifier, Expr) Expr (Identifier, AsgnOp, Expr) GenItem
+    | GenFor   (Identifier, Expr) Expr (Identifier, AsgnOp, Expr) GenItem
     | GenIf    Expr GenItem GenItem
     | GenNull
     | GenModuleItem ModuleItem
@@ -39,9 +39,8 @@ instance Show GenItem where
         where bodyStr = indent $ unlines' $ map showGenCase cs
     show (GenIf e a GenNull) = printf "if (%s) %s"          (show e) (show a)
     show (GenIf e a b      ) = printf "if (%s) %s\nelse %s" (show e) (show a) (show b)
-    show (GenFor (new, x1, e1) c (x2, o2, e2) s) =
-        printf "for (%s%s = %s; %s; %s %s %s) %s"
-            (if new then "genvar " else "")
+    show (GenFor (x1, e1) c (x2, o2, e2) s) =
+        printf "for (%s = %s; %s; %s %s %s) %s"
             x1 (show e1)
             (show c)
             x2 (show o2) (show e2)

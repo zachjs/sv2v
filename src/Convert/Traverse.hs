@@ -63,6 +63,7 @@ module Convert.Traverse
 , traverseGenItemsM
 , traverseGenItems
 , collectGenItemsM
+, traverseNestedGenItemsM
 , traverseAsgnsM
 , traverseAsgns
 , collectAsgnsM
@@ -633,11 +634,11 @@ traverseExprsM' strat exprMapper = moduleItemMapper
         a'' <- traverseAssertionExprsM exprMapper a'
         return $ AssertionItem (mx, a'')
 
-    genItemMapper (GenFor (n1, x1, e1) cc (x2, op2, e2) subItem) = do
+    genItemMapper (GenFor (x1, e1) cc (x2, op2, e2) subItem) = do
         e1' <- exprMapper e1
         e2' <- exprMapper e2
         cc' <- exprMapper cc
-        return $ GenFor (n1, x1, e1') cc' (x2, op2, e2') subItem
+        return $ GenFor (x1, e1') cc' (x2, op2, e2') subItem
     genItemMapper (GenIf e i1 i2) = do
         e' <- exprMapper e
         return $ GenIf e' i1 i2
@@ -762,12 +763,12 @@ traverseLHSsM' strat mapper item =
             items' <- mapM (traverseNestedGenItemsM traverGenItemLHSsM) items
             return $ Generate items'
         traverseModuleItemLHSsM other = return other
-        traverGenItemLHSsM (GenFor (n1, x1, e1) cc (x2, op2, e2) subItem) = do
-            wrapped_x1' <- (if n1 then return else mapper) $ LHSIdent x1
+        traverGenItemLHSsM (GenFor (x1, e1) cc (x2, op2, e2) subItem) = do
+            wrapped_x1' <- mapper $ LHSIdent x1
             wrapped_x2' <- mapper $ LHSIdent x2
             let LHSIdent x1' = wrapped_x1'
             let LHSIdent x2' = wrapped_x2'
-            return $ GenFor (n1, x1', e1) cc (x2', op2, e2) subItem
+            return $ GenFor (x1', e1) cc (x2', op2, e2) subItem
         traverGenItemLHSsM other = return other
 
 traverseLHSs' :: TFStrategy -> Mapper LHS -> Mapper ModuleItem
@@ -956,12 +957,18 @@ traverseNestedGenItemsM mapper = fullMapper
         fullMapper stmt =
             mapper stmt >>= traverseSinglyNestedGenItemsM fullMapper
 
+flattenGenBlocks :: GenItem -> [GenItem]
+flattenGenBlocks (GenBlock "" items) = items
+flattenGenBlocks (GenFor _ _ _ GenNull) = []
+flattenGenBlocks GenNull = []
+flattenGenBlocks other = [other]
+
 traverseSinglyNestedGenItemsM :: Monad m => MapperM m GenItem -> MapperM m GenItem
 traverseSinglyNestedGenItemsM fullMapper = gim
     where
         gim (GenBlock x subItems) = do
             subItems' <- mapM fullMapper subItems
-            return $ GenBlock x (concatMap flattenBlocks subItems')
+            return $ GenBlock x (concatMap flattenGenBlocks subItems')
         gim (GenFor a b c subItem) = do
             subItem' <- fullMapper subItem
             return $ GenFor a b c subItem'
@@ -976,9 +983,6 @@ traverseSinglyNestedGenItemsM fullMapper = gim
         gim (GenModuleItem moduleItem) =
             return $ GenModuleItem moduleItem
         gim (GenNull) = return GenNull
-        flattenBlocks :: GenItem -> [GenItem]
-        flattenBlocks (GenBlock "" items) = items
-        flattenBlocks other = [other]
 
 traverseAsgnsM' :: Monad m => TFStrategy -> MapperM m (LHS, Expr) -> MapperM m ModuleItem
 traverseAsgnsM' strat mapper = moduleItemMapper
@@ -1024,10 +1028,8 @@ collectStmtAsgnsM = collectify traverseStmtAsgnsM
 traverseNestedModuleItemsM :: Monad m => MapperM m ModuleItem -> MapperM m ModuleItem
 traverseNestedModuleItemsM mapper = fullMapper
     where
-        fullMapper (Generate [GenBlock "" genItems]) =
-            mapM fullGenItemMapper genItems >>= mapper . Generate
         fullMapper (Generate genItems) = do
-            let genItems' = filter (/= GenNull) genItems
+            let genItems' = concatMap flattenGenBlocks genItems
             mapM fullGenItemMapper genItems' >>= mapper . Generate
         fullMapper (MIAttr attr mi) =
             fullMapper mi >>= mapper . MIAttr attr

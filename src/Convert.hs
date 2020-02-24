@@ -14,6 +14,7 @@ import qualified Convert.AsgnOp
 import qualified Convert.Assertion
 import qualified Convert.BlockDecl
 import qualified Convert.DimensionQuery
+import qualified Convert.DuplicateGenvar
 import qualified Convert.EmptyArgs
 import qualified Convert.Enum
 import qualified Convert.ForDecl
@@ -56,6 +57,7 @@ phases excludes =
     , Convert.NamedBlock.convert
     , Convert.Assertion.convert
     , Convert.BlockDecl.convert
+    , Convert.DuplicateGenvar.convert
     , selectExclude (Job.Logic    , Convert.Logic.convert)
     , Convert.FuncRet.convert
     , Convert.FuncRoutine.convert

@@ -2,11 +2,10 @@
  - Author: Zachary Snow <zach@zachjs.com>
  -
  - Verilog-2005 requires that for loops have have exactly one assignment in the
- - initialization section. For generate for loops, we move any genvar
- - declarations to a wrapping generate block. For procedural for loops, we pull
- - the declarations out to a wrapping block, and convert all but one assignment
- - to a preceding statement. If a for loop has no assignments or declarations, a
- - dummy declaration is generated.
+ - initialization section. For procedural for loops, we pull the declarations
+ - out to a wrapping block, and convert all but one assignment to a preceding
+ - statement. If a for loop has no assignments or declarations, a dummy
+ - declaration is generated.
  -}
 
 module Convert.ForDecl (convert) where
@@ -17,35 +16,7 @@ import Language.SystemVerilog.AST
 convert :: [AST] -> [AST]
 convert =
     map $ traverseDescriptions $ traverseModuleItems $
-    ( traverseStmts    convertStmt
-    . traverseGenItems convertGenItem
-    )
-
-convertGenItem :: GenItem -> GenItem
-convertGenItem (GenFor (True, _, _) _ _ GenNull) = GenNull
-convertGenItem (GenFor (True, _, _) _ _ (GenBlock _ [])) = GenNull
-convertGenItem (GenFor (True, x, e) a b c) =
-    GenBlock "" genItems
-    where
-        bx = case c of
-            GenBlock name _ -> name
-            _ -> ""
-        x' = if null bx then x else bx ++ "_" ++ x
-        Generate genItems =
-            traverseNestedModuleItems converter $ Generate $
-            [ GenModuleItem $ Genvar x'
-            , GenFor (False, x, e) a b c
-            ]
-        converter =
-            (traverseExprs $ traverseNestedExprs convertExpr) .
-            (traverseLHSs  $ traverseNestedLHSs  convertLHS )
-        prefix :: String -> String
-        prefix ident = if ident == x then x' else ident
-        convertExpr (Ident ident) = Ident $ prefix ident
-        convertExpr other = other
-        convertLHS (LHSIdent ident) = LHSIdent $ prefix ident
-        convertLHS other = other
-convertGenItem other = other
+    traverseStmts convertStmt
 
 convertStmt :: Stmt -> Stmt
 convertStmt (For (Left []) cc asgns stmt) =

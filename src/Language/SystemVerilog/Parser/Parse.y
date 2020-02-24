@@ -1238,7 +1238,7 @@ ConditionalGenerateConstruct :: { GenItem }
   | "if" "(" Expr ")" GenItemOrNull %prec NoElse         { GenIf $3 $5 GenNull }
   | "case" "(" Expr ")" GenCases "endcase" { GenCase $3 $5 }
 LoopGenerateConstruct :: { GenItem }
-  : "for" "(" GenvarInitialization ";" Expr ";" GenvarIteration ")" GenItem { GenFor $3 $5 $7 $9 }
+  : "for" "(" GenvarInitialization ";" Expr ";" GenvarIteration ")" GenItem { $3 $5 $7 $9 }
 
 GenBlock :: { (Identifier, [GenItem]) }
   : "begin" StrTag GenItems "end" StrTag { (combineTags $2 $5, $3) }
@@ -1250,9 +1250,9 @@ GenCase :: { GenCase }
   : Exprs         ":"  GenItemOrNull { ($1, $3) }
   | "default" opt(":") GenItemOrNull { ([], $3) }
 
-GenvarInitialization :: { (Bool, Identifier, Expr) }
-  : "genvar" Identifier "=" Expr { (True , $2, $4) }
-  |          Identifier "=" Expr { (False, $1, $3) }
+GenvarInitialization :: { Expr -> (Identifier, AsgnOp, Expr) -> GenItem -> GenItem }
+  : "genvar" Identifier "=" Expr { \a b c -> GenBlock "" [GenModuleItem (Genvar $2), GenFor ($2, $4) a b c] }
+  |          Identifier "=" Expr { GenFor ($1, $3) }
 
 GenvarIteration :: { (Identifier, AsgnOp, Expr) }
   : Identifier AsgnOp Expr { ($1, $2, $3) }
