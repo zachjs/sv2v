@@ -15,6 +15,7 @@ import System.Environment (getArgs, withArgs)
 
 data Exclude
     = Always
+    | Assert
     | Interface
     | Logic
     | Succinct
@@ -45,7 +46,7 @@ defaultJob = Job
     , siloed = nam_ "siloed" &= help ("Lex input files separately, so"
         ++ " macros from earlier files are not defined in later files")
     , exclude = nam_ "exclude" &= name "E" &= typ "CONV"
-        &= help "Exclude a particular conversion (always, interface, or logic)"
+        &= help "Exclude a particular conversion (always, assert, interface, or logic)"
         &= groupname "Conversion"
     , verbose = nam "verbose" &= help "Retain certain conversion artifacts"
     }
