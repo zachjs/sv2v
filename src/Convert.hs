@@ -55,7 +55,7 @@ phases :: [Job.Exclude] -> [Phase]
 phases excludes =
     [ Convert.AsgnOp.convert
     , Convert.NamedBlock.convert
-    , Convert.Assertion.convert
+    , selectExclude (Job.Assert   , Convert.Assertion.convert)
     , Convert.BlockDecl.convert
     , Convert.DuplicateGenvar.convert
     , selectExclude (Job.Logic    , Convert.Logic.convert)
