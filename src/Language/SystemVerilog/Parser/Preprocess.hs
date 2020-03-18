@@ -41,10 +41,29 @@ data PP = PP
 
 -- keeps track of the state of an if-else cascade level
 data Cond
-    = CurrentlyTrue
-    | PreviouslyTrue
-    | NeverTrue
+    = CurrentlyTrue -- an active if/elsif/else branch (condition is met)
+    | PreviouslyTrue -- an inactive else/elsif block due to an earlier if/elsif
+    | NeverTrue -- an inactive if/elsif block; a subsequent else will be met
     deriving (Eq, Show)
+
+-- update a Cond for an `else block, where this block is active if and only if
+-- no previous block was active
+elseCond :: Cond -> Cond
+elseCond NeverTrue = CurrentlyTrue
+elseCond _ = NeverTrue
+
+-- generate a Cond for an `if/`elsif that is not part of a PreviouslyTrue chain
+ifCond :: Bool -> Cond
+ifCond True = CurrentlyTrue
+ifCond False = NeverTrue
+
+-- update a Cond for an `elsif block. The boolean argument is whether the
+-- `elsif block's test is true.
+elsifCond :: Bool -> Cond -> Cond
+elsifCond defined c =
+    case c of
+        NeverTrue -> ifCond defined
+        _ -> PreviouslyTrue
 
 -- preprocessor entrypoint
 preprocess :: [String] -> Env -> FilePath -> IO (Either String ([(Char, Position)], Env))
@@ -156,6 +175,19 @@ getBuffer = do
     x <- getInput
     p <- getPosition
     return (x, p)
+
+-- Push a condition onto the top of the preprocessor condition stack
+pushCondStack :: Cond -> PPS ()
+pushCondStack c = getCondStack >>= setCondStack . (c :)
+
+-- Pop the top from the preprocessor condition stack
+popCondStack :: String -> PPS Cond
+popCondStack directive = do
+    cs <- getCondStack
+    case cs of
+        [] -> lexicalError $
+              "`" ++ directive ++ " directive outside of an `if/`endif block"
+        c : cs' -> setCondStack cs' >> return c
 
 isIdentChar :: Char -> Bool
 isIdentChar ch =
@@ -677,36 +709,22 @@ handleDirective macrosOnly = do
         "ifdef" -> do
             dropSpaces
             name <- takeIdentifier
-            let newCond = if Map.member name env
-                    then CurrentlyTrue
-                    else NeverTrue
-            setCondStack $ newCond : condStack
+            pushCondStack $ ifCond $ Map.member name env
         "ifndef" -> do
             dropSpaces
             name <- takeIdentifier
-            let newCond = if Map.notMember name env
-                    then CurrentlyTrue
-                    else NeverTrue
-            setCondStack $ newCond : condStack
+            pushCondStack $ ifCond $ Map.notMember name env
         "else" -> do
-            let newCond = if head condStack == NeverTrue
-                    then CurrentlyTrue
-                    else NeverTrue
-            setCondStack $ newCond : tail condStack
+            c <- popCondStack "else"
+            pushCondStack $ elseCond c
         "elsif" -> do
             dropSpaces
             name <- takeIdentifier
-            let currCond = head condStack
-            let newCond =
-                    if currCond /= NeverTrue then
-                        PreviouslyTrue
-                    else if Map.member name env then
-                        CurrentlyTrue
-                    else
-                        NeverTrue
-            setCondStack $ newCond : tail condStack
+            c <- popCondStack "elsif"
+            pushCondStack $ elsifCond (Map.member name env) c
         "endif" -> do
-            setCondStack $ tail condStack
+            _ <- popCondStack "endif"
+            return ()
 
         "define" -> do
             dropSpaces
