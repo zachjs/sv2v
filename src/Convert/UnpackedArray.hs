@@ -85,7 +85,10 @@ traverseStmtM stmt =
     traverseStmtAsgnsM traverseAsgnM
 
 traverseExprM :: Expr -> ST Expr
-traverseExprM = return
+traverseExprM (Range (Ident x) mode i) = do
+    flatUsageM x
+    return $ Range (Ident x) mode i
+traverseExprM other = return other
 
 traverseLHSM :: LHS -> ST LHS
 traverseLHSM (LHSIdent x) = do
