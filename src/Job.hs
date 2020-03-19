@@ -26,6 +26,7 @@ data Job = Job
     , incdir :: [FilePath]
     , define :: [String]
     , siloed :: Bool
+    , skipPreprocessor :: Bool
     , exclude :: [Exclude]
     , verbose :: Bool
     } deriving (Show, Typeable, Data)
@@ -45,8 +46,10 @@ defaultJob = Job
         &= help "Define a macro for preprocessing"
     , siloed = nam_ "siloed" &= help ("Lex input files separately, so"
         ++ " macros from earlier files are not defined in later files")
+    , skipPreprocessor = nam_ "skip-preprocessor" &= help "Disable preprocessor"
     , exclude = nam_ "exclude" &= name "E" &= typ "CONV"
-        &= help "Exclude a particular conversion (always, assert, interface, or logic)"
+        &= help ("Exclude a particular conversion (always, assert, interface,"
+            ++ " or logic)")
         &= groupname "Conversion"
     , verbose = nam "verbose" &= help "Retain certain conversion artifacts"
     }

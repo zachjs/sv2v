@@ -77,8 +77,9 @@ Preprocessing:
   -D --define=NAME[=VALUE]  Define a macro for preprocessing
      --siloed               Lex input files separately, so macros from
                             earlier files are not defined in later files
+     --skip-preprocessor    Disable preprocessor
 Conversion:
-  -E --exclude=CONV         Exclude a particular conversion (always,
+  -E --exclude=CONV         Exclude a particular conversion (always, assert,
                             interface, or logic)
   -v --verbose              Retain certain conversion artifacts
 Other:

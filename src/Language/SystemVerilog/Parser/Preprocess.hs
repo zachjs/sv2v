@@ -9,6 +9,7 @@
  -}
 module Language.SystemVerilog.Parser.Preprocess
     ( preprocess
+    , annotate
     , Env
     ) where
 
@@ -65,6 +66,21 @@ preprocess includePaths env path = do
                 where
                     output = reverse $ ppOutput finalState
                     env' = ppEnv finalState
+
+-- position annotator entrypoint used for files that don't need any
+-- preprocessing
+annotate :: [String] -> Env -> FilePath -> IO (Either String ([(Char, Position)], Env))
+annotate _ env path = do
+    contents <-
+        if path == "-"
+            then getContents
+            else loadFile path
+    let positions = scanl advance (Position path 1 1) contents
+    return $ Right (zip contents positions, env)
+    where
+        advance :: Position -> Char -> Position
+        advance (Position f l _) '\n' = Position f (l + 1) 1
+        advance (Position f l c) _    = Position f l (c + 1)
 
 -- read in the given file
 loadFile :: FilePath -> IO String

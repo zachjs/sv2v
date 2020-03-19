@@ -8,7 +8,7 @@ import System.IO
 import System.Exit
 
 import Data.List (elemIndex)
-import Job (readJob, files, exclude, incdir, define, siloed)
+import Job (readJob, files, exclude, incdir, define, siloed, skipPreprocessor)
 import Convert (convert)
 import Language.SystemVerilog.Parser (parseFiles)
 
@@ -23,7 +23,8 @@ main = do
     job <- readJob
     -- parse the input files
     let defines = map splitDefine $ define job
-    result <- parseFiles (incdir job) defines (siloed job) (files job)
+    result <- parseFiles (incdir job) defines (siloed job)
+        (skipPreprocessor job) (files job)
     case result of
         Left msg -> do
             hPutStr stderr $ msg ++ "\n"
