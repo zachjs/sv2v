@@ -643,8 +643,8 @@ Direction :: { Direction }
 
 ModuleItems :: { [ModuleItem] }
   : {- empty -}                    { [] }
-  | ModuleItems MITrace ModuleItem { $1 ++ [$2] ++ $3 }
-  | ModuleItems ";"                { $1 }
+  | ";" ModuleItems                { $2 }
+  | MITrace ModuleItem ModuleItems { $1 : $2 ++ $3 }
 
 ModuleItem :: { [ModuleItem] }
   : NonGenerateModuleItem { $1 }
@@ -777,8 +777,8 @@ LHSAsgn :: { (LHS, Expr) }
 
 PackageItems :: { [PackageItem] }
   : {- empty -}                      { [] }
-  | PackageItems ";"                 { $1 }
-  | PackageItems PITrace PackageItem { $1 ++ [$2] ++ $3 }
+  | ";" PackageItems                 { $2 }
+  | PITrace PackageItem PackageItems { $1 : $2 ++ $3 }
 PackageItem :: { [PackageItem] }
   : DeclTokens(";")    { map Decl $ parseDTsAsDecls $1 }
   | ParameterDecl(";") { map Decl $1 }
