@@ -449,7 +449,7 @@ TypeNonIdent :: { Type }
   : PartialType OptSigning Dimensions { $1 $2 $3 }
   | "type" "(" Expr ")" { TypeOf $3 }
 PartialType :: { Signing -> [Range] -> Type }
-  : NetType                                 {                        Net           $1    }
+  : NetTypeAndStrength                      {                        Net           $1    }
   | IntegerVectorType                       {                        IntegerVector $1    }
   | IntegerAtomType                         { \sg          -> \[] -> IntegerAtom   $1 sg }
   | NonIntegerType                          { \Unspecified -> \[] -> NonInteger    $1    }
@@ -464,6 +464,11 @@ CastingType :: { Type }
 EnumBaseType :: { Maybe Type }
   : opt(Type) { $1 }
   | DimensionsNonEmpty { Just $ Implicit Unspecified $1 }
+
+NetTypeAndStrength :: { NetTypeAndStrength }
+  : NetType                %prec "+" { NetType       $1    }
+  | NetType DriveStrength  %prec "*" { NetTypeDrive  $1 $2 }
+  | NetType ChargeStrength %prec "*" { NetTypeCharge $1 $2 }
 
 Signing :: { Signing }
   : "signed"   { Signed   }
@@ -656,7 +661,7 @@ NonGenerateModuleItem :: { [ModuleItem] }
   : DeclTokens(";")                      { parseDTsAsModuleItems $1 }
   | ParameterDecl(";")                   { map (MIPackageItem . Decl) $1 }
   | "defparam" LHSAsgns ";"              { map (uncurry Defparam) $2 }
-  | "assign" opt(DelayControl) LHSAsgns ";" { map (uncurry $ Assign $2) $3 }
+  | "assign" AssignOption LHSAsgns ";"   { map (uncurry $ Assign $2) $3 }
   | AlwaysKW Stmt                        { [AlwaysC $1 $2] }
   | "initial" Stmt                       { [Initial $2] }
   | "final"   Stmt                       { [Final   $2] }
@@ -667,6 +672,11 @@ NonGenerateModuleItem :: { [ModuleItem] }
   | NOutputGateKW NOutputGates ";"       { map (\(a, b, c, d) -> NOutputGate $1 a b c d) $2 }
   | AttributeInstance ModuleItem         { map (MIAttr $1) $2 }
   | AssertionItem                        { [AssertionItem $1] }
+
+AssignOption :: { AssignOption }
+  : {- empty -}   { AssignOptionNone }
+  | DelayControl  { AssignOptionDelay $1 }
+  | DriveStrength { AssignOptionDrive $1 }
 
 -- for ModuleItem, for now
 AssertionItem :: { AssertionItem }
@@ -768,6 +778,28 @@ NInputGateKW :: { NInputGateKW }
 NOutputGateKW :: { NOutputGateKW }
   : "buf"  { GateBuf  }
   | "not"  { GateNot  }
+
+DriveStrength :: { DriveStrength }
+  : "(" Strength0 "," Strength1 ")" { DriveStrength $2     $4     }
+  | "(" Strength1 "," Strength0 ")" { DriveStrength $4     $2     }
+  | "(" Strength0 "," "highz1"  ")" { DriveStrength $2     Highz1 }
+  | "(" Strength1 "," "highz0"  ")" { DriveStrength Highz0 $2     }
+  | "(" "highz0"  "," Strength1 ")" { DriveStrength Highz0 $4     }
+  | "(" "highz1"  "," Strength0 ")" { DriveStrength $4     Highz1 }
+Strength0 :: { Strength0 }
+  : "supply0" { Supply0 }
+  | "strong0" { Strong0 }
+  | "pull0"   { Pull0   }
+  | "weak0"   { Weak0   }
+Strength1 :: { Strength1 }
+  : "supply1" { Supply1 }
+  | "strong1" { Strong1 }
+  | "pull1"   { Pull1   }
+  | "weak1"   { Weak1   }
+ChargeStrength :: { ChargeStrength }
+  : "(" "small"  ")" { Small  }
+  | "(" "medium" ")" { Medium }
+  | "(" "large"  ")" { Large  }
 
 LHSAsgns :: { [(LHS, Expr)] }
   : LHSAsgn                   { [$1] }

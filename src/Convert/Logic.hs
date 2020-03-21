@@ -77,9 +77,9 @@ convertDescription ports orig =
 
         fixModuleItem :: ModuleItem -> ModuleItem
         -- rewrite bad continuous assignments to use procedural assignments
-        fixModuleItem (Assign Nothing lhs expr) =
+        fixModuleItem (Assign AssignOptionNone lhs expr) =
             if Set.disjoint usedIdents origIdents
-                then Assign Nothing lhs expr
+                then Assign AssignOptionNone lhs expr
                 else AlwaysC AlwaysComb $ Asgn AsgnOpEq Nothing lhs expr
             where
                 usedIdents = execWriter $ collectNestedLHSsM lhsIdents lhs
@@ -106,7 +106,8 @@ convertDescription ports orig =
                             collectNestedExprsM exprIdents expr
                         tmp = "sv2v_tmp_" ++ instanceName ++ "_" ++ portName
                         tmpExpr = Ident tmp
-                        t = Net TWire Unspecified [(DimsFn FnBits $ Right expr, Number "1")]
+                        t = Net (NetType TWire) Unspecified
+                                [(DimsFn FnBits $ Right expr, Number "1")]
                         items =
                             [ MIPackageItem $ Decl $ Variable Local t tmp [] Nothing
                             , AlwaysC AlwaysComb $ Asgn AsgnOpEq Nothing lhs tmpExpr]
@@ -125,7 +126,7 @@ convertDescription ports orig =
             where
                 t = if Set.member ident fixedIdents
                     then IntegerVector TReg sg
-                    else Net TWire sg
+                    else Net (NetType TWire) sg
         convertModuleItem other = other
         -- all other logics (i.e. inside of functions) become regs
         convertDecl :: Decl -> Decl

@@ -2,9 +2,9 @@
  - Author: Zachary Snow <zach@zachjs.com>
  - Initial Verilog AST Author: Tom Hawkins <tomahawkins@gmail.com>
  -
- - SystemVerilog left-hand sides (aka lvals)
+ - SystemVerilog data, net, and paramter declarations
  -
- - TODO: Normal parameters can be declared with no default valu.
+ - TODO: Normal parameters can be declared with no default value.
  -}
 
 module Language.SystemVerilog.AST.Decl

@@ -576,11 +576,15 @@ traverseExprsM' strat exprMapper = moduleItemMapper
         stmtMapper stmt >>= return . Initial
     moduleItemMapper (Final stmt) =
         stmtMapper stmt >>= return . Final
-    moduleItemMapper (Assign delay lhs expr) = do
-        delay' <- maybeExprMapper delay
+    moduleItemMapper (Assign opt lhs expr) = do
+        opt' <- case opt of
+            AssignOptionNone -> return $ AssignOptionNone
+            AssignOptionDrive ds -> return $ AssignOptionDrive ds
+            AssignOptionDelay delay ->
+                exprMapper delay >>= return . AssignOptionDelay
         lhs' <- lhsMapper lhs
         expr' <- exprMapper expr
-        return $ Assign delay' lhs' expr'
+        return $ Assign opt' lhs' expr'
     moduleItemMapper (MIPackageItem (Function lifetime ret f decls stmts)) = do
         ret' <- typeMapper ret
         decls' <-

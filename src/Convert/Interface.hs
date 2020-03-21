@@ -324,8 +324,8 @@ inlineInterface (ports, items) (instanceName, instanceParams, instancePorts) =
         portBindingItem :: PortBinding -> Maybe ModuleItem
         portBindingItem (ident, Just expr) =
             Just $ if declDirs Map.! ident == Input
-                then Assign Nothing (LHSIdent ident) expr
-                else Assign Nothing (toLHS expr) (Ident ident)
+                then Assign AssignOptionNone (LHSIdent ident) expr
+                else Assign AssignOptionNone (toLHS expr) (Ident ident)
         portBindingItem (_, Nothing) = Nothing
 
         declDirs = execWriter $

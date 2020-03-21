@@ -13,6 +13,7 @@ module Language.SystemVerilog.AST.ModuleItem
     , AlwaysKW      (..)
     , NInputGateKW  (..)
     , NOutputGateKW (..)
+    , AssignOption  (..)
     ) where
 
 import Data.List (intercalate)
@@ -29,12 +30,12 @@ import Language.SystemVerilog.AST.Expr (Expr(Ident, Nil), Range, TypeOrExpr, sho
 import Language.SystemVerilog.AST.GenItem (GenItem)
 import Language.SystemVerilog.AST.LHS (LHS)
 import Language.SystemVerilog.AST.Stmt (Stmt, AssertionItem, Timing(Delay))
-import Language.SystemVerilog.AST.Type (Identifier)
+import Language.SystemVerilog.AST.Type (Identifier, DriveStrength)
 
 data ModuleItem
     = MIAttr     Attr ModuleItem
     | AlwaysC    AlwaysKW Stmt
-    | Assign     (Maybe Expr) LHS Expr
+    | Assign     AssignOption LHS Expr
     | Defparam   LHS Expr
     | Instance   Identifier [ParamBinding] Identifier (Maybe Range) [PortBinding]
     | Genvar     Identifier
@@ -52,6 +53,7 @@ instance Show ModuleItem where
     show (MIPackageItem i) = show i
     show (MIAttr attr mi ) = printf "%s %s" (show attr) (show mi)
     show (AlwaysC     k b) = printf "%s %s" (show k) (show b)
+    show (Assign    o a b) = printf "assign %s%s = %s;" (showPad o) (show a) (show b)
     show (Defparam    a b) = printf "defparam %s = %s;" (show a) (show b)
     show (Genvar      x  ) = printf "genvar %s;" x
     show (Generate    b  ) = printf "generate\n%s\nendgenerate" (indent $ unlines' $ map show b)
@@ -62,9 +64,6 @@ instance Show ModuleItem where
         showGate kw d x $ show lhs : map show exprs
     show (NOutputGate kw d x lhss expr) =
         showGate kw d x $ (map show lhss) ++ [show expr]
-    show (Assign d a b) =
-        printf "assign %s%s = %s;" delayStr (show a) (show b)
-        where delayStr = maybe "" (\e -> "#(" ++ show e ++ ") ") d
     show (AssertionItem (mx, a)) =
         if mx == Nothing
             then show a
@@ -151,3 +150,14 @@ data NOutputGateKW
 instance Show NOutputGateKW where
     show GateBuf  = "buf"
     show GateNot  = "not"
+
+data AssignOption
+    = AssignOptionNone
+    | AssignOptionDelay  Expr
+    | AssignOptionDrive  DriveStrength
+    deriving Eq
+
+instance Show AssignOption where
+    show AssignOptionNone = ""
+    show (AssignOptionDelay de) = printf "#(%s)" (show de)
+    show (AssignOptionDrive ds) = show ds

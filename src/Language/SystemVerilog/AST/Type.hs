@@ -9,13 +9,18 @@
 module Language.SystemVerilog.AST.Type
     ( Identifier
     , Field
-    , Type    (..)
-    , Signing (..)
-    , Packing (..)
-    , NetType (..)
-    , IntegerVectorType (..)
-    , IntegerAtomType   (..)
-    , NonIntegerType    (..)
+    , Type               (..)
+    , Signing            (..)
+    , Packing            (..)
+    , NetType            (..)
+    , IntegerVectorType  (..)
+    , IntegerAtomType    (..)
+    , NonIntegerType     (..)
+    , NetTypeAndStrength (..)
+    , DriveStrength      (..)
+    , Strength0          (..)
+    , Strength1          (..)
+    , ChargeStrength     (..)
     , typeRanges
     , nullRange
     , elaborateIntegerAtom
@@ -35,7 +40,7 @@ data Type
     = IntegerVector IntegerVectorType  Signing [Range]
     | IntegerAtom   IntegerAtomType    Signing
     | NonInteger    NonIntegerType
-    | Net           NetType            Signing [Range]
+    | Net           NetTypeAndStrength Signing [Range]
     | Implicit                         Signing [Range]
     | Alias    (Maybe Identifier) Identifier   [Range]
     | Enum     (Maybe Type) [Item]             [Range]
@@ -217,3 +222,62 @@ data Packing
 instance Show Packing where
     show (Unpacked) = ""
     show (Packed s) = "packed" ++ (showPadBefore s)
+
+data NetTypeAndStrength
+    = NetType       NetType
+    | NetTypeDrive  NetType DriveStrength
+    | NetTypeCharge NetType ChargeStrength
+    deriving (Eq, Ord)
+
+instance Show NetTypeAndStrength where
+    show (NetType       nt   ) = show nt
+    show (NetTypeDrive  nt ds) = printf "%s %s" (show nt) (show ds)
+    show (NetTypeCharge nt cs) = printf "%s %s" (show nt) (show cs)
+
+data DriveStrength
+    = DriveStrength Strength0 Strength1
+    deriving (Eq, Ord)
+
+instance Show DriveStrength where
+    show (DriveStrength s0 s1) = printf "(%s, %s)" (show s0) (show s1)
+
+data Strength0
+  = Supply0
+  | Strong0
+  | Pull0
+  | Weak0
+  | Highz0
+  deriving (Eq, Ord)
+
+instance Show Strength0 where
+  show Supply0 = "supply0"
+  show Strong0 = "strong0"
+  show Pull0   = "pull0"
+  show Weak0   = "weak0"
+  show Highz0  = "highz0"
+
+data Strength1
+  = Supply1
+  | Strong1
+  | Pull1
+  | Weak1
+  | Highz1
+  deriving (Eq, Ord)
+
+instance Show Strength1 where
+  show Supply1 = "supply1"
+  show Strong1 = "strong1"
+  show Pull1   = "pull1"
+  show Weak1   = "weak1"
+  show Highz1  = "highz1"
+
+data ChargeStrength
+  = Small
+  | Medium
+  | Large
+  deriving (Eq, Ord)
+
+instance Show ChargeStrength where
+  show Small  = "(small)"
+  show Medium = "(medium)"
+  show Large  = "(large)"
