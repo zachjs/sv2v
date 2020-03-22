@@ -166,8 +166,9 @@ traverseExpr typeMap =
                         fieldType = fieldMap Map.! x
         levels _ = Nothing
 
-        -- given an expression, returns the two innermost packed dimensions and a
-        -- tagged version of the expression, if possible
+        -- given an expression, returns the two most significant (innermost,
+        -- leftmost) packed dimensions and a tagged version of the expression,
+        -- if possible
         dims :: Expr -> Maybe (Range, Range, Expr)
         dims expr =
             case levels expr of
@@ -266,18 +267,29 @@ traverseExpr typeMap =
                 range' = (base, len)
         rewriteExpr (orig @ (Range expr mode range)) =
             if isJust maybeDims && expr == rewriteExpr expr
-                then Range expr' mode range'
+                then Range expr' mode' range'
                 else orig
             where
                 maybeDims = dims expr
-                Just (_, dimOuter, expr') = maybeDims
+                Just (dimInner, dimOuter, expr') = maybeDims
                 sizeOuter = rangeSize dimOuter
-                base = BinOp Add (BinOp Mul sizeOuter (fst range)) start
-                len = BinOp Mul sizeOuter (snd range)
-                range' = (base, len)
-                start =
+                offsetOuter = uncurry (endianCondExpr dimOuter) $ swap dimOuter
+                (baseOrig, lenOrig) = range
+                lenOrigMinusOne = BinOp Sub lenOrig (Number "1")
+                baseSwapped =
+                    orientIdx dimInner $
                     case mode of
-                        IndexedPlus  -> endianCondExpr dimOuter (snd dimOuter) (fst dimOuter)
-                        IndexedMinus -> endianCondExpr dimOuter (fst dimOuter) (snd dimOuter)
+                        IndexedPlus  ->
+                            endianCondExpr dimInner
+                            baseOrig
+                            (BinOp Add baseOrig lenOrigMinusOne)
+                        IndexedMinus ->
+                            endianCondExpr dimInner
+                            (BinOp Sub baseOrig lenOrigMinusOne)
+                            baseOrig
                         NonIndexed   -> error "invariant violated"
+                base = BinOp Add offsetOuter (BinOp Mul sizeOuter baseSwapped)
+                mode' = IndexedPlus
+                len = BinOp Mul sizeOuter lenOrig
+                range' = (base, len)
         rewriteExpr other = other
