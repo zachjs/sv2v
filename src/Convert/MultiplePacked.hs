@@ -115,13 +115,18 @@ traverseExprM = traverseNestedExprsM $ stately traverseExpr
 -- LHSs need to be converted too. Rather than duplicating the procedures, we
 -- turn LHSs into expressions temporarily and use the expression conversion.
 traverseLHSM :: LHS -> State Info LHS
-traverseLHSM lhs = do
-    let expr = lhsToExpr lhs
-    expr' <- traverseExprM expr
-    case exprToLHS expr' of
-        Just lhs' -> return lhs'
-        Nothing -> error $ "multi-packed conversion created non-LHS from "
-            ++ (show expr) ++ " to " ++ (show expr')
+traverseLHSM = traverseNestedLHSsM traverseLHSSingleM
+    where
+        -- We can't use traverseExprM directly because that would cause Exprs
+        -- inside of LHSs to be converted twice in a single cycle!
+        traverseLHSSingleM :: LHS -> State Info LHS
+        traverseLHSSingleM lhs = do
+            let expr = lhsToExpr lhs
+            expr' <- stately traverseExpr expr
+            case exprToLHS expr' of
+                Just lhs' -> return lhs'
+                Nothing -> error $ "multi-packed conversion created non-LHS from "
+                    ++ (show expr) ++ " to " ++ (show expr')
 
 traverseExpr :: Info -> Expr -> Expr
 traverseExpr typeMap =
