@@ -559,6 +559,7 @@ PackageImportDeclaration :: { [ModuleItem] }
 
 Params :: { [ModuleItem] }
   : {- empty -}          { [] }
+  | "#" "(" ")"          { [] }
   | "#" "(" ParamsFollow { map (MIPackageItem . Decl) $3 }
 ParamsFollow :: { [Decl] }
   : ParamAsgn ")"              { [$1] }
