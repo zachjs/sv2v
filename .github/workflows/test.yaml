@@ -78,33 +78,30 @@ jobs:
           make test
 
   release:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-18.04
     strategy:
       matrix:
-        os:
-          - ubuntu-18.04
-          - macOS-10.15
-          - windows-2019
+        name: [macOS, Linux, Windows]
     needs: build
     if: github.event_name == 'release'
     steps:
       - name: Download Artifact
         uses: actions/download-artifact@v1
         with:
-          name: ${{ runner.os }}
-          path: sv2v-${{ runner.os }}
+          name: ${{ matrix.name }}
+          path: sv2v-${{ matrix.name }}
       - name: Mark Binary Executable
-        if: runner.os == 'macOS' || runner.os == 'Linux'
-        run: chmod +x */sv2v
+        if: matrix.name == 'macOS' || matrix.name == 'Linux'
+        run: chmod +x */sv2v*
       - name: Create ZIP
         shell: bash
-        run: zip -r sv2v-${{ runner.os }} ./sv2v-${{ runner.os }}
+        run: zip -r sv2v-${{ matrix.name }} ./sv2v-${{ matrix.name }}
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./sv2v-${{ runner.os }}.zip
-          asset_name: sv2v-${{ runner.os }}.zip
+          asset_path: ./sv2v-${{ matrix.name }}.zip
+          asset_name: sv2v-${{ matrix.name }}.zip
           asset_content_type: application/zip
