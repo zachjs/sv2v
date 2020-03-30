@@ -942,7 +942,8 @@ PortBinding :: { PortBinding }
   | ".*"                             { ("*", Nothing) }
 
 ParamBindings :: { [ParamBinding] }
-  : "#" "(" ParamBindingsInside ")" { $3 }
+  : "#" "("                     ")" { [] }
+  | "#" "(" ParamBindingsInside ")" { $3 }
 ParamBindingsInside :: { [ParamBinding] }
   : ParamBinding                         { [$1] }
   | ParamBinding "," ParamBindingsInside { $1 : $3}
