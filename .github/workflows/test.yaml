@@ -1,31 +1,61 @@
 name: Build and Test
 on:
   push:
+  pull_request:
   release:
     types:
       - created
 jobs:
 
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-18.04
+          - macOS-10.15
+          - windows-2019
+    steps:
+      - uses: actions/checkout@v1
+      - uses: mstksg/setup-stack@v2
+      - name: Build
+        run: make
+      - name: Prepare Artifact
+        shell: bash
+        run: cp LICENSE NOTICE README.md bin
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v1
+        with:
+          name: ${{ runner.os }}
+          path: bin
+
   test:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-18.04, macOS-latest]
+        os:
+          - ubuntu-18.04
+          - macOS-10.15
+    needs: build
     steps:
       - uses: actions/checkout@v1
-      - name: Install Dependencies
-        run: |
-          brew install haskell-stack shunit2 icarus-verilog || ls
-          sudo apt-get install -y haskell-stack shunit2 flex bison autoconf gperf || ls
+      - name: Install Dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install shunit2 icarus-verilog
+      - name: Install Dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y shunit2 flex bison autoconf gperf
       - name: Cache iverilog
         uses: actions/cache@v1
+        if: runner.os == 'Linux'
         with:
           path: ~/.local
           key: ${{ runner.OS }}-iverilog-10-3
           restore-keys: ${{ runner.OS }}-iverilog-10-3
       - name: Install iverilog
+        if: runner.os == 'Linux'
         run: |
-          if [ "${{ runner.OS }}" = "Linux" ] && [ ! -e "$HOME/.local/bin/iverilog" ]; then
+          if [ ! -e "$HOME/.local/bin/iverilog" ]; then
             curl -L https://github.com/steveicarus/iverilog/archive/v10_3.tar.gz > iverilog-10_3.tar.gz
             tar -xzf iverilog-10_3.tar.gz
             cd iverilog-10_3
@@ -35,58 +65,46 @@ jobs:
             make install
             cd ..
           fi
-      - name: Build
-        run: make
+      - name: Download Artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: ${{ runner.os }}
+          path: bin
+      - name: Mark Binary Executable
+        run: chmod +x bin/sv2v
       - name: Test
         run: |
           export PATH="$PATH:$HOME/.local/bin"
           make test
-      - name: Prepare Artifact
-        if: github.event_name == 'release'
-        run: cp LICENSE NOTICE README.md bin
-      - name: Upload Artifact
-        if: github.event_name == 'release'
-        uses: actions/upload-artifact@v1
-        with:
-          name: ${{ runner.os }}
-          path: bin
 
   release:
-    runs-on: ubuntu-latest
-    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-18.04
+          - macOS-10.15
+          - windows-2019
+    needs: build
     if: github.event_name == 'release'
     steps:
-      - run: sudo apt-get install -y tree
-      - name: Download Linux Artifact
+      - name: Download Artifact
         uses: actions/download-artifact@v1
         with:
-          name: Linux
-          path: sv2v-Linux
-      - name: Download MacOS Artifact
-        uses: actions/download-artifact@v1
-        with:
-          name: macOS
-          path: sv2v-macOS
-      - name: Create ZIPs
-        run: |
-          chmod +x */sv2v
-          zip -r sv2v-Linux ./sv2v-Linux
-          zip -r sv2v-macOS ./sv2v-macOS
-      - name: Upload Linux Release Asset
+          name: ${{ runner.os }}
+          path: sv2v-${{ runner.os }}
+      - name: Mark Binary Executable
+        if: runner.os == 'macOS' || runner.os == 'Linux'
+        run: chmod +x */sv2v
+      - name: Create ZIP
+        shell: bash
+        run: zip -r sv2v-${{ runner.os }} ./sv2v-${{ runner.os }}
+      - name: Upload Release Asset
         uses: actions/upload-release-asset@v1.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./sv2v-Linux.zip
-          asset_name: sv2v-Linux.zip
-          asset_content_type: application/zip
-      - name: Upload MacOS Release Asset
-        uses: actions/upload-release-asset@v1.0.1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./sv2v-macOS.zip
-          asset_name: sv2v-macOS.zip
+          asset_path: ./sv2v-${{ runner.os }}.zip
+          asset_name: sv2v-${{ runner.os }}.zip
           asset_content_type: application/zip
