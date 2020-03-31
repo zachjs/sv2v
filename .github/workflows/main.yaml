@@ -45,14 +45,14 @@ jobs:
       - name: Install Dependencies (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get install -y shunit2 flex bison autoconf gperf
-      - name: Cache iverilog
+      - name: Cache iverilog (Linux)
         uses: actions/cache@v1
         if: runner.os == 'Linux'
         with:
           path: ~/.local
           key: ${{ runner.OS }}-iverilog-10-3
           restore-keys: ${{ runner.OS }}-iverilog-10-3
-      - name: Install iverilog
+      - name: Install iverilog (Linux)
         if: runner.os == 'Linux'
         run: |
           if [ ! -e "$HOME/.local/bin/iverilog" ]; then
@@ -70,10 +70,9 @@ jobs:
         with:
           name: ${{ runner.os }}
           path: bin
-      - name: Mark Binary Executable
-        run: chmod +x bin/sv2v
       - name: Test
         run: |
+          chmod +x bin/sv2v
           export PATH="$PATH:$HOME/.local/bin"
           make test
 
@@ -91,10 +90,8 @@ jobs:
           name: ${{ matrix.name }}
           path: sv2v-${{ matrix.name }}
       - name: Mark Binary Executable
-        if: matrix.name == 'macOS' || matrix.name == 'Linux'
         run: chmod +x */sv2v*
       - name: Create ZIP
-        shell: bash
         run: zip -r sv2v-${{ matrix.name }} ./sv2v-${{ matrix.name }}
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1.0.1
