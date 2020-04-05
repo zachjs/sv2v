@@ -426,7 +426,7 @@ time               { Token Lit_time        _ _ }
 
 %%
 
-opt(p) :: { Maybe a }
+opt(p)
   : p { Just $1 }
   |   { Nothing }
 
