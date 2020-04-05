@@ -6,7 +6,6 @@
 
 module Convert.Interface (convert) where
 
-import Data.List (lookup)
 import Data.Maybe (fromJust, mapMaybe)
 import Control.Monad.Writer
 import qualified Data.Map.Strict as Map

@@ -17,8 +17,7 @@ module Language.SystemVerilog.AST.ModuleItem
     ) where
 
 import Data.List (intercalate)
-import Data.Maybe (maybe, fromJust, isJust)
-import Data.Either (either)
+import Data.Maybe (fromJust, isJust)
 import Text.Printf (printf)
 
 import Language.SystemVerilog.AST.ShowHelp

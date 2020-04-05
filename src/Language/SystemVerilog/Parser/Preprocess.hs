@@ -16,7 +16,7 @@ module Language.SystemVerilog.Parser.Preprocess
 import Control.Monad.Except
 import Control.Monad.State
 import Data.Char (ord)
-import Data.List (span, dropWhileEnd, splitAt, tails, isPrefixOf, findIndex)
+import Data.List (dropWhileEnd, tails, isPrefixOf, findIndex)
 import Data.Maybe (isJust, fromJust)
 import System.Directory (findFile)
 import System.FilePath (dropFileName)
