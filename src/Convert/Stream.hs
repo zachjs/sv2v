@@ -6,25 +6,15 @@
 
 module Convert.Stream (convert) where
 
-import Control.Monad.Writer
-import Data.List.Unique (complex)
-
 import Convert.Traverse
 import Language.SystemVerilog.AST
-
-type Funcs = [ModuleItem]
 
 convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription (description @ Part{}) =
-    Part attrs extern kw lifetime name ports (items ++ funcs)
-    where
-        (description', funcSet) =
-            runWriter $ traverseModuleItemsM (traverseStmtsM traverseStmtM) description
-        Part attrs extern kw lifetime name ports items = description'
-        (funcs, _, _) = complex funcSet
+    traverseModuleItems (traverseStmts traverseStmt) description
 convertDescription other = other
 
 streamerBlock :: Expr -> Expr -> (LHS -> Expr -> Stmt) -> LHS -> Expr -> Stmt
@@ -67,32 +57,32 @@ streamerBlockName :: Expr -> Expr -> Identifier
 streamerBlockName chunk size =
     "_sv2v_strm_" ++ shortHash (chunk, size)
 
-traverseStmtM :: Stmt -> Writer Funcs Stmt
-traverseStmtM (Asgn op mt lhs expr) =
-    traverseAsgnM (lhs, expr) (Asgn op mt)
-traverseStmtM other = return other
+traverseStmt :: Stmt -> Stmt
+traverseStmt (Asgn op mt lhs expr) =
+    traverseAsgn (lhs, expr) (Asgn op mt)
+traverseStmt other = other
 
-traverseAsgnM :: (LHS, Expr) -> (LHS -> Expr -> Stmt) -> Writer Funcs Stmt
-traverseAsgnM (lhs, Stream StreamR _ exprs) constructor =
-    return $ constructor lhs expr
+traverseAsgn :: (LHS, Expr) -> (LHS -> Expr -> Stmt) -> Stmt
+traverseAsgn (lhs, Stream StreamR _ exprs) constructor =
+    constructor lhs expr
     where
         expr = Concat $ exprs ++ [Repeat delta [Number "1'b0"]]
         size = DimsFn FnBits $ Right $ lhsToExpr lhs
         exprSize = DimsFn FnBits $ Right (Concat exprs)
         delta = BinOp Sub size exprSize
-traverseAsgnM (LHSStream StreamR _ lhss, expr) constructor =
-    return $ constructor (LHSConcat lhss) expr
-traverseAsgnM (lhs, Stream StreamL chunk exprs) constructor = do
-    return $ streamerBlock chunk size constructor lhs expr
+traverseAsgn (LHSStream StreamR _ lhss, expr) constructor =
+    constructor (LHSConcat lhss) expr
+traverseAsgn (lhs, Stream StreamL chunk exprs) constructor = do
+    streamerBlock chunk size constructor lhs expr
     where
         expr = Concat $ Repeat delta [Number "1'b0"] : exprs
         size = DimsFn FnBits $ Right $ lhsToExpr lhs
         exprSize = DimsFn FnBits $ Right (Concat exprs)
         delta = BinOp Sub size exprSize
-traverseAsgnM (LHSStream StreamL chunk lhss, expr) constructor = do
-    return $ streamerBlock chunk size constructor lhs expr
+traverseAsgn (LHSStream StreamL chunk lhss, expr) constructor = do
+    streamerBlock chunk size constructor lhs expr
     where
         lhs = LHSConcat lhss
         size = DimsFn FnBits $ Right expr
-traverseAsgnM (lhs, expr) constructor =
-    return $ constructor lhs expr
+traverseAsgn (lhs, expr) constructor =
+    constructor lhs expr

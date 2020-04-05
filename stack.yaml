@@ -1,7 +1,4 @@
 resolver: lts-13.17
 
-extra-deps:
-    - Unique-0.4.7.6
-
 packages:
     - .

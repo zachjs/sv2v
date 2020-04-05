@@ -8,7 +8,6 @@ module Convert.ParamType (convert) where
 
 import Control.Monad.Writer
 import Data.Either (isLeft)
-import Data.List.Unique (complex)
 import Data.Maybe (isJust, isNothing, fromJust)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -20,7 +19,7 @@ type MaybeTypeMap = Map.Map Identifier (Maybe Type)
 type Info = Map.Map Identifier ([Identifier], MaybeTypeMap)
 
 type Instance = Map.Map Identifier Type
-type Instances = [(Identifier, Instance)]
+type Instances = Set.Set (Identifier, Instance)
 
 type IdentSet = Set.Set Identifier
 type UsageMap = [(Identifier, Set.Set Identifier)]
@@ -33,8 +32,7 @@ convert files =
             mapM (collectDescriptionsM collectDescriptionM) files
         (files', instancesRaw) = runWriter $ mapM
             (mapM $ traverseModuleItemsM $ convertModuleItemM info) files
-        instances = uniq instancesRaw
-        uniq l = l' where (l', _, _) = complex l
+        instances = Set.toList instancesRaw
 
         -- add type parameter instantiations
         files'' = map (concatMap explodeDescription) files'
@@ -241,7 +239,7 @@ convertModuleItemM info (orig @ (Instance m bindings x r p)) =
             then return $ Instance m bindingsNamed x r p
             else return $ Instance (moduleDefaultName m) bindingsDefaulted x r p
     else do
-        tell [(m, resolvedTypes)]
+        tell $ Set.singleton (m, resolvedTypes)
         let m' = moduleInstanceName m resolvedTypes
         return $ Instance m' bindings' x r p
     where
