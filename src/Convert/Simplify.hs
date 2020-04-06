@@ -36,7 +36,10 @@ traverseDeclM decl = do
     case decl of
         Param Localparam _ x e -> modify $ Map.insert x e
         _ -> return ()
-    return decl
+    let mi = MIPackageItem $ Decl decl
+    mi' <- traverseModuleItemM mi
+    let MIPackageItem (Decl decl') = mi'
+    return decl'
 
 traverseModuleItemM :: ModuleItem -> State Info ModuleItem
 traverseModuleItemM item = traverseExprsM traverseExprM item
