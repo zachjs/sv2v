@@ -27,6 +27,7 @@ module Language.SystemVerilog.AST.Expr
     ) where
 
 import Data.List (intercalate)
+import Numeric (readHex)
 import Text.Printf (printf)
 import Text.Read (readMaybe)
 
@@ -168,13 +169,17 @@ clog2 :: Int -> Int
 clog2 n = if n < 2 then 0 else clog2Help 1 n
 
 readNumber :: String -> Maybe Int
-readNumber n =
-    readMaybe n' :: Maybe Int
-    where
-        n' = case n of
-            '3' : '2' : '\'' : 'd' : rest -> rest
-            '\'' : 'd' : rest -> rest
-            _ -> n
+readNumber ('3' : '2' : '\'' : 'd' : rest) = readMaybe rest
+readNumber (            '\'' : 'd' : rest) = readMaybe rest
+readNumber ('3' : '2' : '\'' : 'h' : rest) =
+    case readHex rest of
+        [(v, _)] -> Just v
+        _ -> Nothing
+readNumber ('\'' : 'h' : rest) =
+    case readHex rest of
+        [(v, _)] -> Just v
+        _ -> Nothing
+readNumber n = readMaybe n
 
 showUniOpPrec :: Expr -> String
 showUniOpPrec (e @ UniOp{}) = printf "(%s)" (show e)
@@ -190,6 +195,7 @@ showBinOpPrec e = show e
 simplify :: Expr -> Expr
 simplify (UniOp LogNot (Number "1")) = Number "0"
 simplify (UniOp LogNot (Number "0")) = Number "1"
+simplify (UniOp LogNot (BinOp Eq a b)) = BinOp Ne a b
 simplify (orig @ (UniOp UniSub (Number n))) =
     case readNumber n of
         Nothing -> orig
@@ -251,6 +257,8 @@ simplify (BinOp op e1 e2) =
                 (Mul, Just x, Just y) -> Number $ show (x * y)
                 (Div, Just _, Just 0) -> Number "x"
                 (Div, Just x, Just y) -> Number $ show (x `quot` y)
+                (Mod, Just x, Just y) -> Number $ show (x `rem` y)
+                (Pow, Just x, Just y) -> Number $ show (x ^ y)
                 (Eq , Just x, Just y) -> bool $ x == y
                 (Ne , Just x, Just y) -> bool $ x /= y
                 (Gt , Just x, Just y) -> bool $ x >  y
