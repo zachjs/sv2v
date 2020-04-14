@@ -22,11 +22,19 @@ type Modules = Map.Map Identifier [(Identifier, Type)]
 
 convert :: [AST] -> [AST]
 convert =
-    traverseFiles (collectDescriptionsM collectDesc) converter
+    map (filter $ not . isInterface) .
+    repeatedConverter
     where
-        converter (interfaces, modules) =
-            filter (not . isInterface) .
-            map (convertDescription interfaces modules)
+        repeatedConverter :: [AST] -> [AST]
+        repeatedConverter files =
+            if files == files'
+                then files
+                else repeatedConverter files'
+            where
+                files' =
+                    traverseFiles (collectDescriptionsM collectDesc)
+                    (map . uncurry convertDescription)
+                    files
         -- we can only collect/map non-extern interfaces
         collectDesc :: Description -> Writer (Interfaces, Modules) ()
         collectDesc (orig @ (Part _ False kw _ name ports items)) = do
@@ -216,8 +224,11 @@ prefixModuleItems prefix =
         prefixLHS :: LHS -> LHS
         prefixLHS (LHSIdent x) = LHSIdent (prefix x)
         prefixLHS other = other
+        prefixOtherItem :: ModuleItem -> ModuleItem
         prefixOtherItem (MIPackageItem item) =
             MIPackageItem $ prefixPackageItem prefix item
+        prefixOtherItem (Instance m params name rs ports) =
+            Instance m params (prefix name) rs ports
         prefixOtherItem (Genvar x) = Genvar $ prefix x
         prefixOtherItem other = other
 
@@ -235,6 +246,7 @@ prefixPackageItem _ other = other
 collectIdentsM :: ModuleItem -> Writer (Set.Set Identifier) ()
 collectIdentsM (MIPackageItem (Function _ _ x _ _)) = tell $ Set.singleton x
 collectIdentsM (MIPackageItem (Task     _   x _ _)) = tell $ Set.singleton x
+collectIdentsM (Instance _ _ x _ _) = tell $ Set.singleton x
 collectIdentsM (Genvar x) = tell $ Set.singleton x
 collectIdentsM item = collectDeclsM collectDecl item
     where
