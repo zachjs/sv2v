@@ -18,6 +18,15 @@ which Yosys supports].
 [Yosys]: http://www.clifford.at/yosys/
 [SystemVerilog features which Yosys supports]: https://github.com/YosysHQ/yosys#supported-features-from-systemverilog
 
+The idea for this project was shared with me while I was an undergraduate at
+Carnegie Mellon University as part of a joint Computer Science and Electrical
+and Computer Engineering research project on open hardware under Professors [Ken
+Mai] and [Dave Eckhardt]. I have greatly enjoyed collaborating with the team at
+CMU since January 2019, even after my graduation the following May.
+
+[Ken Mai]: https://engineering.cmu.edu/directory/bios/mai-kenneth.html
+[Dave Eckhardt]: https://www.cs.cmu.edu/~davide/
+
 
 ## Dependencies
 
