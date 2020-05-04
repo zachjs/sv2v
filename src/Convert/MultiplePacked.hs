@@ -40,8 +40,10 @@ convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription =
-    scopedConversion traverseDeclM traverseModuleItemM traverseStmtM Map.empty
+convertDescription part @ Part{} =
+    scopedConversion traverseDeclM traverseModuleItemM traverseStmtM
+    Map.empty part
+convertDescription other = other
 
 -- collects and converts declarations with multiple packed dimensions
 traverseDeclM :: Decl -> State Info Decl
