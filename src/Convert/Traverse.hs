@@ -231,6 +231,8 @@ traverseSinglyNestedStmtsM fullMapper = cs
         cs (DoWhile e stmt) = fullMapper stmt >>= return . DoWhile e
         cs (Forever   stmt) = fullMapper stmt >>= return . Forever
         cs (Foreach x vars stmt) = fullMapper stmt >>= return . Foreach x vars
+        cs (If NoCheck (Number "1") s _) = fullMapper s
+        cs (If NoCheck (Number "0") _ s) = fullMapper s
         cs (If u e s1 s2) = do
             s1' <- fullMapper s1
             s2' <- fullMapper s2
