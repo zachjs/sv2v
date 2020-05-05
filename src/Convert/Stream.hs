@@ -23,11 +23,9 @@ streamerBlock chunk size asgn output input =
     [ Variable Local t inp [] $ Just input
     , Variable Local t out [] Nothing
     , Variable Local (IntegerAtom TInteger Unspecified) idx [] Nothing
-    , Variable Local (IntegerAtom TInteger Unspecified) bas [] Nothing
     ]
     [ For inits cmp incr stmt
-    , Asgn AsgnOpEq Nothing (LHSIdent bas) (Ident idx)
-    , For inits cmp2 incr2 stmt2
+    , If NoCheck cmp2 stmt2 Null
     , asgn output (Ident out)
     ]
     where
@@ -38,20 +36,20 @@ streamerBlock chunk size asgn output input =
         inp = name ++ "_inp"
         out = name ++ "_out"
         idx = name ++ "_idx"
-        bas = name ++ "_bas"
         -- main chunk loop
         inits = Right [(LHSIdent idx, lo)]
-        cmp = BinOp Le (Ident idx) (BinOp Sub hi chunk)
+        cmp = BinOp Lt (Ident idx) base
         incr = [(LHSIdent idx, AsgnOp Add, chunk)]
         lhs = LHSRange (LHSIdent out) IndexedMinus (BinOp Sub hi (Ident idx), chunk)
         expr = Range (Ident inp) IndexedPlus (Ident idx, chunk)
         stmt = Asgn AsgnOpEq Nothing lhs expr
+        base = BinOp Mul (BinOp Div size chunk) chunk
         -- final chunk loop
-        cmp2 = BinOp Lt (Ident idx) (BinOp Sub size (Ident bas))
-        incr2 = [(LHSIdent idx, AsgnOp Add, Number "1")]
-        lhs2 = LHSBit (LHSIdent out) (Ident idx)
-        expr2 = Bit (Ident inp) (BinOp Add (Ident idx) (Ident bas))
+        left = BinOp Sub size base
+        lhs2 = LHSRange (LHSIdent out) IndexedMinus (BinOp Sub hi base, left)
+        expr2 = Range (Ident inp) IndexedPlus (base, left)
         stmt2 = Asgn AsgnOpEq Nothing lhs2 expr2
+        cmp2 = BinOp Gt left (Number "0")
 
 streamerBlockName :: Expr -> Expr -> Identifier
 streamerBlockName chunk size =
