@@ -38,9 +38,9 @@ import qualified Convert.SignCast
 import qualified Convert.Simplify
 import qualified Convert.SizeCast
 import qualified Convert.StarPort
-import qualified Convert.StmtBlock
 import qualified Convert.Stream
 import qualified Convert.Struct
+import qualified Convert.TFBlock
 import qualified Convert.Typedef
 import qualified Convert.TypeOf
 import qualified Convert.UnbasedUnsized
@@ -73,9 +73,9 @@ phases excludes =
     , Convert.SizeCast.convert
     , Convert.Simplify.convert
     , Convert.StarPort.convert
-    , Convert.StmtBlock.convert
     , Convert.Stream.convert
     , Convert.Struct.convert
+    , Convert.TFBlock.convert
     , Convert.Typedef.convert
     , Convert.UnbasedUnsized.convert
     , Convert.Unique.convert

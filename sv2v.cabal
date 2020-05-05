@@ -86,9 +86,9 @@ executable sv2v
     Convert.Simplify
     Convert.SizeCast
     Convert.StarPort
-    Convert.StmtBlock
     Convert.Stream
     Convert.Struct
+    Convert.TFBlock
     Convert.Traverse
     Convert.Typedef
     Convert.TypeOf
