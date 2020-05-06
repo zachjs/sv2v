@@ -2,6 +2,7 @@
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  - Original Lexer Author: Tom Hawkins <tomahawkins@gmail.com>
+ - vim: filetype=haskell
  -
  - SystemVerilog Lexer
  -

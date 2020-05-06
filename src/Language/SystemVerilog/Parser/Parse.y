@@ -1,6 +1,7 @@
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  - Original Parser Author: Tom Hawkins <tomahawkins@gmail.com>
+ - vim: filetype=haskell
  -
  - This file has been *heavily* modified and extended from the original version
  - in tomahawkins/verilog. I have added support for numerous SystemVerilog
