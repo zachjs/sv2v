@@ -1,0 +1,6 @@
+*.hs  linguist-language=Haskell
+*.sh  linguist-language=Shell
+*.sv  linguist-language=SystemVerilog
+*.svh linguist-language=SystemVerilog
+*.v   linguist-language=Verilog
+*.vh  linguist-language=Verilog
