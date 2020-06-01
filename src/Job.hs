@@ -8,7 +8,7 @@
 
 module Job where
 
-import GitHash (giHash, tGitInfoCwd)
+import GitHash (giDescribe, tGitInfoCwd)
 import System.IO (stderr, hPutStr)
 import System.Console.CmdArgs
 import System.Environment (getArgs, withArgs)
@@ -31,11 +31,6 @@ data Job = Job
     , verbose :: Bool
     } deriving (Show, Typeable, Data)
 
-gitHash :: String
-gitHash = giHash $$tGitInfoCwd
-shortGitHash :: String
-shortGitHash = take 7 gitHash
-
 defaultJob :: Job
 defaultJob = Job
     { files = def &= args &= typ "FILES"
@@ -54,7 +49,7 @@ defaultJob = Job
     , verbose = nam "verbose" &= help "Retain certain conversion artifacts"
     }
     &= program "sv2v"
-    &= summary ("sv2v v0.0.4 (" ++ shortGitHash ++ ")")
+    &= summary ("sv2v " ++ giDescribe $$tGitInfoCwd)
     &= details [ "sv2v converts SystemVerilog to Verilog."
                , "More info: https://github.com/zachjs/sv2v"
                , "(C) 2019-2020 Zachary Snow, 2011-2015 Tom Hawkins" ]
