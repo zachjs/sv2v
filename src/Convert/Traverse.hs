@@ -54,6 +54,9 @@ module Convert.Traverse
 , traverseExprTypesM
 , traverseExprTypes
 , collectExprTypesM
+, traverseTypeExprsM
+, traverseTypeExprs
+, collectTypeExprsM
 , traverseTypesM'
 , traverseTypes'
 , collectTypesM'
@@ -895,6 +898,16 @@ traverseExprTypes :: Mapper Type -> Mapper Expr
 traverseExprTypes = unmonad traverseExprTypesM
 collectExprTypesM :: Monad m => CollectorM m Type -> CollectorM m Expr
 collectExprTypesM = collectify traverseExprTypesM
+
+traverseTypeExprsM :: Monad m => MapperM m Expr -> MapperM m Type
+traverseTypeExprsM mapper =
+    typeMapper
+    where (_, _, _, _, typeMapper) = exprMapperHelpers mapper
+
+traverseTypeExprs :: Mapper Expr -> Mapper Type
+traverseTypeExprs = unmonad traverseTypeExprsM
+collectTypeExprsM :: Monad m => CollectorM m Expr -> CollectorM m Type
+collectTypeExprsM = collectify traverseTypeExprsM
 
 traverseTypesM' :: Monad m => TypeStrategy -> MapperM m Type -> MapperM m ModuleItem
 traverseTypesM' strategy mapper item =

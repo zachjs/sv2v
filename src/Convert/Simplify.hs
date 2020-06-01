@@ -42,6 +42,14 @@ traverseDeclM decl = do
     return decl'
 
 traverseModuleItemM :: ModuleItem -> State Info ModuleItem
+traverseModuleItemM (Instance m p x r l) = do
+    p' <- mapM paramBindingMapper p
+    traverseExprsM traverseExprM $ Instance m p' x r l
+    where
+        paramBindingMapper (param, Left t) = do
+            t' <- traverseTypeExprsM substituteExprM t
+            return (param, Left t')
+        paramBindingMapper (param, Right e) = return (param, Right e)
 traverseModuleItemM item = traverseExprsM traverseExprM item
 
 traverseStmtM :: Stmt -> State Info Stmt
@@ -49,6 +57,9 @@ traverseStmtM stmt = traverseStmtExprsM traverseExprM stmt
 
 traverseExprM :: Expr -> State Info Expr
 traverseExprM = traverseNestedExprsM $ stately convertExpr
+
+substituteExprM :: Expr -> State Info Expr
+substituteExprM = traverseNestedExprsM $ stately substitute
 
 convertExpr :: Info -> Expr -> Expr
 convertExpr info (Cast (Right c) e) =

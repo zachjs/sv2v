@@ -112,3 +112,4 @@ module f_4; o_nodef #(.T(logic [1:0]), .U(logic), .b(0), .a(1)) x(); endmodule
 
 module p_1; p #(logic [1:0], logic [2:0]) x(); endmodule
 module p_2; p x(); endmodule
+module p_3; localparam W = 2; p #(logic [W:0], logic [W:0]) x(); endmodule
