@@ -1,15 +1,3 @@
-module foo_default #(
-    parameter size = 0
-);
-    initial $display("foo %d %d", 1, size);
-endmodule
-
-module bar_default #(
-    parameter size = 0
-);
-    initial $display("bar %d %d", 1, size);
-endmodule
-
 module foo_byte #(
     parameter size = 0
 );

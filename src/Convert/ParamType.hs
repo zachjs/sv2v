@@ -91,7 +91,7 @@ convert files =
             else if all isNothing maybeTypeMap then
                 []
             else
-                filter (not . flip elem existing) $
+                filter (not . alreadyExists) $
                 (:) (removeDefaultTypeParams part) $
                 if isNothing typeMap
                     then []
@@ -99,6 +99,11 @@ convert files =
             where
                 maybeTypeMap = snd $ info Map.! name
                 typeMap = defaultInstance maybeTypeMap
+                existingNames = map maybeModuleName existing
+                alreadyExists = (flip elem existingNames) . maybeModuleName
+                maybeModuleName :: Description -> Maybe Identifier
+                maybeModuleName (Part _ _ _ _ x _ _) = Just x
+                maybeModuleName _ = Nothing
         replaceDefault _ other = [other]
 
         removeDefaultTypeParams :: Description -> Description
@@ -235,7 +240,7 @@ convertModuleItemM info (orig @ (Instance m bindings x r p)) =
     else if any (not . isSimpleType) resolvedTypes then do
         let defaults = Map.map Left resolvedTypes
         let bindingsDefaulted = Map.toList $ Map.union bindingsMap defaults
-        if isDefaultName m || bindingsDefaulted /= Map.toList bindingsMap
+        if isDefaultName m || bindingsDefaulted == Map.toList bindingsMap
             then return $ Instance m bindingsNamed x r p
             else return $ Instance (moduleDefaultName m) bindingsDefaulted x r p
     else do
