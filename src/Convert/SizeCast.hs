@@ -70,6 +70,12 @@ traverseExprM =
                 _ -> convertCastM (Number s) (Number n)
         convertExprM (orig @ (Cast (Right DimsFn{}) _)) =
             return orig
+        convertExprM (Cast (Right (Ident x)) e) = do
+            typeMap <- get
+            -- can't convert this cast yet because x could be a typename
+            if Map.notMember x typeMap
+                then return $ Cast (Right $ Ident x) e
+                else convertCastM (Ident x) e
         convertExprM (Cast (Right s) e) =
             convertCastM s e
         convertExprM (Cast (Left (IntegerVector _ Signed rs)) e) =
