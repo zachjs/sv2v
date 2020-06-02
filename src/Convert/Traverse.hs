@@ -1052,6 +1052,7 @@ traverseNestedModuleItemsM mapper = fullMapper
             mapM fullGenItemMapper genItems' >>= mapper . Generate
         fullMapper (MIAttr attr mi) =
             fullMapper mi >>= mapper . MIAttr attr
+        fullMapper (Initial Null) = return $ Generate []
         fullMapper other = mapper other
         fullGenItemMapper = traverseNestedGenItemsM genItemMapper
         genItemMapper (GenModuleItem moduleItem) = do
