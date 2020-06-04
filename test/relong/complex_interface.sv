@@ -24,7 +24,7 @@ module CacheWithInterface(
         .response(myResponse)
     );
 
-    CacheSet set(
+    CacheSetWrapper set(
         .data(dataInterface.CacheSet),
         .clock,
         .clear
@@ -33,6 +33,14 @@ module CacheWithInterface(
     assign myRequest = dataIn;
     assign dataOut = myResponse;
 
+endmodule
+
+// to test binding a modport to another modport
+module CacheSetWrapper (
+    CacheSetInterface.CacheSet data,
+    input logic clock, clear
+);
+    CacheSet set(data, clock, clear);
 endmodule
 
 module CacheSet (

@@ -122,11 +122,15 @@ convertDescription ports orig =
 
         -- rewrite variable declarations to have the correct type
         convertModuleItem (MIPackageItem (Decl (Variable dir (IntegerVector _ sg mr) ident a me))) =
-            MIPackageItem $ Decl $ Variable dir (t mr) ident a me
+            MIPackageItem $ Decl $ Variable dir' (t mr) ident a me
             where
                 t = if Set.member ident fixedIdents
                     then IntegerVector TReg sg
                     else Net (NetType TWire) sg
+                dir' =
+                    if dir == Inout && Set.member ident fixedIdents
+                    then Output
+                    else dir
         convertModuleItem other = other
         -- all other logics (i.e. inside of functions) become regs
         convertDecl :: Decl -> Decl
