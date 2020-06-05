@@ -49,24 +49,33 @@ convertDescription pis (orig @ Part{}) =
     Part attrs extern kw lifetime name ports items'
     where
         Part attrs extern kw lifetime name ports items = orig
-        existingPIs = execWriter $ collectModuleItemsM collectPIsM orig
-        runner f = execWriter $ collectModuleItemsM f orig
-        usedPIs = Set.unions $ map runner $
+        items' = addItems pis Set.empty items
+convertDescription _ other = other
+
+-- iteratively inserts missing package items exactly where they are needed
+addItems :: PIs -> Idents -> [ModuleItem] -> [ModuleItem]
+addItems pis existingPIs (item : items) =
+    if not $ Set.disjoint existingPIs thisPI then
+        -- this item was re-imported earlier in the module
+        addItems pis existingPIs items
+    else if null itemsToAdd then
+        -- this item has no additional dependencies
+        item : addItems pis (Set.union existingPIs thisPI) items
+    else
+        -- this item has at least one un-met dependency
+        addItems pis existingPIs (head itemsToAdd : item : items)
+    where
+        thisPI = execWriter $ collectPIsM item
+        runner f = execWriter $ collectNestedModuleItemsM f item
+        usedPIs = Set.unions $ map runner
             [ collectStmtsM collectSubroutinesM
             , collectTypesM $ collectNestedTypesM collectTypenamesM
             , collectExprsM $ collectNestedExprsM collectIdentsM
             ]
         neededPIs = Set.difference usedPIs existingPIs
-        newItems = map MIPackageItem $ Map.elems $
+        itemsToAdd = map MIPackageItem $ Map.elems $
             Map.restrictKeys pis neededPIs
-        -- place data declarations at the beginning to obey declaration
-        -- ordering; everything else can go at the end
-        newItemsBefore = filter isDecl newItems
-        newItemsAfter = filter (not . isDecl) newItems
-        items' = newItemsBefore ++ items ++ newItemsAfter
-        isDecl (MIPackageItem (Decl{})) = True
-        isDecl _ = False
-convertDescription _ other = other
+addItems _ _ [] = []
 
 -- writes down the names of package items
 collectPIsM :: ModuleItem -> Writer Idents ()
