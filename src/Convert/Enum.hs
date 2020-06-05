@@ -3,12 +3,10 @@
  -
  - Conversion for `enum`
  -
- - This conversion replaces the enum items with localparams declared within any
- - modules in which that enum type appears. This is not necessarily foolproof,
- - as some tools do allow the use of an enum item even if the actual enum type
- - does not appear in that description. The localparams are explicitly sized to
- - match the size of the converted enum type. This conversion includes only enum
- - items which are actually used within a given description.
+ - This conversion replaces the enum items with localparams declared at the
+ - global scope. We leave it to the package item nesting conversion to determine
+ - where the generated localparams are needed. The localparams are explicitly
+ - sized to match the size of the converted enum type.
  -
  - SystemVerilog allows for enums to have any number of the items' values
  - specified or unspecified. If the first one is unspecified, it is 0. All other
@@ -22,7 +20,7 @@
 module Convert.Enum (convert) where
 
 import Control.Monad.Writer
-import Data.List (elemIndices, partition, sortOn)
+import Data.List (elemIndices)
 import qualified Data.Set as Set
 
 import Convert.Traverse
@@ -30,70 +28,31 @@ import Language.SystemVerilog.AST
 
 type EnumInfo = (Maybe Range, [(Identifier, Maybe Expr)])
 type Enums = Set.Set EnumInfo
-type Idents = Set.Set Identifier
-type EnumItem = ((Maybe Range, Identifier), Expr)
 
 convert :: [AST] -> [AST]
-convert = map $ traverseDescriptions convertDescription
+convert = map $ concatMap convertDescription
 
 defaultType :: Type
 defaultType = IntegerVector TLogic Unspecified [(Number "31", Number "0")]
 
-convertDescription :: Description -> Description
-convertDescription (description @ Part{}) =
-    Part attrs extern kw lifetime name ports (enumItems ++ items)
-    where
-        -- replace and collect the enum types in this description
-        (Part attrs extern kw lifetime name ports items, enumPairs) =
-            convertDescription' description
-        -- convert the collected enums into their corresponding localparams
-        enumItems = map MIPackageItem $ map toItem $ sortOn snd $ convergeUsage items enumPairs
-convertDescription (description @ (Package _ _ _)) =
-    Package ml name (items ++ enumItems)
-    where
-        -- replace and collect the enum types in this description
-        (Package ml name items, enumPairs) =
-            convertDescription' description
-        -- convert the collected enums into their corresponding localparams
-        enumItems = map toItem $ sortOn snd $ enumPairs
-convertDescription other = other
+convertDescription :: Description -> [Description]
+convertDescription (description @ Package{}) =
+    [Package ml name (items ++ enumItems)]
+    where (Package ml name items, enumItems) = convertDescription' description
+convertDescription description =
+    (map PackageItem enumItems) ++ [description']
+    where (description', enumItems) = convertDescription' description
 
 -- replace and collect the enum types in a description
-convertDescription' :: Description -> (Description, [EnumItem])
+convertDescription' :: Description -> (Description, [PackageItem])
 convertDescription' description =
-    (description', enumPairs)
+    (description', enumItems)
     where
         -- replace and collect the enum types in this description
         (description', enums) = runWriter $
             traverseModuleItemsM (traverseTypesM traverseType) description
         -- convert the collected enums into their corresponding localparams
-        enumPairs = concatMap enumVals $ Set.toList enums
-
--- add only the enums actually used in the given items
-convergeUsage :: [ModuleItem] -> [EnumItem] -> [EnumItem]
-convergeUsage items enums =
-    if null usedEnums
-        then []
-        else usedEnums ++ convergeUsage (enumItems ++ items) unusedEnums
-    where
-        -- determine which of the enum items are actually used here
-        (usedEnums, unusedEnums) = partition isUsed enums
-        enumItems = map MIPackageItem $ map toItem usedEnums
-        isUsed ((_, x), _) = Set.member x usedIdents
-        usedIdents = execWriter $ mapM collectModuleItemM items
-        collectModuleItemM = collectNestedModuleItemsM $ collectExprsM $
-            collectNestedExprsM collectIdent
-        collectIdent :: Expr -> Writer Idents ()
-        collectIdent (Ident x) = tell $ Set.singleton x
-        collectIdent _ = return ()
-
-toItem :: EnumItem -> PackageItem
-toItem ((mr, x), v) =
-    Decl $ Param Localparam itemType x v'
-    where
-        v' = simplify v
-        rs = maybe [] (\a -> [a]) mr
-        itemType = Implicit Unspecified rs
+        enumItems = concatMap makeEnumItems $ Set.toList enums
 
 toBaseType :: Maybe Type -> Type
 toBaseType Nothing = defaultType
@@ -123,19 +82,24 @@ traverseType other = return other
 simplifyRange :: Range -> Range
 simplifyRange (a, b) = (simplify a, simplify b)
 
-enumVals :: EnumInfo -> [EnumItem]
-enumVals (mr, l) =
+makeEnumItems :: EnumInfo -> [PackageItem]
+makeEnumItems (mr, l) =
     -- check for obviously duplicate values
     if noDuplicates
-        then res
+        then zipWith toPackageItem keys vals
         else error $ "enum conversion has duplicate vals: "
                 ++ show (zip keys vals)
     where
         keys = map fst l
         vals = tail $ scanl step (Number "-1") (map snd l)
-        res = zip (zip (repeat mr) keys) vals
         noDuplicates = all (null . tail . flip elemIndices vals) vals
         step :: Expr -> Maybe Expr -> Expr
         step _ (Just expr) = expr
         step expr Nothing =
             simplify $ BinOp Add expr (Number "1")
+        rs = maybe [] (\a -> [a]) mr
+        itemType = Implicit Unspecified rs
+        toPackageItem :: Identifier -> Expr -> PackageItem
+        toPackageItem x v =
+            Decl $ Param Localparam itemType x v'
+            where v' = simplify v
