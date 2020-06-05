@@ -462,9 +462,9 @@ CastingType :: { Type }
   | IntegerAtomType   { IntegerAtom   $1 Unspecified    }
   | NonIntegerType    { NonInteger    $1                }
   | Signing           { Implicit      $1             [] }
-EnumBaseType :: { Maybe Type }
-  : opt(Type) { $1 }
-  | DimensionsNonEmpty { Just $ Implicit Unspecified $1 }
+EnumBaseType :: { Type }
+  : Type       { $1 }
+  | Dimensions { Implicit Unspecified $1 }
 
 NetTypeAndStrength :: { NetTypeAndStrength }
   : NetType                %prec "+" { NetType       $1    }

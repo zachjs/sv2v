@@ -43,7 +43,7 @@ data Type
     | Net           NetTypeAndStrength Signing [Range]
     | Implicit                         Signing [Range]
     | Alias    (Maybe Identifier) Identifier   [Range]
-    | Enum     (Maybe Type) [Item]             [Range]
+    | Enum     Type         [Item]             [Range]
     | Struct   Packing      [Field]            [Range]
     | Union    Packing      [Field]            [Range]
     | InterfaceT Identifier (Maybe Identifier) [Range]
@@ -60,9 +60,9 @@ instance Show Type where
     show (NonInteger    kw      ) = printf "%s"     (show kw)
     show (InterfaceT x my r) = x ++ yStr ++ (showRanges r)
         where yStr = maybe "" ("."++) my
-    show (Enum mt vals r) = printf "enum %s{%s}%s" tStr (commas $ map showVal vals) (showRanges r)
+    show (Enum t vals r) = printf "enum %s{%s}%s" tStr (commas $ map showVal vals) (showRanges r)
         where
-            tStr = maybe "" showPad mt
+            tStr = showPad t
             showVal :: (Identifier, Maybe Expr) -> String
             showVal (x, e) = x ++ (showAssignment e)
     show (Struct p items r) = printf "struct %s{\n%s\n}%s" (showPad p) (showFields items) (showRanges r)

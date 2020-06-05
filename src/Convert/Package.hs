@@ -95,7 +95,7 @@ prefixPackageItem packageName idents item =
             Decl (ParamType  a x b  ) -> Decl (ParamType  a (prefix x) b  )
             other -> other
         convertType (Alias Nothing x rs) = Alias Nothing (prefix x) rs
-        convertType (Enum mt items rs) = Enum mt items' rs
+        convertType (Enum t items rs) = Enum t items' rs
             where
                 items' = map prefixItem items
                 prefixItem (x, me) = (prefix x, me)

@@ -26,14 +26,11 @@ import qualified Data.Set as Set
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type EnumInfo = (Maybe Range, [(Identifier, Maybe Expr)])
+type EnumInfo = (Type, [(Identifier, Maybe Expr)])
 type Enums = Set.Set EnumInfo
 
 convert :: [AST] -> [AST]
 convert = map $ concatMap convertDescription
-
-defaultType :: Type
-defaultType = IntegerVector TLogic Unspecified [(Number "31", Number "0")]
 
 convertDescription :: Description -> [Description]
 convertDescription (description @ Package{}) =
@@ -54,36 +51,30 @@ convertDescription' description =
         -- convert the collected enums into their corresponding localparams
         enumItems = concatMap makeEnumItems $ Set.toList enums
 
-toBaseType :: Maybe Type -> Type
-toBaseType Nothing = defaultType
-toBaseType (Just (Implicit _ rs)) =
-    fst (typeRanges defaultType) rs
-toBaseType (Just t @ (Alias _ _ _)) = t
-toBaseType (Just t) =
-    if null rs
-        then tf [(Number "0", Number "0")]
-        else t
-    where (tf, rs) = typeRanges t
-
 -- replace, but write down, enum types
 traverseType :: Type -> Writer Enums Type
+traverseType (Enum (t @ Alias{}) v rs) =
+    return $ Enum t v rs -- not ready
+traverseType (Enum (Implicit sg rl) v rs) =
+    traverseType $ Enum t' v rs
+    where
+        -- default to a 32 bit logic
+        t' = IntegerVector TLogic sg rl'
+        rl' = if null rl
+            then [(Number "31", Number "0")]
+            else rl
 traverseType (Enum t v rs) = do
-    let baseType = toBaseType t
-    let (tf, rl) = typeRanges baseType
-    mr <- return $ case rl of
-        [] -> Nothing
-        [r] -> Just r
-        _ -> error $ "unexpected multi-dim enum type: "
-                    ++ show (Enum t v rs)
-    () <- tell $ Set.singleton (fmap simplifyRange mr, v)
-    return $ tf (rl ++ rs)
+    let (tf, rl) = typeRanges t
+    rlParam <- case rl of
+        [ ] -> return [(Number "0", Number "0")]
+        [_] -> return rl
+        _   -> error $ "unexpected multi-dim enum type: " ++ show (Enum t v rs)
+    tell $ Set.singleton (tf rlParam, v) -- type of localparams
+    return $ tf (rl ++ rs) -- type of variables
 traverseType other = return other
 
-simplifyRange :: Range -> Range
-simplifyRange (a, b) = (simplify a, simplify b)
-
 makeEnumItems :: EnumInfo -> [PackageItem]
-makeEnumItems (mr, l) =
+makeEnumItems (itemType, l) =
     -- check for obviously duplicate values
     if noDuplicates
         then zipWith toPackageItem keys vals
@@ -97,8 +88,6 @@ makeEnumItems (mr, l) =
         step _ (Just expr) = expr
         step expr Nothing =
             simplify $ BinOp Add expr (Number "1")
-        rs = maybe [] (\a -> [a]) mr
-        itemType = Implicit Unspecified rs
         toPackageItem :: Identifier -> Expr -> PackageItem
         toPackageItem x v =
             Decl $ Param Localparam itemType x v'

@@ -857,11 +857,9 @@ traverseNestedTypesM mapper = fullMapper
         tm (NonInteger    kw      ) = return $ NonInteger    kw
         tm (TypeOf        expr    ) = return $ TypeOf        expr
         tm (InterfaceT x my r) = return $ InterfaceT x my r
-        tm (Enum Nothing vals r) =
-            return $ Enum Nothing vals r
-        tm (Enum (Just t) vals r) = do
+        tm (Enum t vals r) = do
             t' <- fullMapper t
-            return $ Enum (Just t') vals r
+            return $ Enum t' vals r
         tm (Struct p fields r) = do
             types <- mapM fullMapper $ map fst fields
             let idents = map snd fields

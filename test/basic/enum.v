@@ -1,12 +1,7 @@
 `define PRINT(name, val) \
     dummy``name = val; \
-    $display("%h %h %0d %0d", \
+    $display(`"name %h %h %0d %0d`", \
         val, dummy``name, $bits(val), $bits(dummy``name));
-
-`define PRINT_UNSIZED(name, val) \
-    dummy``name = val; \
-    $display("%h %h %0d", \
-        val, dummy``name, $bits(dummy``name));
 
 module top;
 
@@ -15,7 +10,7 @@ module top;
     reg [31:0] dummyC;
     reg [31:0] dummyD;
     reg [31:0] dummyE;
-    reg [0:0] dummyF;
+    reg dummyF;
     reg [0:0] dummyG;
     reg [3:0] dummyH;
     reg [31:0] dummyI;
@@ -51,11 +46,11 @@ module top;
         `PRINT(G, 1'b0)
         `PRINT(G, 1'b1)
 
-        `PRINT_UNSIZED(H, 'b1)
-        `PRINT_UNSIZED(H, 'b0)
+        `PRINT(H, 4'b1)
+        `PRINT(H, 4'b0)
 
-        `PRINT_UNSIZED(I, 'b0)
-        `PRINT_UNSIZED(I, 'b1)
+        `PRINT(I, 'b0)
+        `PRINT(I, 'b1)
 
     end
 

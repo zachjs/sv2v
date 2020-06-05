@@ -134,5 +134,6 @@ convertBits (Right e) =
         Number n ->
             case elemIndex '\'' n of
                 Nothing -> Number "32"
+                Just 0  -> Number "32"
                 Just idx -> Number $ take idx n
         _ -> DimsFn FnBits $ Left $ TypeOf e

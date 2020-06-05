@@ -45,13 +45,8 @@ typedef enum int {
 
 `define PRINT(name, val) \
     dummy``name = name``_``val; \
-    $display("%h %h %0d %0d", \
+    $display(`"name %h %h %0d %0d`", \
         name``_``val, dummy``name, $bits(name``_``val), $bits(dummy``name));
-
-`define PRINT_UNSIZED(name, val) \
-    dummy``name = name``_``val; \
-    $display("%h %h %0d", \
-        name``_``val, dummy``name, $bits(dummy``name));
 
 module top;
     EnumA dummyA;
@@ -95,11 +90,11 @@ module top;
         `PRINT(G, 1)
         `PRINT(G, 2)
 
-        `PRINT_UNSIZED(H, 1)
-        `PRINT_UNSIZED(H, 2)
+        `PRINT(H, 1)
+        `PRINT(H, 2)
 
-        `PRINT_UNSIZED(I, 1)
-        `PRINT_UNSIZED(I, 2)
+        `PRINT(I, 1)
+        `PRINT(I, 2)
 
     end
 
