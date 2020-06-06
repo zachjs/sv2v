@@ -3,10 +3,13 @@
  -
  - Conversion for unbased, unsized literals ('0, '1, 'z, 'x)
  -
- - The literals are given a binary base and are made signed to enable sign
- - extension. In self-determined contexts, the literals are additionally given
- - an explicit size of 1. This enables the desired implicit casting in
+ - The literals are given a binary base, a size of 1, and are made signed to
+ - allow sign extension. This enables the desired implicit casting in
  - Verilog-2005.
+ -
+ - However, in a ternary expressions, these literals should take on the sign and
+ - size of their counterpart. To work around this, we explicitly size cast these
+ - literlas when they appear within a ternary expression.
  -}
 
 module Convert.UnbasedUnsized (convert) where
@@ -23,26 +26,24 @@ convert =
 digits :: [Char]
 digits = ['0', '1', 'x', 'z', 'X', 'Z']
 
-literalFor :: String -> Char -> Expr
-literalFor prefix ch =
+literalFor :: Char -> Expr
+literalFor ch =
     if elem ch digits
-        then Number (prefix ++ [ch])
+        then Number ("1'sb" ++ [ch])
         else error $ "unexpected unbased-unsized digit: " ++ [ch]
-
-sizedLiteralFor :: Char -> Expr
-sizedLiteralFor = literalFor "1'sb"
-
-unsizedLiteralFor :: Char -> Expr
-unsizedLiteralFor = literalFor "'sb"
 
 convertExpr :: Expr -> Expr
 convertExpr (Mux cond left right) =
-    Mux cond (convertExprUnsized left) (convertExprUnsized right)
+    Mux cond (convertExprCast left right) (convertExprCast right left)
 convertExpr (Number ['\'', ch]) =
-    sizedLiteralFor ch
+    literalFor ch
 convertExpr other = other
 
-convertExprUnsized :: Expr -> Expr
-convertExprUnsized (Number ['\'', ch]) =
-    unsizedLiteralFor ch
-convertExprUnsized other = other
+convertExprCast :: Expr -> Expr -> Expr
+convertExprCast (Number ['\'', ch]) other =
+    Cast (Right size) (literalFor ch)
+    where
+        size = case other of
+            Number ['\'', _] -> Number "32"
+            _ -> DimsFn FnBits $ Right other
+convertExprCast other _ = other

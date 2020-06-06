@@ -17,7 +17,7 @@ module top;
         i = 42;
         flag = 1;
         a = (flag ? '1 : i);
-        b = (flag ? 1'sb1 : i);
+        b = (flag ? 'x : i);
         c = (flag ? '1 : '0);
         $display("%b", a);
         $display("%b", b);

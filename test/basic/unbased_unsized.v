@@ -17,7 +17,7 @@ module top;
         i = 42;
         flag = 1;
         a = (flag ? 32'hFFFFFFFF : i);
-        b = (flag ? 1'sb1 : i);
+        b = (flag ? 32'hXXXXXXXX : i);
         c = (flag ?  32'hFFFFFFFF: i);
         $display("%b", a);
         $display("%b", b);
