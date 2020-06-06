@@ -19,9 +19,9 @@ executable sv2v
   default-language: Haskell2010
   main-is: sv2v.hs
   hs-source-dirs: src
-  build-tools:
-    alex  >= 3 && < 4,
-    happy >= 1 && < 2
+  build-tool-depends:
+    , alex:alex   >= 3.2.5 && < 4
+    , happy:happy >= 1.19  && < 2
   build-depends:
     , array
     , base
