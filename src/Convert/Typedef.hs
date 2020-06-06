@@ -35,20 +35,23 @@ convert =
 
 convertDescription :: Types -> Description -> Description
 convertDescription globalTypes description =
-    traverseModuleItems removeTypedef $
-    traverseModuleItems convertModuleItem $
-    traverseModuleItems (traverseExprs $ traverseNestedExprs $ convertExpr) $
-    traverseModuleItems (traverseTypes $ resolveType types) $
-    description
+    traverseModuleItems (convertTypedef types) description'
     where
+        description' =
+            traverseModuleItems (traverseGenItems convertGenItem) description
         types = Map.union globalTypes $
-            execWriter $ collectModuleItemsM getTypedef description
-        getTypedef :: ModuleItem -> Writer Types ()
-        getTypedef (MIPackageItem (Typedef a b)) = tell $ Map.singleton b a
-        getTypedef _ = return ()
+            execWriter $ collectModuleItemsM collectTypedefM description'
+
+convertTypedef :: Types -> ModuleItem -> ModuleItem
+convertTypedef types =
+    removeTypedef .
+    convertModuleItem .
+    (traverseExprs $ traverseNestedExprs $ convertExpr) .
+    (traverseTypes $ resolveType types)
+    where
         removeTypedef :: ModuleItem -> ModuleItem
         removeTypedef (MIPackageItem (Typedef _ x)) =
-            MIPackageItem $ Decl $ CommentDecl  $ "removed typedef: " ++ x
+            MIPackageItem $ Decl $ CommentDecl $ "removed typedef: " ++ x
         removeTypedef other = other
         convertTypeOrExpr :: TypeOrExpr -> TypeOrExpr
         convertTypeOrExpr (Left (TypeOf (Ident x))) =
@@ -70,6 +73,27 @@ convertDescription globalTypes description =
             Instance m (map mapParam params) x r p
             where mapParam (i, v) = (i, convertTypeOrExpr v)
         convertModuleItem other = other
+
+convertGenItem :: GenItem -> GenItem
+convertGenItem (GenIf c a b) =
+    GenIf c a' b'
+    where
+        a' = convertGenItem' a
+        b' = convertGenItem' b
+convertGenItem other = other
+
+convertGenItem' :: GenItem -> GenItem
+convertGenItem' item = do
+    GenBlock "" items
+    where
+        -- convert inner generate blocks first
+        item' = Generate [traverseNestedGenItems convertGenItem item]
+        types = execWriter $ collectNestedModuleItemsM collectTypedefM item'
+        Generate items = traverseNestedModuleItems (convertTypedef types) item'
+
+collectTypedefM :: ModuleItem -> Writer Types ()
+collectTypedefM (MIPackageItem (Typedef a b)) = tell $ Map.singleton b a
+collectTypedefM _ = return ()
 
 resolveItem :: Types -> (Type, Identifier) -> (Type, Identifier)
 resolveItem types (t, x) = (resolveType types t, x)

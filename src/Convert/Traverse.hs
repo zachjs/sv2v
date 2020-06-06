@@ -67,6 +67,7 @@ module Convert.Traverse
 , traverseGenItems
 , collectGenItemsM
 , traverseNestedGenItemsM
+, traverseNestedGenItems
 , traverseAsgnsM
 , traverseAsgns
 , collectAsgnsM
@@ -973,6 +974,9 @@ traverseNestedGenItemsM mapper = fullMapper
     where
         fullMapper stmt =
             mapper stmt >>= traverseSinglyNestedGenItemsM fullMapper
+
+traverseNestedGenItems :: Mapper GenItem -> Mapper GenItem
+traverseNestedGenItems = unmonad traverseNestedGenItemsM
 
 flattenGenBlocks :: GenItem -> [GenItem]
 flattenGenBlocks (GenBlock "" items) = items
