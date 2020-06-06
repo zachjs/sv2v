@@ -3,8 +3,9 @@
  -
  - Conversion for unbased, unsized literals ('0, '1, 'z, 'x)
  -
- - We convert the literals to be signed to enable sign extension, and give them
- - a size of 1 and a binary base. These values implicitly cast as desired in
+ - The literals are given a binary base and are made signed to enable sign
+ - extension. In self-determined contexts, the literals are additionally given
+ - an explicit size of 1. This enables the desired implicit casting in
  - Verilog-2005.
  -}
 
@@ -22,9 +23,26 @@ convert =
 digits :: [Char]
 digits = ['0', '1', 'x', 'z', 'X', 'Z']
 
-convertExpr :: Expr -> Expr
-convertExpr (Number ['\'', ch]) =
+literalFor :: String -> Char -> Expr
+literalFor prefix ch =
     if elem ch digits
-        then Number ("1'sb" ++ [ch])
+        then Number (prefix ++ [ch])
         else error $ "unexpected unbased-unsized digit: " ++ [ch]
+
+sizedLiteralFor :: Char -> Expr
+sizedLiteralFor = literalFor "1'sb"
+
+unsizedLiteralFor :: Char -> Expr
+unsizedLiteralFor = literalFor "'sb"
+
+convertExpr :: Expr -> Expr
+convertExpr (Mux cond left right) =
+    Mux cond (convertExprUnsized left) (convertExprUnsized right)
+convertExpr (Number ['\'', ch]) =
+    sizedLiteralFor ch
 convertExpr other = other
+
+convertExprUnsized :: Expr -> Expr
+convertExprUnsized (Number ['\'', ch]) =
+    unsizedLiteralFor ch
+convertExprUnsized other = other

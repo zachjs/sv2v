@@ -7,4 +7,20 @@ module top;
     `TEST(0);
     `TEST(x);
     `TEST(z);
+
+    logic flag;
+    logic [31:0] i;
+    logic [31:0] a;
+    logic [31:0] b;
+    logic [31:0] c;
+    initial begin
+        i = 42;
+        flag = 1;
+        a = (flag ? '1 : i);
+        b = (flag ? 1'sb1 : i);
+        c = (flag ? '1 : '0);
+        $display("%b", a);
+        $display("%b", b);
+        $display("%b", c);
+    end
 endmodule
