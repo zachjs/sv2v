@@ -1,3 +1,5 @@
+cabal-version: 2.4
+
 name: sv2v
 version: 0.0.3
 synopsis: SystemVerilog to Verilog conversion
@@ -8,13 +10,10 @@ category: Language, Hardware, Embedded, Development
 
 author: Zachary Snow <zach@zachjs.com>, Tom Hawkins <tomahawkins@gmail.com>
 maintainer: Zachary Snow <zach@zachjs.com>
-license: BSD3
+license: BSD-3-Clause
 license-file: LICENSE
 license-files: NOTICE
 homepage: https://github.com/zachjs/sv2v
-
-build-type: Simple
-cabal-version: >= 1.12
 
 executable sv2v
   default-language: Haskell2010
@@ -24,15 +23,15 @@ executable sv2v
     alex  >= 3 && < 4,
     happy >= 1 && < 2
   build-depends:
-    array,
-    base,
-    cmdargs,
-    containers,
-    directory,
-    filepath,
-    githash,
-    hashable,
-    mtl
+    , array
+    , base
+    , cmdargs
+    , containers
+    , directory
+    , filepath
+    , githash
+    , hashable
+    , mtl
   other-modules:
     -- SystemVerilog modules
     Language.SystemVerilog
