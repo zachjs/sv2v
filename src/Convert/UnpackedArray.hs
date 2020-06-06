@@ -3,12 +3,13 @@
  -
  - Conversion for any unpacked array which must be packed because it is: A) a
  - port; B) is bound to a port; C) is assigned a value in a single assignment;
- - or D) is assigned to an unpacked array which itself mus be packed.
+ - or D) is assigned to an unpacked array which itself must be packed.
  -
  - The scoped nature of declarations makes this challenging. While scoping is
- - obeyed in general, any of a set of *equivalent* declarations within a module
- - is packed, all of the declarations are packed. This is because we only record
- - the declaration that needs to be packed when a relevant usage is encountered.
+ - obeyed in general, if any of a set of *equivalent* declarations within a
+ - module is packed, all of the declarations are packed. This is because we only
+ - record the declaration that needs to be packed when a relevant usage is
+ - encountered.
  -}
 
 module Convert.UnpackedArray (convert) where
@@ -97,6 +98,19 @@ traverseLHSM (LHSIdent x) = do
 traverseLHSM other = return other
 
 traverseAsgnM :: (LHS, Expr) -> ST (LHS, Expr)
+traverseAsgnM (LHSIdent x, Mux cond (Ident y) (Ident z)) = do
+    flatUsageM x
+    flatUsageM y
+    flatUsageM z
+    return (LHSIdent x, Mux cond (Ident y) (Ident z))
+traverseAsgnM (LHSIdent x, Mux cond y (Ident z)) = do
+    flatUsageM x
+    flatUsageM z
+    return (LHSIdent x, Mux cond y (Ident z))
+traverseAsgnM (LHSIdent x, Mux cond (Ident y) z) = do
+    flatUsageM x
+    flatUsageM y
+    return (LHSIdent x, Mux cond (Ident y) z)
 traverseAsgnM (LHSIdent x, Ident y) = do
     flatUsageM x
     flatUsageM y

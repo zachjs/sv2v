@@ -2,4 +2,11 @@ module top;
     reg [5:0] a;
     wire [5:0] b;
     always @(*) a = b;
+
+    reg x;
+    wire [5:0] c;
+    wire [5:0] d;
+    wire [5:0] e;
+    initial x = 0;
+    assign c = x ? d : e;
 endmodule
