@@ -295,7 +295,7 @@ convertAsgn structs types (lhs, expr) =
         convertExpr (Struct packing fields (_:rs)) (Bit e _) =
             convertExpr (Struct packing fields rs) e
         convertExpr (Struct packing fields []) (Pattern [("", Repeat (Number nStr) exprs)]) =
-            case readNumber nStr of
+            case fmap fromIntegral (readNumber nStr) of
                 Just n -> convertExpr (Struct packing fields []) $ Pattern $
                         zip (repeat "") (concat $ take n $ repeat exprs)
                 Nothing ->

@@ -81,7 +81,7 @@ convertExpr (orig @ (DimsFn FnDimensions (Left t))) =
 convertExpr (DimFn f (Left t) (Number str)) =
     if dm == Nothing || isUnresolved t then
         DimFn f (Left t) (Number str)
-    else if d <= 0 || d > length rs then
+    else if d <= 0 || fromIntegral d > length rs then
         Number "'x"
     else case f of
         FnLeft -> fst r
@@ -97,7 +97,7 @@ convertExpr (DimFn f (Left t) (Number str)) =
             _ -> snd $ typeRanges $ elaborateType t
         dm = readNumber str
         Just d = dm
-        r = rs !! (d - 1)
+        r = rs !! (fromIntegral $ d - 1)
         isUnresolved :: Type -> Bool
         isUnresolved (Alias{}) = True
         isUnresolved (TypeOf{}) = True

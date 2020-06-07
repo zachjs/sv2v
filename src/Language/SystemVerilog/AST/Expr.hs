@@ -26,7 +26,10 @@ module Language.SystemVerilog.AST.Expr
     , readNumber
     ) where
 
+import Data.Bits (shiftL, shiftR)
+import Data.Int (Int32)
 import Data.List (intercalate)
+import Data.Word (Word32)
 import Numeric (readHex)
 import Text.Printf (printf)
 import Text.Read (readMaybe)
@@ -163,12 +166,12 @@ showExprOrRange :: ExprOrRange -> String
 showExprOrRange (Left  x) = show x
 showExprOrRange (Right x) = show x
 
-clog2Help :: Int -> Int -> Int
+clog2Help :: Int32 -> Int32 -> Int32
 clog2Help p n = if p >= n then 0 else 1 + clog2Help (p*2) n
-clog2 :: Int -> Int
+clog2 :: Int32 -> Int32
 clog2 n = if n < 2 then 0 else clog2Help 1 n
 
-readNumber :: String -> Maybe Int
+readNumber :: String -> Maybe Int32
 readNumber ('3' : '2' : '\'' : 'd' : rest) = readMaybe rest
 readNumber (            '\'' : 'd' : rest) = readMaybe rest
 readNumber ('3' : '2' : '\'' : 'h' : rest) =
@@ -251,7 +254,7 @@ simplify (BinOp op e1 e2) =
         (Add, BinOp Sub e (Number "1"), Number "1") -> e
         (Add, e, BinOp Sub (Number "0") (Number "1")) -> BinOp Sub e (Number "1")
         (_  , Number a, Number b) ->
-            case (op, readNumber a :: Maybe Int, readNumber b :: Maybe Int) of
+            case (op, readNumber a, readNumber b) of
                 (Add, Just x, Just y) -> Number $ show (x + y)
                 (Sub, Just x, Just y) -> Number $ show (x - y)
                 (Mul, Just x, Just y) -> Number $ show (x * y)
@@ -265,7 +268,19 @@ simplify (BinOp op e1 e2) =
                 (Ge , Just x, Just y) -> bool $ x >= y
                 (Lt , Just x, Just y) -> bool $ x <  y
                 (Le , Just x, Just y) -> bool $ x <= y
+                (ShiftAL, Just x, Just y) -> Number $ show $ shiftL x (toInt y)
+                (ShiftAR, Just x, Just y) -> Number $ show $ shiftR x (toInt y)
+                (ShiftL , Just x, Just y) -> Number $ show $ shiftL x (toInt y)
+                (ShiftR , Just x, Just y) -> -- does not sign extend
+                    Number $ show $ toInt32 $ shiftR (toWord32 x) (toInt y)
                 _ -> BinOp op e1' e2'
+            where
+                toInt :: Int32 -> Int
+                toInt = fromIntegral
+                toWord32 :: Int32 -> Word32
+                toWord32 = fromIntegral
+                toInt32 :: Word32 -> Int32
+                toInt32 = fromIntegral
         (Add, BinOp Add e (Number a), Number b) ->
             case (readNumber a, readNumber b) of
                 (Just x, Just y) -> BinOp Add e $ Number $ show (x + y)
