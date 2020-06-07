@@ -136,4 +136,11 @@ convertBits (Right e) =
                 Nothing -> Number "32"
                 Just 0  -> Number "32"
                 Just idx -> Number $ take idx n
+        Range expr mode range ->
+            BinOp Mul size $ convertBits $ Right $ Bit expr (Number "0")
+            where
+                size = case mode of
+                    NonIndexed   -> rangeSize range
+                    IndexedPlus  -> snd range
+                    IndexedMinus -> snd range
         _ -> DimsFn FnBits $ Left $ TypeOf e
