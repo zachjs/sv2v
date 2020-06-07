@@ -33,4 +33,12 @@ module top;
         $display("%b", 5'(1'sb1));
     end
 
+    parameter W = 9;
+    initial begin
+        byte i = -1;
+        byte unsigned j = -1;
+        $display("%b", W'(i));
+        $display("%b", W'(j));
+    end
+
 endmodule

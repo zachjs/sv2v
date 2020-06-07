@@ -36,4 +36,18 @@ module top;
         $display("%b", 5'sb11111);
     end
 
+    parameter W = 9;
+    initial begin : block
+        reg signed [7:0] i;
+        reg [7:0] j;
+        reg [8:0] i_extended;
+        reg [8:0] j_extended;
+        i = -1;
+        j = -1;
+        i_extended = i;
+        j_extended = j;
+        $display("%b", i_extended);
+        $display("%b", j_extended);
+    end
+
 endmodule

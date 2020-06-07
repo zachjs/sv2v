@@ -162,4 +162,9 @@ typeSigning :: Type -> Maybe Signing
 typeSigning (Net           _ sg _) = Just sg
 typeSigning (Implicit        sg _) = Just sg
 typeSigning (IntegerVector _ sg _) = Just sg
+typeSigning (IntegerAtom   t sg  ) =
+    Just $ case (sg, t) of
+        (Unspecified, TTime) -> Unsigned
+        (Unspecified, _    ) -> Signed
+        (_          , _    ) -> sg
 typeSigning _ = Nothing

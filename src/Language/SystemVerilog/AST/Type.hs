@@ -120,10 +120,10 @@ nullRange t rs1 =
         (tf, rs2) = typeRanges t'
 
 elaborateIntegerAtom :: Type -> Type
-elaborateIntegerAtom (IntegerAtom TInt      sg) = baseIntType sg Signed      32
-elaborateIntegerAtom (IntegerAtom TShortint sg) = baseIntType sg Signed      16
-elaborateIntegerAtom (IntegerAtom TLongint  sg) = baseIntType sg Signed      64
-elaborateIntegerAtom (IntegerAtom TByte     sg) = baseIntType sg Unspecified  8
+elaborateIntegerAtom (IntegerAtom TInt      sg) = baseIntType sg Signed 32
+elaborateIntegerAtom (IntegerAtom TShortint sg) = baseIntType sg Signed 16
+elaborateIntegerAtom (IntegerAtom TLongint  sg) = baseIntType sg Signed 64
+elaborateIntegerAtom (IntegerAtom TByte     sg) = baseIntType sg Signed  8
 elaborateIntegerAtom other = other
 
 -- makes a integer "compatible" type with the given signing, base signing and
