@@ -22,6 +22,7 @@ module top;
         $display("%0d %0d", x, ($clog2(WIDTH))'(x));
         $display("%0d %0d", y, ($clog2(WIDTH))'(y));
         $display("%0d %0d", z, ($clog2(WIDTH))'(z));
+        $display("%b", 32'(4));
     end
 
     localparam bit foo = '0;

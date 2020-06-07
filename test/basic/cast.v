@@ -25,6 +25,7 @@ module top;
         $display("%0d %0d", x, $signed(x[4:0]));
         $display("%0d %0d", y, $signed(y[4:0]));
         $display("%0d %0d", z, z[4:0]);
+        $display("%b", 32'd4);
     end
 
     localparam [0:0] foo = 0;

@@ -66,7 +66,9 @@ traverseExprM =
                     where
                         str = (show size) ++ "'d"  ++ (show num)
                         size = s'
-                        num = n' `mod` (2 ^ s')
+                        num = if size == 32
+                            then n'
+                            else n' `mod` (2 ^ s')
                 _ -> convertCastM (Number s) (Number n)
         convertExprM (orig @ (Cast (Right DimsFn{}) _)) =
             return orig
