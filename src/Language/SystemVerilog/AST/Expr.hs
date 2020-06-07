@@ -234,6 +234,12 @@ simplify (BinOp Sub (Number n1) (BinOp Sub (Number n2) e)) =
     simplify $ BinOp Add (BinOp Sub (Number n1) (Number n2)) e
 simplify (BinOp Sub (Number n1) (BinOp Sub e (Number n2))) =
     simplify $ BinOp Sub (BinOp Add (Number n1) (Number n2)) e
+simplify (BinOp Sub (BinOp Add e (Number n1)) (Number n2)) =
+    simplify $ BinOp Add e (BinOp Sub (Number n1) (Number n2))
+simplify (BinOp Add (Number n1) (BinOp Add (Number n2) e)) =
+    simplify $ BinOp Add (BinOp Add (Number n1) (Number n2)) e
+simplify (BinOp Ge (BinOp Sub e (Number "1")) (Number "0")) =
+    simplify $ BinOp Ge e (Number "1")
 simplify (BinOp Add (BinOp Sub (Number n1) e) (Number n2)) =
     case (readNumber n1, readNumber n2) of
         (Just x, Just y) ->
