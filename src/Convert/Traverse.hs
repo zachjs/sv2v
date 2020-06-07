@@ -1062,6 +1062,7 @@ traverseNestedModuleItemsM mapper = fullMapper
             return $ case moduleItem' of
                 Generate subItems -> GenBlock "" subItems
                 _ -> GenModuleItem moduleItem'
+        genItemMapper (GenIf _ GenNull GenNull) = return GenNull
         genItemMapper (GenIf (Number "1") s _) = return s
         genItemMapper (GenIf (Number "0") _ s) = return s
         genItemMapper (GenBlock "" [item]) = return item
