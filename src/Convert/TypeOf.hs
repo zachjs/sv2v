@@ -12,7 +12,9 @@
 module Convert.TypeOf (convert) where
 
 import Control.Monad.State
+import Data.List (elemIndex)
 import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Int (Int32)
 import qualified Data.Map.Strict as Map
 
 import Convert.Traverse
@@ -71,6 +73,11 @@ traverseTypeM (TypeOf expr) = typeof expr
 traverseTypeM other = return other
 
 typeof :: Expr -> State Info Type
+typeof (Number n) =
+    return $ IntegerVector TLogic sg [r]
+    where
+        (size, sg) = parseNumber n
+        r = (Number $ show (size - 1), Number "0")
 typeof (orig @ (Ident x)) = do
     res <- gets $ Map.lookup x
     return $ fromMaybe (TypeOf orig) res
@@ -93,8 +100,70 @@ typeof (orig @ (Range e mode r)) = do
             NonIndexed   -> snd r
             IndexedPlus  -> BinOp Sub (uncurry (BinOp Add) r) (Number "1")
             IndexedMinus -> BinOp Add (uncurry (BinOp Sub) r) (Number "1")
-typeof (BinOp Add e Number{}) = typeof e
+typeof (orig @ (Cast (Right (Ident x)) _)) = do
+    typeMap <- get
+    if Map.member x typeMap
+        then return $ typeOfSize (Ident x)
+        else return $ TypeOf orig
+typeof (Cast (Right s) _) = return $ typeOfSize s
+typeof (UniOp BitNot  e  ) = typeof e
+typeof (BinOp Pow     e _) = typeof e
+typeof (BinOp ShiftL  e _) = typeof e
+typeof (BinOp ShiftR  e _) = typeof e
+typeof (BinOp ShiftAL e _) = typeof e
+typeof (BinOp ShiftAR e _) = typeof e
+typeof (BinOp Add     a b) = return $ largerSizeType a b
+typeof (BinOp Sub     a b) = return $ largerSizeType a b
+typeof (BinOp Mul     a b) = return $ largerSizeType a b
+typeof (BinOp Div     a b) = return $ largerSizeType a b
+typeof (BinOp Mod     a b) = return $ largerSizeType a b
+typeof (BinOp BitAnd  a b) = return $ largerSizeType a b
+typeof (BinOp BitXor  a b) = return $ largerSizeType a b
+typeof (BinOp BitXnor a b) = return $ largerSizeType a b
+typeof (BinOp BitOr   a b) = return $ largerSizeType a b
+typeof (Mux   _       a b) = return $ largerSizeType a b
+typeof (Concat      exprs) = return $ typeOfSize $ concatSize exprs
+typeof (Repeat reps exprs) = return $ typeOfSize size
+    where size = BinOp Mul reps (concatSize exprs)
 typeof other = return $ TypeOf other
+
+-- determines the size and sign of a number literal
+parseNumber :: String -> (Int32, Signing)
+parseNumber s =
+    case elemIndex '\'' s of
+        Nothing  -> (32, Signed)
+        Just 0   -> parseNumber $ '3' : '2' : s
+        Just idx -> (size, signing)
+            where
+                Just size = readNumber $ take idx s
+                signing = case drop (idx + 1) s of
+                    's' : _ -> Signed
+                    _       -> Unsigned
+
+-- produces a type large enough to hold either expression
+largerSizeType :: Expr -> Expr -> Type
+largerSizeType a b =
+    typeOfSize larger
+    where
+        sizeof = DimsFn FnBits . Right
+        cond = BinOp Ge (sizeof a) (sizeof b)
+        larger = Mux cond (sizeof a) (sizeof b)
+
+-- returns the total size of concatenated list of expressions
+concatSize :: [Expr] -> Expr
+concatSize exprs =
+    foldl (BinOp Add) (Number "0") $
+    map sizeof exprs
+    where
+        sizeof = DimsFn FnBits . Right
+
+-- produces a generic type of the given size
+typeOfSize :: Expr -> Type
+typeOfSize size =
+    IntegerVector TLogic sg [(hi, Number "0")]
+    where
+        sg = Unspecified -- suitable for now
+        hi = BinOp Sub size (Number "1")
 
 -- combines a type with unpacked ranges
 injectRanges :: Type -> [Range] -> Type

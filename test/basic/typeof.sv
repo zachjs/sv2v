@@ -11,12 +11,53 @@ module top;
 
     initial begin
         type(f(0)) x = f(0);
+        type(x) y = ~x;
         $display("%b", x);
+        $display("%b", y);
         $display("%b", $bits(x));
         $display("%b", $bits(type(x)));
         $display("%b", $bits(logic [0:1+$bits(type(x))]));
         f(1);
         void'(f(0));
         t(1);
+    end
+
+    parameter FLAG = 1;
+    initial begin
+        logic [4:1] x = 4'b1011;
+        type(x ^ 3'b111) y = x ^ 3'b111;
+        type(x ^ 5'b11111) z = x ^ 5'b11111;
+        type({8 {x}}) a = {8 {x}};
+        type({x, y}) b = {x, y};
+        type(FLAG ? x : y) c = FLAG ? x : y;
+        type(!FLAG ? x : y) d = !FLAG ? x : y;
+        $display("%b %d %d", x, $left(x), $right(x));
+        $display("%b %d %d", y, $left(y), $right(y));
+        $display("%b %d %d", z, $left(z), $right(z));
+        $display("%b %d %d", a, $left(a), $right(a));
+        $display("%b %d %d", b, $left(b), $right(b));
+        $display("%b %d %d", c, $left(c), $right(c));
+        $display("%b %d %d", d, $left(d), $right(d));
+    end
+
+    parameter W = 4;
+    initial begin
+        logic [W-1:0] x = 4'hA;
+        type(FLAG ? x : '1) y = FLAG ? x : '1;
+        type(!FLAG ? y : '1) z = !FLAG ? y : '1;
+        $display("%b %d %d", x, $left(x), $right(x));
+        $display("%b %d %d", y, $left(y), $right(y));
+        $display("%b %d %d", z, $left(z), $right(z));
+    end
+
+    initial begin
+        type(1) w = 1;
+        type(-1) x = -1;
+        type(32'hffff_ffff) y = 32'hffff_ffff;
+        type(32'shffff_ffff) z = 32'shffff_ffff;
+        $display("%b %d %d %d", w, w, $left(w), $right(w));
+        $display("%b %d %d %d", x, x, $left(x), $right(x));
+        $display("%b %d %d %d", y, y, $left(y), $right(y));
+        $display("%b %d %d %d", z, z, $left(z), $right(z));
     end
 endmodule
