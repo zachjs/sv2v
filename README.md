@@ -44,8 +44,8 @@ All of sv2v's dependencies are free and open-source.
 
 ### Pre-built binaries
 
-Binaries for Linux and macOS are available on the [releases page]. If your
-system is not covered, or you would like to build the latest commit, simple
+Binaries for Ubuntu, macOS, and Windows are available on the [releases page]. If
+your system is not covered, or you would like to build the latest commit, simple
 instructions for building from source are below.
 
 [releases page]: https://github.com/zachjs/sv2v/releases
@@ -122,7 +122,7 @@ front end if there is significant interest.
 ## Testing
 
 Once the [test dependencies](#dependencies) are installed, tests can be run with
-`make test`. Travis CI is used to automatically test commits on GitHub.
+`make test`. GitHub Actions is used to automatically test commits.
 
 There is also a [SystemVerilog compliance suite] being created to test
 open-source tools' SystemVerilog support. Although not every test in the suite
