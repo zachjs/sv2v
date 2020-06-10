@@ -63,10 +63,10 @@ instance Show ModuleItem where
         showGate kw d x $ show lhs : map show exprs
     show (NOutputGate kw d x lhss expr) =
         showGate kw d x $ (map show lhss) ++ [show expr]
-    show (AssertionItem (mx, a)) =
-        if mx == Nothing
+    show (AssertionItem (x, a)) =
+        if null x
             then show a
-            else printf "%s : %s" (fromJust mx) (show a)
+            else printf "%s : %s" x (show a)
     show (Instance   m params i r ports) =
         if null params
             then printf "%s %s%s%s;"     m                     i rStr (showPorts ports)

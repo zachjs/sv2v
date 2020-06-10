@@ -43,7 +43,7 @@ data Stmt
     | RepeatL Expr Stmt
     | DoWhile Expr Stmt
     | Forever Stmt
-    | Foreach Identifier [Maybe Identifier] Stmt
+    | Foreach Identifier [Identifier] Stmt
     | If      ViolationCheck Expr Stmt Stmt
     | Timing  Timing Stmt
     | Return  Expr
@@ -79,24 +79,25 @@ instance Show Stmt where
             showInits (Right asgns) = commas $ map showInit asgns
                 where showInit (l, e) = showAssign (l, AsgnOpEq, e)
             showAssign :: (LHS, AsgnOp, Expr) -> String
-            showAssign (l, op, e) = printf "%s %s %s" (show l) (show op) (show e)
+            showAssign (l, op, e) = (showPad l) ++ (showPad op) ++ (show e)
     show (Subroutine e a) = printf "%s%s;" (show e) aStr
         where aStr = if a == Args [] [] then "" else show a
-    show (Asgn  o t v e) = printf "%s %s %s%s;" (show v) (show o) (maybe "" showPad t) (show e)
-    show (While   e s) = printf  "while (%s) %s" (show e) (show s)
-    show (RepeatL e s) = printf "repeat (%s) %s" (show e) (show s)
-    show (DoWhile e s) = printf "do %s while (%s);" (show s) (show e)
-    show (Forever s  ) = printf "forever %s" (show s)
-    show (Foreach x i s) = printf "foreach (%s [ %s ]) %s" x (commas $ map (maybe "" id) i) (show s)
-    show (If u a b Null) = printf "%sif (%s)%s"         (showPad u) (show a) (showBranch b)
-    show (If u a b c   ) = printf "%sif (%s)%s\nelse%s" (showPad u) (show a) (showBlockedBranch b) (showElseBranch c)
-    show (Return e   ) = printf "return %s;" (show e)
-    show (Timing t s ) = printf "%s%s" (show t) (showShortBranch s)
-    show (Trigger b x) = printf "->%s %s;" (if b then "" else ">") x
-    show (Assertion a) = show a
-    show (Continue   ) = "continue;"
-    show (Break      ) = "break;"
-    show (Null       ) = ";"
+    show (Asgn  o t v e) = printf "%s %s %s%s;" (show v) (show o) tStr (show e)
+        where tStr = maybe "" showPad t
+    show (If u c s Null) = printf "%sif (%s)%s"         (showPad u) (show c) (showBranch s)
+    show (If u c s1 s2 ) = printf "%sif (%s)%s\nelse%s" (showPad u) (show c) (showBlockedBranch s1) (showElseBranch s2)
+    show (While     e s) = printf  "while (%s) %s" (show e) (show s)
+    show (RepeatL   e s) = printf "repeat (%s) %s" (show e) (show s)
+    show (DoWhile   e s) = printf "do %s while (%s);" (show s) (show e)
+    show (Forever     s) = printf "forever %s" (show s)
+    show (Foreach x i s) = printf "foreach (%s [ %s ]) %s" x (commas i) (show s)
+    show (Return    e  ) = printf "return %s;" (show e)
+    show (Timing    t s) = printf "%s%s" (show t) (showShortBranch s)
+    show (Trigger   b x) = printf "->%s %s;" (if b then "" else ">") x
+    show (Assertion   a) = show a
+    show (Continue     ) = "continue;"
+    show (Break        ) = "break;"
+    show (Null         ) = ";"
     show (CommentStmt c) =
         if elem '\n' c
             then "// " ++ show c
@@ -183,14 +184,12 @@ instance Show Sense where
     show (SenseStar       ) = "*"
 
 data ActionBlock
-    = ActionBlockIf   Stmt
-    | ActionBlockElse (Maybe Stmt) Stmt
+    = ActionBlock Stmt Stmt
     deriving Eq
 instance Show ActionBlock where
-    show (ActionBlockIf   Null        ) = ";"
-    show (ActionBlockIf   s           ) = printf " %s" (show s)
-    show (ActionBlockElse Nothing   s ) = printf " else %s" (show s)
-    show (ActionBlockElse (Just s1) s2) = printf " %s else %s" (show s1) (show s2)
+    show (ActionBlock s Null) = printf " %s" (show s)
+    show (ActionBlock Null s) = printf " else %s" (show s)
+    show (ActionBlock s1  s2) = printf " %s else %s" (show s1) (show s2)
 
 data PropExpr
     = PropExpr SeqExpr
@@ -228,7 +227,7 @@ instance Show SeqExpr where
     show (SeqExprDelay   me e s) = printf "%s##%s %s" (maybe "" showPad me) (show e) (show s)
     show (SeqExprFirstMatch e a) = printf "first_match(%s, %s)" (show e) (show a)
 
-type AssertionItem = (Maybe Identifier, Assertion)
+type AssertionItem = (Identifier, Assertion)
 type AssertionExpr = Either PropertySpec Expr
 data Assertion
     = Assert AssertionExpr ActionBlock

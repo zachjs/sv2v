@@ -255,14 +255,10 @@ traverseSinglyNestedStmtsM fullMapper = cs
 traverseAssertionStmtsM :: Monad m => MapperM m Stmt -> MapperM m Assertion
 traverseAssertionStmtsM mapper = assertionMapper
     where
-        actionBlockMapper (ActionBlockIf stmt) =
-            mapper stmt >>= return . ActionBlockIf
-        actionBlockMapper (ActionBlockElse Nothing stmt) =
-            mapper stmt >>= return . ActionBlockElse Nothing
-        actionBlockMapper (ActionBlockElse (Just s1) s2) = do
+        actionBlockMapper (ActionBlock s1 s2) = do
             s1' <- mapper s1
             s2' <- mapper s2
-            return $ ActionBlockElse (Just s1') s2'
+            return $ ActionBlock s1' s2'
         assertionMapper (Assert e ab) =
             actionBlockMapper ab >>= return . Assert e
         assertionMapper (Assume e ab) =

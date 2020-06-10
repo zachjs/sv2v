@@ -690,8 +690,8 @@ ProceduralAssertionStatement :: { Assertion }
   | ImmediateAssertionStatement  { $1 }
 
 ConcurrentAssertionItem :: { AssertionItem }
-  : Identifier ":" ConcurrentAssertionStatement { (Just $1, $3) }
-  |                ConcurrentAssertionStatement { (Nothing, $1) }
+  : Identifier ":" ConcurrentAssertionStatement { ($1, $3) }
+  |                ConcurrentAssertionStatement { ("", $1) }
 ConcurrentAssertionStatement :: { Assertion }
   : "assert" "property" "(" PropertySpec ")" ActionBlock { Assert (Left $4) $6 }
   | "assume" "property" "(" PropertySpec ")" ActionBlock { Assume (Left $4) $6 }
@@ -739,9 +739,9 @@ SeqMatchItem :: { SeqMatchItem }
   | Identifier CallArgs { Right ($1, $2) }
 
 ActionBlock :: { ActionBlock }
-  : Stmt %prec NoElse { ActionBlockIf   $1 }
-  |      "else" Stmt  { ActionBlockElse (Nothing) $2 }
-  | Stmt "else" Stmt  { ActionBlockElse (Just $1) $3 }
+  : Stmt %prec NoElse { ActionBlock $1 Null }
+  |      "else" Stmt  { ActionBlock Null $2 }
+  | Stmt "else" Stmt  { ActionBlock $1   $3 }
 
 AttributeInstances :: { [Attr] }
   : {- empty -}                          { [] }
@@ -1029,11 +1029,14 @@ ForStepAssignment :: { (LHS, AsgnOp, Expr) }
   | IncOrDecOperator LHS { ($2, AsgnOp $1, Number "1") }
   | LHS IncOrDecOperator { ($1, AsgnOp $2, Number "1") }
 
-IdxVars :: { [Maybe Identifier] }
+IdxVars :: { [Identifier] }
   : "[" IdxVarsInside "]" { $2 }
-IdxVarsInside :: { [Maybe Identifier] }
-  : opt(Identifier)                   { [$1] }
-  | opt(Identifier) "," IdxVarsInside { $1 : $3 }
+IdxVarsInside :: { [Identifier] }
+  : IdxVar                   { [$1] }
+  | IdxVar "," IdxVarsInside { $1 : $3 }
+IdxVar :: { Identifier }
+  : {- empty -} { "" }
+  | Identifier  { $1 }
 
 DeclsAndStmts :: { ([Decl], [Stmt]) }
   : StmtTrace DeclOrStmt DeclsAndStmts { combineDeclsAndStmts $2 $3 }

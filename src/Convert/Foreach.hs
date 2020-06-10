@@ -22,9 +22,9 @@ convertStmt :: Stmt -> Stmt
 convertStmt (Foreach x idxs stmt) =
     (foldl (.) id $ map toLoop $ zip [1..] idxs) stmt
     where
-        toLoop :: (Int, Maybe Identifier) -> (Stmt -> Stmt)
-        toLoop (_, Nothing) = id
-        toLoop (d, Just i) =
+        toLoop :: (Int, Identifier) -> (Stmt -> Stmt)
+        toLoop (_, "") = id
+        toLoop (d, i) =
             For (Left [idxDecl]) cmp [incr]
             where
                 queryFn f = DimFn f (Right $ Ident x) (Number $ show d)
