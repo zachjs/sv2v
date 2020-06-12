@@ -18,29 +18,16 @@ import Language.SystemVerilog.AST
 type Types = Map.Map Identifier Type
 
 convert :: [AST] -> [AST]
-convert =
-    traverseFiles
-        (collectDescriptionsM getTypedef)
-        (\a -> traverseDescriptions $ removeTypedef . convertDescription a)
-    where
-        getTypedef :: Description -> Writer Types ()
-        getTypedef (PackageItem (Typedef a b)) = tell $ Map.singleton b a
-        getTypedef (Part _ _ Interface _ x _ _) =
-            tell $ Map.singleton x (InterfaceT x Nothing [])
-        getTypedef _ = return ()
-        removeTypedef :: Description -> Description
-        removeTypedef (PackageItem (Typedef _ x)) =
-            PackageItem $ Decl $ CommentDecl $ "removed typedef: " ++ x
-        removeTypedef other = other
+convert = map $ traverseDescriptions convertDescription
 
-convertDescription :: Types -> Description -> Description
-convertDescription globalTypes description =
+convertDescription :: Description -> Description
+convertDescription (description @ Part{}) =
     traverseModuleItems (convertTypedef types) description'
     where
         description' =
             traverseModuleItems (traverseGenItems convertGenItem) description
-        types = Map.union globalTypes $
-            execWriter $ collectModuleItemsM collectTypedefM description'
+        types = execWriter $ collectModuleItemsM collectTypedefM description'
+convertDescription other = other
 
 convertTypedef :: Types -> ModuleItem -> ModuleItem
 convertTypedef types =
