@@ -98,7 +98,7 @@ prefixPackageItem packageName idents item =
         convertType (Enum t items rs) = Enum t items' rs
             where
                 items' = map prefixItem items
-                prefixItem (x, me) = (prefix x, me)
+                prefixItem (x, e) = (prefix x, e)
         convertType other = other
         convertExpr (Ident x) = Ident $ prefix x
         convertExpr other = other
@@ -120,8 +120,8 @@ collectDescriptionM (Package _ name items) =
         toPackageItems :: PackageItem -> PackageItems
         toPackageItems item =
             case piName item of
-                Nothing -> []
-                Just x -> [(x, item)]
+                "" -> []
+                x -> [(x, item)]
         isImport :: PackageItem -> Bool
         isImport (Import _ _) = True
         isImport _ = False
@@ -146,8 +146,8 @@ traverseDescription packages description =
         writePIName :: ModuleItem -> Writer Idents ()
         writePIName (MIPackageItem item) =
             case piName item of
-                Nothing -> return ()
-                Just x -> tell $ Set.singleton x
+                "" -> return ()
+                x -> tell $ Set.singleton x
         writePIName _ = return ()
 
 traverseModuleItem :: Idents -> Packages -> ModuleItem -> ModuleItem
@@ -177,14 +177,14 @@ traverseModuleItem _ _ item =
         traverseType other = other
 
 -- returns the "name" of a package item, if it has one
-piName :: PackageItem -> Maybe Identifier
-piName (Function _ _ ident _ _) = Just ident
-piName (Task     _   ident _ _) = Just ident
-piName (Typedef    _ ident    ) = Just ident
-piName (Decl (Variable _ _ ident _ _)) = Just ident
-piName (Decl (Param    _ _ ident   _)) = Just ident
-piName (Decl (ParamType  _ ident   _)) = Just ident
-piName (Decl (CommentDecl          _)) = Nothing
-piName (Import  _ _) = Nothing
-piName (Export    _) = Nothing
-piName (Directive _) = Nothing
+piName :: PackageItem -> Identifier
+piName (Function _ _ ident _ _) = ident
+piName (Task     _   ident _ _) = ident
+piName (Typedef    _ ident    ) = ident
+piName (Decl (Variable _ _ ident _ _)) = ident
+piName (Decl (Param    _ _ ident   _)) = ident
+piName (Decl (ParamType  _ ident   _)) = ident
+piName (Decl (CommentDecl          _)) = ""
+piName (Import  _ _) = ""
+piName (Export    _) = ""
+piName (Directive _) = ""

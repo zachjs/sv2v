@@ -103,8 +103,8 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                         Just res -> snd res
                         Nothing -> error $ "could not find interface " ++ show interfaceName
                 mapper (dir, port, expr) =
-                    Variable dir mpt (ident ++ "_" ++ port) mprs Nothing
-                    where (mpt, mprs) = lookupType interfaceItems (fromJust expr)
+                    Variable dir mpt (ident ++ "_" ++ port) mprs Nil
+                    where (mpt, mprs) = lookupType interfaceItems expr
         mapInterface (Instance part params ident Nothing instancePorts) =
             -- expand modport port bindings
             case Map.lookup part interfaces of
@@ -125,15 +125,15 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
             traverseExprs (traverseNestedExprs $ convertExpr its mps) .
             traverseLHSs  (traverseNestedLHSs  $ convertLHS  its mps)
             where
-                locals = Set.fromList $ mapMaybe declVarIdent decls
+                locals = Set.fromList $ map declVarIdent decls
                 its = Map.withoutKeys instances locals
                 mps = Map.withoutKeys modports  locals
-                declVarIdent :: Decl -> Maybe Identifier
-                declVarIdent (Variable _ _ x _ _) = Just x
-                declVarIdent _ = Nothing
+                declVarIdent :: Decl -> Identifier
+                declVarIdent (Variable _ _ x _ _) = x
+                declVarIdent _ = ""
 
         expandPortBinding :: Identifier -> PortBinding -> Int -> [PortBinding]
-        expandPortBinding _ (origBinding @ (portName, Just (Dot (Ident instanceName) modportName))) _ =
+        expandPortBinding _ (origBinding @ (portName, Dot (Ident instanceName) modportName)) _ =
             -- expand instance modport bound to a modport
             if Map.member instanceName instances && modportDecls /= Nothing
                 then expandPortBinding' portName instanceName $ fromJust modportDecls
@@ -141,7 +141,7 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
             where
                 interfaceName = instances Map.! instanceName
                 modportDecls = lookupModport interfaceName modportName
-        expandPortBinding moduleName (origBinding @ (portName, Just (Ident ident))) idx =
+        expandPortBinding moduleName (origBinding @ (portName, Ident ident)) idx =
             case (instances Map.!? ident, modports Map.!? ident) of
                 (Nothing, Nothing) -> [origBinding]
                 (Just interfaceName, _) ->
@@ -176,17 +176,17 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                 (_, Just modportDecls) ->
                     -- modport directly bound to a modport
                     expandPortBinding' portName ident $ map redirect modportDecls
-                    where redirect (d, x, _) = (d, x, Just $ Ident x)
+                    where redirect (d, x, _) = (d, x, Ident x)
         expandPortBinding _ other _ = [other]
 
         expandPortBinding' :: Identifier -> Identifier -> [ModportDecl] -> [PortBinding]
         expandPortBinding' portName instanceName modportDecls =
             map mapper modportDecls
             where
-                mapper (_, x, me) = (x', me')
+                mapper (_, x, e) = (x', e')
                     where
                         x' = if null portName then "" else portName ++ '_' : x
-                        me' = fmap (traverseNestedExprs prefixExpr) me
+                        e' = traverseNestedExprs prefixExpr e
                 prefixExpr :: Expr -> Expr
                 prefixExpr (Ident x) = Ident (instanceName ++ '_' : x)
                 prefixExpr other = other
@@ -217,7 +217,7 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                     interfaceItems
                 collectModportDecls :: ModuleItem -> Writer [ModportDecl] ()
                 collectModportDecls (MIPackageItem (Decl (Variable d _ x _ _))) =
-                    tell [(d', x, Just $ Ident x)]
+                    tell [(d', x, Ident x)]
                     where d' = if d == Local then Inout else d
                 collectModportDecls _ = return ()
 
@@ -251,10 +251,10 @@ prefixModuleItems prefix =
     traverseLHSs  (traverseNestedLHSs  prefixLHS )
     where
         prefixDecl :: Decl -> Decl
-        prefixDecl (Variable d t x a me) = Variable d t (prefix x) a me
-        prefixDecl (Param    s t x    e) = Param    s t (prefix x)    e
-        prefixDecl (ParamType  s x   mt) = ParamType  s (prefix x)   mt
-        prefixDecl (CommentDecl       c) = CommentDecl                c
+        prefixDecl (Variable d t x a e) = Variable d t (prefix x) a e
+        prefixDecl (Param    s t x   e) = Param    s t (prefix x)   e
+        prefixDecl (ParamType  s x  mt) = ParamType  s (prefix x)  mt
+        prefixDecl (CommentDecl      c) = CommentDecl               c
         prefixExpr :: Expr -> Expr
         prefixExpr (Ident x) = Ident (prefix x)
         prefixExpr other = other
@@ -343,8 +343,8 @@ inlineInterface (ports, items) (instanceName, instanceParams, instancePorts) =
             zip instancePortNames instancePortExprs
 
         removeDeclDir :: ModuleItem -> ModuleItem
-        removeDeclDir (MIPackageItem (Decl (Variable _ t x a me))) =
-            MIPackageItem $ Decl $ Variable Local t x a me
+        removeDeclDir (MIPackageItem (Decl (Variable _ t x a e))) =
+            MIPackageItem $ Decl $ Variable Local t x a e
         removeDeclDir other = other
         removeModport :: ModuleItem -> ModuleItem
         removeModport (Modport x _) =
@@ -370,11 +370,11 @@ inlineInterface (ports, items) (instanceName, instanceParams, instancePorts) =
         overrideParam other = other
 
         portBindingItem :: PortBinding -> Maybe ModuleItem
-        portBindingItem (ident, Just expr) =
+        portBindingItem (_, Nil) = Nothing
+        portBindingItem (ident, expr) =
             Just $ if declDirs Map.! ident == Input
                 then Assign AssignOptionNone (LHSIdent ident) expr
                 else Assign AssignOptionNone (toLHS expr) (Ident ident)
-        portBindingItem (_, Nothing) = Nothing
 
         declDirs = execWriter $
             mapM (collectDeclsM collectDeclDir) itemsPrefixed

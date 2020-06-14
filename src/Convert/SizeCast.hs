@@ -97,7 +97,7 @@ traverseExprM =
         convertCastWithSigningM s e sg = do
             lift $ tell $ Set.singleton (s, sg)
             let f = castFnName s sg
-            let args = Args [Just e] []
+            let args = Args [e] []
             return $ Call (Ident f) args
 
 castFn :: Expr -> Signing -> Description
@@ -109,7 +109,7 @@ castFn e sg =
         r = (simplify $ BinOp Sub e (Number "1"), Number "0")
         t = IntegerVector TLogic sg [r]
         fnName = castFnName e sg
-        decl = Variable Input t inp [] Nothing
+        decl = Variable Input t inp [] Nil
 
 castFnName :: Expr -> Signing -> String
 castFnName e sg =

@@ -41,5 +41,5 @@ convertStmt functions (Subroutine (Ident func) args) =
     where
         t = TypeOf e
         e = Call (Ident func) args
-        decl = Variable Local t "sv2v_void" [] (Just e)
+        decl = Variable Local t "sv2v_void" [] e
 convertStmt _ other = other

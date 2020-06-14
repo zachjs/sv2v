@@ -300,13 +300,10 @@ traverseAssertionExprsM mapper = assertionMapper
             c' <- mapper c
             return $ Left (a, b, c')
         seqMatchItemMapper (Right (x, (Args l p))) = do
-            l' <- mapM maybeExprMapper l
-            pes <- mapM maybeExprMapper $ map snd p
+            l' <- mapM mapper l
+            pes <- mapM mapper $ map snd p
             let p' = zip (map fst p) pes
             return $ Right (x, Args l' p')
-        maybeExprMapper Nothing = return Nothing
-        maybeExprMapper (Just e) =
-            mapper e >>= return . Just
         ppMapper constructor p1 p2 = do
             p1' <- propExprMapper p1
             p2' <- propExprMapper p2
@@ -331,10 +328,10 @@ traverseAssertionExprsM mapper = assertionMapper
             spMapper PropExprFollowsNO se pe
         propExprMapper (PropExprIff p1 p2) =
             ppMapper PropExprIff p1 p2
-        propSpecMapper (PropertySpec ms me pe) = do
-            me' <- maybeExprMapper me
+        propSpecMapper (PropertySpec ms e pe) = do
+            e' <- mapper e
             pe' <- propExprMapper pe
-            return $ PropertySpec ms me' pe'
+            return $ PropertySpec ms e' pe'
         assertionExprMapper (Left e) =
             propSpecMapper e >>= return . Left
         assertionExprMapper (Right e) =
@@ -408,10 +405,7 @@ traverseNestedExprsM :: Monad m => MapperM m Expr -> MapperM m Expr
 traverseNestedExprsM mapper = exprMapper
     where
         exprMapper e = mapper e >>= em
-        (_, _, _, _, typeMapper) = exprMapperHelpers exprMapper
-        maybeExprMapper Nothing = return Nothing
-        maybeExprMapper (Just e) =
-            exprMapper e >>= return . Just
+        (_, _, _, typeMapper) = exprMapperHelpers exprMapper
         typeOrExprMapper (Left t) =
             typeMapper t >>= return . Left
         typeOrExprMapper (Right e) =
@@ -448,8 +442,8 @@ traverseNestedExprsM mapper = exprMapper
             return $ Stream o e' l'
         em (Call  e (Args l p)) = do
             e' <- exprMapper e
-            l' <- mapM maybeExprMapper l
-            pes <- mapM maybeExprMapper $ map snd p
+            l' <- mapM exprMapper l
+            pes <- mapM exprMapper $ map snd p
             let p' = zip (map fst p) pes
             return $ Call e' (Args l' p')
         em (UniOp      o e) =
@@ -493,19 +487,15 @@ traverseNestedExprsM mapper = exprMapper
         em (Nil) = return Nil
 
 exprMapperHelpers :: Monad m => MapperM m Expr ->
-    (MapperM m Range, MapperM m (Maybe Expr), MapperM m Decl, MapperM m LHS, MapperM m Type)
+    (MapperM m Range, MapperM m Decl, MapperM m LHS, MapperM m Type)
 exprMapperHelpers exprMapper =
-    (rangeMapper, maybeExprMapper, declMapper, traverseNestedLHSsM lhsMapper, typeMapper)
+    (rangeMapper, declMapper, traverseNestedLHSsM lhsMapper, typeMapper)
     where
 
     rangeMapper (a, b) = do
         a' <- exprMapper a
         b' <- exprMapper b
         return (a', b')
-
-    maybeExprMapper Nothing = return Nothing
-    maybeExprMapper (Just e) =
-        exprMapper e >>= return . Just
 
     typeMapper' (TypeOf expr) =
         exprMapper expr >>= return . TypeOf
@@ -526,11 +516,11 @@ exprMapperHelpers exprMapper =
     declMapper (ParamType s x mt) = do
         mt' <- maybeTypeMapper mt
         return $ ParamType s x mt'
-    declMapper (Variable d t x a me) = do
+    declMapper (Variable d t x a e) = do
         t' <- typeMapper t
         a' <- mapM rangeMapper a
-        me' <- maybeExprMapper me
-        return $ Variable d t' x a' me'
+        e' <- exprMapper e
+        return $ Variable d t' x a' e'
     declMapper (CommentDecl c) =
         return $ CommentDecl c
 
@@ -547,13 +537,13 @@ traverseExprsM' :: Monad m => TFStrategy -> MapperM m Expr -> MapperM m ModuleIt
 traverseExprsM' strat exprMapper = moduleItemMapper
     where
 
-    (rangeMapper, maybeExprMapper, declMapper, lhsMapper, typeMapper)
+    (rangeMapper, declMapper, lhsMapper, typeMapper)
         = exprMapperHelpers exprMapper
 
     stmtMapper = traverseNestedStmtsM (traverseStmtExprsM exprMapper)
 
-    portBindingMapper (p, me) =
-        maybeExprMapper me >>= \me' -> return (p, me')
+    portBindingMapper (p, e) =
+        exprMapper e >>= \e' -> return (p, e')
 
     paramBindingMapper (p, Left t) =
         typeMapper t >>= \t' -> return (p, Left t')
@@ -616,12 +606,12 @@ traverseExprsM' strat exprMapper = moduleItemMapper
     moduleItemMapper (Modport x l) =
         mapM modportDeclMapper l >>= return . Modport x
     moduleItemMapper (NInputGate  kw d x lhs exprs) = do
-        d' <- maybeExprMapper d
+        d' <- exprMapper d
         exprs' <- mapM exprMapper exprs
         lhs' <- lhsMapper lhs
         return $ NInputGate kw d' x lhs' exprs'
     moduleItemMapper (NOutputGate kw d x lhss expr) = do
-        d' <- maybeExprMapper d
+        d' <- exprMapper d
         lhss' <- mapM lhsMapper lhss
         expr' <- exprMapper expr
         return $ NOutputGate kw d' x lhss' expr'
@@ -655,10 +645,9 @@ traverseExprsM' strat exprMapper = moduleItemMapper
         return $ GenCase e' cases'
     genItemMapper other = return other
 
-    modportDeclMapper (dir, ident, Just e) = do
+    modportDeclMapper (dir, ident, e) = do
         e' <- exprMapper e
-        return (dir, ident, Just e')
-    modportDeclMapper other = return other
+        return (dir, ident, e')
 
 traverseExprs' :: TFStrategy -> Mapper Expr -> Mapper ModuleItem
 traverseExprs' strat = unmonad $ traverseExprsM' strat
@@ -676,8 +665,7 @@ traverseStmtExprsM :: Monad m => MapperM m Expr -> MapperM m Stmt
 traverseStmtExprsM exprMapper = flatStmtMapper
     where
 
-    (_, maybeExprMapper, declMapper, lhsMapper, _)
-        = exprMapperHelpers exprMapper
+    (_, declMapper, lhsMapper, _) = exprMapperHelpers exprMapper
 
     caseMapper (exprs, stmt) = do
         exprs' <- mapM exprMapper exprs
@@ -715,8 +703,8 @@ traverseStmtExprsM exprMapper = flatStmtMapper
     flatStmtMapper (Timing event stmt) = return $ Timing event stmt
     flatStmtMapper (Subroutine e (Args l p)) = do
         e' <- exprMapper e
-        l' <- mapM maybeExprMapper l
-        pes <- mapM maybeExprMapper $ map snd p
+        l' <- mapM exprMapper l
+        pes <- mapM exprMapper $ map snd p
         let p' = zip (map fst p) pes
         return $ Subroutine e' (Args l' p')
     flatStmtMapper (Return expr) =
@@ -897,7 +885,7 @@ collectExprTypesM = collectify traverseExprTypesM
 traverseTypeExprsM :: Monad m => MapperM m Expr -> MapperM m Type
 traverseTypeExprsM mapper =
     typeMapper
-    where (_, _, _, _, typeMapper) = exprMapperHelpers mapper
+    where (_, _, _, typeMapper) = exprMapperHelpers mapper
 
 traverseTypeExprs :: Mapper Expr -> Mapper Type
 traverseTypeExprs = unmonad traverseTypeExprsM
@@ -918,8 +906,8 @@ traverseTypesM' strategy mapper item =
             fullMapper t >>= \t' -> return $ Param s t' x e
         declMapper (ParamType s x mt) =
             maybeMapper mt >>= \mt' -> return $ ParamType s x mt'
-        declMapper (Variable d t x a me) =
-            fullMapper t >>= \t' -> return $ Variable d t' x a me
+        declMapper (Variable d t x a e) =
+            fullMapper t >>= \t' -> return $ Variable d t' x a e
         declMapper (CommentDecl c) = return $ CommentDecl c
         miMapper (MIPackageItem (Typedef t x)) =
             fullMapper t >>= \t' -> return $ MIPackageItem $ Typedef t' x
@@ -1111,9 +1099,9 @@ traverseScopesM declMapper moduleItemMapper stmtMapper =
         redirectModuleItem (MIPackageItem (Function ml t x decls stmts)) = do
             prevState <- get
             t' <- do
-                res <- declMapper $ Variable Local t x [] Nothing
+                res <- declMapper $ Variable Local t x [] Nil
                 case res of
-                    Variable Local newType _ [] Nothing -> return newType
+                    Variable Local newType _ [] Nil -> return newType
                     _ -> error $ "redirected func ret traverse failed: " ++ show res
             decls' <- mapM declMapper decls
             stmts' <- mapM fullStmtMapper stmts

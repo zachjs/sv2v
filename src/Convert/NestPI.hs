@@ -26,15 +26,15 @@ convert =
             (traverseDescriptions . convertDescription)
         isPI :: Description -> Bool
         isPI (PackageItem Import{}) = False
-        isPI (PackageItem item) = piName item /= Nothing
+        isPI (PackageItem item) = piName item /= ""
         isPI _ = False
 
 -- collects packages items missing
 collectDescriptionM :: Description -> Writer PIs ()
 collectDescriptionM (PackageItem item) = do
     case piName item of
-        Nothing -> return ()
-        Just ident -> tell $ Map.singleton ident item
+        "" -> return ()
+        ident -> tell $ Map.singleton ident item
 collectDescriptionM _ = return ()
 
 -- nests packages items missing from modules
@@ -77,8 +77,8 @@ addItems _ _ [] = []
 collectPIsM :: ModuleItem -> Writer Idents ()
 collectPIsM (MIPackageItem item) =
     case piName item of
-        Nothing -> return ()
-        Just ident -> tell $ Set.singleton ident
+        "" -> return ()
+        ident -> tell $ Set.singleton ident
 collectPIsM _ = return ()
 
 -- writes down the names of subroutine invocations
@@ -98,14 +98,14 @@ collectTypenamesM (Alias _ x _) = tell $ Set.singleton x
 collectTypenamesM _ = return ()
 
 -- returns the "name" of a package item, if it has one
-piName :: PackageItem -> Maybe Identifier
-piName (Function _ _ ident _ _) = Just ident
-piName (Task     _   ident _ _) = Just ident
-piName (Typedef    _ ident    ) = Just ident
-piName (Decl (Variable _ _ ident _ _)) = Just ident
-piName (Decl (Param    _ _ ident   _)) = Just ident
-piName (Decl (ParamType  _ ident   _)) = Just ident
-piName (Decl (CommentDecl          _)) = Nothing
-piName (Import x y) = Just $ show $ Import x y
-piName (Export    _) = Nothing
-piName (Directive _) = Nothing
+piName :: PackageItem -> Identifier
+piName (Function _ _ ident _ _) = ident
+piName (Task     _   ident _ _) = ident
+piName (Typedef    _ ident    ) = ident
+piName (Decl (Variable _ _ ident _ _)) = ident
+piName (Decl (Param    _ _ ident   _)) = ident
+piName (Decl (ParamType  _ ident   _)) = ident
+piName (Decl (CommentDecl          _)) = ""
+piName (Import x y) = show $ Import x y
+piName (Export    _) = ""
+piName (Directive _) = ""

@@ -47,9 +47,9 @@ convertDescription other = other
 
 -- collects and converts declarations with multiple packed dimensions
 traverseDeclM :: Decl -> State Info Decl
-traverseDeclM (Variable dir t ident a me) = do
+traverseDeclM (Variable dir t ident a e) = do
     t' <- traverseTypeM t a ident
-    return $ Variable dir t' ident a me
+    return $ Variable dir t' ident a e
 traverseDeclM (Param s t ident e) = do
     t' <- traverseTypeM t [] ident
     return $ Param s t' ident e

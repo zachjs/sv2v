@@ -189,16 +189,13 @@ collectTFArgsM _ = return ()
 traverseDeclM :: Structs -> Decl -> State Types Decl
 traverseDeclM structs origDecl = do
     case origDecl of
-        Variable d t x a me -> do
+        Variable d t x a e -> do
             let (tf, rs) = typeRanges t
             if isRangeable t
                 then modify $ Map.insert x (tf $ a ++ rs)
                 else return ()
-            case me of
-                Nothing -> return origDecl
-                Just e -> do
-                    e' <- convertDeclExpr x e
-                    return $ Variable d t x a (Just e')
+            e' <- convertDeclExpr x e
+            return $ Variable d t x a e'
         Param s t x e -> do
             modify $ Map.insert x t
             e' <- convertDeclExpr x e
@@ -223,7 +220,7 @@ packerFn structTf =
     Function Automatic (structTf []) fnName decls [retStmt]
     where
         Struct _ fields [] = structTf []
-        toInput (t, x) = Variable Input t x [] Nothing
+        toInput (t, x) = Variable Input t x [] Nil
         decls = map toInput fields
         retStmt = Return $ Concat $ map (Ident . snd) fields
         fnName = packerFnName structTf
@@ -269,6 +266,7 @@ convertAsgn structs types (lhs, expr) =
 
         -- try expression conversion by looking at the *outermost* type first
         convertExpr :: Type -> Expr -> Expr
+        convertExpr _ Nil = Nil
         convertExpr t (Mux c e1 e2) =
             Mux c e1' e2'
             where
@@ -316,7 +314,7 @@ convertAsgn structs types (lhs, expr) =
             else if Map.member structTf structs then
                 Call
                     (Ident $ packerFnName structTf)
-                    (Args (map (Just . snd) items) [])
+                    (Args (map snd items) [])
             else
                 Pattern items
             where
@@ -551,9 +549,8 @@ convertCall structs types fn (Args pnArgs kwArgs) =
         args = Args
             (map snd $ map convertArg $ zip idxs pnArgs)
             (map convertArg kwArgs)
-        convertArg :: (Identifier, Maybe Expr) -> (Identifier, Maybe Expr)
-        convertArg (x, Nothing) = (x, Nothing)
-        convertArg (x, Just e ) = (x, Just e')
+        convertArg :: (Identifier, Expr) -> (Identifier, Expr)
+        convertArg (x, e) = (x, e')
             where
                 (_, e') = convertAsgn structs types
                     (LHSIdent $ f ++ ":" ++ x, e)

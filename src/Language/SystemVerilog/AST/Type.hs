@@ -33,7 +33,7 @@ import Language.SystemVerilog.AST.ShowHelp
 
 type Identifier = String
 
-type Item = (Identifier, Maybe Expr)
+type Item = (Identifier, Expr)
 type Field = (Type, Identifier)
 
 data Type
@@ -63,7 +63,7 @@ instance Show Type where
     show (Enum t vals r) = printf "enum %s{%s}%s" tStr (commas $ map showVal vals) (showRanges r)
         where
             tStr = showPad t
-            showVal :: (Identifier, Maybe Expr) -> String
+            showVal :: (Identifier, Expr) -> String
             showVal (x, e) = x ++ (showAssignment e)
     show (Struct p items r) = printf "struct %s{\n%s\n}%s" (showPad p) (showFields items) (showRanges r)
     show (Union  p items r) = printf  "union %s{\n%s\n}%s" (showPad p) (showFields items) (showRanges r)

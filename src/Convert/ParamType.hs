@@ -99,11 +99,11 @@ convert files =
             where
                 maybeTypeMap = snd $ info Map.! name
                 typeMap = defaultInstance maybeTypeMap
-                existingNames = map maybeModuleName existing
-                alreadyExists = (flip elem existingNames) . maybeModuleName
-                maybeModuleName :: Description -> Maybe Identifier
-                maybeModuleName (Part _ _ _ _ x _ _) = Just x
-                maybeModuleName _ = Nothing
+                existingNames = map moduleName existing
+                alreadyExists = (flip elem existingNames) . moduleName
+                moduleName :: Description -> Identifier
+                moduleName (Part _ _ _ _ x _ _) = x
+                moduleName _ = ""
         replaceDefault _ other = [other]
 
         removeDefaultTypeParams :: Description -> Description

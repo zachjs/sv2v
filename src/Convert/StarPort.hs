@@ -31,12 +31,12 @@ mapInstance modulePorts (Instance m p x r bindings) =
         alreadyBound :: [Identifier]
         alreadyBound = map fst bindings
         expandBinding :: PortBinding -> [PortBinding]
-        expandBinding ("*", Nothing) =
+        expandBinding ("*", Nil) =
             case Map.lookup m modulePorts of
                 Just l ->
-                    map (\port -> (port, Just $ Ident port)) $
+                    map (\port -> (port, Ident port)) $
                     filter (\s -> not $ elem s alreadyBound) $ l
                 -- if we can't find it, just skip :(
-                Nothing -> [("*", Nothing)]
+                Nothing -> [("*", Nil)]
         expandBinding other = [other]
 mapInstance _ other = other

@@ -46,12 +46,12 @@ traverseDeclM decl = do
     item <- traverseModuleItemM (MIPackageItem $ Decl decl)
     let MIPackageItem (Decl decl') = item
     case decl' of
-        Variable d t ident a me -> do
+        Variable d t ident a e -> do
             let t' = injectRanges t a
             modify $ Map.insert ident t'
             return $ case t' of
-                UnpackedType t'' a' -> Variable d t'' ident a' me
-                _ ->                   Variable d t'  ident [] me
+                UnpackedType t'' a' -> Variable d t'' ident a' e
+                _ ->                   Variable d t'  ident [] e
         Param    _ t ident   _ -> do
             let t' = if t == Implicit Unspecified []
                         then IntegerAtom TInteger Unspecified

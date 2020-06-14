@@ -26,7 +26,7 @@ import qualified Data.Set as Set
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type EnumInfo = (Type, [(Identifier, Maybe Expr)])
+type EnumInfo = (Type, [(Identifier, Expr)])
 type Enums = Set.Set EnumInfo
 
 convert :: [AST] -> [AST]
@@ -84,10 +84,9 @@ makeEnumItems (itemType, l) =
         keys = map fst l
         vals = tail $ scanl step (Number "-1") (map snd l)
         noDuplicates = all (null . tail . flip elemIndices vals) vals
-        step :: Expr -> Maybe Expr -> Expr
-        step _ (Just expr) = expr
-        step expr Nothing =
-            simplify $ BinOp Add expr (Number "1")
+        step :: Expr -> Expr -> Expr
+        step expr Nil = simplify $ BinOp Add expr (Number "1")
+        step _ expr = expr
         toPackageItem :: Identifier -> Expr -> PackageItem
         toPackageItem x v =
             Decl $ Param Localparam itemType x v'

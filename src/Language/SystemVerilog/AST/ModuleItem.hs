@@ -17,7 +17,6 @@ module Language.SystemVerilog.AST.ModuleItem
     ) where
 
 import Data.List (intercalate)
-import Data.Maybe (fromJust, isJust)
 import Text.Printf (printf)
 
 import Language.SystemVerilog.AST.ShowHelp
@@ -43,8 +42,8 @@ data ModuleItem
     | Initial    Stmt
     | Final      Stmt
     | MIPackageItem PackageItem
-    | NInputGate  NInputGateKW  (Maybe Expr) Identifier  LHS [Expr]
-    | NOutputGate NOutputGateKW (Maybe Expr) Identifier [LHS] Expr
+    | NInputGate  NInputGateKW  Expr Identifier  LHS [Expr]
+    | NOutputGate NOutputGateKW Expr Identifier [LHS] Expr
     | AssertionItem AssertionItem
     deriving Eq
 
@@ -77,17 +76,17 @@ showPorts :: [PortBinding] -> String
 showPorts ports = indentedParenList $ map showPort ports
 
 showPort :: PortBinding -> String
-showPort ("*", Nothing) = ".*"
+showPort ("*", Nil) = ".*"
 showPort (i, arg) =
     if i == ""
-        then show (fromJust arg)
-        else printf ".%s(%s)" i (if isJust arg then show $ fromJust arg else "")
+        then show arg
+        else printf ".%s(%s)" i (show arg)
 
-showGate :: Show k => k -> Maybe Expr -> Identifier -> [String] -> String
+showGate :: Show k => k -> Expr -> Identifier -> [String] -> String
 showGate kw d x args =
     printf "%s %s%s(%s);" (show kw) delayStr nameStr (commas args)
     where
-        delayStr = maybe "" (showPad . Delay) d
+        delayStr = if d == Nil then "" else showPad $ Delay d
         nameStr = showPad $ Ident x
 
 showParams :: [ParamBinding] -> String
@@ -100,16 +99,16 @@ showParam (i, arg) =
     where fmt = if i == "" then "%s%s" else ".%s(%s)"
 
 showModportDecl :: ModportDecl -> String
-showModportDecl (dir, ident, me) =
-    if me == Just (Ident ident)
+showModportDecl (dir, ident, e) =
+    if e == Ident ident
         then printf "%s %s" (show dir) ident
-        else printf "%s .%s(%s)" (show dir) ident (maybe "" show me)
+        else printf "%s .%s(%s)" (show dir) ident (show e)
 
-type PortBinding = (Identifier, Maybe Expr)
+type PortBinding = (Identifier, Expr)
 
 type ParamBinding = (Identifier, TypeOrExpr)
 
-type ModportDecl = (Direction, Identifier, Maybe Expr)
+type ModportDecl = (Direction, Identifier, Expr)
 
 data AlwaysKW
     = Always

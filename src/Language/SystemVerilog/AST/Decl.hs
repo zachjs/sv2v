@@ -22,15 +22,16 @@ import Language.SystemVerilog.AST.Expr (Expr, Range, showRanges, showAssignment)
 data Decl
     = Param     ParamScope Type Identifier Expr
     | ParamType ParamScope Identifier (Maybe Type)
-    | Variable   Direction Type Identifier [Range] (Maybe Expr)
+    | Variable   Direction Type Identifier [Range] Expr
     | CommentDecl String
     deriving (Eq, Ord)
 
 instance Show Decl where
     showList l _ = unlines' $ map show l
     show (Param s t x e) = printf "%s %s%s = %s;" (show s) (showPad t) x (show e)
-    show (ParamType s x mt) = printf "%s type %s%s;" (show s) x (showAssignment mt)
-    show (Variable d t x a me) = printf "%s%s%s%s%s;" (showPad d) (showPad t) x (showRanges a) (showAssignment me)
+    show (ParamType s x mt) = printf "%s type %s%s;" (show s) x tStr
+        where tStr = maybe "" ((" = " ++) . show) mt
+    show (Variable d t x a e) = printf "%s%s%s%s%s;" (showPad d) (showPad t) x (showRanges a) (showAssignment e)
     show (CommentDecl c) =
         if elem '\n' c
             then "// " ++ show c

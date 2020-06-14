@@ -20,10 +20,10 @@ data Attr
     = Attr [AttrSpec]
     deriving Eq
 
-type AttrSpec = (Identifier, Maybe Expr)
+type AttrSpec = (Identifier, Expr)
 
 instance Show Attr where
     show (Attr specs) = printf "(* %s *)" $ commas $ map showSpec specs
 
 showSpec :: AttrSpec -> String
-showSpec (x, me) = x ++ showAssignment me
+showSpec (x, e) = x ++ showAssignment e

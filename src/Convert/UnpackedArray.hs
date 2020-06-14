@@ -40,9 +40,9 @@ convertDescription description =
 
 -- collects and converts multi-dimensional packed-array declarations
 traverseDeclM :: Decl -> ST Decl
-traverseDeclM (orig @ (Variable dir _ x _ me)) = do
+traverseDeclM (orig @ (Variable dir _ x _ e)) = do
     modify $ Map.insert x orig
-    () <- if dir /= Local || me /= Nothing
+    () <- if dir /= Local || e /= Nil
         then lift $ tell $ Set.singleton orig
         else return ()
     return orig
@@ -50,12 +50,12 @@ traverseDeclM other = return other
 
 -- pack the given decls marked for packing
 packDecl :: DeclSet -> Decl -> Decl
-packDecl decls (orig @ (Variable d t x a me)) = do
+packDecl decls (orig @ (Variable d t x a e)) = do
     if Set.member orig decls
         then do
             let (tf, rs) = typeRanges t
             let t' = tf $ a ++ rs
-            Variable d t' x [] me
+            Variable d t' x [] e
         else orig
 packDecl _ other = other
 
@@ -73,9 +73,9 @@ traverseModuleItemM' (Instance a b c d bindings) = do
     return $ Instance a b c d bindings'
     where
         collectBinding :: PortBinding -> ST PortBinding
-        collectBinding (y, Just (Ident x)) = do
+        collectBinding (y, Ident x) = do
             flatUsageM x
-            return (y, Just (Ident x))
+            return (y, Ident x)
         collectBinding other = return other
 traverseModuleItemM' other = return other
 

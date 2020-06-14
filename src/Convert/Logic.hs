@@ -102,10 +102,10 @@ convertDescription ports orig =
                     unzip $ map (uncurry fixBinding) $ zip bindings [0..]
                 newItems = concat newItemsList
                 fixBinding :: PortBinding -> Int -> (PortBinding, [ModuleItem])
-                fixBinding (portName, Just expr) portIdx =
+                fixBinding (portName, expr) portIdx =
                     if portDir /= Just Output || Set.disjoint usedIdents origIdents
-                        then ((portName, Just expr), [])
-                        else ((portName, Just tmpExpr), items)
+                        then ((portName, expr), [])
+                        else ((portName, tmpExpr), items)
                     where
                         portDir = lookupPortDir portName portIdx
                         usedIdents = execWriter $
@@ -115,7 +115,7 @@ convertDescription ports orig =
                         t = Net (NetType TWire) Unspecified
                                 [(DimsFn FnBits $ Right expr, Number "1")]
                         items =
-                            [ MIPackageItem $ Decl $ Variable Local t tmp [] Nothing
+                            [ MIPackageItem $ Decl $ Variable Local t tmp [] Nil
                             , AlwaysC AlwaysComb $ Asgn AsgnOpEq Nothing lhs tmpExpr]
                         lhs = case exprToLHS expr of
                             Just l -> l
@@ -123,7 +123,6 @@ convertDescription ports orig =
                                 error $ "bad non-lhs, non-net expr "
                                     ++ show expr ++ " connected to output port "
                                     ++ portName ++ " of " ++ instanceName
-                fixBinding other _ = (other, [])
                 lookupPortDir :: Identifier -> Int -> Maybe Direction
                 lookupPortDir "" portIdx =
                     case Map.lookup moduleName ports of
@@ -138,8 +137,8 @@ convertDescription ports orig =
         fixModuleItem other = other
 
         -- rewrite variable declarations to have the correct type
-        convertModuleItem (MIPackageItem (Decl (Variable dir (IntegerVector _ sg mr) ident a me))) =
-            MIPackageItem $ Decl $ Variable dir' (t mr) ident a me
+        convertModuleItem (MIPackageItem (Decl (Variable dir (IntegerVector _ sg mr) ident a e))) =
+            MIPackageItem $ Decl $ Variable dir' (t mr) ident a e
             where
                 t = if Set.member ident fixedIdents
                     then IntegerVector TReg sg
@@ -153,8 +152,8 @@ convertDescription ports orig =
         convertDecl :: Decl -> Decl
         convertDecl (Param s (IntegerVector _ sg rs) x e) =
             Param s (Implicit sg rs) x e
-        convertDecl (Variable d (IntegerVector TLogic sg rs) x a me) =
-            Variable d (IntegerVector TReg sg rs) x a me
+        convertDecl (Variable d (IntegerVector TLogic sg rs) x a e) =
+            Variable d (IntegerVector TReg sg rs) x a e
         convertDecl other = other
 
 regIdents :: ModuleItem -> Writer Idents ()
@@ -180,7 +179,7 @@ traverseStmtM :: Stmt -> StateT Idents (Writer Idents) Stmt
 traverseStmtM (Timing _ stmt) = traverseStmtM stmt
 traverseStmtM (Subroutine (Ident f) args) = do
     case args of
-        Args [_, Just (Ident x), _] [] ->
+        Args [_, Ident x, _] [] ->
             -- assuming that no one will readmem into a local variable
             if f == "$readmemh" || f == "$readmemb"
                 then lift $ tell $ Set.singleton x

@@ -509,7 +509,7 @@ NonIntegerType :: { NonIntegerType }
   | "string"    { TString    }
   | "event"     { TEvent     }
 
-EnumItems :: { [(Identifier, Maybe Expr)] }
+EnumItems :: { [(Identifier, Expr)] }
   : VariablePortIdentifiers { $1 }
 
 StructItems :: { [(Type, Identifier)] }
@@ -589,12 +589,12 @@ ModportPortsDeclaration(delim) :: { [ModportDecl] }
   : ModportSimplePortsDeclaration(delim) { $1 }
 ModportSimplePortsDeclaration(delim) :: { [ModportDecl] }
   : Direction ModportSimplePorts delim { map (\(a, b) -> ($1, a, b)) $2 }
-ModportSimplePorts :: { [(Identifier, Maybe Expr)] }
+ModportSimplePorts :: { [(Identifier, Expr)] }
   : ModportSimplePort                        { [$1] }
   | ModportSimplePorts "," ModportSimplePort { $1 ++ [$3] }
-ModportSimplePort :: { (Identifier, Maybe Expr) }
-  : "." Identifier "(" opt(Expr) ")" { ($2, $4) }
-  | Identifier                       { ($1, Just $ Ident $1) }
+ModportSimplePort :: { (Identifier, Expr) }
+  : "." Identifier "(" ExprOrNil ")" { ($2, $4) }
+  | Identifier                       { ($1, Ident $1) }
 
 Identifier :: { Identifier }
   : simpleIdentifier  { tokenString $1 }
@@ -636,12 +636,12 @@ DeclTokenAsgn :: { DeclToken }
   : "=" opt(DelayOrEvent) Expr {% posInject \p -> DTAsgn p AsgnOpEq $2 $3 }
   | AsgnBinOp Expr             {% posInject \p -> DTAsgn p $1 Nothing $2 }
 
-VariablePortIdentifiers :: { [(Identifier, Maybe Expr)] }
+VariablePortIdentifiers :: { [(Identifier, Expr)] }
   : VariablePortIdentifier                             { [$1] }
   | VariablePortIdentifiers "," VariablePortIdentifier { $1 ++ [$3] }
-VariablePortIdentifier :: { (Identifier, Maybe Expr) }
-  : Identifier          { ($1, Nothing) }
-  | Identifier "=" Expr { ($1, Just $3) }
+VariablePortIdentifier :: { (Identifier, Expr) }
+  : Identifier          { ($1, Nil) }
+  | Identifier "=" Expr { ($1, $3 ) }
 
 Direction :: { Direction }
   : "inout"  { Inout  }
@@ -705,8 +705,8 @@ SimpleImmediateAssertionStatement :: { Assertion }
   | "cover"  "(" Expr ")" Stmt        { Cover  (Right $3) $5 }
 
 PropertySpec :: { PropertySpec }
-  : opt(ClockingEvent) "disable" "iff" "(" Expr ")" PropExpr { PropertySpec $1 (Just $5) $7 }
-  | opt(ClockingEvent)                              PropExpr { PropertySpec $1 (Nothing) $2 }
+  : opt(ClockingEvent) "disable" "iff" "(" Expr ")" PropExpr { PropertySpec $1 $5  $7 }
+  | opt(ClockingEvent)                              PropExpr { PropertySpec $1 Nil $2 }
 
 PropExpr :: { PropExpr }
   : SeqExpr { PropExpr $1 }
@@ -752,23 +752,26 @@ AttrSpecs :: { [AttrSpec] }
   : AttrSpec               { [$1] }
   | AttrSpecs "," AttrSpec { $1 ++ [$3] }
 AttrSpec :: { AttrSpec }
-  : Identifier "=" Expr { ($1, Just $3) }
-  | Identifier          { ($1, Nothing) }
+  : Identifier "=" Expr { ($1, $3 ) }
+  | Identifier          { ($1, Nil) }
 
-NInputGates :: { [(Maybe Expr, Identifier, LHS, [Expr])] }
+NInputGates :: { [(Expr, Identifier, LHS, [Expr])] }
   : NInputGate                 { [$1] }
   | NInputGates "," NInputGate { $1 ++ [$3]}
-NOutputGates :: { [(Maybe Expr, Identifier, [LHS], Expr)] }
+NOutputGates :: { [(Expr, Identifier, [LHS], Expr)] }
   : NOutputGate                  { [$1] }
   | NOutputGates "," NOutputGate { $1 ++ [$3]}
 
-NInputGate :: { (Maybe Expr, Identifier, LHS, [Expr]) }
-  : opt(DelayControl) opt(Identifier) "(" LHS "," Exprs ")" { ($1, fromMaybe "" $2, $4, $6) }
-NOutputGate :: { (Maybe Expr, Identifier, [LHS], Expr) }
-  : opt(DelayControl) opt(Identifier) "(" NOutputGateItems { ($1, fromMaybe "" $2, fst $4, snd $4) }
+NInputGate :: { (Expr, Identifier, LHS, [Expr]) }
+  : DelayControlOrNil opt(Identifier) "(" LHS "," Exprs ")" { ($1, fromMaybe "" $2, $4, $6) }
+NOutputGate :: { (Expr, Identifier, [LHS], Expr) }
+  : DelayControlOrNil opt(Identifier) "(" NOutputGateItems { ($1, fromMaybe "" $2, fst $4, snd $4) }
 NOutputGateItems :: { ([LHS], Expr) }
   : Expr ")" { ([], $1) }
   | Expr "," NOutputGateItems { (fst $3 ++ [toLHS $1], snd $3) }
+DelayControlOrNil :: { Expr }
+  : DelayControl { $1 }
+  | {- empty -} { Nil }
 
 NInputGateKW :: { NInputGateKW }
   : "and"  { GateAnd  }
@@ -937,10 +940,10 @@ PortBindingsInside :: { [PortBinding] }
   : PortBinding                        { [$1] }
   | PortBinding "," PortBindingsInside { $1 : $3}
 PortBinding :: { PortBinding }
-  : "." Identifier "(" opt(Expr) ")" { ($2, $4) }
-  | "." Identifier                   { ($2, Just $ Ident $2) }
-  | Expr                             { ("", Just $1) }
-  | ".*"                             { ("*", Nothing) }
+  : "." Identifier "(" ExprOrNil ")" { ($2, $4) }
+  | "." Identifier                   { ($2, Ident $2) }
+  | Expr                             { ("", $1) }
+  | ".*"                             { ("*", Nil) }
 
 ParamBindings :: { [ParamBinding] }
   : "#" "("                     ")" { [] }
@@ -984,8 +987,7 @@ StmtNonBlock :: { Stmt }
   | "for" "(" ForInit ForCond ForStep ")" Stmt { For $3 $4 $5 $7 }
   | Unique CaseKW "(" Expr ")" Cases "endcase" { Case $1 $2 $4 $6 }
   | TimingControl Stmt                         { Timing $1 $2 }
-  | "return" Expr ";"                          { Return $2 }
-  | "return"      ";"                          { Return Nil }
+  | "return" ExprOrNil ";"                     { Return $2 }
   | "break"       ";"                          { Break }
   | "continue"    ";"                          { Continue }
   | "while"  "(" Expr ")" Stmt                 { While   $3 $5 }
@@ -1131,22 +1133,22 @@ Time :: { String }
 CallArgs :: { Args }
   : "(" CallArgsInside ")" { $2 }
 CallArgsInside :: { Args }
-  : {- empty -}                        { Args [            ] [] }
-  |                NamedCallArgsFollow { Args [            ] $1 }
-  | Expr                 NamedCallArgs { Args [Just $1     ] $2 }
-  |      UnnamedCallArgs NamedCallArgs { Args (Nothing : $1) $2 }
-  | Expr UnnamedCallArgs NamedCallArgs { Args (Just $1 : $2) $3 }
-UnnamedCallArgs :: { [Maybe Expr] }
-  : "," opt(Expr)                { [$2] }
-  | UnnamedCallArgs "," opt(Expr) { $1 ++ [$3] }
-NamedCallArgs :: { [(Identifier, Maybe Expr)] }
+  : {- empty -}                        { Args [        ] [] }
+  |                NamedCallArgsFollow { Args [        ] $1 }
+  | Expr                 NamedCallArgs { Args [$1      ] $2 }
+  |      UnnamedCallArgs NamedCallArgs { Args (Nil : $1) $2 }
+  | Expr UnnamedCallArgs NamedCallArgs { Args ($1  : $2) $3 }
+UnnamedCallArgs :: { [Expr] }
+  : "," ExprOrNil                 { [$2] }
+  | UnnamedCallArgs "," ExprOrNil { $1 ++ [$3] }
+NamedCallArgs :: { [(Identifier, Expr)] }
   : {- empty -}        { [] }
   | "," NamedCallArgsFollow  { $2 }
-NamedCallArgsFollow :: { [(Identifier, Maybe Expr)] }
+NamedCallArgsFollow :: { [(Identifier, Expr)] }
   : NamedCallArg                         { [$1] }
   | NamedCallArgsFollow "," NamedCallArg { $1 ++ [$3] }
-NamedCallArg :: { (Identifier, Maybe Expr) }
-  : "." Identifier "(" opt(Expr) ")" { ($2, $4) }
+NamedCallArg :: { (Identifier, Expr) }
+  : "." Identifier "(" ExprOrNil ")" { ($2, $4) }
 
 Exprs :: { [Expr] }
   :           Expr  { [$1] }
@@ -1229,6 +1231,10 @@ Expr :: { Expr }
   | "^"  Expr %prec REDUCE_OP { UniOp RedXor  $2 }
   | "~^" Expr %prec REDUCE_OP { UniOp RedXnor $2 }
   | "^~" Expr %prec REDUCE_OP { UniOp RedXnor $2 }
+
+ExprOrNil :: { Expr }
+  : Expr        { $1 }
+  | {- empty -} { Nil }
 
 PatternItems :: { [(Identifier, Expr)] }
   : PatternNamedItems   { $1 }
@@ -1373,15 +1379,15 @@ combineDeclsAndStmts :: ([Decl], [Stmt]) -> ([Decl], [Stmt]) -> ([Decl], [Stmt])
 combineDeclsAndStmts (a1, b1) (a2, b2) = (a1 ++ a2, b1 ++ b2)
 
 makeInput :: Decl -> Decl
-makeInput (Variable Local t x a me) = Variable Input t x a me
-makeInput (Variable Input t x a me) = Variable Input t x a me
+makeInput (Variable Local t x a e) = Variable Input t x a e
+makeInput (Variable Input t x a e) = Variable Input t x a e
 makeInput (CommentDecl c) = CommentDecl c
 makeInput other =
   error $ "unexpected non-var or non-input decl: " ++ (show other)
 
 defaultFuncInput :: Decl -> Decl
-defaultFuncInput (Variable dir (Implicit sg rs) x a me) =
-  Variable dir t x a me
+defaultFuncInput (Variable dir (Implicit sg rs) x a e) =
+  Variable dir t x a e
   where
     t = if dir == Input || dir == Inout
       then IntegerVector TLogic sg rs

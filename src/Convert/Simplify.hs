@@ -70,13 +70,13 @@ convertExpr info (DimFn f v e) =
     DimFn f v e'
     where
         e' = simplify $ substitute info e
-convertExpr info (Call (Ident "$clog2") (Args [Just e] [])) =
+convertExpr info (Call (Ident "$clog2") (Args [e] [])) =
     if clog2' == clog2
         then clog2
         else clog2'
     where
         e' = simplify $ substitute info e
-        clog2 = Call (Ident "$clog2") (Args [Just e'] [])
+        clog2 = Call (Ident "$clog2") (Args [e'] [])
         clog2' = simplify clog2
 convertExpr info (Mux cc aa bb) =
     if before == after

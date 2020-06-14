@@ -29,7 +29,7 @@ convertStmt (Foreach x idxs stmt) =
             where
                 queryFn f = DimFn f (Right $ Ident x) (Number $ show d)
                 idxDecl = Variable Local (IntegerAtom TInteger Unspecified) i []
-                    $ Just $ queryFn FnLeft
+                    (queryFn FnLeft)
                 cmp =
                     Mux (BinOp Eq (queryFn FnIncrement) (Number "1"))
                         (BinOp Ge (Ident i) (queryFn FnRight))

@@ -244,18 +244,18 @@ showAssertionExpr (Left e) = printf "property (%s\n)" (show e)
 showAssertionExpr (Right e) = printf "(%s)" (show e)
 
 data PropertySpec
-    = PropertySpec (Maybe Sense) (Maybe Expr) PropExpr
+    = PropertySpec (Maybe Sense) Expr PropExpr
     deriving Eq
 instance Show PropertySpec where
-    show (PropertySpec ms me pe) =
-        printf "%s%s\n\t%s" msStr meStr (show pe)
+    show (PropertySpec ms e pe) =
+        printf "%s%s\n\t%s" msStr eStr (show pe)
         where
             msStr = case ms of
                 Nothing -> ""
                 Just s -> printf "@(%s) " (show s)
-            meStr = case me of
-                Nothing -> ""
-                Just e -> printf "disable iff (%s)" (show e)
+            eStr = case e of
+                Nil -> ""
+                _ -> printf "disable iff (%s)" (show e)
 
 data ViolationCheck
     = Unique

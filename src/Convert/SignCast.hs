@@ -23,7 +23,7 @@ convert =
 
 convertExpr :: Expr -> Expr
 convertExpr (Cast (Left (Implicit Signed [])) e) =
-    Call (Ident "$signed") (Args [Just e] [])
+    Call (Ident "$signed") (Args [e] [])
 convertExpr (Cast (Left (Implicit Unsigned [])) e) =
-    Call (Ident "$unsigned") (Args [Just e] [])
+    Call (Ident "$unsigned") (Args [e] [])
 convertExpr other = other

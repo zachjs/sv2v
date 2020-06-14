@@ -31,7 +31,7 @@ convertDescription other = other
 
 traverseFunctionsM :: ModuleItem -> Writer Idents ModuleItem
 traverseFunctionsM (MIPackageItem (Function ml t f decls stmts)) = do
-    let dummyDecl = Variable Input (Implicit Unspecified []) "_sv2v_unused" [] Nothing
+    let dummyDecl = Variable Input (Implicit Unspecified []) "_sv2v_unused" [] Nil
     decls' <- do
         if any isInput decls
             then return decls
@@ -49,6 +49,6 @@ convertExpr :: Idents -> Expr -> Expr
 convertExpr functions (Call (Ident func) (Args [] [])) =
     Call (Ident func) (Args args [])
     where args = if Set.member func functions
-            then [Just $ Number "0"]
+            then [Number "0"]
             else []
 convertExpr _ other = other

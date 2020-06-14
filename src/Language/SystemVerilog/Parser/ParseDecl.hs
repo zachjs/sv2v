@@ -46,7 +46,6 @@ module Language.SystemVerilog.Parser.ParseDecl
 ) where
 
 import Data.List (findIndex, findIndices, partition)
-import Data.Maybe (mapMaybe)
 
 import Language.SystemVerilog.AST
 import Language.SystemVerilog.Parser.Tokens (Position(..))
@@ -112,20 +111,20 @@ parseDTsAsPortDecls pieces =
         propagateDirections :: Direction -> [Decl] -> [Decl]
         propagateDirections dir (decl @ (Variable _ InterfaceT{} _ _ _) : decls) =
             decl : propagateDirections dir decls
-        propagateDirections lastDir (Variable currDir t x a me : decls) =
+        propagateDirections lastDir (Variable currDir t x a e : decls) =
             decl : propagateDirections dir decls
             where
-                decl = Variable dir t x a me
+                decl = Variable dir t x a e
                 dir = if currDir == Local then lastDir else currDir
         propagateDirections dir (decl : decls) =
             decl : propagateDirections dir decls
         propagateDirections _ [] = []
 
         portNames :: [Decl] -> [Identifier]
-        portNames items = mapMaybe portName items
-        portName :: Decl -> Maybe Identifier
-        portName (Variable _ _ ident _ _) = Just ident
-        portName CommentDecl{} = Nothing
+        portNames = filter (not . null) . map portName
+        portName :: Decl -> Identifier
+        portName (Variable _ _ ident _ _) = ident
+        portName CommentDecl{} = ""
         portName decl =
             error $ "unexpected non-variable port declaration: " ++ (show decl)
 
@@ -315,12 +314,12 @@ takeLHSStep _ _ = Nothing
 
 
 -- batches together separate declaration lists
-type Triplet = (Identifier, [Range], Maybe Expr)
+type Triplet = (Identifier, [Range], Expr)
 type Component = (Direction, Type, [Triplet])
 finalize :: (Position, Component) -> [Decl]
 finalize (pos, (dir, typ, trips)) =
     CommentDecl ("Trace: " ++ show pos) :
-    map (\(x, a, me) -> Variable dir typ x a me) trips
+    map (\(x, a, e) -> Variable dir typ x a e) trips
 
 
 -- internal; entrypoint of the critical portion of our parser
@@ -354,11 +353,11 @@ takeTrips l0 force =
         then ([], l0)
         else (trip : trips, l5)
     where
-        (x , l1) = takeIdent  l0
-        (a , l2) = takeRanges l1
-        (me, l3) = takeAsgn   l2
-        (_ , l4) = takeComma  l3
-        trip = (x, a, me)
+        (x, l1) = takeIdent  l0
+        (a, l2) = takeRanges l1
+        (e, l3) = takeAsgn   l2
+        (_, l4) = takeComma  l3
+        trip = (x, a, e)
         (trips, l5) = takeTrips l4 False
 
 tripLookahead :: [DeclToken] -> Bool
@@ -369,7 +368,7 @@ tripLookahead l0 =
         False
     -- if the identifier is the last token, or if it assigned a value, then we
     -- know we must have a valid triplet ahead
-    else if null l1 || asgn /= Nothing then
+    else if null l1 || asgn /= Nil then
         True
     -- if there is an ident followed by some number of ranges, and that's it,
     -- then there is a trailing declaration of an array ahead
@@ -442,12 +441,12 @@ takeRanges (token : tokens) =
 -- both for standard declarations and in `parseDTsAsDeclOrStmt`, where we're
 -- checking for an assignment statement. The other entry points disallow
 -- `AsgnOpNonBlocking`, so this doesn't liberalize the parser.
-takeAsgn :: [DeclToken] -> (Maybe Expr, [DeclToken])
+takeAsgn :: [DeclToken] -> (Expr, [DeclToken])
 takeAsgn (DTAsgn _ op Nothing e : rest) =
     if op == AsgnOpEq || op == AsgnOpNonBlocking
-        then (Just e , rest)
-        else (Nothing, rest)
-takeAsgn rest = (Nothing, rest)
+        then (e  , rest)
+        else (Nil, rest)
+takeAsgn rest = (Nil, rest)
 
 takeComma :: [DeclToken] -> (Bool, [DeclToken])
 takeComma [] = (False, [])

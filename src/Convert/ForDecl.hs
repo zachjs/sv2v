@@ -23,7 +23,7 @@ convertStmt (For (Left []) cc asgns stmt) =
     convertStmt $ For (Right []) cc asgns stmt
 convertStmt (For (Right []) cc asgns stmt) =
     convertStmt $ For inits cc asgns stmt
-    where inits = Left [dummyDecl (Just $ Number "0")]
+    where inits = Left [dummyDecl $ Number "0"]
 convertStmt (orig @ (For (Right [_]) _ _ _)) = orig
 
 convertStmt (For (Left inits) cc asgns stmt) =
@@ -47,13 +47,15 @@ convertStmt (For (Right origPairs) cc asgns stmt) =
 convertStmt other = other
 
 splitDecl :: Decl -> (Decl, (LHS, Expr))
-splitDecl (Variable d t ident a (Just e)) =
-    (Variable d t ident a Nothing, (LHSIdent ident, e))
-splitDecl other =
-    error $ "invalid for loop decl: " ++ show other
+splitDecl (decl @ (Variable _ _ _ _ Nil)) =
+    error $ "invalid for loop decl: " ++ show decl
+splitDecl (Variable d t ident a e) =
+    (Variable d t ident a Nil, (LHSIdent ident, e))
+splitDecl decl =
+    error $ "invalid for loop decl: " ++ show decl
 
 asgnStmt :: (LHS, Expr) -> Stmt
 asgnStmt = uncurry $ Asgn AsgnOpEq Nothing
 
-dummyDecl :: Maybe Expr -> Decl
+dummyDecl :: Expr -> Decl
 dummyDecl = Variable Local (IntegerAtom TInteger Unspecified) "_sv2v_dummy" []

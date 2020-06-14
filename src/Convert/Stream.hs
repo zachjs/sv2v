@@ -20,9 +20,9 @@ convertDescription other = other
 streamerBlock :: Expr -> Expr -> (LHS -> Expr -> Stmt) -> LHS -> Expr -> Stmt
 streamerBlock chunk size asgn output input =
     Block Seq ""
-    [ Variable Local t inp [] $ Just input
-    , Variable Local t out [] Nothing
-    , Variable Local (IntegerAtom TInteger Unspecified) idx [] Nothing
+    [ Variable Local t inp [] input
+    , Variable Local t out [] Nil
+    , Variable Local (IntegerAtom TInteger Unspecified) idx [] Nil
     ]
     [ For inits cmp incr stmt
     , If NoCheck cmp2 stmt2 Null

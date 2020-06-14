@@ -42,9 +42,11 @@ convertStmt (Block Seq name decls stmts) =
 convertStmt other = other
 
 splitDecl :: Decl -> (Decl, Maybe (LHS, Expr))
-splitDecl (Variable d t ident a (Just e)) =
-    (Variable d t ident a Nothing, Just (LHSIdent ident, e))
-splitDecl other = (other, Nothing)
+splitDecl (decl @ (Variable _ _ _ _ Nil)) =
+    (decl, Nothing)
+splitDecl (Variable d t ident a e) =
+    (Variable d t ident a Nil, Just (LHSIdent ident, e))
+splitDecl decl = (decl, Nothing)
 
 asgnStmt :: (LHS, Expr) -> Stmt
 asgnStmt = uncurry $ Asgn AsgnOpEq Nothing

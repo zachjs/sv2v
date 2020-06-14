@@ -77,7 +77,7 @@ addJumpStateDeclTF :: [Decl] -> [Stmt] -> ([Decl], [Stmt])
 addJumpStateDeclTF decls stmts =
     if uses && not declares then
         ( decls ++
-            [Variable Local jumpStateType jumpState [] (Just jsNone)]
+            [Variable Local jumpStateType jumpState [] jsNone]
         , stmts )
     else if uses then
         (decls, stmts)
@@ -256,7 +256,7 @@ convertLoop loop comp stmt = do
             ]
     let jsStackIdent = jumpState ++ "_" ++ show origLoopDepth
     let jsStackDecl = Variable Local jumpStateType jsStackIdent []
-                        (Just $ Ident jumpState)
+                        (Ident jumpState)
     let jsStackRestore = If NoCheck
                 (BinOp Ne (Ident jumpState) jsReturn)
                 (asgn jumpState (Ident jsStackIdent))

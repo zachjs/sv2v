@@ -10,7 +10,6 @@
 module Convert.KWArgs (convert) where
 
 import Data.List (elemIndex, sortOn)
-import Data.Maybe (mapMaybe)
 import Control.Monad.Writer
 import qualified Data.Map.Strict as Map
 
@@ -39,11 +38,11 @@ collectTF _ = return ()
 
 collectTFDecls :: Identifier -> [Decl] -> Writer TFs ()
 collectTFDecls name decls =
-    tell $ Map.singleton name $ mapMaybe getInput decls
+    tell $ Map.singleton name $ filter (not . null) $ map getInput decls
     where
-        getInput :: Decl -> Maybe Identifier
-        getInput (Variable Input _ ident _ _) = Just ident
-        getInput _ = Nothing
+        getInput :: Decl -> Identifier
+        getInput (Variable Input _ ident _ _) = ident
+        getInput _ = ""
 
 convertExpr :: TFs -> Expr -> Expr
 convertExpr tfs (Call expr args) =

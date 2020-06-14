@@ -127,15 +127,14 @@ instance Show Expr where
     showsPrec _ e = \s -> show e ++ s
 
 data Args
-    = Args [Maybe Expr] [(Identifier, Maybe Expr)]
+    = Args [Expr] [(Identifier, Expr)]
     deriving (Eq, Ord)
 
 instance Show Args where
     show (Args pnArgs kwArgs) = "(" ++ (commas strs) ++ ")"
         where
-            strs = (map showPnArg pnArgs) ++ (map showKwArg kwArgs)
-            showPnArg = maybe "" show
-            showKwArg (x, me) = printf ".%s(%s)" x (showPnArg me)
+            strs = (map show pnArgs) ++ (map showKwArg kwArgs)
+            showKwArg (x, e) = printf ".%s(%s)" x (show e)
 
 data PartSelectMode
     = NonIndexed
@@ -177,9 +176,9 @@ instance Show DimFn where
     show FnSize               = "$size"
 
 
-showAssignment :: Show a => Maybe a -> String
-showAssignment Nothing = ""
-showAssignment (Just val) = " = " ++ show val
+showAssignment :: Expr -> String
+showAssignment Nil = ""
+showAssignment val = " = " ++ show val
 
 showRanges :: [Range] -> String
 showRanges [] = ""
@@ -241,7 +240,7 @@ simplify (orig @ (Repeat (Number n) exprs)) =
 simplify (Concat [expr]) = expr
 simplify (Concat exprs) =
     Concat $ filter (/= Concat []) exprs
-simplify (orig @ (Call (Ident "$clog2") (Args [Just (Number n)] []))) =
+simplify (orig @ (Call (Ident "$clog2") (Args [Number n] []))) =
     case readNumber n of
         Nothing -> orig
         Just x -> Number $ show $ clog2 x
