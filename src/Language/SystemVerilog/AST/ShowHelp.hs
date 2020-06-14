@@ -19,7 +19,7 @@ import Data.List (intercalate)
 
 showPad :: Show t => t -> String
 showPad x =
-    if str == ""
+    if null str
         then ""
         else str ++ " "
     where str = show x
@@ -28,14 +28,14 @@ showPadBefore :: Show t => t -> String
 showPadBefore x =
     if str == ""
         then ""
-        else " " ++ str
+        else ' ' : str
     where str = show x
 
 indent :: String -> String
-indent a = '\t' : f a
+indent = (:) '\t' . f
     where
         f [] = []
-        f ('\n' : xs) = "\n\t" ++ f xs
+        f ('\n' : xs) = '\n' : '\t' : f xs
         f (x : xs) = x : f xs
 
 unlines' :: [String] -> String
@@ -46,7 +46,7 @@ commas = intercalate ", "
 
 indentedParenList :: [String] -> String
 indentedParenList [] = "()"
-indentedParenList [x] = "(" ++ x ++ ")"
+indentedParenList [x] = '(' : x ++ ")"
 indentedParenList l = "(\n" ++ (indent $ intercalate ",\n" l) ++ "\n)"
 
 showEither :: (Show a, Show b) => Either a b -> String

@@ -21,15 +21,9 @@ convert =
     map (filter (not . isPI)) . nest
     where
         nest :: [AST] -> [AST]
-        nest curr =
-            if next == curr
-                then curr
-                else nest next
-            where
-                next = traverseFiles
-                    (collectDescriptionsM collectDescriptionM)
-                    (traverseDescriptions . convertDescription)
-                    curr
+        nest = traverseFiles
+            (collectDescriptionsM collectDescriptionM)
+            (traverseDescriptions . convertDescription)
         isPI :: Description -> Bool
         isPI (PackageItem Import{}) = False
         isPI (PackageItem item) = piName item /= Nothing
@@ -46,7 +40,9 @@ collectDescriptionM _ = return ()
 -- nests packages items missing from modules
 convertDescription :: PIs -> Description -> Description
 convertDescription pis (orig @ Part{}) =
-    Part attrs extern kw lifetime name ports items'
+    if Map.null pis
+        then orig
+        else Part attrs extern kw lifetime name ports items'
     where
         Part attrs extern kw lifetime name ports items = orig
         items' = addItems pis Set.empty items

@@ -25,11 +25,7 @@ import Convert.Traverse
 import Language.SystemVerilog.AST
 
 convert :: [AST] -> [AST]
-convert files =
-    if files == files'
-        then files
-        else convert files'
-    where files' = map (traverseDescriptions convertDescription) files
+convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription =

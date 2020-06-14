@@ -233,7 +233,7 @@ convertModuleItemM info (orig @ (Instance m bindings x r p)) =
     if Map.notMember m info then
         return orig
     else if Map.null maybeTypeMap then
-        return $ Instance m bindingsNamed x r p
+        return orig
     else if any (isLeft . snd) bindings' then
         error $ "param type resolution left type params: " ++ show orig
             ++ " converted to: " ++ show bindings'

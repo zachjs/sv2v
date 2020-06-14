@@ -80,11 +80,6 @@ instance Show Expr where
     show (Repeat  e l  ) = printf "{%s {%s}}"  (show e) (commas $ map show l)
     show (Concat  l    ) = printf "{%s}"                (commas $ map show l)
     show (Stream  o e l) = printf "{%s %s%s}"  (show o) (show e) (show $ Concat l)
-    show (UniOp   o e  ) = printf "%s%s"       (show o) (showUniOpPrec e)
-    show (BinOp   o a b) = printf "%s %s %s"   (showBinOpPrec a) (show o) (showBinOpPrec b)
-    show (Dot     e n  ) = printf "%s.%s"      (show e) n
-    show (Mux     c a b) = printf "(%s ? %s : %s)" (show c) (show a) (show b)
-    show (Call    e l  ) = printf "%s%s"       (show e) (show l)
     show (Cast tore e  ) = printf "%s'(%s)"    (showEither tore) (show e)
     show (DimsFn  f v  ) = printf "%s(%s)"     (show f) (showEither v)
     show (DimFn   f v e) = printf "%s(%s, %s)" (show f) (showEither v) (show e)
@@ -99,6 +94,37 @@ instance Show Expr where
             showPatternItem (':' : n, e) = showPatternItem (n, e)
             showPatternItem (n      , e) = printf "%s: %s" n (show e)
     show (MinTypMax a b c) = printf "(%s : %s : %s)" (show a) (show b) (show c)
+    show (e @ UniOp{}) = showsPrec 0 e ""
+    show (e @ BinOp{}) = showsPrec 0 e ""
+    show (e @ Dot  {}) = showsPrec 0 e ""
+    show (e @ Mux  {}) = showsPrec 0 e ""
+    show (e @ Call {}) = showsPrec 0 e ""
+
+    showsPrec _ (UniOp   o e  ) =
+        shows o .
+        showUniOpPrec e
+    showsPrec _ (BinOp   o a b) =
+        showBinOpPrec a .
+        showChar ' ' .
+        shows o .
+        showChar ' ' .
+        showBinOpPrec b
+    showsPrec _ (Dot     e n  ) =
+        shows e .
+        showChar '.' .
+        showString n
+    showsPrec _ (Mux     c a b) =
+        showChar '(' .
+        shows c .
+        showString " ? " .
+        shows a .
+        showString " : " .
+        shows b .
+        showChar ')'
+    showsPrec _ (Call    e l  ) =
+        shows e .
+        shows l
+    showsPrec _ e = \s -> show e ++ s
 
 data Args
     = Args [Maybe Expr] [(Identifier, Maybe Expr)]
@@ -184,14 +210,14 @@ readNumber ('\'' : 'h' : rest) =
         _ -> Nothing
 readNumber n = readMaybe n
 
-showUniOpPrec :: Expr -> String
-showUniOpPrec (e @ UniOp{}) = printf "(%s)" (show e)
-showUniOpPrec (e @ BinOp{}) = printf "(%s)" (show e)
-showUniOpPrec e = show e
+showUniOpPrec :: Expr -> ShowS
+showUniOpPrec (e @ UniOp{}) = (showParen True . shows) e
+showUniOpPrec (e @ BinOp{}) = (showParen True . shows) e
+showUniOpPrec e = shows e
 
-showBinOpPrec :: Expr -> String
-showBinOpPrec (e @ BinOp{}) = printf "(%s)" (show e)
-showBinOpPrec e = show e
+showBinOpPrec :: Expr -> ShowS
+showBinOpPrec (e @ BinOp{}) = (showParen True . shows) e
+showBinOpPrec e = shows e
 
 -- basic expression simplfication utility to help us generate nicer code in the
 -- common case of ranges like `[FOO-1:0]`
