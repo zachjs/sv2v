@@ -31,7 +31,7 @@ convertDescription (description @ Part{}) =
     Part attrs extern kw lifetime name ports (items ++ funcs)
     where
         description' @ (Part attrs extern kw lifetime name ports items) =
-            scopedConversion (traverseDeclM structs) traverseModuleItemM
+            scopedConversion traverseDeclM' traverseModuleItemM
                 traverseStmtM tfArgTypes description
         -- collect information about this description
         structs = execWriter $ collectModuleItemsM
@@ -45,6 +45,12 @@ convertDescription (description @ Part{}) =
         funcs = map packerFn $ filter isNeeded $ Map.keys structs
         isNeeded tf = Set.member (packerFnName tf) calledPackedFuncs
         -- helpers for the scoped traversal
+        traverseDeclM' :: Decl -> State Types Decl
+        traverseDeclM' decl = do
+            decl' <- traverseDeclM structs decl
+            res <- traverseModuleItemM $ MIPackageItem $ Decl decl'
+            let MIPackageItem (Decl decl'') = res
+            return decl''
         traverseModuleItemM :: ModuleItem -> State Types ModuleItem
         traverseModuleItemM item =
             traverseLHSsM  traverseLHSM  item >>=
