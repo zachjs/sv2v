@@ -51,10 +51,13 @@ module top;
 
     parameter W = 4;
     initial begin : block3
+        reg w;
         reg [W-1:0] x, y, z;
+        w = 1;
         x = 4'hA;
         y = FLAG ? x : 4'hF;
         z = !FLAG ? y : 4'hF;
+        $display("%b %d %d", w, 0, 0);
         $display("%b %d %d", x, W-1, 0);
         $display("%b %d %d", y, W-1, 0);
         $display("%b %d %d", z, W-1, 0);

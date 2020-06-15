@@ -106,6 +106,7 @@ typeof (orig @ (Cast (Right (Ident x)) _)) = do
         then return $ typeOfSize (Ident x)
         else return $ TypeOf orig
 typeof (Cast (Right s) _) = return $ typeOfSize s
+typeof (UniOp UniSub  e  ) = typeof e
 typeof (UniOp BitNot  e  ) = typeof e
 typeof (BinOp Pow     e _) = typeof e
 typeof (BinOp ShiftL  e _) = typeof e

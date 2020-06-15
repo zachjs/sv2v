@@ -42,9 +42,11 @@ module top;
 
     parameter W = 4;
     initial begin
+        type('1) w = '1;
         logic [W-1:0] x = 4'hA;
         type(FLAG ? x : '1) y = FLAG ? x : '1;
         type(!FLAG ? y : '1) z = !FLAG ? y : '1;
+        $display("%b %d %d", w, $left(w), $right(w));
         $display("%b %d %d", x, $left(x), $right(x));
         $display("%b %d %d", y, $left(y), $right(y));
         $display("%b %d %d", z, $left(z), $right(z));
