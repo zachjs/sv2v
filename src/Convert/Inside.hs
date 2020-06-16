@@ -3,10 +3,9 @@
  -
  - Conversion for `inside` expressions and cases
  -
- - The expressions are compared to each candidate using the wildcard comparison
- - operator. Note that if expression has any Xs or Zs that are not wildcarded in
- - the candidate, the results is `1'bx`. As required by the specification, the
- - result of each comparison is combined using an OR reduction.
+ - The expressions are compared to each candidate using `==?`, the wildcard
+ - comparison. As required by the specification, the result of each comparison
+ - is combined using an OR reduction.
  -
  - `case ... inside` statements are converted to an equivalent if-else cascade.
  -
@@ -41,15 +40,8 @@ convertExpr (Inside expr valueRanges) =
     where
         checks = map toCheck valueRanges
         toCheck :: ExprOrRange -> Expr
-        toCheck (Left e) =
-            Mux
-            (BinOp TNe rxr lxlxrxr)
-            (Number "1'bx")
-            (BinOp WEq expr e)
-            where
-                lxl = BinOp BitXor expr expr
-                rxr = BinOp BitXor e e
-                lxlxrxr = BinOp BitXor lxl rxr
+        toCheck (Left pattern) =
+            BinOp WEq expr pattern
         toCheck (Right (lo, hi)) =
             BinOp LogAnd
                 (BinOp Le lo expr)
