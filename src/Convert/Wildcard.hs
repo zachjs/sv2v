@@ -31,18 +31,18 @@ convert =
 
 convertExpr :: Expr -> Expr
 convertExpr (BinOp WEq l r) =
-    Mux noteq (Number "1'b0") $
-    Mux badxs (Number "1'bx")
-              (Number "1'b1")
+    BinOp BitAnd couldMatch $
+    BinOp BitOr  noExtraXZs $
+    Number "1'bx"
     where
         lxl = BinOp BitXor l l
         rxr = BinOp BitXor r r
         -- Step #1: definitive mismatch
-        noteq = BinOp TNe rxlxl lxrxr
+        couldMatch = BinOp TEq rxlxl lxrxr
         rxlxl = BinOp BitXor r lxl
         lxrxr = BinOp BitXor l rxr
         -- Step #2: extra X or Z
-        badxs = BinOp TNe lxlxrxr rxr
+        noExtraXZs = BinOp TEq lxlxrxr rxr
         lxlxrxr = BinOp BitXor lxl rxr
 convertExpr (BinOp WNe l r) =
     UniOp LogNot $
