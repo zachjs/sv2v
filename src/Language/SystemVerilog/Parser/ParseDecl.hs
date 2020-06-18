@@ -154,7 +154,7 @@ asElabTask :: [DeclToken] -> [ModuleItem]
 asElabTask [DTIdent _ name, DTInstance _ args] =
     if name == "$info"
         then [] -- just drop them for simplicity
-        else [Instance "ThisModuleDoesNotExist" [] name' Nothing args]
+        else [Instance "ThisModuleDoesNotExist" [] name' [] args]
     where name' = "__sv2v_elab_" ++ tail name
 asElabTask [DTIdent pos name] =
     asElabTask [DTIdent pos name, DTInstance pos []]
@@ -172,16 +172,19 @@ parseDTsAsIntantiations (DTIdent _ name : tokens) =
         step :: [DeclToken] -> [ModuleItem]
         step [] = error $ "unexpected end of instantiation list: " ++ (show tokens)
         step toks =
-            Instance name params x mr p : follow
+            case (init inst, last inst) of
+                (DTIdent _ x : ranges, DTInstance _ p) ->
+                    Instance name params x rs p : follow
+                    where rs = map asRange ranges
+                _ -> failure
             where
                 (inst, toks') = span (not . isComma) toks
-                (x, mr, p) = case inst of
-                    [DTIdent _ a, DTRange _ (NonIndexed, s), DTInstance _ b] ->
-                        (a, Just s , b)
-                    [DTIdent _ a, DTInstance _ b] -> (a, Nothing, b)
-                    _ -> error $ "unrecognized instantiation of " ++ name
+                follow = if null toks' then [] else step (tail toks')
+                asRange :: DeclToken -> Range
+                asRange (DTRange _ (NonIndexed, s)) = s
+                asRange _ = failure
+                failure = error $ "unrecognized instantiation of " ++ name
                             ++ ": " ++ show inst
-                follow = x `seq` if null toks' then [] else step (tail toks')
         (params, rest) =
             case head tokens of
                 DTParams _ ps -> (ps, tail tokens)

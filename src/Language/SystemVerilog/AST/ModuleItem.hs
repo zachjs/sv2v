@@ -35,7 +35,7 @@ data ModuleItem
     | AlwaysC    AlwaysKW Stmt
     | Assign     AssignOption LHS Expr
     | Defparam   LHS Expr
-    | Instance   Identifier [ParamBinding] Identifier (Maybe Range) [PortBinding]
+    | Instance   Identifier [ParamBinding] Identifier [Range] [PortBinding]
     | Genvar     Identifier
     | Generate   [GenItem]
     | Modport    Identifier [ModportDecl]
@@ -66,11 +66,11 @@ instance Show ModuleItem where
         if null x
             then show a
             else printf "%s : %s" x (show a)
-    show (Instance   m params i r ports) =
+    show (Instance   m params i rs ports) =
         if null params
-            then printf "%s %s%s%s;"     m                     i rStr (showPorts ports)
-            else printf "%s #%s %s%s%s;" m (showParams params) i rStr (showPorts ports)
-        where rStr = maybe "" (\a -> showRanges [a] ++ " ") r
+            then printf "%s %s%s%s;"     m                     i rsStr (showPorts ports)
+            else printf "%s #%s %s%s%s;" m (showParams params) i rsStr (showPorts ports)
+        where rsStr = if null rs then "" else tail $ showRanges rs
 
 showPorts :: [PortBinding] -> String
 showPorts ports = indentedParenList $ map showPort ports

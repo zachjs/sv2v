@@ -42,9 +42,9 @@ traverseDeclM decl = do
     return decl'
 
 traverseModuleItemM :: ModuleItem -> State Info ModuleItem
-traverseModuleItemM (Instance m p x r l) = do
+traverseModuleItemM (Instance m p x rs l) = do
     p' <- mapM paramBindingMapper p
-    traverseExprsM traverseExprM $ Instance m p' x r l
+    traverseExprsM traverseExprM $ Instance m p' x rs l
     where
         paramBindingMapper (param, Left t) = do
             t' <- traverseTypeExprsM substituteExprM t

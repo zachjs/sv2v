@@ -42,7 +42,10 @@ convert = map $ traverseDescriptions convertDescription
 convertDescription :: Description -> Description
 convertDescription part @ Part{} =
     scopedConversion traverseDeclM traverseModuleItemM traverseStmtM
-    Map.empty part
+    instances part'
+    where
+        (part', instances) = runState
+            (traverseModuleItemsM traverseInstancesM part) Map.empty
 convertDescription other = other
 
 -- collects and converts declarations with multiple packed dimensions
@@ -78,6 +81,19 @@ traverseTypeM t a ident = do
             let (fieldTypes, fieldNames) = unzip fields
             fieldTypes' <- mapM (\x -> traverseTypeM x [] "") fieldTypes
             return $ zip fieldTypes' fieldNames
+
+-- converts multi-dimensional instances
+traverseInstancesM :: ModuleItem -> State Info ModuleItem
+traverseInstancesM (Instance m p x rs l) = do
+    rs' <- if length rs <= 1
+        then return rs
+        else do
+            let t = Implicit Unspecified rs
+            modify $ Map.insert x (t, [])
+            let r1 : r2 : rest = rs
+            return $ (combineRanges r1 r2) : rest
+    return $ Instance m p x rs' l
+traverseInstancesM other = return other
 
 -- combines two ranges into one flattened range
 combineRanges :: Range -> Range -> Range

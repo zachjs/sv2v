@@ -598,11 +598,11 @@ traverseExprsM' strat exprMapper = moduleItemMapper
                 then mapM stmtMapper stmts
                 else return stmts
         return $ MIPackageItem $ Task lifetime f decls' stmts'
-    moduleItemMapper (Instance m p x r l) = do
+    moduleItemMapper (Instance m p x rs l) = do
         p' <- mapM paramBindingMapper p
         l' <- mapM portBindingMapper l
-        r' <- mapM rangeMapper r
-        return $ Instance m p' x r' l'
+        rs' <- mapM rangeMapper rs
+        return $ Instance m p' x rs' l'
     moduleItemMapper (Modport x l) =
         mapM modportDeclMapper l >>= return . Modport x
     moduleItemMapper (NInputGate  kw d x lhs exprs) = do
@@ -915,9 +915,9 @@ traverseTypesM' strategy mapper item =
             fullMapper t >>= \t' -> return $ MIPackageItem $ Function l t' x d s
         miMapper (MIPackageItem (other @ (Task _ _ _ _))) =
             return $ MIPackageItem other
-        miMapper (Instance m params x r p) = do
+        miMapper (Instance m params x rs p) = do
             params' <- mapM mapParam params
-            return $ Instance m params' x r p
+            return $ Instance m params' x rs p
             where
                 mapParam (i, Left t) =
                     if strategy == IncludeParamTypes

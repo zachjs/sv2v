@@ -56,8 +56,8 @@ convertTypedef types =
         convertExpr (DimFn f v e) = DimFn f (convertTypeOrExpr v) e
         convertExpr other = other
         convertModuleItem :: ModuleItem -> ModuleItem
-        convertModuleItem (Instance m params x r p) =
-            Instance m (map mapParam params) x r p
+        convertModuleItem (Instance m params x rs p) =
+            Instance m (map mapParam params) x rs p
             where mapParam (i, v) = (i, convertTypeOrExpr v)
         convertModuleItem other = other
 

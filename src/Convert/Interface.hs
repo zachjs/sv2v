@@ -81,7 +81,7 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                             where modport = (interfaceName, modportDecls)
                         Nothing -> return ()
                 _ -> return ()
-        collectInterface (Instance part _ ident Nothing _) =
+        collectInterface (Instance part _ ident [] _) =
             if Map.member part interfaces
                 then tell (Map.singleton ident part, Map.empty)
                 else return ()
@@ -109,7 +109,7 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                 mapper (dir, port, expr) =
                     Variable dir mpt (ident ++ "_" ++ port) mprs Nil
                     where (mpt, mprs) = lookupType interfaceItems expr
-        mapInterface (Instance part params ident Nothing instancePorts) =
+        mapInterface (Instance part params ident [] instancePorts) =
             -- expand modport port bindings
             case Map.lookup part interfaces of
                 Just interface ->
@@ -118,8 +118,8 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                         inlineInterface interface (ident, params, instancePorts)
                 Nothing ->
                     if Map.member part modules
-                        then Instance part params' ident Nothing expandedPorts
-                        else Instance part params  ident Nothing instancePorts
+                        then Instance part params' ident [] expandedPorts
+                        else Instance part params  ident [] instancePorts
             where
                 expandedBindings = map (uncurry $ expandPortBinding part) (zip instancePorts [0..])
                 expandedPorts = concatMap snd expandedBindings

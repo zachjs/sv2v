@@ -25,8 +25,8 @@ collectPortsM (Part _ _ _ _ name ports _) = tell $ Map.singleton name ports
 collectPortsM _ = return ()
 
 mapInstance :: Ports -> ModuleItem -> ModuleItem
-mapInstance modulePorts (Instance m p x r bindings) =
-    Instance m p x r $ concatMap expandBinding bindings
+mapInstance modulePorts (Instance m p x rs bindings) =
+    Instance m p x rs $ concatMap expandBinding bindings
     where
         alreadyBound :: [Identifier]
         alreadyBound = map fst bindings
