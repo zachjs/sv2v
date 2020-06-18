@@ -182,6 +182,7 @@ parseDTsAsIntantiations (DTIdent _ name : tokens) =
                 follow = if null toks' then [] else step (tail toks')
                 asRange :: DeclToken -> Range
                 asRange (DTRange _ (NonIndexed, s)) = s
+                asRange (DTBit _ s) = (Number "0", BinOp Sub s (Number "1"))
                 asRange _ = failure
                 failure = error $ "unrecognized instantiation of " ++ name
                             ++ ": " ++ show inst
@@ -192,6 +193,7 @@ parseDTsAsIntantiations (DTIdent _ name : tokens) =
         isInstanceToken :: DeclToken -> Bool
         isInstanceToken (DTInstance{}) = True
         isInstanceToken (DTRange{}) = True
+        isInstanceToken (DTBit{}) = True
         isInstanceToken (DTIdent{}) = True
         isInstanceToken (DTComma{}) = True
         isInstanceToken _ = False
