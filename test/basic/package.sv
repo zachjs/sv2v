@@ -17,7 +17,7 @@ package D;
 endpackage
 package E;
     import D::*;
-    export D::*;
+    export D::pack;
 endpackage
 package F;
     localparam MAGIC = -42;

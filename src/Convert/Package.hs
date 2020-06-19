@@ -25,6 +25,7 @@
 
 module Convert.Package (convert) where
 
+import Control.Monad.State
 import Control.Monad.Writer
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -86,6 +87,21 @@ prefixPackageItem packageName idents item =
             if Set.member x idents
                 then packageName ++ '_' : x
                 else x
+        prefixM :: Identifier -> State Idents Identifier
+        prefixM x = do
+            locals <- get
+            if Set.notMember x locals
+                then return $ prefix x
+                else return x
+        traverseDeclM :: Decl -> State Idents Decl
+        traverseDeclM decl = do
+            case decl of
+                Variable _ _ x _ _ -> modify $ Set.insert x
+                Param _ _ x _      -> modify $ Set.insert x
+                ParamType _ x _    -> modify $ Set.insert x
+                _ -> return ()
+            traverseDeclTypesM (traverseNestedTypesM convertTypeM) decl
+
         item' = case item of
             Function       a b x c d  -> Function       a b (prefix x) c d
             Task           a   x c d  -> Task           a   (prefix x) c d
@@ -94,21 +110,34 @@ prefixPackageItem packageName idents item =
             Decl (Param    a b x c  ) -> Decl (Param    a b (prefix x) c  )
             Decl (ParamType  a x b  ) -> Decl (ParamType  a (prefix x) b  )
             other -> other
-        convertType (Alias Nothing x rs) = Alias Nothing (prefix x) rs
-        convertType (Enum t items rs) = Enum t items' rs
-            where
-                items' = map prefixItem items
-                prefixItem (x, e) = (prefix x, e)
-        convertType other = other
-        convertExpr (Ident x) = Ident $ prefix x
-        convertExpr other = other
-        convertLHS (LHSIdent x) = LHSIdent $ prefix x
-        convertLHS other = other
-        converter =
-            (traverseTypes $ traverseNestedTypes convertType) .
-            (traverseExprs $ traverseNestedExprs convertExpr) .
-            (traverseLHSs  $ traverseNestedLHSs  convertLHS )
-        MIPackageItem item'' = converter $ MIPackageItem item'
+
+        convertTypeM (Alias Nothing x rs) =
+            prefixM x >>= \x' -> return $ Alias Nothing x' rs
+        convertTypeM (Enum t items rs) =
+            mapM prefixItem items >>= \items' -> return $ Enum t items' rs
+            where prefixItem (x, e) = prefixM x >>= \x' -> return (x', e)
+        convertTypeM other = return other
+        convertExprM (Ident x) = prefixM x >>= return . Ident
+        convertExprM other =
+            traverseExprTypesM (traverseNestedTypesM convertTypeM) other
+        convertLHSM (LHSIdent x) = prefixM x >>= return . LHSIdent
+        convertLHSM other = return other
+
+        convertModuleItemM x = return x >>=
+            (traverseTypesM                        convertTypeM) >>=
+            (traverseExprsM $ traverseNestedExprsM convertExprM) >>=
+            (traverseLHSsM  $ traverseNestedLHSsM  convertLHSM )
+        convertStmtM stmt = return stmt >>=
+            (traverseStmtExprsM $ traverseNestedExprsM convertExprM) >>=
+            (traverseStmtLHSsM  $ traverseNestedLHSsM  convertLHSM )
+
+        MIPackageItem item'' =
+            evalState
+            (traverseScopesM
+            traverseDeclM
+            convertModuleItemM
+            convertStmtM
+            (MIPackageItem item')) Set.empty
 
 collectDescriptionM :: Description -> Writer Packages ()
 collectDescriptionM (Package _ name items) =
@@ -144,6 +173,8 @@ traverseDescription packages description =
         existingItemNames = execWriter $
             collectModuleItemsM writePIName description
         writePIName :: ModuleItem -> Writer Idents ()
+        writePIName (MIPackageItem (Import _ (Just x))) =
+            tell $ Set.singleton x
         writePIName (MIPackageItem item) =
             case piName item of
                 "" -> return ()
@@ -153,14 +184,16 @@ traverseDescription packages description =
 traverseModuleItem :: Idents -> Packages -> ModuleItem -> ModuleItem
 traverseModuleItem existingItemNames packages (MIPackageItem (Import x y)) =
     if Map.member x packages
-        then Generate $ map (GenModuleItem . MIPackageItem) items
+        then Generate $ map (GenModuleItem . MIPackageItem) itemsRenamed
         else MIPackageItem $ Import x y
     where
         packageItems = packages Map.! x
-        filterer itemName = case y of
-                Nothing -> Set.notMember itemName existingItemNames
-                Just ident -> ident == itemName
-        items = map snd $ filter (filterer . fst) $ packageItems
+        namesToAvoid = case y of
+            Nothing -> existingItemNames
+            Just ident -> Set.delete ident existingItemNames
+        itemsRenamed = map
+            (prefixPackageItem x namesToAvoid)
+            (map snd packageItems)
 traverseModuleItem _ _ item =
     (traverseExprs $ traverseNestedExprs traverseExpr) $
     (traverseTypes $ traverseNestedTypes traverseType) $

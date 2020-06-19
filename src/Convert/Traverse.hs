@@ -57,6 +57,9 @@ module Convert.Traverse
 , traverseTypeExprsM
 , traverseTypeExprs
 , collectTypeExprsM
+, traverseDeclTypesM
+, traverseDeclTypes
+, collectDeclTypesM
 , traverseTypesM'
 , traverseTypes'
 , collectTypesM'
@@ -892,6 +895,20 @@ traverseTypeExprs = unmonad traverseTypeExprsM
 collectTypeExprsM :: Monad m => CollectorM m Expr -> CollectorM m Type
 collectTypeExprsM = collectify traverseTypeExprsM
 
+traverseDeclTypesM :: Monad m => MapperM m Type -> MapperM m Decl
+traverseDeclTypesM mapper (Param s t x e) =
+    mapper t >>= \t' -> return $ Param s t' x e
+traverseDeclTypesM mapper (ParamType s x mt) =
+    mapM mapper mt >>= \mt' -> return $ ParamType s x mt'
+traverseDeclTypesM mapper (Variable d t x a e) =
+    mapper t >>= \t' -> return $ Variable d t' x a e
+traverseDeclTypesM _ (CommentDecl c) = return $ CommentDecl c
+
+traverseDeclTypes :: Mapper Type -> Mapper Decl
+traverseDeclTypes = unmonad traverseDeclTypesM
+collectDeclTypesM :: Monad m => CollectorM m Type -> CollectorM m Decl
+collectDeclTypesM = collectify traverseDeclTypesM
+
 traverseTypesM' :: Monad m => TypeStrategy -> MapperM m Type -> MapperM m ModuleItem
 traverseTypesM' strategy mapper item =
     miMapper item >>=
@@ -899,16 +916,8 @@ traverseTypesM' strategy mapper item =
     traverseExprsM (traverseNestedExprsM exprMapper)
     where
         fullMapper = traverseNestedTypesM mapper
-        maybeMapper Nothing = return Nothing
-        maybeMapper (Just t) = fullMapper t >>= return . Just
         exprMapper = traverseExprTypesM fullMapper
-        declMapper (Param s t x e) =
-            fullMapper t >>= \t' -> return $ Param s t' x e
-        declMapper (ParamType s x mt) =
-            maybeMapper mt >>= \mt' -> return $ ParamType s x mt'
-        declMapper (Variable d t x a e) =
-            fullMapper t >>= \t' -> return $ Variable d t' x a e
-        declMapper (CommentDecl c) = return $ CommentDecl c
+        declMapper = traverseDeclTypesM fullMapper
         miMapper (MIPackageItem (Typedef t x)) =
             fullMapper t >>= \t' -> return $ MIPackageItem $ Typedef t' x
         miMapper (MIPackageItem (Function l t x d s)) =
