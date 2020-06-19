@@ -91,24 +91,27 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
         mapInterface (orig @ (MIPackageItem (Decl (Variable _ t ident _ _)))) =
             -- expand instantiation of a modport
             case Map.lookup ident modports of
-                Just (_, modportDecls) -> Generate $
-                    map (GenModuleItem . MIPackageItem . Decl)
-                    (parameterDecls ++ map mapper modportDecls)
+                Just (_, modportDecls) -> Generate $ map GenModuleItem $
+                    filter shouldKeep interfaceItems ++ map makePortDecl modportDecls
                 Nothing -> orig
             where
                 interfaceName = case t of
                     InterfaceT x (Just _) [] -> x
                     Alias Nothing x [] -> x
                     _ -> error $ "unexpected modport type " ++ show t
-                interfaceItems =
+                interfaceItems = prefixInterface ident $
                     case Map.lookup interfaceName interfaces of
                         Just res -> snd res
                         Nothing -> error $ "could not find interface " ++ show interfaceName
-                parameterDecls = map snd $ parameters interfaceItems
-                mapper :: ModportDecl -> Decl
-                mapper (dir, port, expr) =
+                shouldKeep (MIPackageItem (Decl Param{})) = True
+                shouldKeep (MIPackageItem Task{}) = True
+                shouldKeep (MIPackageItem Function{}) = True
+                shouldKeep _ = False
+                makePortDecl :: ModportDecl -> ModuleItem
+                makePortDecl (dir, port, expr) =
+                    MIPackageItem $ Decl $
                     Variable dir mpt (ident ++ "_" ++ port) mprs Nil
-                    where (mpt, mprs) = lookupType interfaceItems expr
+                    where (mpt, mprs) = lookupType interfaceItems ident expr
         mapInterface (Instance part params ident [] instancePorts) =
             -- expand modport port bindings
             case Map.lookup part interfaces of
@@ -149,6 +152,15 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                 declVarIdent _ = ""
 
         expandPortBinding :: Identifier -> PortBinding -> Int -> ([ParamBinding], [PortBinding])
+        expandPortBinding moduleName ("", binding) idx =
+            case Map.lookup moduleName modules of
+                Nothing -> error $ "could not find module: " ++ moduleName
+                Just (_, decls) ->
+                    if idx < length decls
+                        then expandPortBinding moduleName
+                            (fst $ decls !! idx, binding) idx
+                        else error $ "could not infer port for "
+                            ++ show binding ++ " in module " ++ show moduleName
         expandPortBinding _ (origBinding @ (portName, Dot (Ident instanceName) modportName)) _ =
             -- expand instance modport bound to a modport
             if Map.member instanceName instances && modportDecls /= Nothing
@@ -158,7 +170,7 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
             where
                 interfaceName = instances Map.! instanceName
                 modportDecls = lookupModport interfaceName modportName
-        expandPortBinding moduleName (origBinding @ (portName, Ident ident)) idx =
+        expandPortBinding moduleName (origBinding @ (portName, Ident ident)) _ =
             case (instances Map.!? ident, modports Map.!? ident) of
                 (Nothing, Nothing) -> ([], [origBinding])
                 (Just interfaceName, _) ->
@@ -173,13 +185,7 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                     where
                         Just (_, decls) = Map.lookup moduleName modules
                         portType =
-                            if null portName
-                            then if idx < length decls
-                                then snd $ decls !! idx
-                                else error $ "could not infer port "
-                                    ++ show origBinding ++ " in module "
-                                    ++ show moduleName
-                            else case lookup portName decls of
+                            case lookup portName decls of
                                 Nothing -> error $ "could not find port "
                                     ++ show portName ++ " in module "
                                     ++ show moduleName
@@ -206,11 +212,11 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                 paramBindings = map toParamBinding interfaceParamNames
                 interfaceItems = snd $ interfaces Map.! interfaceName
                 interfaceParamNames = map fst $ parameters interfaceItems
-                toParamBinding x = (x, Right $ Ident $ instanceName ++ '_' : x)
+                toParamBinding x = (portName ++ '_' : x, Right $ Ident $ instanceName ++ '_' : x)
                 portBindings = map toPortBinding modportDecls
                 toPortBinding (_, x, e) = (x', e')
                     where
-                        x' = if null portName then "" else portName ++ '_' : x
+                        x' = portName ++ '_' : x
                         e' = traverseNestedExprs prefixExpr e
                 prefixExpr :: Expr -> Expr
                 prefixExpr (Ident x) = Ident (instanceName ++ '_' : x)
@@ -318,17 +324,17 @@ collectIdentsM item = collectDeclsM collectDecl item
         collectDecl (ParamType  _ x   _) = tell $ Set.singleton x
         collectDecl (CommentDecl      _) = return ()
 
-lookupType :: [ModuleItem] -> Expr -> (Type, [Range])
-lookupType items (Ident ident) =
+lookupType :: [ModuleItem] -> Identifier -> Expr -> (Type, [Range])
+lookupType items prefix (Ident ident) =
     case mapMaybe findType items of
         [] -> error $ "unable to locate type of " ++ ident
         ts -> head ts
     where
         findType :: ModuleItem -> Maybe (Type, [Range])
         findType (MIPackageItem (Decl (Variable _ t x rs _))) =
-            if x == ident then Just (t, rs) else Nothing
+            if x == prefix ++ "_" ++ ident then Just (t, rs) else Nothing
         findType _ = Nothing
-lookupType _ expr =
+lookupType _ _ expr =
     -- TODO: Add support for non-Ident modport expressions.
     error $ "interface conversion does not support modport expressions that "
         ++ " are not identifiers: " ++ show expr
@@ -345,17 +351,9 @@ inlineInterface (ports, items) (instanceName, instanceParams, instancePorts) =
         comment = MIPackageItem $ Decl $ CommentDecl $
             "expanded instance: " ++ instanceName
         prefix = instanceName ++ "_"
-        idents = execWriter $
-            mapM (collectNestedModuleItemsM collectIdentsM) items
-        prefixIfNecessary :: Identifier -> Identifier
-        prefixIfNecessary x =
-            if Set.member x idents
-                then prefix ++ x
-                else x
         itemsPrefixed =
-            map (traverseNestedModuleItems $ prefixModuleItems prefixIfNecessary) $
             map (traverseDecls overrideParam) $
-            items
+            prefixInterface instanceName items
         origInstancePortNames = map fst instancePorts
         instancePortExprs = map snd instancePorts
         instancePortNames =
@@ -377,7 +375,7 @@ inlineInterface (ports, items) (instanceName, instanceParams, instancePorts) =
         removeModport other = other
 
         interfaceParamNames = map fst $ parameters items
-        instanceParamMap =
+        instanceParamMap = Map.mapKeys (prefix ++) $
             Map.fromList $ resolveParams interfaceParamNames instanceParams
         overrideParam :: Decl -> Decl
         overrideParam (Param Parameter t x e) =
@@ -418,6 +416,22 @@ inlineInterface (ports, items) (instanceName, instanceParams, instancePorts) =
                 Just lhs -> lhs
                 Nothing  -> error $ "trying to bind an interface output to " ++
                                 show expr ++ " but that can't be an LHS"
+
+-- convert an interface instantiation into a series of equivalent module items
+prefixInterface :: Identifier -> [ModuleItem] -> [ModuleItem]
+prefixInterface instanceName items =
+    map prefixItem items
+    where
+        prefix = instanceName ++ "_"
+        idents = execWriter $
+            mapM (collectNestedModuleItemsM collectIdentsM) items
+        prefixIfNecessary :: Identifier -> Identifier
+        prefixIfNecessary x =
+            if Set.member x idents
+                then prefix ++ x
+                else x
+        prefixItem = traverseNestedModuleItems $
+            prefixModuleItems prefixIfNecessary
 
 -- give a set of param bindings explicit names
 resolveParams :: [Identifier] -> [ParamBinding] -> [ParamBinding]

@@ -1,6 +1,10 @@
 interface I;
     parameter WIDTH = 32;
-    logic [WIDTH-1:0] data = 0;
+    function compute_offset;
+        return 1;
+    endfunction
+    localparam OFFSET = compute_offset();
+    logic [WIDTH-OFFSET:0] data = 0;
     modport P(input data);
 endinterface
 

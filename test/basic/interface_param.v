@@ -2,7 +2,8 @@ module M(data);
     parameter A = 1;
     parameter WIDTH = 32;
     parameter B = 2;
-    input wire [WIDTH-1:0] data;
+    localparam OFFSET = 1;
+    input wire [WIDTH-OFFSET:0] data;
     initial begin
         $display("A %b", A);
         $display("I.P %b", data);
