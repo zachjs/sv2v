@@ -33,12 +33,19 @@ convert :: [AST] -> [AST]
 convert = map $ concatMap convertDescription
 
 convertDescription :: Description -> [Description]
-convertDescription (description @ Package{}) =
-    [Package ml name (items ++ enumItems)]
-    where (Package ml name items, enumItems) = convertDescription' description
+convertDescription (Package ml name items) =
+    [Package ml name $ concatMap convertPackageItem items]
 convertDescription description =
     (map PackageItem enumItems) ++ [description']
     where (description', enumItems) = convertDescription' description
+
+-- explode a package item with its corresponding enum items
+convertPackageItem :: PackageItem -> [PackageItem]
+convertPackageItem item = do
+    item' : enumItems
+    where
+        (PackageItem item', enumItems) =
+            convertDescription' $ PackageItem item
 
 -- replace and collect the enum types in a description
 convertDescription' :: Description -> (Description, [PackageItem])
