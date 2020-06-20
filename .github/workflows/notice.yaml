@@ -1,6 +1,8 @@
 name: Notice
 on:
   push:
+    branches:
+      - master
     paths:
       - stack.yaml
       - stack.yaml.lock
