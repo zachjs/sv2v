@@ -122,9 +122,9 @@ unmonad :: (MapperM Identity a -> MapperM Identity b) -> Mapper a -> Mapper b
 unmonad traverser mapper = runIdentity . traverser (return . mapper)
 
 collectify :: Monad m => (MapperM m a -> MapperM m b) -> CollectorM m a -> CollectorM m b
-collectify traverser collector thing =
-    traverser mapper thing >>= \_ -> return ()
-    where mapper x = collector x >>= \() -> return x
+collectify traverser collector =
+    traverser mapper >=> \_ -> return ()
+    where mapper x = collector x >> return x
 
 traverseDescriptionsM :: Monad m => MapperM m Description -> MapperM m AST
 traverseDescriptionsM = mapM

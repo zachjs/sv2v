@@ -41,10 +41,9 @@ convert =
         -- we can only collect/map non-extern interfaces
         collectDesc :: Description -> Writer (Interfaces, Modules) ()
         collectDesc (orig @ (Part _ False kw _ name ports items)) = do
-            if kw == Interface then
-                if all fullyResolved items
-                    then tell (Map.singleton name (ports, items), Map.empty)
-                    else return ()
+            if kw == Interface
+                then when (all fullyResolved items) $
+                    tell (Map.singleton name (ports, items), Map.empty)
                 else tell (Map.empty, Map.singleton name (params, decls))
             where
                 params = map fst $ parameters items
@@ -85,13 +84,11 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
         collectInstanceM (MIPackageItem (Decl (Variable _ t ident _ _))) =
             case t of
                 InterfaceT interfaceName (Just modportName) [] ->
-                    if Map.member interfaceName interfaces
-                        then writeModport interfaceName modportName
-                        else return ()
+                    when (Map.member interfaceName interfaces) $
+                        writeModport interfaceName modportName
                 Alias Nothing interfaceName [] ->
-                    if Map.member interfaceName interfaces
-                        then writeModport interfaceName ""
-                        else return ()
+                    when (Map.member interfaceName interfaces) $
+                        writeModport interfaceName ""
                 _ -> return ()
             where
                 writeModport :: Identifier -> Identifier ->
@@ -100,9 +97,8 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                     tell (Map.empty, Map.singleton ident modport)
                     where modport = (interfaceName, modportName)
         collectInstanceM (Instance part _ ident [] _) =
-            if Map.member part interfaces
-                then tell (Map.singleton ident part, Map.empty)
-                else return ()
+            when (Map.member part interfaces) $
+                tell (Map.singleton ident part, Map.empty)
         collectInstanceM _ = return ()
 
         expandInterface :: ModuleItem -> ModuleItem
@@ -440,9 +436,8 @@ inlineInterface (ports, items) (instanceName, instanceParams, instancePorts) =
             mapM (collectDeclsM collectDeclDir) itemsPrefixed
         collectDeclDir :: Decl -> Writer (Map.Map Identifier Direction) ()
         collectDeclDir (Variable dir _ ident _ _) =
-            if dir /= Local
-                then tell $ Map.singleton ident dir
-                else return ()
+            when (dir /= Local) $
+                tell $ Map.singleton ident dir
         collectDeclDir _ = return ()
 
         toLHS :: Expr -> LHS

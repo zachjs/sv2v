@@ -123,13 +123,13 @@ prefixPackageItem packageName idents item =
         convertLHSM (LHSIdent x) = prefixM x >>= return . LHSIdent
         convertLHSM other = return other
 
-        convertModuleItemM x = return x >>=
-            (traverseTypesM                        convertTypeM) >>=
-            (traverseExprsM $ traverseNestedExprsM convertExprM) >>=
-            (traverseLHSsM  $ traverseNestedLHSsM  convertLHSM )
-        convertStmtM stmt = return stmt >>=
-            (traverseStmtExprsM $ traverseNestedExprsM convertExprM) >>=
-            (traverseStmtLHSsM  $ traverseNestedLHSsM  convertLHSM )
+        convertModuleItemM =
+            traverseTypesM                       convertTypeM  >=>
+            traverseExprsM (traverseNestedExprsM convertExprM) >=>
+            traverseLHSsM  (traverseNestedLHSsM  convertLHSM )
+        convertStmtM =
+            traverseStmtExprsM (traverseNestedExprsM convertExprM) >=>
+            traverseStmtLHSsM  (traverseNestedLHSsM  convertLHSM )
 
         MIPackageItem item'' =
             evalState

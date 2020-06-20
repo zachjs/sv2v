@@ -118,13 +118,13 @@ combineRanges r1 r2 = r
                             (BinOp Sub lower (Number "1"))
 
 traverseModuleItemM :: ModuleItem -> State Info ModuleItem
-traverseModuleItemM item =
-    traverseLHSsM  traverseLHSM  item >>=
+traverseModuleItemM =
+    traverseLHSsM  traverseLHSM  >=>
     traverseExprsM traverseExprM
 
 traverseStmtM :: Stmt -> State Info Stmt
-traverseStmtM stmt =
-    traverseStmtLHSsM  traverseLHSM  stmt >>=
+traverseStmtM =
+    traverseStmtLHSsM  traverseLHSM  >=>
     traverseStmtExprsM traverseExprM
 
 traverseExprM :: Expr -> State Info Expr

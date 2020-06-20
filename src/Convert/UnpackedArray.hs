@@ -61,11 +61,11 @@ packDecl _ other = other
 
 
 traverseModuleItemM :: ModuleItem -> ST ModuleItem
-traverseModuleItemM item =
-    traverseModuleItemM' item
-    >>= traverseLHSsM  traverseLHSM
-    >>= traverseExprsM traverseExprM
-    >>= traverseAsgnsM traverseAsgnM
+traverseModuleItemM =
+    traverseModuleItemM'
+    >=> traverseLHSsM  traverseLHSM
+    >=> traverseExprsM traverseExprM
+    >=> traverseAsgnsM traverseAsgnM
 
 traverseModuleItemM' :: ModuleItem -> ST ModuleItem
 traverseModuleItemM' (Instance a b c d bindings) = do
@@ -80,9 +80,9 @@ traverseModuleItemM' (Instance a b c d bindings) = do
 traverseModuleItemM' other = return other
 
 traverseStmtM :: Stmt -> ST Stmt
-traverseStmtM stmt =
-    traverseStmtLHSsM  traverseLHSM  stmt >>=
-    traverseStmtExprsM traverseExprM >>=
+traverseStmtM =
+    traverseStmtLHSsM  traverseLHSM  >=>
+    traverseStmtExprsM traverseExprM >=>
     traverseStmtAsgnsM traverseAsgnM
 
 traverseExprM :: Expr -> ST Expr

@@ -52,21 +52,21 @@ convertDescription (description @ Part{}) =
             let MIPackageItem (Decl decl'') = res
             return decl''
         traverseModuleItemM :: ModuleItem -> State Types ModuleItem
-        traverseModuleItemM item =
-            traverseLHSsM  traverseLHSM  item >>=
-            traverseExprsM traverseExprM      >>=
+        traverseModuleItemM =
+            traverseLHSsM  traverseLHSM  >=>
+            traverseExprsM traverseExprM >=>
             traverseAsgnsM traverseAsgnM
         traverseStmtM :: Stmt -> State Types Stmt
         traverseStmtM (Subroutine expr args) = do
             stateTypes <- get
             let stmt' = Subroutine expr $ convertCall
                             structs stateTypes expr args
-            traverseStmtLHSsM  traverseLHSM  stmt' >>=
-                traverseStmtExprsM traverseExprM   >>=
-                traverseStmtAsgnsM traverseAsgnM
-        traverseStmtM stmt =
-            traverseStmtLHSsM  traverseLHSM  stmt >>=
-            traverseStmtExprsM traverseExprM      >>=
+            traverseStmtM' stmt'
+        traverseStmtM stmt = traverseStmtM' stmt
+        traverseStmtM' :: Stmt -> State Types Stmt
+        traverseStmtM' =
+            traverseStmtLHSsM  traverseLHSM  >=>
+            traverseStmtExprsM traverseExprM >=>
             traverseStmtAsgnsM traverseAsgnM
         traverseExprM =
             traverseNestedExprsM $ stately converter
