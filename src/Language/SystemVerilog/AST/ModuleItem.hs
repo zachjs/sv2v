@@ -28,7 +28,7 @@ import Language.SystemVerilog.AST.Expr (Expr(Ident, Nil), Range, TypeOrExpr, sho
 import Language.SystemVerilog.AST.GenItem (GenItem)
 import Language.SystemVerilog.AST.LHS (LHS)
 import Language.SystemVerilog.AST.Stmt (Stmt, AssertionItem, Timing(Delay))
-import Language.SystemVerilog.AST.Type (Identifier, DriveStrength)
+import Language.SystemVerilog.AST.Type (Type, Identifier, DriveStrength)
 
 data ModuleItem
     = MIAttr     Attr ModuleItem
@@ -99,16 +99,16 @@ showParam (i, arg) =
     where fmt = if i == "" then "%s%s" else ".%s(%s)"
 
 showModportDecl :: ModportDecl -> String
-showModportDecl (dir, ident, e) =
+showModportDecl (dir, ident, t, e) =
     if e == Ident ident
         then printf "%s %s" (show dir) ident
-        else printf "%s .%s(%s)" (show dir) ident (show e)
+        else printf "%s .%s(/* type: %s */ %s)" (show dir) ident (show t) (show e)
 
 type PortBinding = (Identifier, Expr)
 
 type ParamBinding = (Identifier, TypeOrExpr)
 
-type ModportDecl = (Direction, Identifier, Expr)
+type ModportDecl = (Direction, Identifier, Type, Expr)
 
 data AlwaysKW
     = Always

@@ -648,9 +648,10 @@ traverseExprsM' strat exprMapper = moduleItemMapper
         return $ GenCase e' cases'
     genItemMapper other = return other
 
-    modportDeclMapper (dir, ident, e) = do
+    modportDeclMapper (dir, ident, t, e) = do
+        t' <- typeMapper t
         e' <- exprMapper e
-        return (dir, ident, e')
+        return (dir, ident, t', e')
 
 traverseExprs' :: TFStrategy -> Mapper Expr -> Mapper ModuleItem
 traverseExprs' strat = unmonad $ traverseExprsM' strat
@@ -933,6 +934,11 @@ traverseTypesM' strategy mapper item =
                         then fullMapper t >>= \t' -> return (i, Left t')
                         else return (i, Left t)
                 mapParam (i, Right e) = return $ (i, Right e)
+        miMapper (Modport name decls) =
+            mapM mapModportDecl decls >>= return . Modport name
+            where
+                mapModportDecl (d, x, t, e) =
+                    fullMapper t >>= \t' -> return (d, x, t', e)
         miMapper other = return other
 
 traverseTypes' :: TypeStrategy -> Mapper Type -> Mapper ModuleItem

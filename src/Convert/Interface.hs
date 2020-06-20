@@ -38,8 +38,10 @@ convert =
         -- we can only collect/map non-extern interfaces
         collectDesc :: Description -> Writer (Interfaces, Modules) ()
         collectDesc (orig @ (Part _ False kw _ name ports items)) = do
-            if kw == Interface
-                then tell (Map.singleton name (ports, items), Map.empty)
+            if kw == Interface then
+                if all fullyResolved items
+                    then tell (Map.singleton name (ports, items), Map.empty)
+                    else return ()
                 else tell (Map.empty, Map.singleton name (params, decls))
             where
                 params = map fst $ parameters items
@@ -51,8 +53,19 @@ convert =
                 collectDecl _ = return ()
         collectDesc _ = return ()
         isInterface :: Description -> Bool
-        isInterface (Part _ False Interface _ _ _ _) = True
+        isInterface (Part _ False Interface _ _ _ items) =
+            all fullyResolved items
         isInterface _ = False
+        -- returns whether a ModuleItem still contains TypeOf
+        fullyResolved :: ModuleItem -> Bool
+        fullyResolved =
+            not . any isTypeOf . execWriter .
+                collectNestedModuleItemsM (collectTypesM collectType)
+            where
+                collectType :: Type -> Writer [Type] ()
+                collectType t = tell [t]
+                isTypeOf TypeOf{} = True
+                isTypeOf _ = False
 
 convertDescription :: Interfaces -> Modules -> Description -> Description
 convertDescription interfaces modules (Part attrs extern Module lifetime name ports items) =
@@ -72,7 +85,9 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
         collectInterface (MIPackageItem (Decl (Variable _ t ident _ _))) =
             case t of
                 InterfaceT interfaceName (Just modportName) [] ->
-                    tell (Map.empty, Map.singleton ident (interfaceName, modportDecls))
+                    if Map.member interfaceName interfaces
+                        then tell (Map.empty, Map.singleton ident (interfaceName, modportDecls))
+                        else return ()
                     where Just modportDecls = lookupModport interfaceName modportName
                 Alias Nothing interfaceName [] ->
                     case impliedModport interfaceName of
@@ -92,7 +107,8 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
             -- expand instantiation of a modport
             case Map.lookup ident modports of
                 Just (_, modportDecls) -> Generate $ map GenModuleItem $
-                    filter shouldKeep interfaceItems ++ map makePortDecl modportDecls
+                    filter shouldKeep interfaceItems ++ map makePortDecl
+                    (prefixModportDecls ident modportDecls)
                 Nothing -> orig
             where
                 interfaceName = case t of
@@ -108,10 +124,10 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                 shouldKeep (MIPackageItem Function{}) = True
                 shouldKeep _ = False
                 makePortDecl :: ModportDecl -> ModuleItem
-                makePortDecl (dir, port, expr) =
+                makePortDecl (dir, port, typ, _) =
                     MIPackageItem $ Decl $
                     Variable dir mpt (ident ++ "_" ++ port) mprs Nil
-                    where (mpt, mprs) = lookupType interfaceItems ident expr
+                    where (mpt, mprs) = (typ, [])
         mapInterface (Instance part params ident [] instancePorts) =
             -- expand modport port bindings
             case Map.lookup part interfaces of
@@ -201,7 +217,7 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                     -- modport directly bound to a modport
                     expandPortBinding' interfaceName portName ident
                         (map redirect modportDecls)
-                    where redirect (d, x, _) = (d, x, Ident x)
+                    where redirect (d, x, t, _) = (d, x, t, Ident x)
         expandPortBinding _ other _ = ([], [other])
 
         expandPortBinding' :: Identifier -> Identifier -> Identifier ->
@@ -214,7 +230,7 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                 interfaceParamNames = map fst $ parameters interfaceItems
                 toParamBinding x = (portName ++ '_' : x, Right $ Ident $ instanceName ++ '_' : x)
                 portBindings = map toPortBinding modportDecls
-                toPortBinding (_, x, e) = (x', e')
+                toPortBinding (_, x, _, e) = (x', e')
                     where
                         x' = portName ++ '_' : x
                         e' = traverseNestedExprs prefixExpr e
@@ -247,8 +263,8 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                     mapM (collectNestedModuleItemsM collectModportDecls) $
                     interfaceItems
                 collectModportDecls :: ModuleItem -> Writer [ModportDecl] ()
-                collectModportDecls (MIPackageItem (Decl (Variable d _ x _ _))) =
-                    tell [(d', x, Ident x)]
+                collectModportDecls (MIPackageItem (Decl (Variable d t x _ _))) =
+                    tell [(d', x, t, Ident x)]
                     where d' = if d == Local then Inout else d
                 collectModportDecls _ = return ()
 
@@ -268,7 +284,8 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
         convertPort ident =
             case Map.lookup ident modports of
                 Nothing -> [ident]
-                Just (_, decls) -> map (\(_, x, _) -> ident ++ "_" ++ x) decls
+                Just (_, decls) -> map (\(_, x, _, _) ->
+                    ident ++ "_" ++ x) decls
 
 convertDescription _ _ other = other
 
@@ -324,20 +341,23 @@ collectIdentsM item = collectDeclsM collectDecl item
         collectDecl (ParamType  _ x   _) = tell $ Set.singleton x
         collectDecl (CommentDecl      _) = return ()
 
-lookupType :: [ModuleItem] -> Identifier -> Expr -> (Type, [Range])
-lookupType items prefix (Ident ident) =
-    case mapMaybe findType items of
-        [] -> error $ "unable to locate type of " ++ ident
-        ts -> head ts
+-- add a prefix to the expressions in a modport definition
+prefixModportDecls :: Identifier -> [ModportDecl] -> [ModportDecl]
+prefixModportDecls name modportDecls =
+    map mapper modportDecls
     where
-        findType :: ModuleItem -> Maybe (Type, [Range])
-        findType (MIPackageItem (Decl (Variable _ t x rs _))) =
-            if x == prefix ++ "_" ++ ident then Just (t, rs) else Nothing
-        findType _ = Nothing
-lookupType _ _ expr =
-    -- TODO: Add support for non-Ident modport expressions.
-    error $ "interface conversion does not support modport expressions that "
-        ++ " are not identifiers: " ++ show expr
+        mapper :: ModportDecl -> ModportDecl
+        mapper (d, x, t, e) = (d, x, t', e')
+            where
+                exprMapper = traverseNestedExprs prefixExpr
+                t' = traverseNestedTypes (traverseTypeExprs exprMapper) t
+                e' = exprMapper e
+        prefix :: Identifier -> Identifier
+        prefix = (++) $ name ++ "_"
+        prefixExpr :: Expr -> Expr
+        prefixExpr (Ident ('$' : x)) = Ident $ '$' : x
+        prefixExpr (Ident x) = Ident (prefix x)
+        prefixExpr other = other
 
 -- convert an interface instantiation into a series of equivalent module items
 inlineInterface :: Interface -> (Identifier, [ParamBinding], [PortBinding]) -> [ModuleItem]
@@ -367,7 +387,11 @@ inlineInterface (ports, items) (instanceName, instanceParams, instancePorts) =
 
         removeDeclDir :: ModuleItem -> ModuleItem
         removeDeclDir (MIPackageItem (Decl (Variable _ t x a e))) =
-            MIPackageItem $ Decl $ Variable Local t x a e
+            MIPackageItem $ Decl $ Variable Local t' x a e
+            where t' = case t of
+                    Implicit Unspecified rs ->
+                        IntegerVector TLogic Unspecified rs
+                    _ -> t
         removeDeclDir other = other
         removeModport :: ModuleItem -> ModuleItem
         removeModport (Modport x _) =

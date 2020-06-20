@@ -588,7 +588,7 @@ ModportPortsDeclarations :: { [ModportDecl] }
 ModportPortsDeclaration(delim) :: { [ModportDecl] }
   : ModportSimplePortsDeclaration(delim) { $1 }
 ModportSimplePortsDeclaration(delim) :: { [ModportDecl] }
-  : Direction ModportSimplePorts delim { map (\(a, b) -> ($1, a, b)) $2 }
+  : Direction ModportSimplePorts delim { map (\(a, b) -> ($1, a, TypeOf b, b)) $2 }
 ModportSimplePorts :: { [(Identifier, Expr)] }
   : ModportSimplePort                        { [$1] }
   | ModportSimplePorts "," ModportSimplePort { $1 ++ [$3] }

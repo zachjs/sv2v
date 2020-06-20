@@ -56,10 +56,11 @@ convert =
                                         portName ++ " in module " ++ name
         collectPortsM _ = return ()
         collectDeclDirsM :: ModuleItem -> Writer [(Identifier, Direction)] ()
-        collectDeclDirsM (MIPackageItem (Decl (Variable dir _ ident _ _))) =
-            if dir == Local
-                then return ()
-                else tell [(ident, dir)]
+        collectDeclDirsM (MIPackageItem (Decl (Variable dir t ident _ _))) =
+            case (dir, t) of
+                (_, InterfaceT{}) -> tell [(ident, Local)]
+                (Local, _) -> return ()
+                _ -> tell [(ident, dir)]
         collectDeclDirsM _ = return ()
 
 convertDescription :: Ports -> Description -> Description
