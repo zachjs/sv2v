@@ -70,7 +70,7 @@ jobs:
           name: ${{ matrix.name }}
           path: sv2v-${{ matrix.name }}
       - name: Mark Binary Executable
-        run: chmod +x */sv2v
+        run: chmod +x */sv2v*
       - name: Create ZIP
         run: zip -r sv2v-${{ matrix.name }} ./sv2v-${{ matrix.name }}
       - name: Upload Release Asset
