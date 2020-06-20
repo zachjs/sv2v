@@ -52,8 +52,7 @@ convert =
                 lookupDir portName =
                     case lookup portName dirs of
                         Just dir -> dir
-                        Nothing -> error $ "Could not find dir for port " ++
-                                        portName ++ " in module " ++ name
+                        Nothing -> Inout
         collectPortsM _ = return ()
         collectDeclDirsM :: ModuleItem -> Writer [(Identifier, Direction)] ()
         collectDeclDirsM (MIPackageItem (Decl (Variable dir t ident _ _))) =
