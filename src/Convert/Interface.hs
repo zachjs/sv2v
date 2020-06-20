@@ -8,12 +8,14 @@ module Convert.Interface (convert) where
 
 import Data.Maybe (mapMaybe)
 import Control.Monad.Writer
+import Control.Monad.State
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
+type Idents = Set.Set Identifier
 type Interface = ([Identifier], [ModuleItem])
 type Interfaces = Map.Map Identifier Interface
 type Module = ([Identifier], [(Identifier, Type)])
@@ -72,11 +74,8 @@ convertDescription :: Interfaces -> Modules -> Description -> Description
 convertDescription interfaces modules (Part attrs extern Module lifetime name ports items) =
     Part attrs extern Module lifetime name ports' items'
     where
-        items' =
-            map (traverseNestedModuleItems $ traverseExprs' ExcludeTFs (traverseNestedExprs $ convertExpr instances modports)) $
-            map (traverseNestedModuleItems $ traverseLHSs'  ExcludeTFs (traverseNestedLHSs  $ convertLHS  instances modports)) $
-            map (traverseNestedModuleItems mapInterface) $
-            items
+        items' = map (flattenInstances instances modports) $
+            map (traverseNestedModuleItems expandInterface) items
         ports' = concatMap convertPort ports
 
         -- collect the interface type of all interface instances in this module
@@ -106,8 +105,8 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                 else return ()
         collectInstanceM _ = return ()
 
-        mapInterface :: ModuleItem -> ModuleItem
-        mapInterface (orig @ (MIPackageItem (Decl (Variable _ _ ident _ _)))) =
+        expandInterface :: ModuleItem -> ModuleItem
+        expandInterface (orig @ (MIPackageItem (Decl (Variable _ _ ident _ _)))) =
             -- expand instantiation of a modport
             if Map.member ident modports
                 then Generate $ map GenModuleItem $
@@ -129,7 +128,7 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                     where port' = if null modportName
                                     then port
                                     else ident ++ '_' : port
-        mapInterface (Instance part params ident [] instancePorts) =
+        expandInterface (Instance part params ident [] instancePorts) =
             -- expand modport port bindings
             case Map.lookup part interfaces of
                 Just interface ->
@@ -150,23 +149,7 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                     if null addedParams
                         then params
                         else paramsNamed ++ addedParams
-        mapInterface (orig @ (MIPackageItem (Function _ _ _ decls _))) =
-            convertTF decls orig
-        mapInterface (orig @ (MIPackageItem (Task _ _ decls _))) =
-            convertTF decls orig
-        mapInterface other = other
-
-        convertTF :: [Decl] -> ModuleItem -> ModuleItem
-        convertTF decls =
-            traverseExprs (traverseNestedExprs $ convertExpr its mps) .
-            traverseLHSs  (traverseNestedLHSs  $ convertLHS  its mps)
-            where
-                locals = Set.fromList $ map declVarIdent decls
-                its = Map.withoutKeys instances locals
-                mps = Map.withoutKeys modports  locals
-                declVarIdent :: Decl -> Identifier
-                declVarIdent (Variable _ _ x _ _) = x
-                declVarIdent _ = ""
+        expandInterface other = other
 
         expandPortBinding :: Identifier -> PortBinding -> Int -> ([ParamBinding], [PortBinding])
         expandPortBinding moduleName ("", binding) idx =
@@ -272,31 +255,69 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                     where d' = if d == Local then Inout else d
                 collectModportDecls _ = return ()
 
-        convertExpr :: Instances -> Modports -> Expr -> Expr
-        convertExpr its mps (orig @ (Dot (Ident x) y)) =
-            if Map.member x mps || Map.member x its
-                then Ident (x ++ "_" ++ y)
-                else orig
-        convertExpr _ _ other = other
-        convertLHS :: Instances -> Modports -> LHS -> LHS
-        convertLHS its mps (orig @ (LHSDot (LHSIdent x) y)) =
-            if Map.member x mps || Map.member x its
-                then LHSIdent (x ++ "_" ++ y)
-                else orig
-        convertLHS _ _ other = other
         convertPort :: Identifier -> [Identifier]
         convertPort ident =
             case Map.lookup ident modports of
                 Nothing -> [ident]
                 Just (interfaceName, modportName) ->
-                    map (\(_, x, _, _) ->
-                    ident ++ "_" ++ x) modportDecls
+                    map (\(_, x, _, _) -> ident ++ "_" ++ x) modportDecls
                     where
-                    interfaceItems = snd $ lookupInterface interfaceName
-                    modportDecls = lookupModport interfaceItems modportName
+                        interfaceItems = snd $ lookupInterface interfaceName
+                        modportDecls = lookupModport interfaceItems modportName
 
 convertDescription _ _ other = other
 
+-- replaces accesses of interface or modport members with their corresponding
+-- flattened (exploded) data declarations
+flattenInstances :: Instances -> Modports -> ModuleItem -> ModuleItem
+flattenInstances instances modports =
+    \item -> evalState (rewriter item) Set.empty
+    where
+        rewriter = traverseScopesM traverseDeclM
+            (traverseNestedModuleItemsM traverseModuleItemM) traverseStmtM
+
+        traverseModuleItemM :: ModuleItem -> State Idents ModuleItem
+        traverseModuleItemM =
+            traverseExprsM traverseExprM >=>
+            traverseLHSsM  traverseLHSM
+        traverseStmtM :: Stmt -> State Idents Stmt
+        traverseStmtM =
+            traverseStmtExprsM traverseExprM >=>
+            traverseStmtLHSsM  traverseLHSM
+        traverseDeclM :: Decl -> State Idents Decl
+        traverseDeclM decl = do
+            item <- traverseModuleItemM (MIPackageItem $ Decl decl)
+            let MIPackageItem (Decl decl') = item
+            case decl' of
+                Variable _ _ ident _ _ -> modify $ Set.insert ident
+                Param    _ _ ident   _ -> modify $ Set.insert ident
+                ParamType{} -> return ()
+                CommentDecl{} -> return ()
+            return decl'
+
+        traverseExprM = traverseNestedExprsM convertExprM
+        traverseLHSM  = traverseNestedLHSsM  convertLHSM
+
+        convertExprM :: Expr -> State Idents Expr
+        convertExprM (orig @ (Dot (Ident x) y)) = do
+            substituteNonLocal orig repl x
+            where repl = Ident (x ++ "_" ++ y)
+        convertExprM other = return other
+
+        convertLHSM :: LHS -> State Idents LHS
+        convertLHSM (orig @ (LHSDot (LHSIdent x) y)) = do
+            substituteNonLocal orig repl x
+            where repl = LHSIdent (x ++ "_" ++ y)
+        convertLHSM other = return other
+
+        substituteNonLocal :: a -> a -> Identifier -> State Idents a
+        substituteNonLocal orig repl ident = do
+            locals <- get
+            return $ if Map.member ident modports || Map.member ident instances
+                then if Set.notMember ident locals
+                    then repl
+                    else orig
+                else orig
 
 -- add a prefix to all standard identifiers in a module item
 prefixModuleItems :: (Identifier -> Identifier) -> ModuleItem -> ModuleItem
