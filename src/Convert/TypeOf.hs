@@ -15,6 +15,7 @@ import Control.Monad.State
 import Data.List (elemIndex)
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Int (Int32)
+import Data.Tuple (swap)
 import qualified Data.Map.Strict as Map
 
 import Convert.Traverse
@@ -100,6 +101,14 @@ typeof (orig @ (Range e mode r)) = do
             NonIndexed   -> snd r
             IndexedPlus  -> BinOp Sub (uncurry (BinOp Add) r) (Number "1")
             IndexedMinus -> BinOp Add (uncurry (BinOp Sub) r) (Number "1")
+typeof (orig @ (Dot e x)) = do
+    t <- typeof e
+    return $ case t of
+        Struct _ fields [] ->
+            case lookup x $ map swap fields of
+                Just typ -> typ
+                Nothing -> TypeOf orig
+        _ -> TypeOf orig
 typeof (orig @ (Cast (Right (Ident x)) _)) = do
     typeMap <- get
     if Map.member x typeMap

@@ -62,8 +62,14 @@ convert =
         fullyResolved :: ModuleItem -> Bool
         fullyResolved =
             not . any isTypeOf . execWriter .
-                collectNestedModuleItemsM (collectTypesM collectType)
+                collectNestedModuleItemsM collectModport
             where
+                collectModport :: ModuleItem -> Writer [Type] ()
+                collectModport (Modport _ modportDecls) =
+                    mapM collectModportDecl modportDecls >> return ()
+                collectModport _ = return ()
+                collectModportDecl :: ModportDecl -> Writer [Type] ()
+                collectModportDecl (_, _, t, _) = collectType t
                 collectType :: Type -> Writer [Type] ()
                 collectType t = tell [t]
                 isTypeOf TypeOf{} = True

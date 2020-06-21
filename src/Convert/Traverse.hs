@@ -837,7 +837,7 @@ collectDeclsM = collectDeclsM' IncludeTFs
 traverseNestedTypesM :: Monad m => MapperM m Type -> MapperM m Type
 traverseNestedTypesM mapper = fullMapper
     where
-        fullMapper t = tm t >>= mapper
+        fullMapper = mapper >=> tm
         tm (Alias      ps xx    rs) = return $ Alias      ps xx    rs
         tm (Net           kw sg rs) = return $ Net           kw sg rs
         tm (Implicit         sg rs) = return $ Implicit         sg rs

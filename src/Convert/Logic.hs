@@ -74,7 +74,16 @@ convertDescription ports orig =
             PackageItem _ -> True
             Package _ _ _ -> False
 
-        origIdents = execWriter (collectModuleItemsM regIdents orig)
+        logics = execWriter (collectModuleItemsM collectLogicM orig)
+        collectLogicM :: ModuleItem -> Writer Idents ()
+        collectLogicM (MIPackageItem (Decl (Variable _ t x _ _))) =
+            case t of
+                IntegerVector TLogic _ _ -> tell $ Set.singleton x
+                _ -> return ()
+        collectLogicM _ = return ()
+
+        origIdents = Set.intersection logics $
+            execWriter (collectModuleItemsM regIdents orig)
         fixed = traverseModuleItems fixModuleItem orig
         fixedIdents = execWriter (collectModuleItemsM regIdents fixed)
         conversion = traverseDecls convertDecl . convertModuleItem
