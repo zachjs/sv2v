@@ -208,8 +208,7 @@ collectStmtsM = collectStmtsM' IncludeTFs
 -- higher levels up
 traverseNestedStmtsM :: Monad m => MapperM m Stmt -> MapperM m Stmt
 traverseNestedStmtsM mapper = fullMapper
-    where
-        fullMapper stmt = mapper stmt >>= traverseSinglyNestedStmtsM fullMapper
+    where fullMapper = mapper >=> traverseSinglyNestedStmtsM fullMapper
 
 -- variant of the above which only traverses one level down
 traverseSinglyNestedStmtsM :: Monad m => MapperM m Stmt -> MapperM m Stmt
@@ -407,7 +406,7 @@ collectStmtLHSsM = collectify traverseStmtLHSsM
 traverseNestedExprsM :: Monad m => MapperM m Expr -> MapperM m Expr
 traverseNestedExprsM mapper = exprMapper
     where
-        exprMapper e = mapper e >>= em
+        exprMapper = mapper >=> em
         (_, _, _, typeMapper) = exprMapperHelpers exprMapper
         typeOrExprMapper (Left t) =
             typeMapper t >>= return . Left
@@ -735,8 +734,8 @@ collectStmtExprsM :: Monad m => CollectorM m Expr -> CollectorM m Stmt
 collectStmtExprsM = collectify traverseStmtExprsM
 
 traverseLHSsM' :: Monad m => TFStrategy -> MapperM m LHS -> MapperM m ModuleItem
-traverseLHSsM' strat mapper item =
-    traverseStmtsM' strat (traverseStmtLHSsM mapper) item >>= traverseModuleItemLHSsM
+traverseLHSsM' strat mapper =
+    traverseStmtsM' strat (traverseStmtLHSsM mapper) >=> traverseModuleItemLHSsM
     where
         traverseModuleItemLHSsM (Assign delay lhs expr) = do
             lhs' <- mapper lhs
@@ -784,7 +783,7 @@ collectLHSsM = collectLHSsM' IncludeTFs
 traverseNestedLHSsM :: Monad m => MapperM m LHS -> MapperM m LHS
 traverseNestedLHSsM mapper = fullMapper
     where
-        fullMapper lhs = mapper lhs >>= tl
+        fullMapper = mapper >=> tl
         tl (LHSIdent  x       ) = return $ LHSIdent x
         tl (LHSBit    l e     ) = fullMapper l >>= \l' -> return $ LHSBit    l' e
         tl (LHSRange  l m r   ) = fullMapper l >>= \l' -> return $ LHSRange  l' m r
@@ -911,9 +910,9 @@ collectDeclTypesM :: Monad m => CollectorM m Type -> CollectorM m Decl
 collectDeclTypesM = collectify traverseDeclTypesM
 
 traverseTypesM' :: Monad m => TypeStrategy -> MapperM m Type -> MapperM m ModuleItem
-traverseTypesM' strategy mapper item =
-    miMapper item >>=
-    traverseDeclsM declMapper >>=
+traverseTypesM' strategy mapper =
+    miMapper >=>
+    traverseDeclsM declMapper >=>
     traverseExprsM (traverseNestedExprsM exprMapper)
     where
         fullMapper = traverseNestedTypesM mapper
@@ -970,9 +969,7 @@ collectGenItemsM = collectify traverseGenItemsM
 -- GenModuleItems
 traverseNestedGenItemsM :: Monad m => MapperM m GenItem -> MapperM m GenItem
 traverseNestedGenItemsM mapper = fullMapper
-    where
-        fullMapper stmt =
-            mapper stmt >>= traverseSinglyNestedGenItemsM fullMapper
+    where fullMapper = mapper >=> traverseSinglyNestedGenItemsM fullMapper
 
 traverseNestedGenItems :: Mapper GenItem -> Mapper GenItem
 traverseNestedGenItems = unmonad traverseNestedGenItemsM
@@ -1007,7 +1004,7 @@ traverseSinglyNestedGenItemsM fullMapper = gim
 traverseAsgnsM' :: Monad m => TFStrategy -> MapperM m (LHS, Expr) -> MapperM m ModuleItem
 traverseAsgnsM' strat mapper = moduleItemMapper
     where
-        moduleItemMapper item = miMapperA item >>= miMapperB
+        moduleItemMapper = miMapperA >=> miMapperB
 
         miMapperA (Assign delay lhs expr) = do
             (lhs', expr') <- mapper (lhs, expr)
@@ -1101,8 +1098,8 @@ traverseScopesM declMapper moduleItemMapper stmtMapper =
     fullModuleItemMapper
     where
 
-        nestedStmtMapper stmt =
-            stmtMapper stmt >>= traverseSinglyNestedStmtsM fullStmtMapper
+        nestedStmtMapper =
+            stmtMapper >=> traverseSinglyNestedStmtsM fullStmtMapper
         fullStmtMapper (Block kw name decls stmts) = do
             prevState <- get
             decls' <- mapM declMapper decls
