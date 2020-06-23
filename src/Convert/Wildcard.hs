@@ -15,25 +15,73 @@
  - 3. Otherwise, the result is `1'b1`.
  -
  - `!=?` is simply converted as the logical negation of `==?`, which is
- - converted as described above.
+ -
+ - TODO: For code using actual wildcard patterns, this conversion produces code
+ - which is not synthesizable.
+ -
+ - The conversion for `inside` produces wildcard equality comparisons as per the
+ - SystemVerilog specification. However, many usages of `inside` don't depend on
+ - the wildcard behavior. To avoid generating needlessly complex output, this
+ - conversion use the standard equality operator if the pattern obviously
+ - contains no wildcard bits.
  -}
 
 module Convert.Wildcard (convert) where
 
+import Control.Monad.State
+import qualified Data.Map.Strict as Map
+
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-convert :: [AST] -> [AST]
-convert =
-    map $
-    traverseDescriptions $ traverseModuleItems $
-    traverseExprs $ traverseNestedExprs convertExpr
+type Patterns = Map.Map Identifier String
 
-convertExpr :: Expr -> Expr
-convertExpr (BinOp WEq l r) =
-    BinOp BitAnd couldMatch $
-    BinOp BitOr  noExtraXZs $
-    Number "1'bx"
+convert :: [AST] -> [AST]
+convert = map $ traverseDescriptions convertDescription
+
+convertDescription :: Description -> Description
+convertDescription =
+    scopedConversion traverseDeclM traverseModuleItemM traverseStmtM Map.empty
+
+traverseDeclM :: Decl -> State Patterns Decl
+traverseDeclM decl = do
+    case decl of
+        Param Localparam _ x (Number n) -> modify $ Map.insert x n
+        _ -> return ()
+    let mi = MIPackageItem $ Decl decl
+    mi' <- traverseModuleItemM mi
+    let MIPackageItem (Decl decl') = mi'
+    return decl'
+
+traverseModuleItemM :: ModuleItem -> State Patterns ModuleItem
+traverseModuleItemM = traverseExprsM traverseExprM
+
+traverseStmtM :: Stmt -> State Patterns Stmt
+traverseStmtM = traverseStmtExprsM traverseExprM
+
+traverseExprM :: Expr -> State Patterns Expr
+traverseExprM = traverseNestedExprsM $ stately convertExpr
+
+isPlainPattern :: Patterns -> Expr -> Bool
+isPlainPattern _ (Number n) =
+    not $ any isWildcardChar n
+    where
+        isWildcardChar :: Char -> Bool
+        isWildcardChar = flip elem "xzXZ?"
+isPlainPattern patterns (Ident x) =
+    case Map.lookup x patterns of
+        Nothing -> False
+        Just n -> isPlainPattern patterns (Number n)
+isPlainPattern _ _ = False
+
+convertExpr :: Patterns -> Expr -> Expr
+convertExpr patterns (BinOp WEq l r) =
+    if isPlainPattern patterns r
+        then BinOp Eq l r
+        else
+            BinOp BitAnd couldMatch $
+            BinOp BitOr  noExtraXZs $
+            Number "1'bx"
     where
         lxl = BinOp BitXor l l
         rxr = BinOp BitXor r r
@@ -44,8 +92,8 @@ convertExpr (BinOp WEq l r) =
         -- Step #2: extra X or Z
         noExtraXZs = BinOp TEq lxlxrxr rxr
         lxlxrxr = BinOp BitXor lxl rxr
-convertExpr (BinOp WNe l r) =
+convertExpr patterns (BinOp WNe l r) =
     UniOp LogNot $
-    convertExpr $
+    convertExpr patterns $
     BinOp WEq l r
-convertExpr other = other
+convertExpr _ other = other
