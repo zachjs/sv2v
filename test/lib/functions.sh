@@ -58,6 +58,8 @@ assertConverts() {
         diff $ac_tmpb $ac_tmpc > /dev/null
         assertTrue "conversion of $ac_file not stable after the second iteration" $?
     fi
+    $SV2V -v $ac_file 2> /dev/null > /dev/null
+    assertTrue "verbose conversion of $ac_file failed" $?
     # using sed to remove quoted strings
     filtered=`sed -E 's/"([^"]|\")+"//g' $ac_tmpa`
     # check for various things iverilog accepts which we don't want to output

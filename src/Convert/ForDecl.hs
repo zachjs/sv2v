@@ -31,7 +31,7 @@ convertStmt (For (Left inits) cc asgns stmt) =
         initAsgns ++
         [For (Right [(lhs, expr)]) cc asgns stmt]
     where
-        splitDecls = map splitDecl inits
+        splitDecls = map splitDecl $ filter (not . isComment) inits
         decls = map fst splitDecls
         initAsgns = map asgnStmt $ init $ map snd splitDecls
         (lhs, expr) = snd $ last splitDecls
@@ -53,6 +53,10 @@ splitDecl (Variable d t ident a e) =
     (Variable d t ident a Nil, (LHSIdent ident, e))
 splitDecl decl =
     error $ "invalid for loop decl: " ++ show decl
+
+isComment :: Decl -> Bool
+isComment CommentDecl{} = True
+isComment _ = False
 
 asgnStmt :: (LHS, Expr) -> Stmt
 asgnStmt = uncurry $ Asgn AsgnOpEq Nothing
