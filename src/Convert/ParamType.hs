@@ -219,13 +219,27 @@ exprToType _ = Nothing
 -- TODO: If a type parameter contains an expression, that expression should be
 -- substituted into the new module, or created as a new parameter.
 isSimpleType :: Type -> Bool
-isSimpleType (IntegerVector _ _ _) = True
-isSimpleType (IntegerAtom   _ _  ) = True
-isSimpleType (NonInteger    _    ) = True
-isSimpleType (Net           _ _ _) = True
-isSimpleType (Struct   _ fields _) = all (isSimpleType . fst) fields
-isSimpleType (Union    _ fields _) = all (isSimpleType . fst) fields
-isSimpleType _ = False
+isSimpleType typ =
+    (not $ typeHasQueries typ) &&
+    case typ of
+        IntegerVector{} -> True
+        IntegerAtom  {} -> True
+        NonInteger   {} -> True
+        Net          {} -> True
+        Struct   _ fields _ -> all (isSimpleType . fst) fields
+        Union    _ fields _ -> all (isSimpleType . fst) fields
+        _ -> False
+
+-- returns whether a type contains any dimension queries
+typeHasQueries :: Type -> Bool
+typeHasQueries =
+    not . null . execWriter . collectTypeExprsM
+    (collectNestedExprsM collectUnresolvedExprM)
+    where
+        collectUnresolvedExprM :: Expr -> Writer [Expr] ()
+        collectUnresolvedExprM (expr @ DimsFn{}) = tell [expr]
+        collectUnresolvedExprM (expr @ DimFn {}) = tell [expr]
+        collectUnresolvedExprM _ = return ()
 
 -- attempt to rewrite instantiations with type parameters
 convertModuleItemM :: Info -> ModuleItem -> Writer Instances ModuleItem
