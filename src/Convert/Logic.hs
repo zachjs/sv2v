@@ -171,6 +171,8 @@ regIdents :: ModuleItem -> Writer Idents ()
 regIdents (item @ AlwaysC{}) = regIdents' item
 regIdents (item @ Initial{}) = regIdents' item
 regIdents (item @ Final{})   = regIdents' item
+regIdents (item @ (MIPackageItem Task    {})) = regIdents' item
+regIdents (item @ (MIPackageItem Function{})) = regIdents' item
 regIdents _ = return ()
 
 regIdents' :: ModuleItem -> Writer Idents ()
