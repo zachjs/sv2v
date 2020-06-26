@@ -34,12 +34,23 @@ convertDescription =
 traverseDeclM :: Decl -> State Info Decl
 traverseDeclM decl = do
     case decl of
-        Param Localparam _ x e -> modify $ Map.insert x e
+        Param Localparam _ x e ->
+            when (isSimpleExpr e) $ modify $ Map.insert x e
         _ -> return ()
     let mi = MIPackageItem $ Decl decl
     mi' <- traverseModuleItemM mi
     let MIPackageItem (Decl decl') = mi'
     return decl'
+
+isSimpleExpr :: Expr -> Bool
+isSimpleExpr Ident{}   = True
+isSimpleExpr PSIdent{} = True
+isSimpleExpr Number{}  = True
+isSimpleExpr String{}  = True
+isSimpleExpr (Dot   e _  ) = isSimpleExpr e
+isSimpleExpr (Bit   e _  ) = isSimpleExpr e
+isSimpleExpr (Range e _ _) = isSimpleExpr e
+isSimpleExpr _ = False
 
 traverseModuleItemM :: ModuleItem -> State Info ModuleItem
 traverseModuleItemM (Instance m p x rs l) = do
