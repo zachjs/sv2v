@@ -118,6 +118,11 @@ simulateAndCompare() {
     assertTrue "VCDs are different:\n$output" $?
     output=`diff $ref_log $gen_log`
     assertTrue "Simulation outputs differ:\n$output" $?
+
+    rm -f $ref_vcd
+    rm -f $gen_vcd
+    rm -f $ref_log
+    rm -f $gen_log
 }
 
 runTest() {

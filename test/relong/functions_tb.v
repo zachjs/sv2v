@@ -23,7 +23,7 @@ module top;
     end
 
     initial begin
-        $monitor($time, " data: %h check: %b checkData: %h", dataIn, {check1, check2}, checkData);
+        $monitor($time, " data: %h check: %b%b checkData: %h", dataIn, check1, check2, checkData);
         clear = 1'b1;
         dataIn = 8'h0;
         repeat(3) @(posedge clock);
