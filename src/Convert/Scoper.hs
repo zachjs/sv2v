@@ -7,7 +7,8 @@
  -
  - This module provides a series of "scopers" which track the scope of blocks,
  - generate loops, tasks, and functions, and provides the ability to insert and
- - lookup elements in a scope-aware way.
+ - lookup elements in a scope-aware way. It also provides the ability to check
+ - whether the current node is within a procedural context.
  -
  - The interfaces take in a mappers for each of: Decl, ModuleItem, GenItem, and
  - Stmt. Note that Function, Task, Always, Initial, and Final are NOT passed
@@ -36,9 +37,11 @@ module Convert.Scoper
     , lookupLHSM
     , lookupIdentM
     , lookupAccessesM
-    , Access
+    , Access(..)
     , Scopes
     , embedScopes
+    , withinProcedure
+    , withinProcedureM
     ) where
 
 import Control.Monad.State
@@ -77,6 +80,7 @@ data Entry a = Entry
 data Scopes a = Scopes
     { sCurrent :: [Tier]
     , sMapping :: Mapping a
+    , sProcedure :: Bool
     } deriving Show
 
 embedScopes :: Monad m => (Scopes a -> b -> c) -> b -> ScoperT a m c
@@ -103,7 +107,8 @@ enterScope name index = do
     let entry = Entry existingElement index Map.empty
     mapping <- gets sMapping
     let mapping' = setScope current' entry mapping
-    put $ Scopes current' mapping'
+    procedure <- gets sProcedure
+    put $ Scopes current' mapping' procedure
     where thd3 (_, _, c) = c
 
 exitScope :: Monad m => Identifier -> Identifier -> ScoperT a m ()
@@ -111,11 +116,30 @@ exitScope name index = do
     let tier = Tier name index
     current <- gets sCurrent
     mapping <- gets sMapping
+    procedure <- gets sProcedure
     if null current || last current /= tier
         then error "exitScope invariant violated"
         else do
             let current' = init current
-            put $ Scopes current' mapping
+            put $ Scopes current' mapping procedure
+
+enterProcedure :: Monad m => ScoperT a m ()
+enterProcedure = do
+    current <- gets sCurrent
+    mapping <- gets sMapping
+    procedure <- gets sProcedure
+    if procedure
+        then error "enterProcedure invariant failed"
+        else put $ Scopes current mapping True
+
+exitProcedure :: Monad m => ScoperT a m ()
+exitProcedure = do
+    current <- gets sCurrent
+    mapping <- gets sMapping
+    procedure <- gets sProcedure
+    if not procedure
+        then error "exitProcedure invariant failed"
+        else put $ Scopes current mapping False
 
 tierToAccess :: Tier -> Access
 tierToAccess (Tier x "") = Access x Nil
@@ -139,9 +163,10 @@ insertElem :: Monad m => Identifier -> a -> ScoperT a m ()
 insertElem name element = do
     current <- gets sCurrent
     mapping <- gets sMapping
+    procedure <- gets sProcedure
     let entry = Entry (Just element) "" Map.empty
     let mapping' = setScope (current ++ [Tier name ""]) entry mapping
-    put $ Scopes current mapping'
+    put $ Scopes current mapping' procedure
 
 type Replacements = Map.Map Identifier Expr
 
@@ -198,6 +223,12 @@ lookupAccesses scopes accesses = do
                 toResult (a, b) = (full, a, b)
         results = catMaybes $ map try options
 
+withinProcedureM :: Monad m => ScoperT a m Bool
+withinProcedureM = gets sProcedure
+
+withinProcedure :: Scopes a -> Bool
+withinProcedure = sProcedure
+
 evalScoper
     :: MapperM (Scoper a) Decl
     -> MapperM (Scoper a) ModuleItem
@@ -228,7 +259,7 @@ evalScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items =
             items' <- mapM fullModuleItemMapper items
             exitScope topName ""
             return items'
-        initialState = Scopes [] Map.empty
+        initialState = Scopes [] Map.empty False
 
         fullStmtMapper :: Stmt -> ScoperT a m Stmt
         fullStmtMapper (Block kw name decls stmts) = do
@@ -269,6 +300,7 @@ evalScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items =
 
         fullModuleItemMapper :: ModuleItem -> ScoperT a m ModuleItem
         fullModuleItemMapper (MIPackageItem (Function ml t x decls stmts)) = do
+            enterProcedure
             t' <- do
                 res <- declMapper $ Variable Local t x [] Nil
                 case res of
@@ -278,21 +310,33 @@ evalScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items =
             decls' <- mapTFDecls decls
             stmts' <- mapM fullStmtMapper stmts
             exitScope x ""
+            exitProcedure
             return $ MIPackageItem $ Function ml t' x decls' stmts'
         fullModuleItemMapper (MIPackageItem (Task     ml   x decls stmts)) = do
+            enterProcedure
             enterScope x ""
             decls' <- mapTFDecls decls
             stmts' <- mapM fullStmtMapper stmts
             exitScope x ""
+            exitProcedure
             return $ MIPackageItem $ Task     ml    x decls' stmts'
         fullModuleItemMapper (MIPackageItem (Decl decl)) =
             declMapper decl >>= return . MIPackageItem . Decl
-        fullModuleItemMapper (AlwaysC kw stmt) =
-            fullStmtMapper stmt >>= return . AlwaysC kw
-        fullModuleItemMapper (Initial stmt) =
-            fullStmtMapper stmt >>= return . Initial
-        fullModuleItemMapper (Final stmt) =
-            fullStmtMapper stmt >>= return . Final
+        fullModuleItemMapper (AlwaysC kw stmt) = do
+            enterProcedure
+            stmt' <- fullStmtMapper stmt
+            exitProcedure
+            return $ AlwaysC kw stmt'
+        fullModuleItemMapper (Initial stmt) = do
+            enterProcedure
+            stmt' <- fullStmtMapper stmt
+            exitProcedure
+            return $ Initial stmt'
+        fullModuleItemMapper (Final stmt) = do
+            enterProcedure
+            stmt' <- fullStmtMapper stmt
+            exitProcedure
+            return $ Final stmt'
         fullModuleItemMapper (Generate genItems) =
             mapM fullGenItemMapper genItems >>= return . Generate
         fullModuleItemMapper (MIAttr attr item) =
