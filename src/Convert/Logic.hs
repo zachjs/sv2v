@@ -30,11 +30,14 @@ import Control.Monad.Writer
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
+import Convert.Scoper
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type Idents = Set.Set Identifier
 type Ports = Map.Map Identifier [(Identifier, Direction)]
+type Location = [Identifier]
+type Locations = Set.Set Location
+type ST = ScoperT Type (State Locations)
 
 convert :: [AST] -> [AST]
 convert =
@@ -63,40 +66,49 @@ convert =
         collectDeclDirsM _ = return ()
 
 convertDescription :: Ports -> Description -> Description
-convertDescription ports orig =
-    if shouldConvert
-        then converted
-        else orig
+convertDescription ports (description @ (Part _ _ Module _ _ _ _)) =
+    evalState (operation description) Set.empty
     where
-        shouldConvert = case orig of
-            Part _ _ Interface _ _ _ _ -> False
-            Part _ _ Module _ _ _ _ -> True
-            PackageItem _ -> True
-            Package _ _ _ -> False
+        operation =
+            -- log then rewrite
+            partScoperT td tm tg ts >=>
+            partScoperT rd tm tg ts
+        td = traverseDeclM
+        rd = rewriteDeclM
+        tm = traverseModuleItemM ports
+        tg = traverseGenItemM
+        ts = traverseStmtM
+convertDescription _ other = other
 
-        logics = execWriter (collectModuleItemsM collectLogicM orig)
-        collectLogicM :: ModuleItem -> Writer Idents ()
-        collectLogicM (MIPackageItem (Decl (Variable _ t x _ _))) =
-            case t of
-                IntegerVector TLogic _ _ -> tell $ Set.singleton x
-                _ -> return ()
-        collectLogicM _ = return ()
+traverseGenItemM :: GenItem -> ST GenItem
+traverseGenItemM = return
 
-        origIdents = Set.intersection logics $
-            execWriter (collectModuleItemsM regIdents orig)
-        fixed = traverseModuleItems fixModuleItem orig
-        fixedIdents = execWriter (collectModuleItemsM regIdents fixed)
-        conversion = traverseDecls convertDecl . convertModuleItem
-        converted = traverseModuleItems conversion fixed
+traverseModuleItemM :: Ports -> ModuleItem -> ST ModuleItem
+traverseModuleItemM ports = embedScopes $ traverseModuleItem ports
+
+traverseModuleItem :: Ports -> Scopes Type -> ModuleItem -> ModuleItem
+traverseModuleItem ports scopes =
+    fixModuleItem
+    where
+        isReg :: LHS -> Bool
+        isReg =
+            or . execWriter . collectNestedLHSsM isReg'
+            where
+                isRegType :: Type -> Bool
+                isRegType (IntegerVector TReg _ _) = True
+                isRegType _ = False
+                isReg' :: LHS -> Writer [Bool] ()
+                isReg' lhs =
+                    case lookupLHS scopes lhs of
+                        Just (_, _, t) -> tell [isRegType t]
+                        _ -> tell [False]
 
         fixModuleItem :: ModuleItem -> ModuleItem
         -- rewrite bad continuous assignments to use procedural assignments
         fixModuleItem (Assign AssignOptionNone lhs expr) =
-            if Set.disjoint usedIdents origIdents
+            if not (isReg lhs)
                 then Assign AssignOptionNone lhs expr
                 else AlwaysC AlwaysComb $ Asgn AsgnOpEq Nothing lhs expr
-            where
-                usedIdents = execWriter $ collectNestedLHSsM lhsIdents lhs
         -- rewrite port bindings to use temporary nets where necessary
         fixModuleItem (Instance moduleName params instanceName rs bindings) =
             if null newItems
@@ -112,13 +124,13 @@ convertDescription ports orig =
                 newItems = concat newItemsList
                 fixBinding :: PortBinding -> Int -> (PortBinding, [ModuleItem])
                 fixBinding (portName, expr) portIdx =
-                    if portDir /= Just Output || Set.disjoint usedIdents origIdents
+                    if not outputBound || not usesReg
                         then ((portName, expr), [])
                         else ((portName, tmpExpr), items)
                     where
+                        outputBound = portDir == Just Output
+                        usesReg = Just True == fmap isReg (exprToLHS expr)
                         portDir = lookupPortDir portName portIdx
-                        usedIdents = execWriter $
-                            collectNestedExprsM exprIdents expr
                         tmp = "sv2v_tmp_" ++ instanceName ++ "_" ++ portName
                         tmpExpr = Ident tmp
                         t = Net (NetType TWire) Unspecified
@@ -145,72 +157,57 @@ convertDescription ports orig =
                         Just l -> lookup portName l
         fixModuleItem other = other
 
-        -- rewrite variable declarations to have the correct type
-        convertModuleItem (MIPackageItem (Decl (Variable dir (IntegerVector _ sg mr) ident a e))) =
-            MIPackageItem $ Decl $ Variable dir' (t mr) ident a e
-            where
-                t = if Set.member ident fixedIdents
-                    then IntegerVector TReg sg
-                    else Net (NetType TWire) sg
-                dir' =
-                    if dir == Inout && Set.member ident fixedIdents
-                    then Output
-                    else dir
-        convertModuleItem other = other
-        -- all other logics (i.e. inside of functions) become regs
-        convertDecl :: Decl -> Decl
-        convertDecl (Param s (IntegerVector _ sg []) x e) =
-            Param s (Implicit sg [(Number "0", Number "0")]) x e
-        convertDecl (Param s (IntegerVector _ sg rs) x e) =
-            Param s (Implicit sg rs) x e
-        convertDecl (Variable d (IntegerVector TLogic sg rs) x a e) =
-            Variable d (IntegerVector TReg sg rs) x a e
-        convertDecl other = other
-
-regIdents :: ModuleItem -> Writer Idents ()
-regIdents (item @ AlwaysC{}) = regIdents' item
-regIdents (item @ Initial{}) = regIdents' item
-regIdents (item @ Final{})   = regIdents' item
-regIdents (item @ (MIPackageItem Task    {})) = regIdents' item
-regIdents (item @ (MIPackageItem Function{})) = regIdents' item
-regIdents _ = return ()
-
-regIdents' :: ModuleItem -> Writer Idents ()
-regIdents' item = do
-    let write = traverseScopesM traverseDeclM return traverseStmtM item
-    leftovers <- execStateT write Set.empty
-    if Set.null leftovers
-        then return ()
-        else error $ "regIdents' got leftovers: " ++ show leftovers
-
-traverseDeclM :: Monad m => Decl -> StateT Idents m Decl
-traverseDeclM (decl @ (Variable _ _ x _ _)) =
-    modify (Set.insert x) >> return decl
+traverseDeclM :: Decl -> ST Decl
+traverseDeclM (decl @ (Variable _ t x _ _)) =
+    insertElem x t >> return decl
 traverseDeclM decl = return decl
 
-traverseStmtM :: Stmt -> StateT Idents (Writer Idents) Stmt
-traverseStmtM (Timing _ stmt) = traverseStmtM stmt
+rewriteDeclM :: Decl -> ST Decl
+rewriteDeclM (Variable d t x a e) = do
+    (d', t') <- case t of
+        IntegerVector TLogic sg rs -> do
+            insertElem x t
+            details <- lookupIdentM x
+            let Just (accesses, _, _) = details
+            let location = map accessName accesses
+            usedAsReg <- lift $ gets $ Set.member location
+            blockLogic <- withinProcedureM
+            if usedAsReg || blockLogic
+                then do
+                    let dir = if d == Inout then Output else d
+                    return (dir, IntegerVector TReg sg rs)
+                else return (d, Net (NetType TWire) sg rs)
+        _ -> return (d, t)
+    insertElem x t'
+    return $ Variable d' t' x a e
+rewriteDeclM (Param s (IntegerVector _ sg []) x e) =
+    return $ Param s (Implicit sg [(zero, zero)]) x e
+    where zero = Number "0"
+rewriteDeclM (Param s (IntegerVector _ sg rs) x e) =
+    return $ Param s (Implicit sg rs) x e
+rewriteDeclM decl = return decl
+
+traverseStmtM :: Stmt -> ST Stmt
+traverseStmtM (Timing timing stmt) =
+    -- ignore the timing LHSs
+    return $ Timing timing stmt
 traverseStmtM (Subroutine (Ident f) args) = do
     case args of
         Args [_, Ident x, _] [] ->
-            -- assuming that no one will readmem into a local variable
             if f == "$readmemh" || f == "$readmemb"
-                then lift $ tell $ Set.singleton x
+                then collectLHSM $ LHSIdent x
                 else return ()
         _ -> return ()
     return $ Subroutine (Ident f) args
 traverseStmtM stmt = do
-    -- only write down idents which aren't shadowed
-    let regs = execWriter $ collectStmtLHSsM (collectNestedLHSsM lhsIdents) stmt
-    locals <- get
-    let globals = Set.difference regs locals
-    lift $ tell globals
+    collectStmtLHSsM (collectNestedLHSsM collectLHSM) stmt
     return stmt
 
-lhsIdents :: LHS -> Writer Idents ()
-lhsIdents (LHSIdent x) = tell $ Set.singleton x
-lhsIdents _ = return () -- the collector recurses for us
-
-exprIdents :: Expr -> Writer Idents ()
-exprIdents (Ident x) = tell $ Set.singleton x
-exprIdents _ = return () -- the collector recurses for us
+collectLHSM :: LHS -> ST ()
+collectLHSM lhs = do
+    details <- lookupLHSM lhs
+    case details of
+        Just (accesses, _, _) -> do
+            let location = map accessName accesses
+            lift $ modify $ Set.insert location
+        Nothing -> return ()
