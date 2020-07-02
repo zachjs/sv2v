@@ -18,36 +18,23 @@ import Language.SystemVerilog.AST
 
 type TypeFunc = [Range] -> Type
 type StructInfo = (Type, Map.Map Identifier (Range, Expr))
-type Structs = Map.Map TypeFunc StructInfo
 type Types = Map.Map Identifier Type
-type Idents = Set.Set Identifier
 
 convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription (description @ (Part _ _ Module _ _ _ _)) =
-    traverseModuleItems (traverseTypes' ExcludeParamTypes $ convertType structs) $
-    Part attrs extern kw lifetime name ports (items ++ funcs)
+    traverseModuleItems (traverseTypes' ExcludeParamTypes convertType) $
+        scopedConversion traverseDeclM' traverseModuleItemM
+            traverseStmtM tfArgTypes description
     where
-        description' @ (Part attrs extern kw lifetime name ports items) =
-            scopedConversion traverseDeclM' traverseModuleItemM
-                traverseStmtM tfArgTypes description
         -- collect information about this description
-        structs = execWriter $ collectModuleItemsM
-            (collectTypesM collectStructM) description
         tfArgTypes = execWriter $ collectModuleItemsM collectTFArgsM description
-        -- determine which of the packer functions we actually need
-        calledFuncs = execWriter $ collectModuleItemsM
-            (collectExprsM $ collectNestedExprsM collectCallsM) description'
-        packerFuncs = Set.map packerFnName $ Map.keysSet structs
-        calledPackedFuncs = Set.intersection calledFuncs packerFuncs
-        funcs = map packerFn $ filter isNeeded $ Map.keys structs
-        isNeeded tf = Set.member (packerFnName tf) calledPackedFuncs
         -- helpers for the scoped traversal
         traverseDeclM' :: Decl -> State Types Decl
         traverseDeclM' decl = do
-            decl' <- traverseDeclM structs decl
+            decl' <- traverseDeclM decl
             res <- traverseModuleItemM $ MIPackageItem $ Decl decl'
             let MIPackageItem (Decl decl'') = res
             return decl''
@@ -59,8 +46,7 @@ convertDescription (description @ (Part _ _ Module _ _ _ _)) =
         traverseStmtM :: Stmt -> State Types Stmt
         traverseStmtM (Subroutine expr args) = do
             stateTypes <- get
-            let stmt' = Subroutine expr $ convertCall
-                            structs stateTypes expr args
+            let stmt' = Subroutine expr $ convertCall stateTypes expr args
             traverseStmtM' stmt'
         traverseStmtM stmt = traverseStmtM' stmt
         traverseStmtM' :: Stmt -> State Types Stmt
@@ -73,35 +59,32 @@ convertDescription (description @ (Part _ _ Module _ _ _ _)) =
             where
                 converter :: Types -> Expr -> Expr
                 converter types expr =
-                    snd $ convertAsgn structs types (LHSIdent "", expr)
+                    snd $ convertAsgn types (LHSIdent "", expr)
         traverseLHSM =
             traverseNestedLHSsM $ stately converter
             where
                 converter :: Types -> LHS -> LHS
                 converter types lhs =
-                    fst $ convertAsgn structs types (lhs, Ident "")
-        traverseAsgnM = stately $ convertAsgn structs
+                    fst $ convertAsgn types (lhs, Ident "")
+        traverseAsgnM = stately convertAsgn
 convertDescription other = other
 
 -- write down unstructured versions of packed struct types
-collectStructM :: Type -> Writer Structs ()
-collectStructM (Struct Unpacked fields _) =
-    collectStructM' (Struct Unpacked) True Unspecified fields
-collectStructM (Struct (Packed sg) fields _) =
-    collectStructM' (Struct $ Packed sg) True sg fields
-collectStructM (Union  (Packed sg) fields _) =
-    collectStructM' (Union $ Packed sg) False sg fields
-collectStructM _ = return ()
 
-collectStructM'
-    :: ([Field] -> [Range] -> Type)
-    -> Bool -> Signing -> [Field] -> Writer Structs ()
-collectStructM' constructor isStruct sg fields = do
+convertStruct :: Type -> Maybe StructInfo
+convertStruct (Struct Unpacked fields _) =
+    convertStruct' True Unspecified fields
+convertStruct (Struct (Packed sg) fields _) =
+    convertStruct' True sg fields
+convertStruct (Union  (Packed sg) fields _) =
+    convertStruct' False sg fields
+convertStruct _ = Nothing
+
+convertStruct' :: Bool -> Signing -> [Field] -> Maybe StructInfo
+convertStruct' isStruct sg fields =
     if canUnstructure
-        then tell $ Map.singleton
-            (constructor fields)
-            (unstructType, unstructFields)
-        else return ()
+        then Just (unstructType, unstructFields)
+        else Nothing
     where
         zero = Number "0"
         typeRange :: Type -> Range
@@ -152,20 +135,18 @@ collectStructM' constructor isStruct sg fields = do
         isFlatIntVec _ = False
         canUnstructure = all isFlatIntVec fieldTypes
 
+isReadyStruct :: Type -> Bool
+isReadyStruct = (Nothing /=) . convertStruct
+
 
 -- convert a struct type to its unstructured equivalent
-convertType :: Structs -> Type -> Type
-convertType structs t1 =
-    case Map.lookup tf1 structs of
+convertType :: Type -> Type
+convertType t1 =
+    case convertStruct t1 of
         Nothing -> t1
         Just (t2, _) -> tf2 (rs1 ++ rs2)
             where (tf2, rs2) = typeRanges t2
-    where (tf1, rs1) = typeRanges t1
-
--- writes down the names of called functions
-collectCallsM :: Expr -> Writer Idents ()
-collectCallsM (Call (Ident f) _) = tell $ Set.singleton f
-collectCallsM _ = return ()
+    where (_, rs1) = typeRanges t1
 
 collectTFArgsM :: ModuleItem -> Writer Types ()
 collectTFArgsM (MIPackageItem item) = do
@@ -186,8 +167,8 @@ collectTFArgsM (MIPackageItem item) = do
 collectTFArgsM _ = return ()
 
 -- write down the types of declarations
-traverseDeclM :: Structs -> Decl -> State Types Decl
-traverseDeclM structs origDecl = do
+traverseDeclM :: Decl -> State Types Decl
+traverseDeclM origDecl = do
     case origDecl of
         Variable d t x a e -> do
             let (tf, rs) = typeRanges t
@@ -206,29 +187,12 @@ traverseDeclM structs origDecl = do
         convertDeclExpr :: Identifier -> Expr -> State Types Expr
         convertDeclExpr x e = do
             types <- get
-            let (LHSIdent _, e') = convertAsgn structs types (LHSIdent x, e)
+            let (LHSIdent _, e') = convertAsgn types (LHSIdent x, e)
             return e'
         isRangeable :: Type -> Bool
         isRangeable (IntegerAtom _ _) = False
         isRangeable (NonInteger  _  ) = False
         isRangeable _ = True
-
--- produces a function which packs the components of a struct literal
-packerFn :: TypeFunc -> ModuleItem
-packerFn structTf =
-    MIPackageItem $
-    Function Automatic (structTf []) fnName decls [retStmt]
-    where
-        Struct _ fields [] = structTf []
-        toInput (t, x) = Variable Input t x [] Nil
-        decls = map toInput fields
-        retStmt = Return $ Concat $ map (Ident . snd) fields
-        fnName = packerFnName structTf
-
--- returns a "unique" name for the packer for a given struct type
-packerFnName :: TypeFunc -> Identifier
-packerFnName structTf =
-    "sv2v_struct_" ++ shortHash structTf
 
 -- removes the innermost range from the given type, if possible
 dropInnerTypeRange :: Type -> Type
@@ -243,8 +207,8 @@ dropInnerTypeRange t =
 -- looking at the innermost type of a node to convert outer uses of fields, and
 -- then using the outermost type to figure out the corresponding struct
 -- definition for struct literals that are encountered.
-convertAsgn :: Structs -> Types -> (LHS, Expr) -> (LHS, Expr)
-convertAsgn structs types (lhs, expr) =
+convertAsgn :: Types -> (LHS, Expr) -> (LHS, Expr)
+convertAsgn types (lhs, expr) =
     (lhs', expr')
     where
         (typ, lhs') = convertLHS lhs
@@ -311,10 +275,10 @@ convertAsgn structs types (lhs, expr) =
                     " has extra named fields: " ++
                     show (Set.toList extraNames) ++ " that are not in " ++
                     show structTf
-            else if Map.member structTf structs then
-                Call
-                    (Ident $ packerFnName structTf)
-                    (Args (map snd items) [])
+            else if isReadyStruct (structTf []) then
+                Concat
+                    $ map (uncurry $ Cast . Left)
+                    $ zip (map fst fields) (map snd items)
             else
                 Pattern items
             where
@@ -397,7 +361,7 @@ convertAsgn structs types (lhs, expr) =
         convertSubExpr (Dot e x) =
             if maybeFields == Nothing
                 then (Implicit Unspecified [], Dot e' x)
-                else if Map.notMember structTf structs
+                else if not $ isReadyStruct (structTf [])
                         then (fieldType, Dot e' x)
                         else (dropInnerTypeRange fieldType, undotted)
             where
@@ -414,7 +378,7 @@ convertAsgn structs types (lhs, expr) =
         convertSubExpr (Range (Dot e x) NonIndexed rOuter) =
             if maybeFields == Nothing
                 then (Implicit Unspecified [], orig')
-                else if Map.notMember structTf structs
+                else if not $ isReadyStruct (structTf [])
                         then (fieldType, orig')
                         else (dropInnerTypeRange fieldType, undotted)
             where
@@ -435,7 +399,7 @@ convertAsgn structs types (lhs, expr) =
         convertSubExpr (Range (Dot e x) mode (baseO, lenO)) =
             if maybeFields == Nothing
                 then (Implicit Unspecified [], orig')
-                else if Map.notMember structTf structs
+                else if not $ isReadyStruct (structTf [])
                         then (fieldType, orig')
                         else (dropInnerTypeRange fieldType, undotted)
             where
@@ -463,7 +427,7 @@ convertAsgn structs types (lhs, expr) =
         convertSubExpr (Bit (Dot e x) i) =
             if maybeFields == Nothing
                 then (Implicit Unspecified [], Bit (Dot e' x) i)
-                else if Map.notMember structTf structs
+                else if not $ isReadyStruct (structTf [])
                         then (dropInnerTypeRange fieldType, Bit (Dot e' x) i)
                         else (dropInnerTypeRange fieldType, Bit e' i')
             where
@@ -481,7 +445,7 @@ convertAsgn structs types (lhs, expr) =
                 (t, e') = convertSubExpr e
                 t' = dropInnerTypeRange t
         convertSubExpr (Call e args) =
-            (retType, Call e $ convertCall structs types e' args)
+            (retType, Call e $ convertCall types e' args)
             where
                 (_, e') = convertSubExpr e
                 retType = case e' of
@@ -514,7 +478,9 @@ convertAsgn structs types (lhs, expr) =
                 Nothing -> error $ "field '" ++ fieldName ++
                     "' not found in struct: " ++ show structTf
                 Just r -> r
-            where fieldRangeMap = Map.map fst $ snd $ structs Map.! structTf
+            where
+                Just structInfo = convertStruct $ structTf []
+                fieldRangeMap = Map.map fst $ snd structInfo
 
         -- lookup the type of a field in the given field list
         lookupFieldType :: [(Type, Identifier)] -> Identifier -> Type
@@ -538,8 +504,8 @@ convertAsgn structs types (lhs, expr) =
                 dims = snd $ typeRanges fieldType
 
 -- attempts to convert based on the assignment-like contexts of TF arguments
-convertCall :: Structs -> Types -> Expr -> Args -> Args
-convertCall structs types fn (Args pnArgs kwArgs) =
+convertCall :: Types -> Expr -> Args -> Args
+convertCall types fn (Args pnArgs kwArgs) =
     case fn of
         Ident _ -> args
         _ -> Args pnArgs kwArgs
@@ -552,6 +518,5 @@ convertCall structs types fn (Args pnArgs kwArgs) =
         convertArg :: (Identifier, Expr) -> (Identifier, Expr)
         convertArg (x, e) = (x, e')
             where
-                (_, e') = convertAsgn structs types
+                (_, e') = convertAsgn types
                     (LHSIdent $ f ++ ":" ++ x, e)
-
