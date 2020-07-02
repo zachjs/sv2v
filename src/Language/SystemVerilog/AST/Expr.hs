@@ -207,7 +207,13 @@ readNumber ('\'' : 'h' : rest) =
     case readHex rest of
         [(v, _)] -> Just v
         _ -> Nothing
-readNumber n = readMaybe n
+readNumber n =
+    case readMaybe n of
+        Nothing -> Nothing
+        Just res ->
+            if show res == n
+                then Just res
+                else Nothing
 
 showUniOpPrec :: Expr -> ShowS
 showUniOpPrec (e @ UniOp{}) = (showParen True . shows) e

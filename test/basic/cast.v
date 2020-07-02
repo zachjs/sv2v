@@ -26,6 +26,12 @@ module top;
         $display("%0d %0d", y, $signed(y[4:0]));
         $display("%0d %0d", z, z[4:0]);
         $display("%b", 32'd4);
+        $display("%b", 33'd4);
+        $display("%b", 33'h1_FFFF_FFFF);
+        $display("%b", 32'd0);
+        $display("%b", 33'd4294967296);
+        $display("%b", 32'd1);
+        $display("%b", 33'd4294967297);
     end
 
     localparam [0:0] foo = 0;
