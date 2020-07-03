@@ -9,108 +9,91 @@
 
 module Convert.Typedef (convert) where
 
-import Control.Monad.Writer
-import qualified Data.Map as Map
+import Control.Monad ((>=>))
 
+import Convert.Scoper
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type Types = Map.Map Identifier Type
-
 convert :: [AST] -> [AST]
-convert = map $ traverseDescriptions convertDescription
+convert = map $ traverseDescriptions $ partScoper
+    traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
 
-convertDescription :: Description -> Description
-convertDescription (description @ Part{}) =
-    traverseModuleItems (convertTypedef types) description'
-    where
-        description' =
-            traverseModuleItems (traverseGenItems convertGenItem) description
-        types = execWriter $ collectModuleItemsM collectTypedefM description'
-convertDescription other = other
+traverseTypeOrExprM :: TypeOrExpr -> Scoper Type TypeOrExpr
+traverseTypeOrExprM (Left (TypeOf (Ident x))) = do
+    details <- lookupIdentM x
+    return $ case details of
+        Nothing -> Left $ TypeOf $ Ident x
+        Just (_, _, typ) -> Left typ
+traverseTypeOrExprM (Right (Ident x)) = do
+    details <- lookupIdentM x
+    return $ case details of
+        Nothing -> Right $ Ident x
+        Just (_, _, typ) -> Left typ
+traverseTypeOrExprM other = return other
 
-convertTypedef :: Types -> ModuleItem -> ModuleItem
-convertTypedef types =
-    removeTypedef .
-    convertModuleItem .
-    (traverseExprs $ traverseNestedExprs $ convertExpr) .
-    (traverseTypes $ resolveType types)
-    where
-        removeTypedef :: ModuleItem -> ModuleItem
-        removeTypedef (MIPackageItem (Typedef _ x)) =
-            MIPackageItem $ Decl $ CommentDecl $ "removed typedef: " ++ x
-        removeTypedef other = other
-        convertTypeOrExpr :: TypeOrExpr -> TypeOrExpr
-        convertTypeOrExpr (Left (TypeOf (Ident x))) =
-            if Map.member x types
-                then Left $ resolveType types (Alias Nothing x [])
-                else Left $ TypeOf (Ident x)
-        convertTypeOrExpr (Right (Ident x)) =
-            if Map.member x types
-                then Left $ resolveType types (Alias Nothing x [])
-                else Right $ Ident x
-        convertTypeOrExpr other = other
-        convertExpr :: Expr -> Expr
-        convertExpr (Cast v e) = Cast (convertTypeOrExpr v) e
-        convertExpr (DimsFn f v) = DimsFn f (convertTypeOrExpr v)
-        convertExpr (DimFn f v e) = DimFn f (convertTypeOrExpr v) e
-        convertExpr other = other
-        convertModuleItem :: ModuleItem -> ModuleItem
-        convertModuleItem (Instance m params x rs p) =
-            Instance m (map mapParam params) x rs p
-            where mapParam (i, v) = (i, convertTypeOrExpr v)
-        convertModuleItem other = other
+traverseExprM :: Expr -> Scoper Type Expr
+traverseExprM (Cast v e) = do
+    v' <- traverseTypeOrExprM v
+    return $ Cast v' e
+traverseExprM (DimsFn f v) = do
+    v' <- traverseTypeOrExprM v
+    return $ DimsFn f v'
+traverseExprM (DimFn f v e) = do
+    v' <- traverseTypeOrExprM v
+    return $ DimFn f v' e
+traverseExprM other = return other
 
-convertGenItem :: GenItem -> GenItem
-convertGenItem (GenIf c a b) =
-    GenIf c a' b'
-    where
-        a' = convertGenItem' a
-        b' = convertGenItem' b
-convertGenItem other = other
+traverseModuleItemM :: ModuleItem -> Scoper Type ModuleItem
+traverseModuleItemM (MIPackageItem (Typedef t x)) = do
+    t' <- traverseNestedTypesM traverseTypeM t
+    insertElem x t'
+    return $ Generate []
+traverseModuleItemM (Instance m params x rs p) = do
+    let mapParam (i, v) = traverseTypeOrExprM v >>= \v' -> return (i, v')
+    params' <- mapM mapParam params
+    traverseModuleItemM' $ Instance m params' x rs p
+traverseModuleItemM item = traverseModuleItemM' item
 
-convertGenItem' :: GenItem -> GenItem
-convertGenItem' item = do
-    GenBlock "" items
-    where
-        -- convert inner generate blocks first
-        item' = Generate [traverseNestedGenItems convertGenItem item]
-        types = execWriter $ collectNestedModuleItemsM collectTypedefM item'
-        Generate items = traverseNestedModuleItems (convertTypedef types) item'
+traverseModuleItemM' :: ModuleItem -> Scoper Type ModuleItem
+traverseModuleItemM' =
+    traverseTypesM traverseTypeM >=>
+    traverseExprsM (traverseNestedExprsM traverseExprM)
 
-collectTypedefM :: ModuleItem -> Writer Types ()
-collectTypedefM (MIPackageItem (Typedef a b)) = tell $ Map.singleton b a
-collectTypedefM _ = return ()
+traverseGenItemM :: GenItem -> Scoper Type GenItem
+traverseGenItemM = traverseGenItemExprsM (traverseNestedExprsM traverseExprM)
 
-resolveItem :: Types -> (Type, Identifier) -> (Type, Identifier)
-resolveItem types (t, x) = (resolveType types t, x)
+traverseDeclM :: Decl -> Scoper Type Decl
+traverseDeclM decl = do
+    item <- traverseModuleItemM (MIPackageItem $ Decl decl)
+    let MIPackageItem (Decl decl') = item
+    case decl' of
+        Variable{} -> return decl'
+        Param{} -> return decl'
+        ParamType{} -> return decl'
+        CommentDecl{} -> return decl'
 
-resolveType :: Types -> Type -> Type
-resolveType _ (Net           kw sg rs) = Net           kw sg rs
-resolveType _ (Implicit         sg rs) = Implicit         sg rs
-resolveType _ (IntegerVector kw sg rs) = IntegerVector kw sg rs
-resolveType _ (IntegerAtom   kw sg   ) = IntegerAtom   kw sg
-resolveType _ (NonInteger    kw      ) = NonInteger    kw
-resolveType _ (InterfaceT     x my rs) = InterfaceT     x my rs
-resolveType _ (Alias (Just ps)  st rs) = Alias (Just ps)  st rs
-resolveType _ (TypeOf            expr) = TypeOf            expr
-resolveType _ (UnpackedType  t     rs) = UnpackedType  t     rs
-resolveType types (Enum   t vals  rs) = Enum (resolveType types t) vals rs
-resolveType types (Struct p items rs) = Struct p (map (resolveItem types) items) rs
-resolveType types (Union  p items rs) = Union  p (map (resolveItem types) items) rs
-resolveType types (Alias Nothing st rs1) =
-    if Map.notMember st types
-    then Alias Nothing st rs1
-    else case resolveType types $ types Map.! st of
-        (Net           kw sg rs2) -> Net           kw sg $ rs1 ++ rs2
-        (Implicit         sg rs2) -> Implicit         sg $ rs1 ++ rs2
-        (IntegerVector kw sg rs2) -> IntegerVector kw sg $ rs1 ++ rs2
-        (Enum            t v rs2) -> Enum            t v $ rs1 ++ rs2
-        (Struct          p l rs2) -> Struct          p l $ rs1 ++ rs2
-        (Union           p l rs2) -> Union           p l $ rs1 ++ rs2
-        (InterfaceT     x my rs2) -> InterfaceT     x my $ rs1 ++ rs2
-        (Alias          ps x rs2) -> Alias          ps x $ rs1 ++ rs2
-        (UnpackedType  t     rs2) -> UnpackedType      t $ rs1 ++ rs2
-        (IntegerAtom   kw sg    ) -> nullRange (IntegerAtom kw sg) rs1
-        (NonInteger    kw       ) -> nullRange (NonInteger  kw   ) rs1
-        (TypeOf             expr) -> nullRange (TypeOf       expr) rs1
+traverseStmtM :: Stmt -> Scoper Type Stmt
+traverseStmtM =
+    traverseStmtExprsM $ traverseNestedExprsM $
+    traverseExprTypesM traverseTypeM >=> traverseExprM
+
+traverseTypeM :: Type -> Scoper Type Type
+traverseTypeM (Alias Nothing st rs1) = do
+    details <- lookupIdentM st
+    return $ case details of
+        Nothing -> Alias Nothing st rs1
+        Just (_, _, typ) -> case typ of
+            Net           kw sg rs2 -> Net           kw sg $ rs1 ++ rs2
+            Implicit         sg rs2 -> Implicit         sg $ rs1 ++ rs2
+            IntegerVector kw sg rs2 -> IntegerVector kw sg $ rs1 ++ rs2
+            Enum            t v rs2 -> Enum            t v $ rs1 ++ rs2
+            Struct          p l rs2 -> Struct          p l $ rs1 ++ rs2
+            Union           p l rs2 -> Union           p l $ rs1 ++ rs2
+            InterfaceT     x my rs2 -> InterfaceT     x my $ rs1 ++ rs2
+            Alias          ps x rs2 -> Alias          ps x $ rs1 ++ rs2
+            UnpackedType  t     rs2 -> UnpackedType      t $ rs1 ++ rs2
+            IntegerAtom   kw sg     -> nullRange (IntegerAtom kw sg) rs1
+            NonInteger    kw        -> nullRange (NonInteger  kw   ) rs1
+            TypeOf             expr -> nullRange (TypeOf       expr) rs1
+traverseTypeM other = return other

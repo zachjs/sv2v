@@ -57,6 +57,12 @@ module Convert.Traverse
 , traverseTypeExprsM
 , traverseTypeExprs
 , collectTypeExprsM
+, traverseGenItemExprsM
+, traverseGenItemExprs
+, collectGenItemExprsM
+, traverseDeclExprsM
+, traverseDeclExprs
+, collectDeclExprsM
 , traverseDeclTypesM
 , traverseDeclTypes
 , collectDeclTypesM
@@ -97,6 +103,8 @@ module Convert.Traverse
 , stately
 , traverseFilesM
 , traverseFiles
+, traverseSinglyNestedGenItemsM
+, traverseSinglyNestedStmtsM
 ) where
 
 import Data.Functor.Identity (Identity, runIdentity)
@@ -407,7 +415,7 @@ traverseNestedExprsM :: Monad m => MapperM m Expr -> MapperM m Expr
 traverseNestedExprsM mapper = exprMapper
     where
         exprMapper = mapper >=> em
-        (_, _, _, typeMapper) = exprMapperHelpers exprMapper
+        (_, _, _, typeMapper, _) = exprMapperHelpers exprMapper
         typeOrExprMapper (Left t) =
             typeMapper t >>= return . Left
         typeOrExprMapper (Right e) =
@@ -489,9 +497,19 @@ traverseNestedExprsM mapper = exprMapper
         em (Nil) = return Nil
 
 exprMapperHelpers :: Monad m => MapperM m Expr ->
-    (MapperM m Range, MapperM m Decl, MapperM m LHS, MapperM m Type)
+    ( MapperM m Range
+    , MapperM m Decl
+    , MapperM m LHS
+    , MapperM m Type
+    , MapperM m GenItem
+    )
 exprMapperHelpers exprMapper =
-    (rangeMapper, declMapper, traverseNestedLHSsM lhsMapper, typeMapper)
+    ( rangeMapper
+    , declMapper
+    , traverseNestedLHSsM lhsMapper
+    , typeMapper
+    , genItemMapper
+    )
     where
 
     rangeMapper (a, b) = do
@@ -535,11 +553,26 @@ exprMapperHelpers exprMapper =
         return $ LHSStream o e' ls
     lhsMapper other = return other
 
+    genItemMapper (GenFor (x1, e1) cc (x2, op2, e2) subItem) = do
+        e1' <- exprMapper e1
+        e2' <- exprMapper e2
+        cc' <- exprMapper cc
+        return $ GenFor (x1, e1') cc' (x2, op2, e2') subItem
+    genItemMapper (GenIf e i1 i2) = do
+        e' <- exprMapper e
+        return $ GenIf e' i1 i2
+    genItemMapper (GenCase e cases) = do
+        e' <- exprMapper e
+        caseExprs <- mapM (mapM exprMapper . fst) cases
+        let cases' = zip caseExprs (map snd cases)
+        return $ GenCase e' cases'
+    genItemMapper other = return other
+
 traverseExprsM' :: Monad m => TFStrategy -> MapperM m Expr -> MapperM m ModuleItem
 traverseExprsM' strat exprMapper = moduleItemMapper
     where
 
-    (rangeMapper, declMapper, lhsMapper, typeMapper)
+    (rangeMapper, declMapper, lhsMapper, typeMapper, genItemMapper)
         = exprMapperHelpers exprMapper
 
     stmtMapper = traverseNestedStmtsM (traverseStmtExprsM exprMapper)
@@ -632,21 +665,6 @@ traverseExprsM' strat exprMapper = moduleItemMapper
         a'' <- traverseAssertionExprsM exprMapper a'
         return $ AssertionItem (mx, a'')
 
-    genItemMapper (GenFor (x1, e1) cc (x2, op2, e2) subItem) = do
-        e1' <- exprMapper e1
-        e2' <- exprMapper e2
-        cc' <- exprMapper cc
-        return $ GenFor (x1, e1') cc' (x2, op2, e2') subItem
-    genItemMapper (GenIf e i1 i2) = do
-        e' <- exprMapper e
-        return $ GenIf e' i1 i2
-    genItemMapper (GenCase e cases) = do
-        e' <- exprMapper e
-        caseExprs <- mapM (mapM exprMapper . fst) cases
-        let cases' = zip caseExprs (map snd cases)
-        return $ GenCase e' cases'
-    genItemMapper other = return other
-
     modportDeclMapper (dir, ident, t, e) = do
         t' <- typeMapper t
         e' <- exprMapper e
@@ -668,7 +686,7 @@ traverseStmtExprsM :: Monad m => MapperM m Expr -> MapperM m Stmt
 traverseStmtExprsM exprMapper = flatStmtMapper
     where
 
-    (_, declMapper, lhsMapper, _) = exprMapperHelpers exprMapper
+    (_, declMapper, lhsMapper, _, _) = exprMapperHelpers exprMapper
 
     caseMapper (exprs, stmt) = do
         exprs' <- mapM exprMapper exprs
@@ -888,12 +906,32 @@ collectExprTypesM = collectify traverseExprTypesM
 traverseTypeExprsM :: Monad m => MapperM m Expr -> MapperM m Type
 traverseTypeExprsM mapper =
     typeMapper
-    where (_, _, _, typeMapper) = exprMapperHelpers mapper
+    where (_, _, _, typeMapper, _) = exprMapperHelpers mapper
 
 traverseTypeExprs :: Mapper Expr -> Mapper Type
 traverseTypeExprs = unmonad traverseTypeExprsM
 collectTypeExprsM :: Monad m => CollectorM m Expr -> CollectorM m Type
 collectTypeExprsM = collectify traverseTypeExprsM
+
+traverseGenItemExprsM :: Monad m => MapperM m Expr -> MapperM m GenItem
+traverseGenItemExprsM mapper =
+    genItemMapper
+    where (_, _, _, _, genItemMapper) = exprMapperHelpers mapper
+
+traverseGenItemExprs :: Mapper Expr -> Mapper GenItem
+traverseGenItemExprs = unmonad traverseGenItemExprsM
+collectGenItemExprsM :: Monad m => CollectorM m Expr -> CollectorM m GenItem
+collectGenItemExprsM = collectify traverseGenItemExprsM
+
+traverseDeclExprsM :: Monad m => MapperM m Expr -> MapperM m Decl
+traverseDeclExprsM mapper =
+    declMapper
+    where (_, declMapper, _, _, _) = exprMapperHelpers mapper
+
+traverseDeclExprs :: Mapper Expr -> Mapper Decl
+traverseDeclExprs = unmonad traverseDeclExprsM
+collectDeclExprsM :: Monad m => CollectorM m Expr -> CollectorM m Decl
+collectDeclExprsM = collectify traverseDeclExprsM
 
 traverseDeclTypesM :: Monad m => MapperM m Type -> MapperM m Decl
 traverseDeclTypesM mapper (Param s t x e) =

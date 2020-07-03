@@ -11,45 +11,27 @@
 
 module Convert.TypeOf (convert) where
 
-import Control.Monad.State
 import Data.List (elemIndex)
-import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Int (Int32)
 import Data.Tuple (swap)
 import qualified Data.Map.Strict as Map
 
+import Convert.Scoper
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type Info = Map.Map Identifier Type
-
 convert :: [AST] -> [AST]
-convert = map $ traverseDescriptions convertDescription
+convert = map $ traverseDescriptions $ partScoper
+    traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
 
-convertDescription :: Description -> Description
-convertDescription (description @ Part{}) =
-    scopedConversion traverseDeclM traverseModuleItemM traverseStmtM
-        initialState description
-    where
-        Part _ _ _ _ _ _ items = description
-        initialState = Map.fromList $ mapMaybe returnType items
-        returnType :: ModuleItem -> Maybe (Identifier, Type)
-        returnType (MIPackageItem (Function _ t f _ _)) =
-            if t == Implicit Unspecified []
-                -- functions with no return type implicitly return a single bit
-                then Just (f, IntegerVector TLogic Unspecified [])
-                else Just (f, t)
-        returnType _ = Nothing
-convertDescription other = other
-
-traverseDeclM :: Decl -> State Info Decl
+traverseDeclM :: Decl -> Scoper Type Decl
 traverseDeclM decl = do
     item <- traverseModuleItemM (MIPackageItem $ Decl decl)
     let MIPackageItem (Decl decl') = item
     case decl' of
         Variable d t ident a e -> do
             let t' = injectRanges t a
-            modify $ Map.insert ident t'
+            insertElem ident t'
             return $ case t' of
                 UnpackedType t'' a' -> Variable d t'' ident a' e
                 _ ->                   Variable d t'  ident [] e
@@ -57,39 +39,58 @@ traverseDeclM decl = do
             let t' = if t == Implicit Unspecified []
                         then IntegerAtom TInteger Unspecified
                         else t
-            modify $ Map.insert ident t'
+            insertElem ident t'
             return decl'
         ParamType{} -> return decl'
         CommentDecl{} -> return decl'
 
-traverseModuleItemM :: ModuleItem -> State Info ModuleItem
-traverseModuleItemM item = traverseTypesM traverseTypeM item
+traverseModuleItemM :: ModuleItem -> Scoper Type ModuleItem
+traverseModuleItemM = traverseTypesM traverseTypeM
 
-traverseStmtM :: Stmt -> State Info Stmt
-traverseStmtM =
-    traverseStmtExprsM $ traverseNestedExprsM $ traverseExprTypesM traverseTypeM
+traverseGenItemM :: GenItem -> Scoper Type GenItem
+traverseGenItemM = traverseGenItemExprsM traverseExprM
 
-traverseTypeM :: Type -> State Info Type
+traverseStmtM :: Stmt -> Scoper Type Stmt
+traverseStmtM = traverseStmtExprsM traverseExprM
+
+traverseExprM :: Expr -> Scoper Type Expr
+traverseExprM = traverseNestedExprsM $ traverseExprTypesM traverseTypeM
+
+traverseTypeM :: Type -> Scoper Type Type
 traverseTypeM (TypeOf expr) = typeof expr
 traverseTypeM other = return other
 
-typeof :: Expr -> State Info Type
+lookupTypeOf :: Expr -> Scoper Type Type
+lookupTypeOf expr = do
+    details <- lookupExprM expr
+    case details of
+        Nothing -> return $ TypeOf expr
+        -- functions with no return type implicitly return a single bit
+        Just (_, _, Implicit Unspecified []) ->
+            return $ IntegerVector TLogic Unspecified []
+        Just (_, replacements, typ) ->
+            return $ rewriteType typ
+            where
+                rewriteType = traverseNestedTypes $ traverseTypeExprs $
+                    traverseNestedExprs replace
+                replace :: Expr -> Expr
+                replace (Ident x) =
+                    Map.findWithDefault (Ident x) x replacements
+                replace other = other
+
+typeof :: Expr -> Scoper Type Type
 typeof (Number n) =
     return $ IntegerVector TLogic sg [r]
     where
         (size, sg) = parseNumber n
         r = (Number $ show (size - 1), Number "0")
-typeof (orig @ (Ident x)) = do
-    res <- gets $ Map.lookup x
-    return $ fromMaybe (TypeOf orig) res
-typeof (orig @ (Call (Ident x) _)) = do
-    res <- gets $ Map.lookup x
-    return $ fromMaybe (TypeOf orig) res
+typeof (Call (Ident x) _) =
+    typeof $ Ident x
 typeof (orig @ (Bit e _)) = do
     t <- typeof e
-    return $ case t of
-        TypeOf _ -> TypeOf orig
-        _ -> popRange t
+    case t of
+        TypeOf _ -> lookupTypeOf orig
+        _ -> return $ popRange t
 typeof (orig @ (Range e mode r)) = do
     t <- typeof e
     return $ case t of
@@ -103,17 +104,18 @@ typeof (orig @ (Range e mode r)) = do
             IndexedMinus -> BinOp Add (uncurry (BinOp Sub) r) (Number "1")
 typeof (orig @ (Dot e x)) = do
     t <- typeof e
-    return $ case t of
+    case t of
         Struct _ fields [] ->
+            return $ fieldsType fields
+        Union _ fields [] ->
+            return $ fieldsType fields
+        _ -> lookupTypeOf orig
+    where
+        fieldsType :: [Field] -> Type
+        fieldsType fields =
             case lookup x $ map swap fields of
                 Just typ -> typ
                 Nothing -> TypeOf orig
-        _ -> TypeOf orig
-typeof (orig @ (Cast (Right (Ident x)) _)) = do
-    typeMap <- get
-    if Map.member x typeMap
-        then return $ typeOfSize (Ident x)
-        else return $ TypeOf orig
 typeof (Cast (Right s) _) = return $ typeOfSize s
 typeof (UniOp UniSub  e  ) = typeof e
 typeof (UniOp BitNot  e  ) = typeof e
@@ -135,7 +137,7 @@ typeof (Mux   _       a b) = return $ largerSizeType a b
 typeof (Concat      exprs) = return $ typeOfSize $ concatSize exprs
 typeof (Repeat reps exprs) = return $ typeOfSize size
     where size = BinOp Mul reps (concatSize exprs)
-typeof other = return $ TypeOf other
+typeof other = lookupTypeOf other
 
 -- determines the size and sign of a number literal
 parseNumber :: String -> (Int32, Signing)

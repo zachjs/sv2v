@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
@@ -25,42 +26,34 @@
 
 module Convert.MultiplePacked (convert) where
 
-import Control.Monad.State
+import Control.Monad ((>=>))
 import Data.Tuple (swap)
 import Data.Maybe (isJust)
 import qualified Data.Map.Strict as Map
 
+import Convert.Scoper
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
 type TypeInfo = (Type, [Range])
-type Info = Map.Map Identifier TypeInfo
 
 convert :: [AST] -> [AST]
-convert = map $ traverseDescriptions convertDescription
-
-convertDescription :: Description -> Description
-convertDescription part @ Part{} =
-    scopedConversion traverseDeclM traverseModuleItemM traverseStmtM
-    instances part'
-    where
-        (part', instances) = runState
-            (traverseModuleItemsM traverseInstancesM part) Map.empty
-convertDescription other = other
+convert = map $ traverseDescriptions $ partScoper
+    traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
 
 -- collects and converts declarations with multiple packed dimensions
-traverseDeclM :: Decl -> State Info Decl
+traverseDeclM :: Decl -> Scoper TypeInfo Decl
 traverseDeclM (Variable dir t ident a e) = do
     t' <- traverseTypeM t a ident
-    return $ Variable dir t' ident a e
+    traverseDeclExprsM traverseExprM $ Variable dir t' ident a e
 traverseDeclM (Param s t ident e) = do
     t' <- traverseTypeM t [] ident
-    return $ Param s t' ident e
-traverseDeclM other = return other
+    traverseDeclExprsM traverseExprM $ Param s t' ident e
+traverseDeclM other = traverseDeclExprsM traverseExprM other
 
-traverseTypeM :: Type -> [Range] -> Identifier -> State Info Type
+traverseTypeM :: Type -> [Range] -> Identifier -> Scoper TypeInfo Type
 traverseTypeM t a ident = do
-    modify $ Map.insert ident (t, a)
+    insertElem ident (t, a)
     t' <- case t of
         Struct pk fields rs -> do
             fields' <- flattenFields fields
@@ -82,18 +75,20 @@ traverseTypeM t a ident = do
             fieldTypes' <- mapM (\x -> traverseTypeM x [] "") fieldTypes
             return $ zip fieldTypes' fieldNames
 
--- converts multi-dimensional instances
-traverseInstancesM :: ModuleItem -> State Info ModuleItem
-traverseInstancesM (Instance m p x rs l) = do
+traverseModuleItemM :: ModuleItem -> Scoper TypeInfo ModuleItem
+traverseModuleItemM (Instance m p x rs l) = do
+    -- converts multi-dimensional instances
     rs' <- if length rs <= 1
         then return rs
         else do
             let t = Implicit Unspecified rs
-            modify $ Map.insert x (t, [])
+            insertElem x (t, [])
             let r1 : r2 : rest = rs
             return $ (combineRanges r1 r2) : rest
-    return $ Instance m p x rs' l
-traverseInstancesM other = return other
+    traverseExprsM traverseExprM $ Instance m p x rs' l
+traverseModuleItemM item =
+    traverseLHSsM  traverseLHSM  item >>=
+    traverseExprsM traverseExprM
 
 -- combines two ranges into one flattened range
 combineRanges :: Range -> Range -> Range
@@ -117,37 +112,38 @@ combineRanges r1 r2 = r
                 upper = BinOp Add (BinOp Mul size1 size2)
                             (BinOp Sub lower (Number "1"))
 
-traverseModuleItemM :: ModuleItem -> State Info ModuleItem
-traverseModuleItemM =
-    traverseLHSsM  traverseLHSM  >=>
-    traverseExprsM traverseExprM
-
-traverseStmtM :: Stmt -> State Info Stmt
+traverseStmtM :: Stmt -> Scoper TypeInfo Stmt
 traverseStmtM =
     traverseStmtLHSsM  traverseLHSM  >=>
     traverseStmtExprsM traverseExprM
 
-traverseExprM :: Expr -> State Info Expr
-traverseExprM = traverseNestedExprsM $ stately traverseExpr
+traverseExprM :: Expr -> Scoper TypeInfo Expr
+traverseExprM = traverseNestedExprsM convertExprM
+
+traverseGenItemM :: GenItem -> Scoper TypeInfo GenItem
+traverseGenItemM = traverseGenItemExprsM traverseExprM
 
 -- LHSs need to be converted too. Rather than duplicating the procedures, we
 -- turn LHSs into expressions temporarily and use the expression conversion.
-traverseLHSM :: LHS -> State Info LHS
+traverseLHSM :: LHS -> Scoper TypeInfo LHS
 traverseLHSM = traverseNestedLHSsM traverseLHSSingleM
     where
         -- We can't use traverseExprM directly because that would cause Exprs
         -- inside of LHSs to be converted twice in a single cycle!
-        traverseLHSSingleM :: LHS -> State Info LHS
+        traverseLHSSingleM :: LHS -> Scoper TypeInfo LHS
         traverseLHSSingleM lhs = do
             let expr = lhsToExpr lhs
-            expr' <- stately traverseExpr expr
+            expr' <- convertExprM expr
             case exprToLHS expr' of
                 Just lhs' -> return lhs'
                 Nothing -> error $ "multi-packed conversion created non-LHS from "
                     ++ (show expr) ++ " to " ++ (show expr')
 
-traverseExpr :: Info -> Expr -> Expr
-traverseExpr typeMap =
+convertExprM :: Expr -> Scoper TypeInfo Expr
+convertExprM = embedScopes convertExpr
+
+convertExpr :: Scopes TypeInfo -> Expr -> Expr
+convertExpr scopes =
     rewriteExpr
     where
         -- removes the innermost dimensions of the given type information, and
@@ -165,19 +161,17 @@ traverseExpr typeMap =
         -- given an expression, returns its type information and a tagged
         -- version of the expression, if possible
         levels :: Expr -> Maybe (TypeInfo, Expr)
-        levels (Ident x) =
-            case Map.lookup x typeMap of
-                Just a -> Just (a, Ident $ tag : x)
-                Nothing -> Nothing
         levels (Bit expr a) =
-            fmap (dropLevel $ \expr' -> Bit expr' a) (levels expr)
+            case levels expr of
+                Just info -> Just $ dropLevel (\expr' -> Bit expr' a) info
+                Nothing -> fallbackLevels $ Bit expr a
         levels (Range expr a b) =
             fmap (dropLevel $ \expr' -> Range expr' a b) (levels expr)
         levels (Dot expr x) =
             case levels expr of
                 Just ((Struct _ fields [], []), expr') -> dropDot fields expr'
                 Just ((Union  _ fields [], []), expr') -> dropDot fields expr'
-                _ -> Nothing
+                _ -> fallbackLevels $ Dot expr x
             where
                 dropDot :: [Field] -> Expr -> Maybe (TypeInfo, Expr)
                 dropDot fields expr' =
@@ -187,7 +181,14 @@ traverseExpr typeMap =
                     where
                         fieldMap = Map.fromList $ map swap fields
                         fieldType = fieldMap Map.! x
-        levels _ = Nothing
+        levels expr = fallbackLevels expr
+
+        fallbackLevels :: Expr -> Maybe (TypeInfo, Expr)
+        fallbackLevels expr =
+            fmap ((, expr) . thd3) res
+            where
+                res = lookupExpr scopes expr
+                thd3 (_, _, c) = c
 
         -- given an expression, returns the two most significant (innermost,
         -- leftmost) packed dimensions and a tagged version of the expression,

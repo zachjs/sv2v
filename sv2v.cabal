@@ -81,6 +81,7 @@ executable sv2v
     Convert.Package
     Convert.ParamType
     Convert.RemoveComments
+    Convert.Scoper
     Convert.SignCast
     Convert.Simplify
     Convert.SizeCast

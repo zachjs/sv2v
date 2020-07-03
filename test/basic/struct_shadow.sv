@@ -134,6 +134,7 @@ module top;
         input StructA b;
         input StructB c;
         input StructC d;
+        integer unused;
         input StructD e;
         input StructE f;
         $display("F: %1d%1d%1d -> ", i,j,k, a,b,c,d,e,f);
