@@ -12,7 +12,6 @@
 module Convert.TypeOf (convert) where
 
 import Data.List (elemIndex)
-import Data.Int (Int32)
 import Data.Tuple (swap)
 import qualified Data.Map.Strict as Map
 
@@ -140,7 +139,7 @@ typeof (Repeat reps exprs) = return $ typeOfSize size
 typeof other = lookupTypeOf other
 
 -- determines the size and sign of a number literal
-parseNumber :: String -> (Int32, Signing)
+parseNumber :: String -> (Integer, Signing)
 parseNumber s =
     case elemIndex '\'' s of
         Nothing  -> (32, Signed)
