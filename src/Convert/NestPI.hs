@@ -68,7 +68,7 @@ addItems pis existingPIs (item : items) =
             , collectTypesM $ collectNestedTypesM collectTypenamesM
             , collectExprsM $ collectNestedExprsM collectIdentsM
             ]
-        neededPIs = Set.difference usedPIs existingPIs
+        neededPIs = Set.difference (Set.difference usedPIs existingPIs) thisPI
         itemsToAdd = map MIPackageItem $ Map.elems $
             Map.restrictKeys pis neededPIs
 addItems _ _ [] = []

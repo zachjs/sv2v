@@ -1,6 +1,6 @@
 `define TEST(value) \
     logic [63:0] val_``value = 'value; \
-    initial $display(`"'value -> %b (%0d) %b (%0d)", \
+    initial $display(`"'value -> %b (%0d) %b (%0d)`", \
         val_``value, $bits(val_``value), \
         'value, $bits('value) \
         );
@@ -46,4 +46,69 @@ module top;
         $display($bits(type('1)));
         $display($bits(type(flag ? '1 : 'x)));
     end
+
+    parameter P = 1;
+
+    M       m1('0, '1, 'x, 'z);
+    M #( 2) m2('0, '1, 'x, 'z);
+    M #(28) m3('0, '1, 'x, 'z);
+    M #(29) m4('0, '1, 'x, 'z);
+    M #(30) m5('0, '1, 'x, 'z);
+    M #(31) m6('0, '1, 'x, 'z);
+    M #(32) m7('0, '1, 'x, 'z);
+    M #(33) m8('0, '1, 'x, 'z);
+    M #(34) m9('0, '1, 'x, 'z);
+
+    M #(31) mA(P ? '0 : '1, !P ? '0 : '1, 'x, 'z);
+    M #(34) mB(P ? '0 : '1, !P ? '0 : '1, 'x, 'z);
+    M #(31) mC(P ? '0 : '0 + '1, !P ? '0 : '0 + '1, 'x, 'z);
+    M #(34) mD(P ? '0 : '0 + '1, !P ? '0 : '0 + '1, 'x, 'z);
+
+`define TEST_OP(left, op, right, expected) \
+    $display(`"%s: (left) op (right) -> %b (ref: %b)`", \
+        ((left) op (right)) == expected ? "PASS" : "FAIL", \
+        (left) op (right), expected \
+    );
+
+    initial begin
+        `TEST_OP( 1'h1        , ==, '1, 1'b1)
+        `TEST_OP( 2'h3        , ==, '1, 1'b1)
+        `TEST_OP(31'h7fffffff , ==, '1, 1'b1)
+        `TEST_OP(32'hffffffff , ==, '1, 1'b1)
+        `TEST_OP(33'h1ffffffff, ==, '1, 1'b1)
+
+        `TEST_OP( 1'h1        , <=, '1, 1'b1)
+        `TEST_OP( 2'h3        , <=, '1, 1'b1)
+        `TEST_OP(31'h7fffffff , <=, '1, 1'b1)
+        `TEST_OP(32'hffffffff , <=, '1, 1'b1)
+        `TEST_OP(33'h1ffffffff, <=, '1, 1'b1)
+
+        `TEST_OP( 1'h1        , >=, '1, 1'b1)
+        `TEST_OP( 2'h3        , >=, '1, 1'b1)
+        `TEST_OP(31'h7fffffff , >=, '1, 1'b1)
+        `TEST_OP(32'hffffffff , >=, '1, 1'b1)
+        `TEST_OP(33'h1ffffffff, >=, '1, 1'b1)
+
+        `TEST_OP( 1'h1        , &, '1,  1'h1        )
+        `TEST_OP( 2'h3        , &, '1,  2'h3        )
+        `TEST_OP(31'h7fffffff , &, '1, 31'h7fffffff )
+        `TEST_OP(32'hffffffff , &, '1, 32'hffffffff )
+        `TEST_OP(33'h1ffffffff, &, '1, 33'h1ffffffff)
+
+        `TEST_OP(33'h1ffffffff, &, P ? '1 : '0, 33'h1ffffffff)
+        `TEST_OP(33'h1ffffffff, &, '1 & '1, 33'h1ffffffff)
+        `TEST_OP(33'h1ffffffff, &, !P ? '1 : '0 - 1, 33'h1ffffffff)
+        `TEST_OP(34'h3ffffffff, &, '0 - 1, 34'h3ffffffff)
+
+        `TEST_OP(1, ==, 2'h3 == '1, 1'b1)
+    end
+endmodule
+
+module M(a, b, c, d);
+    parameter W = 1;
+    input logic [W+0:1] a;
+    input logic [W+1:1] b;
+    input logic [W+2:1] c;
+    input logic [W+3:1] d;
+    initial $display("M W=%0d %b %b %b %b", W, a, b, c, d);
 endmodule

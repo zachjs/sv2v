@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
@@ -54,6 +55,9 @@ traverseModuleItemM item = traverseExprsM traverseExprM item
 traverseStmtM :: Stmt -> ST Stmt
 traverseStmtM stmt = traverseStmtExprsM traverseExprM stmt
 
+pattern ConvertedUU :: Char -> Expr
+pattern ConvertedUU ch = Number ['1', '\'', 's', 'b', ch]
+
 traverseExprM :: Expr -> ST Expr
 traverseExprM =
     traverseNestedExprsM convertExprM
@@ -85,6 +89,13 @@ traverseExprM =
         convertExprM other = return other
 
         convertCastM :: Expr -> Expr -> ST Expr
+        convertCastM (s @ (Number str)) (e @ (ConvertedUU ch)) = do
+            typeMap <- get
+            case (exprSigning typeMap e, readNumber str) of
+                (Just Unspecified, Just n) -> return $ Number $
+                    show n ++ "'b" ++ take (fromIntegral n) (repeat ch)
+                (Just sg, _) -> convertCastWithSigningM s e sg
+                _ -> return $ Cast (Right s) e
         convertCastM s e = do
             typeMap <- get
             case exprSigning typeMap e of
