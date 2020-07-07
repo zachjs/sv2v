@@ -192,7 +192,7 @@ convertExpr t (Mux c e1 e2) =
 -- populate arrays. Maybe this should be somewhere else?
 convertExpr (IntegerVector t sg (r:rs)) (Pattern [(":default", e)]) =
     Repeat (rangeSize r) [e']
-    where e' = convertExpr (IntegerVector t sg rs) e
+    where e' = Cast (Left $ IntegerVector t sg rs) e
 -- TODO: This is a conversion for concat array literals with elements
 -- that are unsized numbers. This probably belongs somewhere else.
 convertExpr (t @ IntegerVector{}) (Pattern items) =

@@ -97,6 +97,16 @@ module top;
 
         `TEST_OP(1, ==, 2'h3 == '1, 1'b1)
     end
+
+    parameter A = 8;
+    parameter B = 5;
+    reg [A*B-1:0] arr;
+    initial begin
+        arr = 1'sb1; $display("%b", arr);
+        arr = 1'sb0; $display("%b", arr);
+        arr = 1'sbx; $display("%b", arr);
+        arr = 1'sbz; $display("%b", arr);
+    end
 endmodule
 
 module M(a, b, c, d);

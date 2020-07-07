@@ -102,6 +102,16 @@ module top;
 
         `TEST_OP(1, ==, 2'h3 == '1, 1'b1)
     end
+
+    parameter A = 8;
+    parameter B = 5;
+    logic [A-1:0][B-1:0] arr;
+    initial begin
+        arr = '{default: '1}; $display("%b", arr);
+        arr = '{default: '0}; $display("%b", arr);
+        arr = '{default: 'x}; $display("%b", arr);
+        arr = '{default: 'z}; $display("%b", arr);
+    end
 endmodule
 
 module M(a, b, c, d);
