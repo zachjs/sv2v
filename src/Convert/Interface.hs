@@ -92,7 +92,7 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                 InterfaceT interfaceName (Just modportName) [] ->
                     when (Map.member interfaceName interfaces) $
                         writeModport interfaceName modportName
-                Alias Nothing interfaceName [] ->
+                Alias interfaceName [] ->
                     when (Map.member interfaceName interfaces) $
                         writeModport interfaceName ""
                 _ -> return ()
@@ -195,7 +195,7 @@ convertDescription interfaces modules (Part attrs extern Module lifetime name po
                         modportDecls = lookupModport interfaceItems modportName
                         modportName = case portType of
                             InterfaceT _ (Just x) [] -> x
-                            Alias Nothing _ [] -> ""
+                            Alias _ [] -> ""
                             _ -> error $ "can't deduce modport for interface "
                                     ++ interfaceName ++ " bound to port "
                                     ++ portName ++ " of module " ++ moduleName

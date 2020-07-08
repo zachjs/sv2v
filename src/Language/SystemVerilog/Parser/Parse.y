@@ -423,7 +423,7 @@ time               { Token Lit_time        _ _ }
 %left  "**"
 %right REDUCE_OP "!" "~" "++" "--"
 %left "'"
-%left  "(" ")" "[" "]" "." "::"
+%left  "(" ")" "[" "]" "." "::" "#"
 
 %%
 
@@ -444,8 +444,11 @@ Description :: { [Description] }
 
 Type :: { Type }
   : TypeNonIdent { $1 }
-  |                 Identifier Dimensions { Alias (Nothing) $1 $2 }
-  | Identifier "::" Identifier Dimensions { Alias (Just $1) $3 $4 }
+  | TypeAlias    { $1 }
+TypeAlias :: { Type }
+  :                               Identifier Dimensions { Alias   $1       $2 }
+  | Identifier               "::" Identifier Dimensions { PSAlias $1    $3 $4 }
+  | Identifier ParamBindings "::" Identifier Dimensions { CSAlias $1 $2 $4 $5 }
 TypeNonIdent :: { Type }
   : PartialType OptSigning Dimensions { $1 $2 $3 }
   | "type" "(" Expr ")" { TypeOf $3 }
@@ -626,12 +629,13 @@ DeclToken :: { DeclToken }
   | Signing                            {% posInject \p -> DTSigning  p $1 }
   | ExplicitLifetime                   {% posInject \p -> DTLifetime p $1 }
   | "const" PartialType                {% posInject \p -> DTType     p $2 }
-  | Identifier "::" Identifier         {% posInject \p -> DTPSIdent  p $1 $3 }
   | "{" StreamOp StreamSize Concat "}" {% posInject \p -> DTStream   p $2 $3           (map toLHS $4) }
   | "{" StreamOp            Concat "}" {% posInject \p -> DTStream   p $2 (Number "1") (map toLHS $3) }
   | opt("var") "type" "(" Expr ")"     {% posInject \p -> DTType     p (\Unspecified -> \[] -> TypeOf $4) }
   | "<=" opt(DelayOrEvent) Expr        {% posInject \p -> DTAsgn     p AsgnOpNonBlocking $2 $3 }
   | IncOrDecOperator                   {% posInject \p -> DTAsgn     p (AsgnOp $1) Nothing (Number "1") }
+  | Identifier               "::" Identifier {% posInject \p -> DTCSIdent p $1 [] $3 }
+  | Identifier ParamBindings "::" Identifier {% posInject \p -> DTCSIdent p $1 $2 $4 }
 DeclTokenAsgn :: { DeclToken }
   : "=" opt(DelayOrEvent) Expr {% posInject \p -> DTAsgn p AsgnOpEq $2 $3 }
   | AsgnBinOp Expr             {% posInject \p -> DTAsgn p $1 Nothing $2 }
@@ -1052,11 +1056,10 @@ ModuleParameterDecl(delim) :: { [Decl] }
   :    ParameterDecl(delim) { $1 }
   | "type" TypeAsgns delim  { map (uncurry $ ParamType Parameter) $2 }
 ParameterDecl(delim) :: { [Decl] }
-  : ParameterDeclKW                                       DeclAsgns delim { makeParamDecls $1 (Implicit Unspecified []) $2 }
-  | ParameterDeclKW                             ParamType DeclAsgns delim { makeParamDecls $1 ($2                     ) $3 }
-  | ParameterDeclKW                 Identifier Dimensions DeclAsgns delim { makeParamDecls $1 (Alias (Nothing)   $2 $3) $4 }
-  | ParameterDeclKW Identifier "::" Identifier Dimensions DeclAsgns delim { makeParamDecls $1 (Alias (Just $2)   $4 $5) $6 }
-  | ParameterDeclKW "type"                                TypeAsgns delim { map (uncurry $ ParamType $1) $3 }
+  : ParameterDeclKW           DeclAsgns delim { makeParamDecls $1 (Implicit Unspecified []) $2 }
+  | ParameterDeclKW ParamType DeclAsgns delim { makeParamDecls $1 $2 $3 }
+  | ParameterDeclKW TypeAlias DeclAsgns delim { makeParamDecls $1 $2 $3 }
+  | ParameterDeclKW "type"    TypeAsgns delim { map (uncurry $ ParamType $1) $3 }
 ParameterDeclKW :: { ParamScope }
   : "parameter"  { Parameter  }
   | "localparam" { Localparam }
@@ -1079,8 +1082,13 @@ DelayOrEvent :: { Timing }
   : DelayControl { Delay $1 }
   | EventControl { Event $1 }
 DelayControl :: { Expr }
-  : "#" DelayValue   { $2 }
-  | "#" "(" Expr ")" { $3 }
+  : "#" Number { Number $2 }
+  | "#" Time   { Time   $2 }
+  | "#" "(" Expr ")"  { $3 }
+  | "#" "(" Expr ":" Expr ":" Expr ")" { MinTypMax $3 $5 $7 }
+  | "#"                               Identifier { Ident         $2 }
+  | "#" Identifier               "::" Identifier { PSIdent $2    $4 }
+  | "#" Identifier ParamBindings "::" Identifier { CSIdent $2 $3 $5 }
 CycleDelay :: { Expr }
   : "##" Expr { $2 }
 EventControl :: { Sense }
@@ -1099,13 +1107,6 @@ Sense :: { Sense }
   | "negedge"     LHS     { SenseNegedge $2 }
   | "posedge" "(" LHS ")" { SensePosedge $3 }
   | "negedge" "(" LHS ")" { SenseNegedge $3 }
-
-DelayValue :: { Expr }
-  : Number { Number $1 }
-  | Time   { Time   $1 }
-  | Identifier { Ident $1 }
-  | Identifier "::" Identifier { PSIdent $1 $3 }
-  | "(" Expr ":" Expr ":" Expr ")" { MinTypMax $2 $4 $6 }
 
 CaseKW :: { CaseKW }
   : "case"  { CaseN }
@@ -1174,8 +1175,6 @@ Expr :: { Expr }
   | DimsFn "(" TypeOrExpr ")"   { DimsFn $1 $3 }
   | DimFn  "(" TypeOrExpr ")"   { DimFn  $1 $3 (Number "1") }
   | DimFn  "(" TypeOrExpr "," Expr ")" { DimFn $1 $3 $5 }
-  | Identifier                  { Ident $1 }
-  | Identifier "::" Identifier  { PSIdent $1 $3 }
   | Expr PartSelect             { Range $1 (fst $2) (snd $2) }
   | Expr "[" Expr "]"           { Bit   $1 $3 }
   | "{" Expr Concat "}"         { Repeat $2 $3 }
@@ -1189,6 +1188,9 @@ Expr :: { Expr }
   | "{" StreamOp            Concat "}" { Stream $2 (Number "1") $3 }
   | Expr "inside" "{" OpenRangeList "}" { Inside $1 $4 }
   | "(" Expr ":" Expr ":" Expr ")" { MinTypMax $2 $4 $6 }
+  | Identifier %prec REDUCE_OP {- defer -}   { Ident         $1 }
+  | Identifier               "::" Identifier { PSIdent $1    $3 }
+  | Identifier ParamBindings "::" Identifier { CSIdent $1 $2 $4 }
   -- binary expressions
   | Expr "||"  Expr { BinOp LogOr  $1 $3 }
   | Expr "&&"  Expr { BinOp LogAnd $1 $3 }

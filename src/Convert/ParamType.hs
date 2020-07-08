@@ -199,8 +199,7 @@ defaultTag = "_sv2v_default"
 
 -- attempt to convert an expression to syntactically equivalent type
 exprToType :: Expr -> Maybe Type
-exprToType (Ident x) = Just $ Alias Nothing x []
-exprToType (PSIdent x y) = Just $ Alias (Just x) y []
+exprToType (CSIdent x p y) = Just $ CSAlias x p y []
 exprToType (Range e NonIndexed r) =
     case exprToType e of
         Nothing -> Nothing

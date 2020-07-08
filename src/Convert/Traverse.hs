@@ -431,6 +431,10 @@ traverseNestedExprsM mapper = exprMapper
         em (Time   s) = return $ Time   s
         em (Ident  i) = return $ Ident  i
         em (PSIdent x y) = return $ PSIdent x y
+        em (CSIdent x ps y) = do
+            tes' <- mapM typeOrExprMapper $ map snd ps
+            let ps' = zip (map fst ps) tes'
+            return $ CSIdent x ps' y
         em (Range e m (e1, e2)) = do
             e' <- exprMapper e
             e1' <- exprMapper e1
@@ -517,8 +521,18 @@ exprMapperHelpers exprMapper =
         b' <- exprMapper b
         return (a', b')
 
+    typeOrExprMapper (Left t) =
+        typeMapper t >>= return . Left
+    typeOrExprMapper (Right e) =
+        exprMapper e >>= return . Right
+
     typeMapper' (TypeOf expr) =
         exprMapper expr >>= return . TypeOf
+    typeMapper' (CSAlias x pm y rs) = do
+        vals' <- mapM typeOrExprMapper $ map snd pm
+        let pm' = zip (map fst pm) vals'
+        rs' <- mapM rangeMapper rs
+        return $ CSAlias x pm' y rs'
     typeMapper' t = do
         let (tf, rs) = typeRanges t
         rs' <- mapM rangeMapper rs
@@ -855,7 +869,7 @@ traverseNestedTypesM :: Monad m => MapperM m Type -> MapperM m Type
 traverseNestedTypesM mapper = fullMapper
     where
         fullMapper = mapper >=> tm
-        tm (Alias      ps xx    rs) = return $ Alias      ps xx    rs
+        tm (CSAlias ps pm xx    rs) = return $ CSAlias ps pm xx    rs
         tm (Net           kw sg rs) = return $ Net           kw sg rs
         tm (Implicit         sg rs) = return $ Implicit         sg rs
         tm (IntegerVector kw sg rs) = return $ IntegerVector kw sg rs

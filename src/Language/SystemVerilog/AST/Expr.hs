@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  - Initial Verilog AST Author: Tom Hawkins <tomahawkins@gmail.com>
@@ -7,6 +8,8 @@
 
 module Language.SystemVerilog.AST.Expr
     ( Expr (..)
+    , pattern Ident
+    , pattern PSIdent
     , Range
     , TypeOrExpr
     , ExprOrRange
@@ -24,6 +27,8 @@ module Language.SystemVerilog.AST.Expr
     , endianCondRange
     , dimensionsSize
     , readNumber
+    , ParamBinding
+    , showParams
     ) where
 
 import Data.Bits (shiftL, shiftR)
@@ -45,8 +50,7 @@ data Expr
     = String  String
     | Number  String
     | Time    String
-    | Ident   Identifier
-    | PSIdent Identifier Identifier
+    | CSIdent Identifier [ParamBinding] Identifier
     | Range   Expr PartSelectMode Range
     | Bit     Expr Expr
     | Repeat  Expr [Expr]
@@ -66,12 +70,19 @@ data Expr
     | Nil
     deriving (Eq, Ord)
 
+pattern Ident :: Identifier -> Expr
+pattern Ident x = PSIdent "" x
+
+pattern PSIdent :: Identifier -> Identifier -> Expr
+pattern PSIdent x y = CSIdent x [] y
+
 instance Show Expr where
     show (Nil          ) = ""
     show (Number  str  ) = str
     show (Time    str  ) = str
     show (Ident   str  ) = str
     show (PSIdent x y  ) = printf "%s::%s" x y
+    show (CSIdent x p y) = printf "%s#%s::%s" x (showParams p) y
     show (String  str  ) = printf "\"%s\"" str
     show (Bit     e b  ) = printf "%s[%s]"     (show e) (show b)
     show (Range   e m r) = printf "%s[%s%s%s]" (show e) (show $ fst r) (show m) (show $ snd r)
@@ -353,3 +364,14 @@ dimensionsSize ranges =
     foldl (BinOp Mul) (Number "1") $
     map rangeSize $
     ranges
+
+type ParamBinding = (Identifier, TypeOrExpr)
+
+showParams :: [ParamBinding] -> String
+showParams params = indentedParenList $ map showParam params
+
+showParam :: ParamBinding -> String
+showParam ("*", Right Nil) = ".*"
+showParam (i, arg) =
+    printf fmt i (either show show arg)
+    where fmt = if i == "" then "%s%s" else ".%s(%s)"

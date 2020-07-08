@@ -79,10 +79,10 @@ traverseStmtM =
     traverseExprTypesM traverseTypeM >=> traverseExprM
 
 traverseTypeM :: Type -> Scoper Type Type
-traverseTypeM (Alias Nothing st rs1) = do
+traverseTypeM (Alias st rs1) = do
     details <- lookupIdentM st
     return $ case details of
-        Nothing -> Alias Nothing st rs1
+        Nothing -> Alias st rs1
         Just (_, _, typ) -> case typ of
             Net           kw sg rs2 -> Net           kw sg $ rs1 ++ rs2
             Implicit         sg rs2 -> Implicit         sg $ rs1 ++ rs2
@@ -91,7 +91,7 @@ traverseTypeM (Alias Nothing st rs1) = do
             Struct          p l rs2 -> Struct          p l $ rs1 ++ rs2
             Union           p l rs2 -> Union           p l $ rs1 ++ rs2
             InterfaceT     x my rs2 -> InterfaceT     x my $ rs1 ++ rs2
-            Alias          ps x rs2 -> Alias          ps x $ rs1 ++ rs2
+            CSAlias    ps pm xx rs2 -> CSAlias    ps pm xx $ rs1 ++ rs2
             UnpackedType  t     rs2 -> UnpackedType      t $ rs1 ++ rs2
             IntegerAtom   kw sg     -> nullRange (IntegerAtom kw sg) rs1
             NonInteger    kw        -> nullRange (NonInteger  kw   ) rs1

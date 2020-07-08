@@ -111,8 +111,8 @@ prefixPackageItem packageName idents item =
             Decl (ParamType  a x b  ) -> Decl (ParamType  a (prefix x) b  )
             other -> other
 
-        convertTypeM (Alias Nothing x rs) =
-            prefixM x >>= \x' -> return $ Alias Nothing x' rs
+        convertTypeM (Alias x rs) =
+            prefixM x >>= \x' -> return $ Alias x' rs
         convertTypeM (Enum t items rs) =
             mapM prefixItem items >>= \items' -> return $ Enum t items' rs
             where prefixItem (x, e) = prefixM x >>= \x' -> return (x', e)
@@ -201,12 +201,14 @@ traverseModuleItem _ _ item =
     where
 
         traverseExpr :: Expr -> Expr
+        traverseExpr (Ident x) = Ident x
         traverseExpr (PSIdent x y) = Ident $ x ++ "_" ++ y
         traverseExpr other = other
 
         traverseType :: Type -> Type
-        traverseType (Alias (Just ps) xx rs) =
-            Alias Nothing (ps ++ "_" ++ xx) rs
+        traverseType (Alias xx rs) = Alias xx rs
+        traverseType (PSAlias ps xx rs) =
+            Alias (ps ++ "_" ++ xx) rs
         traverseType other = other
 
 -- returns the "name" of a package item, if it has one

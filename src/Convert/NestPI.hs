@@ -94,7 +94,7 @@ collectIdentsM _ = return ()
 
 -- writes down aliased typenames
 collectTypenamesM :: Type -> Writer Idents ()
-collectTypenamesM (Alias _ x _) = tell $ Set.singleton x
+collectTypenamesM (CSAlias _ _ x _) = tell $ Set.singleton x
 collectTypenamesM _ = return ()
 
 -- returns the "name" of a package item, if it has one

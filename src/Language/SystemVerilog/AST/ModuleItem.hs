@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  - Initial Verilog AST Author: Tom Hawkins <tomahawkins@gmail.com>
@@ -8,7 +9,6 @@
 module Language.SystemVerilog.AST.ModuleItem
     ( ModuleItem    (..)
     , PortBinding
-    , ParamBinding
     , ModportDecl
     , AlwaysKW      (..)
     , NInputGateKW  (..)
@@ -24,7 +24,7 @@ import Language.SystemVerilog.AST.ShowHelp
 import Language.SystemVerilog.AST.Attr (Attr)
 import Language.SystemVerilog.AST.Decl (Direction)
 import Language.SystemVerilog.AST.Description (PackageItem)
-import Language.SystemVerilog.AST.Expr (Expr(Ident, Nil), Range, TypeOrExpr, showRanges)
+import Language.SystemVerilog.AST.Expr (Expr(Nil), pattern Ident, Range, showRanges, ParamBinding, showParams)
 import Language.SystemVerilog.AST.GenItem (GenItem)
 import Language.SystemVerilog.AST.LHS (LHS)
 import Language.SystemVerilog.AST.Stmt (Stmt, AssertionItem, Timing(Delay))
@@ -89,15 +89,6 @@ showGate kw d x args =
         delayStr = if d == Nil then "" else showPad $ Delay d
         nameStr = showPad $ Ident x
 
-showParams :: [ParamBinding] -> String
-showParams params = indentedParenList $ map showParam params
-
-showParam :: ParamBinding -> String
-showParam ("*", Right Nil) = ".*"
-showParam (i, arg) =
-    printf fmt i (either show show arg)
-    where fmt = if i == "" then "%s%s" else ".%s(%s)"
-
 showModportDecl :: ModportDecl -> String
 showModportDecl (dir, ident, t, e) =
     if e == Ident ident
@@ -105,8 +96,6 @@ showModportDecl (dir, ident, t, e) =
         else printf "%s .%s(/* type: %s */ %s)" (show dir) ident (show t) (show e)
 
 type PortBinding = (Identifier, Expr)
-
-type ParamBinding = (Identifier, TypeOrExpr)
 
 type ModportDecl = (Direction, Identifier, Type, Expr)
 
