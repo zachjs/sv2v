@@ -143,15 +143,19 @@ convert files =
         -- substitute in a particular instance's parameter types
         rewriteModule :: Description -> Instance -> Description
         rewriteModule part typeMap =
-            Part attrs extern kw ml m' p items'
+            Part attrs extern kw ml m' p (additionalParamItems ++ items')
             where
                 Part attrs extern kw ml m p items = part
                 m' = moduleInstanceName m typeMap
                 items' = map rewriteDecl items
                 rewriteDecl :: ModuleItem -> ModuleItem
                 rewriteDecl (MIPackageItem (Decl (ParamType Parameter x _))) =
-                    MIPackageItem $ Typedef (typeMap Map.! x) x
+                    MIPackageItem $ Typedef (typeMap' Map.! x) x
                 rewriteDecl other = other
+                explodedTypeMap = Map.mapWithKey prepareTypeIdents typeMap
+                typeMap' = Map.map fst explodedTypeMap
+                additionalParamItems = concatMap makeAddedParams $
+                    Map.toList $ Map.map snd explodedTypeMap
                 -- TODO FIXME: Typedef conversion must be made to handle
                 -- ParamTypes!
                 -----items' = map (traverseDecls rewriteDecl) items
@@ -159,6 +163,22 @@ convert files =
                 -----rewriteDecl (ParamType Parameter x _) =
                 -----    ParamType Localparam x (Just $ typeMap Map.! x)
                 -----rewriteDecl other = other
+
+        makeAddedParams :: (Identifier, IdentSet) -> [ModuleItem]
+        makeAddedParams (paramName, identSet) =
+            map (MIPackageItem . Decl) $
+            map toTypeParam idents ++ map toParam idents
+            where
+                idents = Set.toList identSet
+                toParam :: Identifier -> Decl
+                toParam ident =
+                    Param Parameter typ name (Number "0")
+                    where
+                        typ = Alias (addedParamTypeName paramName ident) []
+                        name = addedParamName paramName ident
+                toTypeParam :: Identifier -> Decl
+                toTypeParam ident = ParamType Parameter name Nothing
+                    where name = addedParamTypeName paramName ident
 
 -- write down module parameter names and type parameters
 collectDescriptionM :: Description -> Writer Info ()
@@ -236,9 +256,28 @@ typeHasQueries =
     (collectNestedExprsM collectUnresolvedExprM)
     where
         collectUnresolvedExprM :: Expr -> Writer [Expr] ()
+        collectUnresolvedExprM Ident{} = return ()
+        collectUnresolvedExprM (expr @ PSIdent{}) = tell [expr]
+        collectUnresolvedExprM (expr @ CSIdent{}) = tell [expr]
         collectUnresolvedExprM (expr @ DimsFn{}) = tell [expr]
         collectUnresolvedExprM (expr @ DimFn {}) = tell [expr]
         collectUnresolvedExprM _ = return ()
+
+prepareTypeIdents :: Identifier -> Type -> (Type, IdentSet)
+prepareTypeIdents prefix typ =
+    runWriter $ traverseTypeExprsM (traverseNestedExprsM prepareExprIdents) typ
+    where
+        prepareExprIdents :: Expr -> Writer IdentSet Expr
+        prepareExprIdents (Ident x) = do
+            tell $ Set.singleton x
+            return $ Ident $ prefix ++ '_' : x
+        prepareExprIdents other = return other
+
+addedParamName :: Identifier -> Identifier -> Identifier
+addedParamName paramName var = paramName ++ '_' : var
+
+addedParamTypeName :: Identifier -> Identifier -> Identifier
+addedParamTypeName paramName var = paramName ++ '_' : var ++ "_type"
 
 -- attempt to rewrite instantiations with type parameters
 convertModuleItemM :: Info -> ModuleItem -> Writer Instances ModuleItem
@@ -259,7 +298,7 @@ convertModuleItemM info (orig @ (Instance m bindings x r p)) =
     else do
         tell $ Set.singleton (m, resolvedTypes)
         let m' = moduleInstanceName m resolvedTypes
-        return $ Instance m' bindings' x r p
+        return $ Instance m' (additionalBindings ++ bindings') x r p
     where
         (paramNames, maybeTypeMap) = info Map.! m
         -- attach names to unnamed parameters
@@ -294,4 +333,21 @@ convertModuleItemM info (orig @ (Instance m bindings x r p)) =
         -- leave only the normal expression params behind
         isParamType = flip Map.member maybeTypeMap
         bindings' = filter (not . isParamType . fst) bindingsNamed
+
+        -- create additional parameters needed to specify existing type params
+        explodedTypes = Map.mapWithKey prepareTypeIdents resolvedTypes
+        additionalBindings = concatMap makeAddedParams $
+            Map.toList $ Map.map snd explodedTypes
+        makeAddedParams :: (Identifier, IdentSet) -> [ParamBinding]
+        makeAddedParams (paramName, identSet) =
+            map toTypeParam idents ++ map toParam idents
+            where
+                idents = Set.toList identSet
+                toParam :: Identifier -> ParamBinding
+                toParam ident =
+                    (addedParamName paramName ident, Right $ Ident ident)
+                toTypeParam :: Identifier -> ParamBinding
+                toTypeParam ident =
+                    (addedParamTypeName paramName ident, Left $ TypeOf $ Ident ident)
+
 convertModuleItemM _ other = return other
