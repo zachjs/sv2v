@@ -82,7 +82,7 @@ convertExpr (DimFn f (Left t) (Number str)) =
     else case f of
         FnLeft -> fst r
         FnRight -> snd r
-        FnIncrement -> endianCondExpr r (Number "1") (Number "-1")
+        FnIncrement -> endianCondExpr r (Number "1") (UniOp UniSub $ Number "1")
         FnLow -> endianCondExpr r (snd r) (fst r)
         FnHigh -> endianCondExpr r (fst r) (snd r)
         FnSize -> rangeSize r

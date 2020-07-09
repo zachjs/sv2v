@@ -89,7 +89,7 @@ makeEnumItems (itemType, l) =
                 ++ show (zip keys vals)
     where
         keys = map fst l
-        vals = tail $ scanl step (Number "-1") (map snd l)
+        vals = tail $ scanl step (UniOp UniSub $ Number "1") (map snd l)
         noDuplicates = all (null . tail . flip elemIndices vals) vals
         step :: Expr -> Expr -> Expr
         step expr Nil = simplify $ BinOp Add expr (Number "1")

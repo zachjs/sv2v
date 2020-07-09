@@ -233,10 +233,6 @@ simplify :: Expr -> Expr
 simplify (UniOp LogNot (Number "1")) = Number "0"
 simplify (UniOp LogNot (Number "0")) = Number "1"
 simplify (UniOp LogNot (BinOp Eq a b)) = BinOp Ne a b
-simplify (orig @ (UniOp UniSub (Number n))) =
-    case readNumber n of
-        Nothing -> orig
-        Just x -> Number $ show (-x)
 simplify (orig @ (Repeat (Number n) exprs)) =
     case readNumber n of
         Nothing -> orig
@@ -252,7 +248,7 @@ simplify (Concat exprs) =
 simplify (orig @ (Call (Ident "$clog2") (Args [Number n] []))) =
     case readNumber n of
         Nothing -> orig
-        Just x -> Number $ show $ clog2 x
+        Just x -> toLiteral $ clog2 x
 simplify (Mux cc e1 e2) =
     case cc' of
         Number "1" -> e1'
@@ -274,10 +270,14 @@ simplify (BinOp Add (Number n1) (BinOp Add (Number n2) e)) =
     simplify $ BinOp Add (BinOp Add (Number n1) (Number n2)) e
 simplify (BinOp Ge (BinOp Sub e (Number "1")) (Number "0")) =
     simplify $ BinOp Ge e (Number "1")
+simplify (BinOp Add e1 (UniOp UniSub e2)) =
+    simplify $ BinOp Sub e1 e2
+simplify (BinOp Add (UniOp UniSub e2) e1) =
+    simplify $ BinOp Sub e1 e2
 simplify (BinOp Add (BinOp Sub (Number n1) e) (Number n2)) =
     case (readNumber n1, readNumber n2) of
         (Just x, Just y) ->
-            simplify $ BinOp Sub (Number $ show (x + y)) e'
+            simplify $ BinOp Sub (toLiteral (x + y)) e'
         _ -> nochange
     where
         e' = simplify e
@@ -295,33 +295,33 @@ simplify (BinOp op e1 e2) =
         (Add, e, BinOp Sub (Number "0") (Number "1")) -> BinOp Sub e (Number "1")
         (_  , Number a, Number b) ->
             case (op, readNumber a, readNumber b) of
-                (Add, Just x, Just y) -> Number $ show (x + y)
-                (Sub, Just x, Just y) -> Number $ show (x - y)
-                (Mul, Just x, Just y) -> Number $ show (x * y)
+                (Add, Just x, Just y) -> toLiteral (x + y)
+                (Sub, Just x, Just y) -> toLiteral (x - y)
+                (Mul, Just x, Just y) -> toLiteral (x * y)
                 (Div, Just _, Just 0) -> Number "x"
-                (Div, Just x, Just y) -> Number $ show (x `quot` y)
-                (Mod, Just x, Just y) -> Number $ show (x `rem` y)
-                (Pow, Just x, Just y) -> Number $ show (x ^ y)
+                (Div, Just x, Just y) -> toLiteral (x `quot` y)
+                (Mod, Just x, Just y) -> toLiteral (x `rem` y)
+                (Pow, Just x, Just y) -> toLiteral (x ^ y)
                 (Eq , Just x, Just y) -> bool $ x == y
                 (Ne , Just x, Just y) -> bool $ x /= y
                 (Gt , Just x, Just y) -> bool $ x >  y
                 (Ge , Just x, Just y) -> bool $ x >= y
                 (Lt , Just x, Just y) -> bool $ x <  y
                 (Le , Just x, Just y) -> bool $ x <= y
-                (ShiftAL, Just x, Just y) -> Number $ show $ shiftL x (toInt y)
-                (ShiftAR, Just x, Just y) -> Number $ show $ shiftR x (toInt y)
-                (ShiftL , Just x, Just y) -> Number $ show $ shiftL x (toInt y)
+                (ShiftAL, Just x, Just y) -> toLiteral $ shiftL x (toInt y)
+                (ShiftAR, Just x, Just y) -> toLiteral $ shiftR x (toInt y)
+                (ShiftL , Just x, Just y) -> toLiteral $ shiftL x (toInt y)
                 (ShiftR , Just x, Just y) ->
                     if x < 0 && y > 0
                         then BinOp ShiftR (Number a) (Number b)
-                        else Number $ show $ shiftR x (toInt y)
+                        else toLiteral $ shiftR x (toInt y)
                 _ -> BinOp op e1' e2'
             where
                 toInt :: Integer -> Int
                 toInt = fromIntegral
         (Add, BinOp Add e (Number a), Number b) ->
             case (readNumber a, readNumber b) of
-                (Just x, Just y) -> BinOp Add e $ Number $ show (x + y)
+                (Just x, Just y) -> BinOp Add e $ toLiteral (x + y)
                 _ -> BinOp op e1' e2'
         (Sub, e, Number "-1") -> BinOp Add e (Number "1")
         _ -> BinOp op e1' e2'
@@ -331,6 +331,16 @@ simplify (BinOp op e1 e2) =
         bool True = Number "1"
         bool False = Number "0"
 simplify other = other
+
+toLiteral :: Integer -> Expr
+toLiteral n =
+    if n >= 4294967296
+        then Number $ show (bits n) ++ "'d" ++ show n
+        else Number $ show n
+
+bits :: Integer -> Integer
+bits 0 = 0
+bits n = 1 + bits (quot n 2)
 
 rangeSize :: Range -> Expr
 rangeSize (s, e) =

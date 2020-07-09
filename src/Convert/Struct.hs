@@ -65,8 +65,9 @@ convertStruct' isStruct sg fields =
                 else map simplify $ repeat (Number "0")
         fieldHis =
             if isStruct
-                then map simplify $ init $ scanr (BinOp Add) (Number "-1") fieldSizes
-                else map simplify $ map (BinOp Add (Number "-1")) fieldSizes
+                then map simplify $ init $ scanr (BinOp Add) minusOne fieldSizes
+                else map simplify $ map (BinOp Add minusOne) fieldSizes
+        minusOne = UniOp UniSub $ Number "1"
 
         -- create the mapping structure for the unstructured fields
         keys = map snd fields
