@@ -4,9 +4,10 @@
  - Conversion for moving top-level package items into modules
  -}
 
-module Convert.NestPI (convert) where
+module Convert.NestPI (convert, reorder) where
 
 import Control.Monad.Writer
+import Data.Maybe (mapMaybe)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
@@ -29,6 +30,9 @@ convert =
         isPI (PackageItem item) = piName item /= ""
         isPI _ = False
 
+reorder :: [AST] -> [AST]
+reorder = map $ traverseDescriptions reorderDescription
+
 -- collects packages items missing
 collectDescriptionM :: Description -> Writer PIs ()
 collectDescriptionM (PackageItem item) = do
@@ -48,6 +52,18 @@ convertDescription pis (orig @ Part{}) =
         items' = addItems pis Set.empty items
 convertDescription _ other = other
 
+-- attempt to fix simple declaration order issues
+reorderDescription :: Description -> Description
+reorderDescription (Part attrs extern kw lifetime name ports items) =
+    Part attrs extern kw lifetime name ports items'
+    where
+        items' = addItems localPIs Set.empty items
+        localPIs = Map.fromList $ mapMaybe toPIElem items
+        toPIElem :: ModuleItem -> Maybe (Identifier, PackageItem)
+        toPIElem (MIPackageItem item) = Just (piName item, item)
+        toPIElem _ = Nothing
+reorderDescription other = other
+
 -- iteratively inserts missing package items exactly where they are needed
 addItems :: PIs -> Idents -> [ModuleItem] -> [ModuleItem]
 addItems pis existingPIs (item : items) =
@@ -66,7 +82,8 @@ addItems pis existingPIs (item : items) =
         usedPIs = Set.unions $ map runner
             [ collectStmtsM collectSubroutinesM
             , collectTypesM $ collectNestedTypesM collectTypenamesM
-            , collectExprsM $ collectNestedExprsM collectIdentsM
+            , collectExprsM $ collectNestedExprsM collectExprIdentsM
+            , collectLHSsM  $ collectNestedLHSsM  collectLHSIdentsM
             ]
         neededPIs = Set.difference (Set.difference usedPIs existingPIs) thisPI
         itemsToAdd = map MIPackageItem $ Map.elems $
@@ -87,10 +104,15 @@ collectSubroutinesM (Subroutine (Ident f) _) = tell $ Set.singleton f
 collectSubroutinesM _ = return ()
 
 -- writes down the names of function calls and identifiers
-collectIdentsM :: Expr -> Writer Idents ()
-collectIdentsM (Call (Ident x) _) = tell $ Set.singleton x
-collectIdentsM (Ident x)          = tell $ Set.singleton x
-collectIdentsM _ = return ()
+collectExprIdentsM :: Expr -> Writer Idents ()
+collectExprIdentsM (Call (Ident x) _) = tell $ Set.singleton x
+collectExprIdentsM (Ident x)          = tell $ Set.singleton x
+collectExprIdentsM _ = return ()
+
+-- writes down the names of identifiers
+collectLHSIdentsM :: LHS -> Writer Idents ()
+collectLHSIdentsM (LHSIdent x) = tell $ Set.singleton x
+collectLHSIdentsM _ = return ()
 
 -- writes down aliased typenames
 collectTypenamesM :: Type -> Writer Idents ()

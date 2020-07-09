@@ -104,7 +104,8 @@ run :: [Job.Exclude] -> Phase
 run excludes = foldr (.) id $ phases excludes
 
 convert :: [Job.Exclude] -> Phase
-convert excludes = convert'
+convert excludes =
+    convert' . Convert.NestPI.reorder
     where
         convert' :: Phase
         convert' descriptions =
