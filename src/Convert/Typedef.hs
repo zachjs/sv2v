@@ -70,6 +70,10 @@ traverseDeclM decl = do
     case decl' of
         Variable{} -> return decl'
         Param{} -> return decl'
+        ParamType Localparam x (Just t) -> do
+            t' <- traverseNestedTypesM traverseTypeM t
+            insertElem x t'
+            return $ CommentDecl $ "removed localparam type " ++ x
         ParamType{} -> return decl'
         CommentDecl{} -> return decl'
 

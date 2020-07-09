@@ -147,22 +147,15 @@ convert files =
             where
                 Part attrs extern kw ml m p items = part
                 m' = moduleInstanceName m typeMap
-                items' = map rewriteDecl items
-                rewriteDecl :: ModuleItem -> ModuleItem
-                rewriteDecl (MIPackageItem (Decl (ParamType Parameter x _))) =
-                    MIPackageItem $ Typedef (typeMap' Map.! x) x
+                items' = map (traverseDecls rewriteDecl) items
+                rewriteDecl :: Decl -> Decl
+                rewriteDecl (ParamType Parameter x _) =
+                    ParamType Localparam x (Just $ typeMap' Map.! x)
                 rewriteDecl other = other
                 explodedTypeMap = Map.mapWithKey prepareTypeIdents typeMap
                 typeMap' = Map.map fst explodedTypeMap
                 additionalParamItems = concatMap makeAddedParams $
                     Map.toList $ Map.map snd explodedTypeMap
-                -- TODO FIXME: Typedef conversion must be made to handle
-                -- ParamTypes!
-                -----items' = map (traverseDecls rewriteDecl) items
-                -----rewriteDecl :: Decl -> Decl
-                -----rewriteDecl (ParamType Parameter x _) =
-                -----    ParamType Localparam x (Just $ typeMap Map.! x)
-                -----rewriteDecl other = other
 
         makeAddedParams :: (Identifier, IdentSet) -> [ModuleItem]
         makeAddedParams (paramName, identSet) =
