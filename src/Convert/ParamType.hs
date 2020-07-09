@@ -235,8 +235,6 @@ exprToType (Bit e i) =
 exprToType _ = Nothing
 
 -- checks where a type is sufficiently resolved to be substituted
--- TODO: If a type parameter contains an expression, that expression should be
--- substituted into the new module, or created as a new parameter.
 isSimpleType :: Type -> Bool
 isSimpleType typ =
     (not $ typeHasQueries typ) &&

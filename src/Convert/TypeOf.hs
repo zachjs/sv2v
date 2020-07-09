@@ -2,11 +2,6 @@
  - Author: Zachary Snow <zach@zachjs.com>
  -
  - Conversion for the `type` operator
- -
- - TODO: This conversion only supports the most basic expressions so far. We can
- - add support for range and bit accesses, struct fields, and perhaps even
- - arithmetic operations. Bits and pieces of similar logic exist in other
- - conversion.
  -}
 
 module Convert.TypeOf (convert) where
