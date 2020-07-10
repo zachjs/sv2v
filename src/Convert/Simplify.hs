@@ -44,7 +44,6 @@ traverseDeclM decl = do
 
 isSimpleExpr :: Expr -> Bool
 isSimpleExpr Ident{}   = True
-isSimpleExpr PSIdent{} = True
 isSimpleExpr Number{}  = True
 isSimpleExpr String{}  = True
 isSimpleExpr (Dot   e _  ) = isSimpleExpr e

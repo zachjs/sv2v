@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  - Initial Verilog AST Author: Tom Hawkins <tomahawkins@gmail.com>
@@ -8,8 +7,6 @@
 
 module Language.SystemVerilog.AST.Expr
     ( Expr (..)
-    , pattern Ident
-    , pattern PSIdent
     , Range
     , TypeOrExpr
     , ExprOrRange
@@ -50,6 +47,8 @@ data Expr
     = String  String
     | Number  String
     | Time    String
+    | Ident   Identifier
+    | PSIdent Identifier Identifier
     | CSIdent Identifier [ParamBinding] Identifier
     | Range   Expr PartSelectMode Range
     | Bit     Expr Expr
@@ -69,12 +68,6 @@ data Expr
     | MinTypMax Expr Expr Expr
     | Nil
     deriving (Eq, Ord)
-
-pattern Ident :: Identifier -> Expr
-pattern Ident x = PSIdent "" x
-
-pattern PSIdent :: Identifier -> Identifier -> Expr
-pattern PSIdent x y = CSIdent x [] y
 
 instance Show Expr where
     show (Nil          ) = ""

@@ -60,6 +60,10 @@ convertDescription' description =
 
 -- replace, but write down, enum types
 traverseType :: Type -> Writer Enums Type
+traverseType (Enum (t @ Alias{}) v rs) =
+    return $ Enum t v rs -- not ready
+traverseType (Enum (t @ PSAlias{}) v rs) =
+    return $ Enum t v rs -- not ready
 traverseType (Enum (t @ CSAlias{}) v rs) =
     return $ Enum t v rs -- not ready
 traverseType (Enum (Implicit sg rl) v rs) =

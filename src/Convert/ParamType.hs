@@ -212,7 +212,9 @@ defaultTag = "_sv2v_default"
 
 -- attempt to convert an expression to syntactically equivalent type
 exprToType :: Expr -> Maybe Type
-exprToType (CSIdent x p y) = Just $ CSAlias x p y []
+exprToType (Ident       x) = Just $ Alias       x []
+exprToType (PSIdent y   x) = Just $ PSAlias y   x []
+exprToType (CSIdent y p x) = Just $ CSAlias y p x []
 exprToType (Range e NonIndexed r) =
     case exprToType e of
         Nothing -> Nothing
@@ -248,7 +250,6 @@ typeHasQueries =
     (collectNestedExprsM collectUnresolvedExprM)
     where
         collectUnresolvedExprM :: Expr -> Writer [Expr] ()
-        collectUnresolvedExprM Ident{} = return ()
         collectUnresolvedExprM (expr @ PSIdent{}) = tell [expr]
         collectUnresolvedExprM (expr @ CSIdent{}) = tell [expr]
         collectUnresolvedExprM (expr @ DimsFn{}) = tell [expr]

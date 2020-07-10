@@ -201,14 +201,11 @@ traverseModuleItem _ _ item =
     where
 
         traverseExpr :: Expr -> Expr
-        traverseExpr (Ident x) = Ident x
         traverseExpr (PSIdent x y) = Ident $ x ++ "_" ++ y
         traverseExpr other = other
 
         traverseType :: Type -> Type
-        traverseType (Alias xx rs) = Alias xx rs
-        traverseType (PSAlias ps xx rs) =
-            Alias (ps ++ "_" ++ xx) rs
+        traverseType (PSAlias ps xx rs) = Alias (ps ++ "_" ++ xx) rs
         traverseType other = other
 
 -- returns the "name" of a package item, if it has one

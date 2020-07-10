@@ -869,6 +869,8 @@ traverseNestedTypesM :: Monad m => MapperM m Type -> MapperM m Type
 traverseNestedTypesM mapper = fullMapper
     where
         fullMapper = mapper >=> tm
+        tm (Alias         xx    rs) = return $ Alias         xx    rs
+        tm (PSAlias ps    xx    rs) = return $ PSAlias ps    xx    rs
         tm (CSAlias ps pm xx    rs) = return $ CSAlias ps pm xx    rs
         tm (Net           kw sg rs) = return $ Net           kw sg rs
         tm (Implicit         sg rs) = return $ Implicit         sg rs

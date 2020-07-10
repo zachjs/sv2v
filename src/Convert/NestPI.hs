@@ -116,6 +116,8 @@ collectLHSIdentsM _ = return ()
 
 -- writes down aliased typenames
 collectTypenamesM :: Type -> Writer Idents ()
+collectTypenamesM (Alias       x _) = tell $ Set.singleton x
+collectTypenamesM (PSAlias _   x _) = tell $ Set.singleton x
 collectTypenamesM (CSAlias _ _ x _) = tell $ Set.singleton x
 collectTypenamesM _ = return ()
 

@@ -65,6 +65,8 @@ convertExpr (orig @ (DimsFn FnUnpackedDimensions (Left t))) =
 convertExpr (orig @ (DimsFn FnDimensions (Left t))) =
     case t of
         IntegerAtom{} -> Number "1"
+        Alias{} -> orig
+        PSAlias{} -> orig
         CSAlias{} -> orig
         TypeOf{} -> orig
         UnpackedType t' rs ->
@@ -95,8 +97,10 @@ convertExpr (DimFn f (Left t) (Number str)) =
         Just d = dm
         r = rs !! (fromIntegral $ d - 1)
         isUnresolved :: Type -> Bool
-        isUnresolved (CSAlias{}) = True
-        isUnresolved (TypeOf{}) = True
+        isUnresolved Alias{} = True
+        isUnresolved PSAlias{} = True
+        isUnresolved CSAlias{} = True
+        isUnresolved TypeOf{} = True
         isUnresolved _ = False
 convertExpr (DimFn f (Left t) d) =
     DimFn f (Left t) d

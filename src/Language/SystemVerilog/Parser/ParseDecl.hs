@@ -38,7 +38,6 @@
 
 module Language.SystemVerilog.Parser.ParseDecl
 ( DeclToken (..)
-, pattern DTIdent
 , parseDTsAsPortDecls
 , parseDTsAsModuleItems
 , parseDTsAsDecls
@@ -58,6 +57,8 @@ data DeclToken
     | DTAutoDim  Position
     | DTAsgn     Position AsgnOp (Maybe Timing) Expr
     | DTRange    Position (PartSelectMode, Range)
+    | DTIdent    Position Identifier
+    | DTPSIdent  Position Identifier Identifier
     | DTCSIdent  Position Identifier [ParamBinding] Identifier
     | DTDir      Position Direction
     | DTType     Position (Signing -> [Range] -> Type)
@@ -70,9 +71,6 @@ data DeclToken
     | DTSigning  Position Signing
     | DTLifetime Position Lifetime
     deriving (Show, Eq)
-
-pattern DTIdent :: Position -> Identifier -> DeclToken
-pattern DTIdent p x = DTCSIdent p "" [] x
 
 -- entrypoints besides `parseDTsAsDeclOrStmt` use this to disallow `DTAsgn` with
 -- a non-blocking operator, binary assignment operator, or a timing control
@@ -227,6 +225,10 @@ parseDTsAsDecl tokens =
 -- [PUBLIC]: parser for single block item declarations or assign or arg-less
 -- subroutine call statements
 parseDTsAsDeclOrStmt :: [DeclToken] -> ([Decl], [Stmt])
+parseDTsAsDeclOrStmt [DTIdent pos f] =
+    ([], [traceStmt pos, Subroutine (Ident f) (Args [] [])])
+parseDTsAsDeclOrStmt [DTPSIdent pos ps f] =
+    ([], [traceStmt pos, Subroutine (PSIdent ps f) (Args [] [])])
 parseDTsAsDeclOrStmt [DTCSIdent pos ps pm f] =
     ([], [traceStmt pos, Subroutine (CSIdent ps pm f) (Args [] [])])
 parseDTsAsDeclOrStmt (DTAsgn pos (AsgnOp op) mt e : tok : toks) =
@@ -406,6 +408,8 @@ takeType (DTIdent _ a  : DTDot _ b      : rest) = (InterfaceT a (Just b), rest)
 takeType (DTType  _ tf : DTSigning _ sg : rest) = (tf       sg          , rest)
 takeType (DTType  _ tf                  : rest) = (tf       Unspecified , rest)
 takeType (DTSigning _ sg                : rest) = (Implicit sg          , rest)
+takeType (DTPSIdent _ ps    tn          : rest) = (PSAlias ps    tn     , rest)
+takeType (DTCSIdent _ ps pm tn          : rest) = (CSAlias ps pm tn     , rest)
 takeType (DTIdent pos tn                : rest) =
     if couldBeTypename
         then (Alias tn            ,                  rest)
@@ -419,7 +423,6 @@ takeType (DTIdent pos tn                : rest) =
                 (_, Nothing) -> True
                 -- if comma is first, then this ident is a declaration
                 (Just a, Just b) -> a < b
-takeType (DTCSIdent _ ps pm tn          : rest) = (CSAlias ps pm tn     , rest)
 takeType rest = (Implicit Unspecified, rest)
 
 takeRanges :: [DeclToken] -> ([Range], [DeclToken])
@@ -479,6 +482,8 @@ tokPos (DTComma    p) = p
 tokPos (DTAutoDim  p) = p
 tokPos (DTAsgn     p _ _ _) = p
 tokPos (DTRange    p _) = p
+tokPos (DTIdent    p _) = p
+tokPos (DTPSIdent  p _ _) = p
 tokPos (DTCSIdent  p _ _ _) = p
 tokPos (DTDir      p _) = p
 tokPos (DTType     p _) = p

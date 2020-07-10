@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE PatternSynonyms #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  - Initial Verilog AST Author: Tom Hawkins <tomahawkins@gmail.com>
@@ -11,8 +10,6 @@ module Language.SystemVerilog.AST.Type
     ( Identifier
     , Field
     , Type               (..)
-    , pattern Alias
-    , pattern PSAlias
     , Signing            (..)
     , Packing            (..)
     , NetType            (..)
@@ -45,6 +42,8 @@ data Type
     | NonInteger    NonIntegerType
     | Net           NetTypeAndStrength Signing [Range]
     | Implicit                         Signing [Range]
+    | Alias               Identifier           [Range]
+    | PSAlias  Identifier Identifier           [Range]
     | CSAlias  Identifier [ParamBinding] Identifier [Range]
     | Enum     Type         [Item]             [Range]
     | Struct   Packing      [Field]            [Range]
@@ -53,12 +52,6 @@ data Type
     | TypeOf Expr
     | UnpackedType Type [Range] -- used internally
     deriving (Eq, Ord)
-
-pattern Alias :: Identifier -> [Range] -> Type
-pattern Alias x rs = PSAlias "" x rs
-
-pattern PSAlias :: Identifier -> Identifier -> [Range] -> Type
-pattern PSAlias x y rs = CSAlias x [] y rs
 
 instance Show Type where
     show (Alias         xx    rs) = printf "%s%s" xx (showRanges rs)
@@ -102,6 +95,8 @@ instance Ord (Signing -> [Range] -> Type) where
     compare tf1 tf2 = compare (tf1 Unspecified) (tf2 Unspecified)
 
 typeRanges :: Type -> ([Range] -> Type, [Range])
+typeRanges (Alias         xx    rs) = (Alias         xx   , rs)
+typeRanges (PSAlias ps    xx    rs) = (PSAlias ps    xx   , rs)
 typeRanges (CSAlias ps pm xx    rs) = (CSAlias ps pm xx   , rs)
 typeRanges (Net           kw sg rs) = (Net           kw sg, rs)
 typeRanges (Implicit         sg rs) = (Implicit         sg, rs)

@@ -634,7 +634,7 @@ DeclToken :: { DeclToken }
   | opt("var") "type" "(" Expr ")"     {% posInject \p -> DTType     p (\Unspecified -> \[] -> TypeOf $4) }
   | "<=" opt(DelayOrEvent) Expr        {% posInject \p -> DTAsgn     p AsgnOpNonBlocking $2 $3 }
   | IncOrDecOperator                   {% posInject \p -> DTAsgn     p (AsgnOp $1) Nothing (Number "1") }
-  | Identifier               "::" Identifier {% posInject \p -> DTCSIdent p $1 [] $3 }
+  | Identifier               "::" Identifier {% posInject \p -> DTPSIdent p $1    $3 }
   | Identifier ParamBindings "::" Identifier {% posInject \p -> DTCSIdent p $1 $2 $4 }
 DeclTokenAsgn :: { DeclToken }
   : "=" opt(DelayOrEvent) Expr {% posInject \p -> DTAsgn p AsgnOpEq $2 $3 }
