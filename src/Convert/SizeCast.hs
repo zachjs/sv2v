@@ -64,7 +64,9 @@ traverseExprM =
     where
         convertExprM :: Expr -> ST Expr
         convertExprM (Cast (Right (Number s)) (Number n)) =
-            case (readNumber s, readNumber n) of
+            if elem '\'' n && s == takeWhile (/= '\'') n
+            then return $ Number n
+            else case (readNumber s, readNumber n) of
                 (Just s', Just n') ->
                     return $ Number str
                     where
