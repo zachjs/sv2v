@@ -236,6 +236,7 @@ isSimpleType typ =
         IntegerAtom  {} -> True
         NonInteger   {} -> True
         Net          {} -> True
+        Implicit     {} -> True
         Struct   _ fields _ -> all (isSimpleType . fst) fields
         Union    _ fields _ -> all (isSimpleType . fst) fields
         _ -> False
