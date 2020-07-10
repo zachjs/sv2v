@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
@@ -18,7 +19,7 @@ import Language.SystemVerilog.AST
 type MaybeTypeMap = Map.Map Identifier (Maybe Type)
 type Info = Map.Map Identifier ([Identifier], MaybeTypeMap)
 
-type Instance = Map.Map Identifier Type
+type Instance = Map.Map Identifier (Type, IdentSet)
 type Instances = Set.Set (Identifier, Instance)
 
 type IdentSet = Set.Set Identifier
@@ -150,12 +151,10 @@ convert files =
                 items' = map (traverseDecls rewriteDecl) items
                 rewriteDecl :: Decl -> Decl
                 rewriteDecl (ParamType Parameter x _) =
-                    ParamType Localparam x (Just $ typeMap' Map.! x)
+                    ParamType Localparam x (Just $ fst $ typeMap Map.! x)
                 rewriteDecl other = other
-                explodedTypeMap = Map.mapWithKey prepareTypeIdents typeMap
-                typeMap' = Map.map fst explodedTypeMap
                 additionalParamItems = concatMap makeAddedParams $
-                    Map.toList $ Map.map snd explodedTypeMap
+                    Map.toList $ Map.map snd typeMap
 
         makeAddedParams :: (Identifier, IdentSet) -> [ModuleItem]
         makeAddedParams (paramName, identSet) =
@@ -195,7 +194,7 @@ defaultInstance :: MaybeTypeMap -> Maybe Instance
 defaultInstance maybeTypeMap =
     if any isNothing maybeTypeMap
         then Nothing
-        else Just $ Map.map fromJust maybeTypeMap
+        else Just $ Map.map ((, Set.empty) . fromJust) maybeTypeMap
 
 -- generate a "unique" name for a particular module type instance
 moduleInstanceName :: Identifier -> Instance -> Identifier
@@ -282,8 +281,8 @@ convertModuleItemM info (orig @ (Instance m bindings x r p)) =
     else if any (isLeft . snd) bindings' then
         error $ "param type resolution left type params: " ++ show orig
             ++ " converted to: " ++ show bindings'
-    else if any (not . isSimpleType) resolvedTypes then do
-        let defaults = Map.map Left resolvedTypes
+    else if any (not . isSimpleType . fst) resolvedTypes then do
+        let defaults = Map.map (Left . fst) resolvedTypes
         let bindingsDefaulted = Map.toList $ Map.union bindingsMap defaults
         if isDefaultName m || bindingsDefaulted == Map.toList bindingsMap
             then return $ Instance m bindingsNamed x r p
@@ -305,19 +304,19 @@ convertModuleItemM info (orig @ (Instance m bindings x r p)) =
         -- determine the types corresponding to each type parameter
         bindingsMap = Map.fromList bindingsNamed
         resolvedTypes = Map.mapWithKey resolveType maybeTypeMap
-        resolveType :: Identifier -> Maybe Type -> Type
+        resolveType :: Identifier -> Maybe Type -> (Type, IdentSet)
         resolveType paramName defaultType =
             case (Map.lookup paramName bindingsMap, defaultType) of
-                (Nothing, Just t) -> t
+                (Nothing, Just t) -> (t, Set.empty)
                 (Nothing, Nothing) ->
                     error $ "instantiation " ++ show orig ++
                         " is missing a type parameter: " ++ paramName
-                (Just (Left t), _) -> t
+                (Just (Left t), _) -> prepareTypeIdents paramName t
                 (Just (Right e), _) ->
                     -- Some types are parsed as expressions because of the
                     -- ambiguities of defined type names.
                     case exprToType e of
-                        Just t -> t
+                        Just t -> prepareTypeIdents paramName t
                         Nothing ->
                             error $ "instantiation " ++ show orig
                                 ++ " has expr " ++ show e
@@ -328,9 +327,8 @@ convertModuleItemM info (orig @ (Instance m bindings x r p)) =
         bindings' = filter (not . isParamType . fst) bindingsNamed
 
         -- create additional parameters needed to specify existing type params
-        explodedTypes = Map.mapWithKey prepareTypeIdents resolvedTypes
         additionalBindings = concatMap makeAddedParams $
-            Map.toList $ Map.map snd explodedTypes
+            Map.toList $ Map.map snd resolvedTypes
         makeAddedParams :: (Identifier, IdentSet) -> [ParamBinding]
         makeAddedParams (paramName, identSet) =
             map toTypeParam idents ++ map toParam idents
