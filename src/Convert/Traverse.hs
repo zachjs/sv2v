@@ -8,7 +8,6 @@ module Convert.Traverse
 ( MapperM
 , Mapper
 , CollectorM
-, TFStrategy (..)
 , TypeStrategy (..)
 , unmonad
 , collectify
@@ -21,33 +20,21 @@ module Convert.Traverse
 , traverseStmtsM
 , traverseStmts
 , collectStmtsM
-, traverseStmtsM'
-, traverseStmts'
-, collectStmtsM'
 , traverseStmtLHSsM
 , traverseStmtLHSs
 , collectStmtLHSsM
 , traverseExprsM
 , traverseExprs
 , collectExprsM
-, traverseExprsM'
-, traverseExprs'
-, collectExprsM'
 , traverseStmtExprsM
 , traverseStmtExprs
 , collectStmtExprsM
 , traverseLHSsM
 , traverseLHSs
 , collectLHSsM
-, traverseLHSsM'
-, traverseLHSs'
-, collectLHSsM'
 , traverseDeclsM
 , traverseDecls
 , collectDeclsM
-, traverseDeclsM'
-, traverseDecls'
-, collectDeclsM'
 , traverseNestedTypesM
 , traverseNestedTypes
 , collectNestedTypesM
@@ -80,9 +67,6 @@ module Convert.Traverse
 , traverseAsgnsM
 , traverseAsgns
 , collectAsgnsM
-, traverseAsgnsM'
-, traverseAsgns'
-, collectAsgnsM'
 , traverseStmtAsgnsM
 , traverseStmtAsgns
 , collectStmtAsgnsM
@@ -115,11 +99,6 @@ import Language.SystemVerilog.AST
 type MapperM m t = t -> m t
 type Mapper t = t -> t
 type CollectorM m t = t -> m ()
-
-data TFStrategy
-    = IncludeTFs
-    | ExcludeTFs
-    deriving Eq
 
 data TypeStrategy
     = IncludeParamTypes
@@ -175,22 +154,16 @@ traverseModuleItems = unmonad traverseModuleItemsM
 collectModuleItemsM :: Monad m => CollectorM m ModuleItem -> CollectorM m Description
 collectModuleItemsM = collectify traverseModuleItemsM
 
-traverseStmtsM' :: Monad m => TFStrategy -> MapperM m Stmt -> MapperM m ModuleItem
-traverseStmtsM' strat mapper = moduleItemMapper
+traverseStmtsM :: Monad m => MapperM m Stmt -> MapperM m ModuleItem
+traverseStmtsM mapper = moduleItemMapper
     where
         moduleItemMapper (AlwaysC kw stmt) =
             fullMapper stmt >>= return . AlwaysC kw
         moduleItemMapper (MIPackageItem (Function lifetime ret name decls stmts)) = do
-            stmts' <-
-                if strat == IncludeTFs
-                    then mapM fullMapper stmts
-                    else return stmts
+            stmts' <- mapM fullMapper stmts
             return $ MIPackageItem $ Function lifetime ret name decls stmts'
         moduleItemMapper (MIPackageItem (Task lifetime name decls stmts)) = do
-            stmts' <-
-                if strat == IncludeTFs
-                    then mapM fullMapper stmts
-                    else return stmts
+            stmts' <- mapM fullMapper stmts
             return $ MIPackageItem $ Task lifetime name decls stmts'
         moduleItemMapper (Initial stmt) =
             fullMapper stmt >>= return . Initial
@@ -199,17 +172,10 @@ traverseStmtsM' strat mapper = moduleItemMapper
         moduleItemMapper other = return $ other
         fullMapper = traverseNestedStmtsM mapper
 
-traverseStmts' :: TFStrategy -> Mapper Stmt -> Mapper ModuleItem
-traverseStmts' strat = unmonad $ traverseStmtsM' strat
-collectStmtsM' :: Monad m => TFStrategy -> CollectorM m Stmt -> CollectorM m ModuleItem
-collectStmtsM' strat = collectify $ traverseStmtsM' strat
-
-traverseStmtsM :: Monad m => MapperM m Stmt -> MapperM m ModuleItem
-traverseStmtsM = traverseStmtsM' IncludeTFs
 traverseStmts :: Mapper Stmt -> Mapper ModuleItem
-traverseStmts = traverseStmts' IncludeTFs
+traverseStmts = unmonad traverseStmtsM
 collectStmtsM :: Monad m => CollectorM m Stmt -> CollectorM m ModuleItem
-collectStmtsM = collectStmtsM' IncludeTFs
+collectStmtsM = collectify traverseStmtsM
 
 -- private utility for turning a thing which maps over a single lever of
 -- statements into one that maps over the nested statements first, then the
@@ -582,8 +548,8 @@ exprMapperHelpers exprMapper =
         return $ GenCase e' cases'
     genItemMapper other = return other
 
-traverseExprsM' :: Monad m => TFStrategy -> MapperM m Expr -> MapperM m ModuleItem
-traverseExprsM' strat exprMapper = moduleItemMapper
+traverseExprsM :: Monad m => MapperM m Expr -> MapperM m ModuleItem
+traverseExprsM exprMapper = moduleItemMapper
     where
 
     (rangeMapper, declMapper, lhsMapper, typeMapper, genItemMapper)
@@ -628,24 +594,12 @@ traverseExprsM' strat exprMapper = moduleItemMapper
         return $ Assign opt' lhs' expr'
     moduleItemMapper (MIPackageItem (Function lifetime ret f decls stmts)) = do
         ret' <- typeMapper ret
-        decls' <-
-            if strat == IncludeTFs
-                then mapM declMapper decls
-                else return decls
-        stmts' <-
-            if strat == IncludeTFs
-                then mapM stmtMapper stmts
-                else return stmts
+        decls' <- mapM declMapper decls
+        stmts' <- mapM stmtMapper stmts
         return $ MIPackageItem $ Function lifetime ret' f decls' stmts'
     moduleItemMapper (MIPackageItem (Task lifetime f decls stmts)) = do
-        decls' <-
-            if strat == IncludeTFs
-                then mapM declMapper decls
-                else return decls
-        stmts' <-
-            if strat == IncludeTFs
-                then mapM stmtMapper stmts
-                else return stmts
+        decls' <- mapM declMapper decls
+        stmts' <- mapM stmtMapper stmts
         return $ MIPackageItem $ Task lifetime f decls' stmts'
     moduleItemMapper (Instance m p x rs l) = do
         p' <- mapM paramBindingMapper p
@@ -684,17 +638,10 @@ traverseExprsM' strat exprMapper = moduleItemMapper
         e' <- exprMapper e
         return (dir, ident, t', e')
 
-traverseExprs' :: TFStrategy -> Mapper Expr -> Mapper ModuleItem
-traverseExprs' strat = unmonad $ traverseExprsM' strat
-collectExprsM' :: Monad m => TFStrategy -> CollectorM m Expr -> CollectorM m ModuleItem
-collectExprsM' strat = collectify $ traverseExprsM' strat
-
-traverseExprsM :: Monad m => MapperM m Expr -> MapperM m ModuleItem
-traverseExprsM = traverseExprsM' IncludeTFs
 traverseExprs :: Mapper Expr -> Mapper ModuleItem
-traverseExprs = traverseExprs' IncludeTFs
+traverseExprs = unmonad traverseExprsM
 collectExprsM :: Monad m => CollectorM m Expr -> CollectorM m ModuleItem
-collectExprsM = collectExprsM' IncludeTFs
+collectExprsM = collectify traverseExprsM
 
 traverseStmtExprsM :: Monad m => MapperM m Expr -> MapperM m Stmt
 traverseStmtExprsM exprMapper = flatStmtMapper
@@ -765,9 +712,9 @@ traverseStmtExprs = unmonad traverseStmtExprsM
 collectStmtExprsM :: Monad m => CollectorM m Expr -> CollectorM m Stmt
 collectStmtExprsM = collectify traverseStmtExprsM
 
-traverseLHSsM' :: Monad m => TFStrategy -> MapperM m LHS -> MapperM m ModuleItem
-traverseLHSsM' strat mapper =
-    traverseStmtsM' strat (traverseStmtLHSsM mapper) >=> traverseModuleItemLHSsM
+traverseLHSsM :: Monad m => MapperM m LHS -> MapperM m ModuleItem
+traverseLHSsM mapper =
+    traverseStmtsM (traverseStmtLHSsM mapper) >=> traverseModuleItemLHSsM
     where
         traverseModuleItemLHSsM (Assign delay lhs expr) = do
             lhs' <- mapper lhs
@@ -800,17 +747,10 @@ traverseLHSsM' strat mapper =
             return $ GenFor (x1', e1) cc (x2', op2, e2) subItem
         traverGenItemLHSsM other = return other
 
-traverseLHSs' :: TFStrategy -> Mapper LHS -> Mapper ModuleItem
-traverseLHSs' strat = unmonad $ traverseLHSsM' strat
-collectLHSsM' :: Monad m => TFStrategy -> CollectorM m LHS -> CollectorM m ModuleItem
-collectLHSsM' strat = collectify $ traverseLHSsM' strat
-
-traverseLHSsM :: Monad m => MapperM m LHS -> MapperM m ModuleItem
-traverseLHSsM = traverseLHSsM' IncludeTFs
 traverseLHSs :: Mapper LHS -> Mapper ModuleItem
-traverseLHSs = traverseLHSs' IncludeTFs
+traverseLHSs = unmonad traverseLHSsM
 collectLHSsM :: Monad m => CollectorM m LHS -> CollectorM m ModuleItem
-collectLHSsM = collectLHSsM' IncludeTFs
+collectLHSsM = collectify traverseLHSsM
 
 traverseNestedLHSsM :: Monad m => MapperM m LHS -> MapperM m LHS
 traverseNestedLHSsM mapper = fullMapper
@@ -828,24 +768,18 @@ traverseNestedLHSs = unmonad traverseNestedLHSsM
 collectNestedLHSsM :: Monad m => CollectorM m LHS -> CollectorM m LHS
 collectNestedLHSsM = collectify traverseNestedLHSsM
 
-traverseDeclsM' :: Monad m => TFStrategy -> MapperM m Decl -> MapperM m ModuleItem
-traverseDeclsM' strat mapper item = do
+traverseDeclsM :: Monad m => MapperM m Decl -> MapperM m ModuleItem
+traverseDeclsM mapper item = do
     item' <- miMapper item
-    traverseStmtsM' strat stmtMapper item'
+    traverseStmtsM stmtMapper item'
     where
         miMapper (MIPackageItem (Decl decl)) =
             mapper decl >>= return . MIPackageItem . Decl
         miMapper (MIPackageItem (Function l t x decls stmts)) = do
-            decls' <-
-                if strat == IncludeTFs
-                    then mapM mapper decls
-                    else return decls
+            decls' <- mapM mapper decls
             return $ MIPackageItem $ Function l t x decls' stmts
         miMapper (MIPackageItem (Task l x decls stmts)) = do
-            decls' <-
-                if strat == IncludeTFs
-                    then mapM mapper decls
-                    else return decls
+            decls' <- mapM mapper decls
             return $ MIPackageItem $ Task l x decls' stmts
         miMapper other = return other
         stmtMapper (Block kw name decls stmts) = do
@@ -853,17 +787,10 @@ traverseDeclsM' strat mapper item = do
             return $ Block kw name decls' stmts
         stmtMapper other = return other
 
-traverseDecls' :: TFStrategy -> Mapper Decl -> Mapper ModuleItem
-traverseDecls' strat = unmonad $ traverseDeclsM' strat
-collectDeclsM' :: Monad m => TFStrategy -> CollectorM m Decl -> CollectorM m ModuleItem
-collectDeclsM' strat = collectify $ traverseDeclsM' strat
-
-traverseDeclsM :: Monad m => MapperM m Decl -> MapperM m ModuleItem
-traverseDeclsM = traverseDeclsM' IncludeTFs
 traverseDecls :: Mapper Decl -> Mapper ModuleItem
-traverseDecls = traverseDecls' IncludeTFs
+traverseDecls = unmonad traverseDeclsM
 collectDeclsM :: Monad m => CollectorM m Decl -> CollectorM m ModuleItem
-collectDeclsM = collectDeclsM' IncludeTFs
+collectDeclsM = collectify traverseDeclsM
 
 traverseNestedTypesM :: Monad m => MapperM m Type -> MapperM m Type
 traverseNestedTypesM mapper = fullMapper
@@ -1055,8 +982,8 @@ traverseSinglyNestedGenItemsM fullMapper = gim
             return $ GenModuleItem moduleItem
         gim (GenNull) = return GenNull
 
-traverseAsgnsM' :: Monad m => TFStrategy -> MapperM m (LHS, Expr) -> MapperM m ModuleItem
-traverseAsgnsM' strat mapper = moduleItemMapper
+traverseAsgnsM :: Monad m => MapperM m (LHS, Expr) -> MapperM m ModuleItem
+traverseAsgnsM mapper = moduleItemMapper
     where
         moduleItemMapper = miMapperA >=> miMapperB
 
@@ -1068,20 +995,13 @@ traverseAsgnsM' strat mapper = moduleItemMapper
             return $ Defparam lhs' expr'
         miMapperA other = return other
 
-        miMapperB = traverseStmtsM' strat stmtMapper
+        miMapperB = traverseStmtsM stmtMapper
         stmtMapper = traverseStmtAsgnsM mapper
 
-traverseAsgns' :: TFStrategy -> Mapper (LHS, Expr) -> Mapper ModuleItem
-traverseAsgns' strat = unmonad $ traverseAsgnsM' strat
-collectAsgnsM' :: Monad m => TFStrategy -> CollectorM m (LHS, Expr) -> CollectorM m ModuleItem
-collectAsgnsM' strat = collectify $ traverseAsgnsM' strat
-
-traverseAsgnsM :: Monad m => MapperM m (LHS, Expr) -> MapperM m ModuleItem
-traverseAsgnsM = traverseAsgnsM' IncludeTFs
 traverseAsgns :: Mapper (LHS, Expr) -> Mapper ModuleItem
-traverseAsgns = traverseAsgns' IncludeTFs
+traverseAsgns = unmonad traverseAsgnsM
 collectAsgnsM :: Monad m => CollectorM m (LHS, Expr) -> CollectorM m ModuleItem
-collectAsgnsM = collectAsgnsM' IncludeTFs
+collectAsgnsM = collectify traverseAsgnsM
 
 traverseStmtAsgnsM :: Monad m => MapperM m (LHS, Expr) -> MapperM m Stmt
 traverseStmtAsgnsM mapper = stmtMapper
