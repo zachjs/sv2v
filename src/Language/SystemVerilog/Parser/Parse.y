@@ -295,6 +295,7 @@ import Language.SystemVerilog.Parser.Tokens
 simpleIdentifier   { Token Id_simple       _ _ }
 escapedIdentifier  { Token Id_escaped      _ _ }
 systemIdentifier   { Token Id_system       _ _ }
+real               { Token Lit_real        _ _ }
 number             { Token Lit_number      _ _ }
 string             { Token Lit_string      _ _ }
 time               { Token Lit_time        _ _ }
@@ -630,10 +631,10 @@ DeclToken :: { DeclToken }
   | ExplicitLifetime                   {% posInject \p -> DTLifetime p $1 }
   | "const" PartialType                {% posInject \p -> DTType     p $2 }
   | "{" StreamOp StreamSize Concat "}" {% posInject \p -> DTStream   p $2 $3           (map toLHS $4) }
-  | "{" StreamOp            Concat "}" {% posInject \p -> DTStream   p $2 (Number "1") (map toLHS $3) }
+  | "{" StreamOp            Concat "}" {% posInject \p -> DTStream   p $2 (RawNum 1) (map toLHS $3) }
   | opt("var") "type" "(" Expr ")"     {% posInject \p -> DTType     p (\Unspecified -> \[] -> TypeOf $4) }
   | "<=" opt(DelayOrEvent) Expr        {% posInject \p -> DTAsgn     p AsgnOpNonBlocking $2 $3 }
-  | IncOrDecOperator                   {% posInject \p -> DTAsgn     p (AsgnOp $1) Nothing (Number "1") }
+  | IncOrDecOperator                   {% posInject \p -> DTAsgn     p (AsgnOp $1) Nothing (RawNum 1) }
   | Identifier               "::" Identifier {% posInject \p -> DTPSIdent p $1    $3 }
   | Identifier ParamBindings "::" Identifier {% posInject \p -> DTCSIdent p $1 $2 $4 }
 DeclTokenAsgn :: { DeclToken }
@@ -905,7 +906,7 @@ DimensionsNonEmpty :: { [Range] }
   | DimensionsNonEmpty Dimension { $1 ++ [$2] }
 Dimension :: { Range }
   : Range        { $1 }
-  | "[" Expr "]" { (Number "0", BinOp Sub $2 (Number "1")) }
+  | "[" Expr "]" { (RawNum 0, BinOp Sub $2 (RawNum 1)) }
 
 DeclAsgns :: { [(Identifier, Expr, [Range])] }
   : DeclAsgn               { [$1] }
@@ -928,8 +929,8 @@ LHS :: { LHS }
   | LHS "[" Expr "]"   { LHSBit    $1 $3 }
   | LHS "." Identifier { LHSDot    $1 $3 }
   | LHSConcat          { LHSConcat $1    }
-  | "{" StreamOp StreamSize Concat "}" { LHSStream $2 $3           (map toLHS $4) }
-  | "{" StreamOp            Concat "}" { LHSStream $2 (Number "1") (map toLHS $3) }
+  | "{" StreamOp StreamSize Concat "}" { LHSStream $2 $3         (map toLHS $4) }
+  | "{" StreamOp            Concat "}" { LHSStream $2 (RawNum 1) (map toLHS $3) }
 
 LHSConcat :: { [LHS] }
   : "{" LHSs "}" { $2 }
@@ -972,8 +973,8 @@ StmtAsgn :: { Stmt }
   : LHS "="  opt(DelayOrEvent) Expr ";" { Asgn AsgnOpEq $3 $1 $4 }
   | LHS "<=" opt(DelayOrEvent) Expr ";" { Asgn AsgnOpNonBlocking $3 $1 $4 }
   | LHS AsgnBinOp              Expr ";" { Asgn $2  Nothing $1 $3 }
-  | LHS IncOrDecOperator ";" { Asgn (AsgnOp $2) Nothing $1 (Number "1") }
-  | IncOrDecOperator LHS ";" { Asgn (AsgnOp $1) Nothing $2 (Number "1") }
+  | LHS IncOrDecOperator ";" { Asgn (AsgnOp $2) Nothing $1 (RawNum 1) }
+  | IncOrDecOperator LHS ";" { Asgn (AsgnOp $1) Nothing $2 (RawNum 1) }
   | LHS          ";" { Subroutine (lhsToExpr $1) (Args [] []) }
   | LHS CallArgs ";" { Subroutine (lhsToExpr $1) $2 }
 StmtNonAsgn :: { Stmt }
@@ -1021,7 +1022,7 @@ ForInit :: { Either [Decl] [(LHS, Expr)] }
   | DeclTokens(";") { parseDTsAsDeclsOrAsgns $1 }
 
 ForCond :: { Expr }
-  :      ";" { Number "1" }
+  :      ";" { RawNum 1 }
   | Expr ";" { $1 }
 
 ForStep :: { [(LHS, AsgnOp, Expr)] }
@@ -1032,8 +1033,8 @@ ForStepNonEmpty :: { [(LHS, AsgnOp, Expr)] }
   | ForStepNonEmpty "," ForStepAssignment { $1 ++ [$3] }
 ForStepAssignment :: { (LHS, AsgnOp, Expr) }
   : LHS AsgnOp Expr { ($1, $2, $3) }
-  | IncOrDecOperator LHS { ($2, AsgnOp $1, Number "1") }
-  | LHS IncOrDecOperator { ($1, AsgnOp $2, Number "1") }
+  | IncOrDecOperator LHS { ($2, AsgnOp $1, RawNum 1) }
+  | LHS IncOrDecOperator { ($1, AsgnOp $2, RawNum 1) }
 
 IdxVars :: { [Identifier] }
   : "[" IdxVarsInside "]" { $2 }
@@ -1122,8 +1123,11 @@ InsideCase :: { ([ExprOrRange], Stmt) }
   : OpenRangeList ":"  Stmt { ($1, $3) }
   | "default" opt(":") Stmt { ([], $3) }
 
-Number :: { String }
-  : number    { tokenString $1 }
+Real :: { String }
+  : real { tokenString $1 }
+
+Number :: { Number }
+  : number { parseNumber $ tokenString $1 }
 
 String :: { String }
   : string { tail $ init $ tokenString $1 }
@@ -1169,11 +1173,12 @@ ValueRange :: { ExprOrRange }
 Expr :: { Expr }
   : "(" Expr ")"                { $2 }
   | String                      { String $1 }
+  | Real                        { Real   $1 }
   | Number                      { Number $1 }
   | Time                        { Time   $1 }
   | Expr CallArgs               { Call $1 $2 }
   | DimsFn "(" TypeOrExpr ")"   { DimsFn $1 $3 }
-  | DimFn  "(" TypeOrExpr ")"   { DimFn  $1 $3 (Number "1") }
+  | DimFn  "(" TypeOrExpr ")"   { DimFn  $1 $3 (RawNum 1) }
   | DimFn  "(" TypeOrExpr "," Expr ")" { DimFn $1 $3 $5 }
   | Expr PartSelect             { Range $1 (fst $2) (snd $2) }
   | Expr "[" Expr "]"           { Bit   $1 $3 }
@@ -1184,8 +1189,8 @@ Expr :: { Expr }
   | "'" "{" PatternItems "}"    { Pattern $3 }
   | CastingType "'" "(" Expr ")" { Cast (Left  $1) $4 }
   | Expr        "'" "(" Expr ")" { Cast (Right $1) $4 }
-  | "{" StreamOp StreamSize Concat "}" { Stream $2 $3           $4 }
-  | "{" StreamOp            Concat "}" { Stream $2 (Number "1") $3 }
+  | "{" StreamOp StreamSize Concat "}" { Stream $2 $3         $4 }
+  | "{" StreamOp            Concat "}" { Stream $2 (RawNum 1) $3 }
   | Expr "inside" "{" OpenRangeList "}" { Inside $1 $4 }
   | "(" Expr ":" Expr ":" Expr ")" { MinTypMax $2 $4 $6 }
   | Identifier %prec REDUCE_OP {- defer -}   { Ident         $1 }
@@ -1302,8 +1307,8 @@ GenvarInitialization :: { Expr -> (Identifier, AsgnOp, Expr) -> GenItem -> GenIt
 
 GenvarIteration :: { (Identifier, AsgnOp, Expr) }
   : Identifier AsgnOp Expr { ($1, $2, $3) }
-  | IncOrDecOperator Identifier { ($2, AsgnOp $1, Number "1") }
-  | Identifier IncOrDecOperator { ($1, AsgnOp $2, Number "1") }
+  | IncOrDecOperator Identifier { ($2, AsgnOp $1, RawNum 1) }
+  | Identifier IncOrDecOperator { ($1, AsgnOp $2, RawNum 1) }
 
 AsgnOp :: { AsgnOp }
   : "=" { AsgnOpEq }

@@ -34,7 +34,7 @@ import qualified Data.Map.Strict as Map
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type Patterns = Map.Map Identifier String
+type Patterns = Map.Map Identifier Number
 
 convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
@@ -64,10 +64,7 @@ traverseExprM = traverseNestedExprsM $ stately convertExpr
 
 isPlainPattern :: Patterns -> Expr -> Bool
 isPlainPattern _ (Number n) =
-    not $ any isWildcardChar n
-    where
-        isWildcardChar :: Char -> Bool
-        isWildcardChar = flip elem "xzXZ?"
+    numberToInteger n /= Nothing
 isPlainPattern patterns (Ident x) =
     case Map.lookup x patterns of
         Nothing -> False
@@ -81,7 +78,7 @@ convertExpr patterns (BinOp WEq l r) =
         else
             BinOp BitAnd couldMatch $
             BinOp BitOr  noExtraXZs $
-            Number "1'bx"
+            Number (Based 1 False Binary 0 1)
     where
         lxl = BinOp BitXor l l
         rxr = BinOp BitXor r r

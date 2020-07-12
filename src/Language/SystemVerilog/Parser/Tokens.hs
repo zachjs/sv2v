@@ -302,6 +302,7 @@ data TokenName
     | Id_simple
     | Id_escaped
     | Id_system
+    | Lit_real
     | Lit_number
     | Lit_string
     | Lit_time

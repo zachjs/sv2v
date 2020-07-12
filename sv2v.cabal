@@ -43,6 +43,7 @@ executable sv2v
     Language.SystemVerilog.AST.GenItem
     Language.SystemVerilog.AST.LHS
     Language.SystemVerilog.AST.ModuleItem
+    Language.SystemVerilog.AST.Number
     Language.SystemVerilog.AST.Op
     Language.SystemVerilog.AST.ShowHelp
     Language.SystemVerilog.AST.Stmt
@@ -64,6 +65,7 @@ executable sv2v
     Convert.DuplicateGenvar
     Convert.EmptyArgs
     Convert.Enum
+    Convert.ExprUtils
     Convert.ForDecl
     Convert.Foreach
     Convert.FuncRet

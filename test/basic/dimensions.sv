@@ -25,6 +25,14 @@ module top;
         $display($size(Ram[0]));
         $display($bits(foo));
 
+        $display("args %b", $size(RamPair, 1));
+        $display("args %b", $size(RamPair, 1'b1));
+        $display("args %b", $size(RamPair, '1));
+        $display("args %b", $size(RamPair, 'o1));
+        $display("args %b", $size(RamPair, 1'h1));
+        $display("args %b", $size(RamPair, 1'd1));
+        $display("args %b", $size(RamPair, 1'dx));
+
         `EXHAUST(Ram);
         `EXHAUST(Ram[0+:2]);
         `EXHAUST(Ram[1+:2]);

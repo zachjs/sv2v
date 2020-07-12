@@ -12,6 +12,7 @@ import Control.Monad.Writer
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
+import Convert.ExprUtils
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
@@ -55,8 +56,8 @@ traverseModuleItemM item = traverseExprsM traverseExprM item
 traverseStmtM :: Stmt -> ST Stmt
 traverseStmtM stmt = traverseStmtExprsM traverseExprM stmt
 
-pattern ConvertedUU :: Char -> Expr
-pattern ConvertedUU ch = Number ['1', '\'', 's', 'b', ch]
+pattern ConvertedUU :: Integer -> Integer -> Expr
+pattern ConvertedUU a b = Number (Based 1 True Binary a b)
 
 traverseExprM :: Expr -> ST Expr
 traverseExprM =
@@ -64,16 +65,25 @@ traverseExprM =
     where
         convertExprM :: Expr -> ST Expr
         convertExprM (Cast (Right (Number s)) (Number n)) =
-            if elem '\'' n && s == takeWhile (/= '\'') n
-            then return $ Number n
-            else case (readNumber s, readNumber n) of
-                (Just s', Just n') ->
-                    return $ Number str
+            case n of
+                UnbasedUnsized{} -> fallback
+                Decimal (-32) True val ->
+                    num $ Decimal (fromIntegral size) False val'
                     where
-                        str = (show size) ++ "'d"  ++ (show num)
-                        size = s'
-                        num = n' `mod` (2 ^ s')
-                _ -> convertCastM (Number s) (Number n)
+                        Just size = numberToInteger s
+                        val' = val `mod` (2 ^ size)
+                Decimal size signed val ->
+                    if sizesMatch
+                        then num $ Decimal (abs size) signed val
+                        else fallback
+                Based size signed base vals knds ->
+                    if sizesMatch
+                        then num $ Based (abs size) signed base vals knds
+                        else fallback
+            where
+                sizesMatch = numberToInteger s == Just (numberBitLength n)
+                fallback = convertCastM (Number s) (Number n)
+                num = return . Number
         convertExprM (orig @ (Cast (Right DimsFn{}) _)) =
             return orig
         convertExprM (Cast (Right (Ident x)) e) = do
@@ -91,13 +101,13 @@ traverseExprM =
         convertExprM other = return other
 
         convertCastM :: Expr -> Expr -> ST Expr
-        convertCastM (s @ (Number str)) (e @ (ConvertedUU ch)) = do
-            typeMap <- get
-            case (exprSigning typeMap e, readNumber str) of
-                (Just Unspecified, Just n) -> return $ Number $
-                    show n ++ "'b" ++ take (fromIntegral n) (repeat ch)
-                (Just sg, _) -> convertCastWithSigningM s e sg
-                _ -> return $ Cast (Right s) e
+        convertCastM (RawNum n) (ConvertedUU a b) =
+            return $ Number $ Based (fromIntegral n) False Binary
+                (extend a) (extend b)
+            where
+                extend 0 = 0
+                extend 1 = (2 ^ n) - 1
+                extend _ = error "not possible"
         convertCastM s e = do
             typeMap <- get
             case exprSigning typeMap e of
@@ -117,7 +127,7 @@ castFn e sg =
     Function Automatic t fnName [decl] [Return $ Ident inp]
     where
         inp = "inp"
-        r = (simplify $ BinOp Sub e (Number "1"), Number "0")
+        r = (simplify $ BinOp Sub e (RawNum 1), RawNum 0)
         t = IntegerVector TLogic sg [r]
         fnName = castFnName e sg
         decl = Variable Input t inp [] Nil
@@ -130,7 +140,7 @@ castFnName e sg =
     where
         sizeStr = case e of
             Number n ->
-                case readNumber n of
+                case numberToInteger n of
                     Just v -> show v
                     _ -> shortHash e
             _ -> shortHash e

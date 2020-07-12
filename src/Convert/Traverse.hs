@@ -78,6 +78,9 @@ module Convert.Traverse
 , traverseNestedExprsM
 , traverseNestedExprs
 , collectNestedExprsM
+, traverseSinglyNestedExprsM
+, traverseSinglyNestedExprs
+, collectSinglyNestedExprsM
 , traverseNestedLHSsM
 , traverseNestedLHSs
 , collectNestedLHSsM
@@ -211,8 +214,13 @@ traverseSinglyNestedStmtsM fullMapper = cs
         cs (DoWhile e stmt) = fullMapper stmt >>= return . DoWhile e
         cs (Forever   stmt) = fullMapper stmt >>= return . Forever
         cs (Foreach x vars stmt) = fullMapper stmt >>= return . Foreach x vars
-        cs (If NoCheck (Number "1") s _) = fullMapper s
-        cs (If NoCheck (Number "0") _ s) = fullMapper s
+        cs (If NoCheck (Number n) s1 s2) = do
+            s1' <- fullMapper s1
+            s2' <- fullMapper s2
+            return $ case numberToInteger n of
+                Nothing -> If NoCheck (Number n) s1' s2'
+                Just 0 -> s2'
+                Just _ -> s1'
         cs (If u e s1 s2) = do
             s1' <- fullMapper s1
             s2' <- fullMapper s2
@@ -379,8 +387,16 @@ collectStmtLHSsM = collectify traverseStmtLHSsM
 
 traverseNestedExprsM :: Monad m => MapperM m Expr -> MapperM m Expr
 traverseNestedExprsM mapper = exprMapper
+    where exprMapper = mapper >=> traverseSinglyNestedExprsM exprMapper
+
+traverseNestedExprs :: Mapper Expr -> Mapper Expr
+traverseNestedExprs = unmonad traverseNestedExprsM
+collectNestedExprsM :: Monad m => CollectorM m Expr -> CollectorM m Expr
+collectNestedExprsM = collectify traverseNestedExprsM
+
+traverseSinglyNestedExprsM :: Monad m => MapperM m Expr -> MapperM m Expr
+traverseSinglyNestedExprsM exprMapper = em
     where
-        exprMapper = mapper >=> em
         (_, _, _, typeMapper, _) = exprMapperHelpers exprMapper
         typeOrExprMapper (Left t) =
             typeMapper t >>= return . Left
@@ -393,7 +409,8 @@ traverseNestedExprsM mapper = exprMapper
             e2' <- exprMapper e2
             return $ Right (e1', e2')
         em (String s) = return $ String s
-        em (Number s) = return $ Number s
+        em (Real   s) = return $ Real   s
+        em (Number n) = return $ Number n
         em (Time   s) = return $ Time   s
         em (Ident  i) = return $ Ident  i
         em (PSIdent x y) = return $ PSIdent x y
@@ -465,6 +482,11 @@ traverseNestedExprsM mapper = exprMapper
             e3' <- exprMapper e3
             return $ MinTypMax e1' e2' e3'
         em (Nil) = return Nil
+
+traverseSinglyNestedExprs :: Mapper Expr -> Mapper Expr
+traverseSinglyNestedExprs = unmonad traverseSinglyNestedExprsM
+collectSinglyNestedExprsM :: Monad m => CollectorM m Expr -> CollectorM m Expr
+collectSinglyNestedExprsM = collectify traverseSinglyNestedExprsM
 
 exprMapperHelpers :: Monad m => MapperM m Expr ->
     ( MapperM m Range
@@ -1033,8 +1055,11 @@ traverseNestedModuleItemsM mapper = fullMapper
                 Generate subItems -> GenBlock "" subItems
                 _ -> GenModuleItem moduleItem'
         genItemMapper (GenIf _ GenNull GenNull) = return GenNull
-        genItemMapper (GenIf (Number "1") s _) = return s
-        genItemMapper (GenIf (Number "0") _ s) = return s
+        genItemMapper (GenIf (Number n) s1 s2) = do
+            case numberToInteger n of
+                Nothing -> return $ GenIf (Number n) s1 s2
+                Just 0 -> genItemMapper s2
+                Just _ -> genItemMapper s1
         genItemMapper (GenBlock "" [item]) = return item
         genItemMapper (GenBlock _ []) = return GenNull
         genItemMapper other = return other
@@ -1048,11 +1073,6 @@ traverseNestedStmts :: Mapper Stmt -> Mapper Stmt
 traverseNestedStmts = unmonad traverseNestedStmtsM
 collectNestedStmtsM :: Monad m => CollectorM m Stmt -> CollectorM m Stmt
 collectNestedStmtsM = collectify traverseNestedStmtsM
-
-traverseNestedExprs :: Mapper Expr -> Mapper Expr
-traverseNestedExprs = unmonad traverseNestedExprsM
-collectNestedExprsM :: Monad m => CollectorM m Expr -> CollectorM m Expr
-collectNestedExprsM = collectify traverseNestedExprsM
 
 -- Traverse all the declaration scopes within a ModuleItem. Note that Functions,
 -- Tasks, Always/Initial/Final blocks are all NOT passed through ModuleItem

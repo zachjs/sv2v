@@ -6,7 +6,6 @@
 
 module Convert.TypeOf (convert) where
 
-import Data.List (elemIndex)
 import Data.Tuple (swap)
 import qualified Data.Map.Strict as Map
 
@@ -76,8 +75,9 @@ typeof :: Expr -> Scoper Type Type
 typeof (Number n) =
     return $ IntegerVector TLogic sg [r]
     where
-        (size, sg) = parseNumber n
-        r = (Number $ show (size - 1), Number "0")
+        r = (RawNum $ size - 1, RawNum 0)
+        size = numberBitLength n
+        sg = if numberIsSigned n then Signed else Unspecified
 typeof (Call (Ident x) _) =
     typeof $ Ident x
 typeof (orig @ (Bit e _)) = do
@@ -94,8 +94,8 @@ typeof (orig @ (Range e mode r)) = do
         lo = fst r
         hi = case mode of
             NonIndexed   -> snd r
-            IndexedPlus  -> BinOp Sub (uncurry (BinOp Add) r) (Number "1")
-            IndexedMinus -> BinOp Add (uncurry (BinOp Sub) r) (Number "1")
+            IndexedPlus  -> BinOp Sub (uncurry (BinOp Add) r) (RawNum 1)
+            IndexedMinus -> BinOp Add (uncurry (BinOp Sub) r) (RawNum 1)
 typeof (orig @ (Dot e x)) = do
     t <- typeof e
     case t of
@@ -133,19 +133,6 @@ typeof (Repeat reps exprs) = return $ typeOfSize size
     where size = BinOp Mul reps (concatSize exprs)
 typeof other = lookupTypeOf other
 
--- determines the size and sign of a number literal
-parseNumber :: String -> (Integer, Signing)
-parseNumber s =
-    case elemIndex '\'' s of
-        Nothing  -> (32, Signed)
-        Just 0   -> parseNumber $ '3' : '2' : s
-        Just idx -> (size, signing)
-            where
-                Just size = readNumber $ take idx s
-                signing = case drop (idx + 1) s of
-                    's' : _ -> Signed
-                    _       -> Unsigned
-
 -- produces a type large enough to hold either expression
 largerSizeType :: Expr -> Expr -> Type
 largerSizeType a b =
@@ -158,7 +145,7 @@ largerSizeType a b =
 -- returns the total size of concatenated list of expressions
 concatSize :: [Expr] -> Expr
 concatSize exprs =
-    foldl (BinOp Add) (Number "0") $
+    foldl (BinOp Add) (RawNum 0) $
     map sizeof exprs
     where
         sizeof = DimsFn FnBits . Right
@@ -166,10 +153,10 @@ concatSize exprs =
 -- produces a generic type of the given size
 typeOfSize :: Expr -> Type
 typeOfSize size =
-    IntegerVector TLogic sg [(hi, Number "0")]
+    IntegerVector TLogic sg [(hi, RawNum 0)]
     where
         sg = Unspecified -- suitable for now
-        hi = BinOp Sub size (Number "1")
+        hi = BinOp Sub size (RawNum 1)
 
 -- combines a type with unpacked ranges
 injectRanges :: Type -> [Range] -> Type

@@ -13,6 +13,7 @@ import Data.Maybe (isJust, isNothing, fromJust)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
+import Convert.ExprUtils
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
@@ -164,7 +165,7 @@ convert files =
                 idents = Set.toList identSet
                 toParam :: Identifier -> Decl
                 toParam ident =
-                    Param Parameter typ name (Number "0")
+                    Param Parameter typ name (RawNum 0)
                     where
                         typ = Alias (addedParamTypeName paramName ident) []
                         name = addedParamName paramName ident
@@ -225,7 +226,7 @@ exprToType (Bit e i) =
         Just t -> Just $ tf (rs ++ [r])
             where
                 (tf, rs) = typeRanges t
-                r = (simplify $ BinOp Sub i (Number "1"), Number "0")
+                r = (simplify $ BinOp Sub i (RawNum 1), RawNum 0)
 exprToType _ = Nothing
 
 -- checks where a type is sufficiently resolved to be substituted

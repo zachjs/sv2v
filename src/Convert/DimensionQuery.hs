@@ -19,8 +19,7 @@
 
 module Convert.DimensionQuery (convert) where
 
-import Data.List (elemIndex)
-
+import Convert.ExprUtils
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
@@ -37,9 +36,9 @@ elaborateType (IntegerAtom t sg) =
     IntegerVector TLogic sg [(hi, lo)]
     where
         size = atomSize t
-        hi = Number $ show (size - 1)
-        lo = Number "0"
-        atomSize :: IntegerAtomType -> Int
+        hi = RawNum $ size - 1
+        lo = RawNum 0
+        atomSize :: IntegerAtomType -> Integer
         atomSize TByte = 8
         atomSize TShortint = 16
         atomSize TInt = 32
@@ -59,32 +58,32 @@ convertExpr (DimFn fn (Right e) d) =
     DimFn fn (Left $ TypeOf e) d
 convertExpr (orig @ (DimsFn FnUnpackedDimensions (Left t))) =
     case t of
-        UnpackedType _ rs -> Number $ show $ length rs
+        UnpackedType _ rs -> RawNum $ fromIntegral $ length rs
         TypeOf{} -> orig
-        _ -> Number "0"
+        _ -> RawNum 0
 convertExpr (orig @ (DimsFn FnDimensions (Left t))) =
     case t of
-        IntegerAtom{} -> Number "1"
+        IntegerAtom{} -> RawNum 1
         Alias{} -> orig
         PSAlias{} -> orig
         CSAlias{} -> orig
         TypeOf{} -> orig
         UnpackedType t' rs ->
             BinOp Add
-                (Number $ show $ length rs)
+                (RawNum $ fromIntegral $ length rs)
                 (DimsFn FnDimensions $ Left t')
-        _ -> Number $ show $ length $ snd $ typeRanges t
+        _ -> RawNum $ fromIntegral $ length $ snd $ typeRanges t
 
 -- conversion for array dimension functions on types
-convertExpr (DimFn f (Left t) (Number str)) =
-    if dm == Nothing || isUnresolved t then
-        DimFn f (Left t) (Number str)
-    else if d <= 0 || fromIntegral d > length rs then
-        Number "'x"
+convertExpr (DimFn f (Left t) (Number n)) =
+    if isUnresolved t then
+        DimFn f (Left t) (Number n)
+    else if d <= 0 || d > length rs then
+        Number $ UnbasedUnsized 'x'
     else case f of
         FnLeft -> fst r
         FnRight -> snd r
-        FnIncrement -> endianCondExpr r (Number "1") (UniOp UniSub $ Number "1")
+        FnIncrement -> endianCondExpr r (RawNum 1) (UniOp UniSub $ RawNum 1)
         FnLow -> endianCondExpr r (snd r) (fst r)
         FnHigh -> endianCondExpr r (fst r) (snd r)
         FnSize -> rangeSize r
@@ -93,9 +92,10 @@ convertExpr (DimFn f (Left t) (Number str)) =
             UnpackedType tInner rsOuter ->
                 rsOuter ++ (snd $ typeRanges $ elaborateType tInner)
             _ -> snd $ typeRanges $ elaborateType t
-        dm = readNumber str
-        Just d = dm
-        r = rs !! (fromIntegral $ d - 1)
+        d = case numberToInteger n of
+            Just value -> fromIntegral value
+            Nothing -> 0
+        r = rs !! (d - 1)
         isUnresolved :: Type -> Bool
         isUnresolved Alias{} = True
         isUnresolved PSAlias{} = True
@@ -117,7 +117,7 @@ convertBits (Left t) =
         Struct   _ fields rs ->
             BinOp Mul
                 (dimensionsSize rs)
-                (foldl (BinOp Add) (Number "0") fieldSizes)
+                (foldl (BinOp Add) (RawNum 0) fieldSizes)
             where fieldSizes = map (DimsFn FnBits . Left . fst) fields
         UnpackedType  t'  rs ->
             BinOp Mul
@@ -127,17 +127,13 @@ convertBits (Left t) =
 convertBits (Right e) =
     case e of
         Concat exprs ->
-            foldl (BinOp Add) (Number "0") $
+            foldl (BinOp Add) (RawNum 0) $
             map (convertBits . Right) $
             exprs
         Stream _ _ exprs -> convertBits $ Right $ Concat exprs
-        Number n ->
-            case elemIndex '\'' n of
-                Nothing -> Number "32"
-                Just 0  -> Number "32"
-                Just idx -> Number $ take idx n
+        Number n -> RawNum $ numberBitLength n
         Range expr mode range ->
-            BinOp Mul size $ convertBits $ Right $ Bit expr (Number "0")
+            BinOp Mul size $ convertBits $ Right $ Bit expr (RawNum 0)
             where
                 size = case mode of
                     NonIndexed   -> rangeSize range

@@ -29,8 +29,8 @@ streamerBlock chunk size asgn output input =
     , asgn output (Ident out)
     ]
     where
-        lo = Number "0"
-        hi = BinOp Sub size (Number "1")
+        lo = RawNum 0
+        hi = BinOp Sub size (RawNum 1)
         t = IntegerVector TLogic Unspecified [(hi, lo)]
         name = streamerBlockName chunk size
         inp = name ++ "_inp"
@@ -49,7 +49,7 @@ streamerBlock chunk size asgn output input =
         lhs2 = LHSRange (LHSIdent out) IndexedMinus (BinOp Sub hi base, left)
         expr2 = Range (Ident inp) IndexedPlus (base, left)
         stmt2 = Asgn AsgnOpEq Nothing lhs2 expr2
-        cmp2 = BinOp Gt left (Number "0")
+        cmp2 = BinOp Gt left (RawNum 0)
 
 streamerBlockName :: Expr -> Expr -> Identifier
 streamerBlockName chunk size =
@@ -60,11 +60,14 @@ traverseStmt (Asgn op mt lhs expr) =
     traverseAsgn (lhs, expr) (Asgn op mt)
 traverseStmt other = other
 
+zeroBit :: Expr
+zeroBit = Number $ Based 1 False Binary 0 0
+
 traverseAsgn :: (LHS, Expr) -> (LHS -> Expr -> Stmt) -> Stmt
 traverseAsgn (lhs, Stream StreamR _ exprs) constructor =
     constructor lhs expr
     where
-        expr = Concat $ exprs ++ [Repeat delta [Number "1'b0"]]
+        expr = Concat $ exprs ++ [Repeat delta [zeroBit]]
         size = DimsFn FnBits $ Right $ lhsToExpr lhs
         exprSize = DimsFn FnBits $ Right (Concat exprs)
         delta = BinOp Sub size exprSize
@@ -73,7 +76,7 @@ traverseAsgn (LHSStream StreamR _ lhss, expr) constructor =
 traverseAsgn (lhs, Stream StreamL chunk exprs) constructor = do
     streamerBlock chunk size constructor lhs expr
     where
-        expr = Concat $ Repeat delta [Number "1'b0"] : exprs
+        expr = Concat $ Repeat delta [zeroBit] : exprs
         size = DimsFn FnBits $ Right $ lhsToExpr lhs
         exprSize = DimsFn FnBits $ Right (Concat exprs)
         delta = BinOp Sub size exprSize

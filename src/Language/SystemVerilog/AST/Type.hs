@@ -112,10 +112,10 @@ typeRanges (UnpackedType t rs) = (UnpackedType t, rs)
 
 nullRange :: Type -> ([Range] -> Type)
 nullRange t [] = t
-nullRange t [(Number "0", Number "0")] = t
+nullRange t [(RawNum 0, RawNum 0)] = t
 nullRange (IntegerAtom TInteger sg) rs =
     -- integer arrays are allowed in SystemVerilog but not in Verilog
-    IntegerVector TBit sg (rs ++ [(Number "31", Number "0")])
+    IntegerVector TBit sg (rs ++ [(RawNum 31, RawNum 0)])
 nullRange t rs1 =
     if t == t'
         then error $ "non-vector type " ++ show t ++
@@ -136,9 +136,9 @@ elaborateIntegerAtom other = other
 -- size; if not unspecified, the first signing overrides the second
 baseIntType :: Signing -> Signing -> Int -> Type
 baseIntType sgOverride sgBase size =
-    IntegerVector TReg sg [(Number hi, Number "0")]
+    IntegerVector TReg sg [(RawNum hi, RawNum 0)]
     where
-        hi = show (size - 1)
+        hi = fromIntegral $ size - 1
         sg = if sgOverride /= Unspecified
                 then sgOverride
                 else sgBase

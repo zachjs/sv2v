@@ -49,6 +49,6 @@ convertExpr :: Idents -> Expr -> Expr
 convertExpr functions (Call (Ident func) (Args [] [])) =
     Call (Ident func) (Args args [])
     where args = if Set.member func functions
-            then [Number "0"]
+            then [RawNum 0]
             else []
 convertExpr _ other = other

@@ -26,6 +26,7 @@
 
 module Convert.MultiplePacked (convert) where
 
+import Convert.ExprUtils
 import Control.Monad ((>=>))
 import Data.Tuple (swap)
 import Data.Maybe (isJust)
@@ -110,7 +111,7 @@ combineRanges r1 r2 = r
                 size2 = rangeSizeHiLo (s2, e2)
                 lower = BinOp Add e2 (BinOp Mul e1 size2)
                 upper = BinOp Add (BinOp Mul size1 size2)
-                            (BinOp Sub lower (Number "1"))
+                            (BinOp Sub lower (RawNum 1))
 
 traverseStmtM :: Stmt -> Scoper TypeInfo Stmt
 traverseStmtM =
@@ -254,7 +255,7 @@ convertExpr scopes =
                 maybeDims = dims expr
                 exprOuter = Bit expr idxInner
                 baseDec = fst rangeOuter
-                baseInc = BinOp Sub (BinOp Add baseDec len) (Number "1")
+                baseInc = BinOp Sub (BinOp Add baseDec len) (RawNum 1)
                 base = endianCondExpr rangeOuter baseDec baseInc
                 len = rangeSize rangeOuter
                 range = (base, len)
@@ -277,7 +278,7 @@ convertExpr scopes =
                 base = endianCondExpr dimOuter baseDec baseInc
                 len = lenOuter
                 range' = (base, len)
-                one = Number "1"
+                one = RawNum 1
         rewriteExpr (orig @ (Range expr NonIndexed range)) =
             if isJust maybeDims && expr == rewriteExpr expr
                 then rewriteExpr $ Range expr IndexedMinus range'
@@ -285,7 +286,7 @@ convertExpr scopes =
             where
                 maybeDims = dims expr
                 baseDec = fst range
-                baseInc = BinOp Sub (BinOp Add baseDec len) (Number "1")
+                baseInc = BinOp Sub (BinOp Add baseDec len) (RawNum 1)
                 base = endianCondExpr range baseDec baseInc
                 len = rangeSize range
                 range' = (base, len)
@@ -299,7 +300,7 @@ convertExpr scopes =
                 sizeOuter = rangeSize dimOuter
                 offsetOuter = uncurry (endianCondExpr dimOuter) $ swap dimOuter
                 (baseOrig, lenOrig) = range
-                lenOrigMinusOne = BinOp Sub lenOrig (Number "1")
+                lenOrigMinusOne = BinOp Sub lenOrig (RawNum 1)
                 baseSwapped =
                     orientIdx dimInner $
                     case mode of

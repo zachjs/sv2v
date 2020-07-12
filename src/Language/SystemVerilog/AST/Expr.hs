@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  - Initial Verilog AST Author: Tom Hawkins <tomahawkins@gmail.com>
@@ -17,23 +18,15 @@ module Language.SystemVerilog.AST.Expr
     , showAssignment
     , showRanges
     , showExprOrRange
-    , simplify
-    , rangeSize
-    , rangeSizeHiLo
-    , endianCondExpr
-    , endianCondRange
-    , dimensionsSize
-    , readNumber
     , ParamBinding
     , showParams
+    , pattern RawNum
     ) where
 
-import Data.Bits (shiftL, shiftR)
 import Data.List (intercalate)
-import Numeric (readHex)
 import Text.Printf (printf)
-import Text.Read (readMaybe)
 
+import Language.SystemVerilog.AST.Number (Number(..))
 import Language.SystemVerilog.AST.Op
 import Language.SystemVerilog.AST.ShowHelp
 import {-# SOURCE #-} Language.SystemVerilog.AST.Type
@@ -43,9 +36,13 @@ type Range = (Expr, Expr)
 type TypeOrExpr = Either Type Expr
 type ExprOrRange = Either Expr Range
 
+pattern RawNum :: Integer -> Expr
+pattern RawNum n = Number (Decimal (-32) True n)
+
 data Expr
     = String  String
-    | Number  String
+    | Real    String
+    | Number  Number
     | Time    String
     | Ident   Identifier
     | PSIdent Identifier Identifier
@@ -71,9 +68,10 @@ data Expr
 
 instance Show Expr where
     show (Nil          ) = ""
-    show (Number  str  ) = str
     show (Time    str  ) = str
     show (Ident   str  ) = str
+    show (Real    str  ) = str
+    show (Number  n    ) = show n
     show (PSIdent x y  ) = printf "%s::%s" x y
     show (CSIdent x p y) = printf "%s#%s::%s" x (showParams p) y
     show (String  str  ) = printf "\"%s\"" str
@@ -193,24 +191,6 @@ showExprOrRange :: ExprOrRange -> String
 showExprOrRange (Left  x) = show x
 showExprOrRange (Right x) = show x
 
-clog2Help :: Integer -> Integer -> Integer
-clog2Help p n = if p >= n then 0 else 1 + clog2Help (p*2) n
-clog2 :: Integer -> Integer
-clog2 n = if n < 2 then 0 else clog2Help 1 n
-
-readNumber :: String -> Maybe Integer
-readNumber ('3' : '2' : '\'' : 'd' : rest) = readMaybe rest
-readNumber (            '\'' : 'd' : rest) = readMaybe rest
-readNumber ('3' : '2' : '\'' : 'h' : rest) =
-    case readHex rest of
-        [(v, _)] -> Just v
-        _ -> Nothing
-readNumber ('\'' : 'h' : rest) =
-    case readHex rest of
-        [(v, _)] -> Just v
-        _ -> Nothing
-readNumber n = readMaybe n
-
 showUniOpPrec :: Expr -> ShowS
 showUniOpPrec (e @ UniOp{}) = (showParen True . shows) e
 showUniOpPrec (e @ BinOp{}) = (showParen True . shows) e
@@ -219,154 +199,6 @@ showUniOpPrec e = shows e
 showBinOpPrec :: Expr -> ShowS
 showBinOpPrec (e @ BinOp{}) = (showParen True . shows) e
 showBinOpPrec e = shows e
-
--- basic expression simplfication utility to help us generate nicer code in the
--- common case of ranges like `[FOO-1:0]`
-simplify :: Expr -> Expr
-simplify (UniOp LogNot (Number "1")) = Number "0"
-simplify (UniOp LogNot (Number "0")) = Number "1"
-simplify (UniOp LogNot (BinOp Eq a b)) = BinOp Ne a b
-simplify (orig @ (Repeat (Number n) exprs)) =
-    case readNumber n of
-        Nothing -> orig
-        Just 0 -> Concat []
-        Just 1 -> Concat exprs
-        Just x ->
-            if x < 0
-                then error $ "negative repeat count: " ++ show orig
-                else orig
-simplify (Concat [expr]) = expr
-simplify (Concat exprs) =
-    Concat $ filter (/= Concat []) exprs
-simplify (orig @ (Call (Ident "$clog2") (Args [Number n] []))) =
-    case readNumber n of
-        Nothing -> orig
-        Just x -> toLiteral $ clog2 x
-simplify (Mux cc e1 e2) =
-    case cc' of
-        Number "1" -> e1'
-        Number "0" -> e2'
-        _ -> Mux cc' e1' e2'
-    where
-        cc' = simplify cc
-        e1' = simplify e1
-        e2' = simplify e2
-simplify (Range e NonIndexed r) = Range e NonIndexed r
-simplify (Range e _ (i, Number "0")) = Bit e i
-simplify (BinOp Sub (Number n1) (BinOp Sub (Number n2) e)) =
-    simplify $ BinOp Add (BinOp Sub (Number n1) (Number n2)) e
-simplify (BinOp Sub (Number n1) (BinOp Sub e (Number n2))) =
-    simplify $ BinOp Sub (BinOp Add (Number n1) (Number n2)) e
-simplify (BinOp Sub (BinOp Add e (Number n1)) (Number n2)) =
-    simplify $ BinOp Add e (BinOp Sub (Number n1) (Number n2))
-simplify (BinOp Add (Number n1) (BinOp Add (Number n2) e)) =
-    simplify $ BinOp Add (BinOp Add (Number n1) (Number n2)) e
-simplify (BinOp Ge (BinOp Sub e (Number "1")) (Number "0")) =
-    simplify $ BinOp Ge e (Number "1")
-simplify (BinOp Add e1 (UniOp UniSub e2)) =
-    simplify $ BinOp Sub e1 e2
-simplify (BinOp Add (UniOp UniSub e2) e1) =
-    simplify $ BinOp Sub e1 e2
-simplify (BinOp Add (BinOp Sub (Number n1) e) (Number n2)) =
-    case (readNumber n1, readNumber n2) of
-        (Just x, Just y) ->
-            simplify $ BinOp Sub (toLiteral (x + y)) e'
-        _ -> nochange
-    where
-        e' = simplify e
-        nochange = BinOp Add (BinOp Sub (Number n1) e') (Number n2)
-simplify (BinOp op e1 e2) =
-    case (op, e1', e2') of
-        (Add, Number "0", e) -> e
-        (Add, e, Number "0") -> e
-        (Mul, _, Number "0") -> Number "0"
-        (Mul, Number "0", _) -> Number "0"
-        (Mul, e, Number "1") -> e
-        (Mul, Number "1", e) -> e
-        (Sub, e, Number "0") -> e
-        (Add, BinOp Sub e (Number "1"), Number "1") -> e
-        (Add, e, BinOp Sub (Number "0") (Number "1")) -> BinOp Sub e (Number "1")
-        (_  , Number a, Number b) ->
-            case (op, readNumber a, readNumber b) of
-                (Add, Just x, Just y) -> toLiteral (x + y)
-                (Sub, Just x, Just y) -> toLiteral (x - y)
-                (Mul, Just x, Just y) -> toLiteral (x * y)
-                (Div, Just _, Just 0) -> Number "x"
-                (Div, Just x, Just y) -> toLiteral (x `quot` y)
-                (Mod, Just x, Just y) -> toLiteral (x `rem` y)
-                (Pow, Just x, Just y) -> toLiteral (x ^ y)
-                (Eq , Just x, Just y) -> bool $ x == y
-                (Ne , Just x, Just y) -> bool $ x /= y
-                (Gt , Just x, Just y) -> bool $ x >  y
-                (Ge , Just x, Just y) -> bool $ x >= y
-                (Lt , Just x, Just y) -> bool $ x <  y
-                (Le , Just x, Just y) -> bool $ x <= y
-                (ShiftAL, Just x, Just y) -> toLiteral $ shiftL x (toInt y)
-                (ShiftAR, Just x, Just y) -> toLiteral $ shiftR x (toInt y)
-                (ShiftL , Just x, Just y) -> toLiteral $ shiftL x (toInt y)
-                (ShiftR , Just x, Just y) ->
-                    if x < 0 && y > 0
-                        then BinOp ShiftR (Number a) (Number b)
-                        else toLiteral $ shiftR x (toInt y)
-                _ -> BinOp op e1' e2'
-            where
-                toInt :: Integer -> Int
-                toInt = fromIntegral
-        (Add, BinOp Add e (Number a), Number b) ->
-            case (readNumber a, readNumber b) of
-                (Just x, Just y) -> BinOp Add e $ toLiteral (x + y)
-                _ -> BinOp op e1' e2'
-        (Sub, e, Number "-1") -> BinOp Add e (Number "1")
-        _ -> BinOp op e1' e2'
-    where
-        e1' = simplify e1
-        e2' = simplify e2
-        bool True = Number "1"
-        bool False = Number "0"
-simplify other = other
-
-toLiteral :: Integer -> Expr
-toLiteral n =
-    if n >= 4294967296
-        then Number $ show (bits n) ++ "'d" ++ show n
-        else Number $ show n
-
-bits :: Integer -> Integer
-bits 0 = 0
-bits n = 1 + bits (quot n 2)
-
-rangeSize :: Range -> Expr
-rangeSize (s, e) =
-    endianCondExpr (s, e) a b
-    where
-        a = rangeSizeHiLo (s, e)
-        b = rangeSizeHiLo (e, s)
-
-rangeSizeHiLo :: Range -> Expr
-rangeSizeHiLo (hi, lo) =
-    simplify $ BinOp Add (BinOp Sub hi lo) (Number "1")
-
--- chooses one or the other expression based on the endianness of the given
--- range; [hi:lo] chooses the first expression
-endianCondExpr :: Range -> Expr -> Expr -> Expr
-endianCondExpr r e1 e2 = simplify $ Mux (uncurry (BinOp Ge) r) e1 e2
-
--- chooses one or the other range based on the endianness of the given range,
--- but in such a way that the result is itself also usable as a range even if
--- the endianness cannot be resolved during conversion, i.e. if it's dependent
--- on a parameter value; [hi:lo] chooses the first range
-endianCondRange :: Range -> Range -> Range -> Range
-endianCondRange r r1 r2 =
-    ( endianCondExpr r (fst r1) (fst r2)
-    , endianCondExpr r (snd r1) (snd r2)
-    )
-
-dimensionsSize :: [Range] -> Expr
-dimensionsSize ranges =
-    simplify $
-    foldl (BinOp Mul) (Number "1") $
-    map rangeSize $
-    ranges
 
 type ParamBinding = (Identifier, TypeOrExpr)
 

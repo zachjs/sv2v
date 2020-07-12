@@ -19,6 +19,7 @@ module Convert.Simplify (convert) where
 import Control.Monad.State
 import qualified Data.Map.Strict as Map
 
+import Convert.ExprUtils
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
@@ -66,44 +67,56 @@ traverseStmtM :: Stmt -> State Info Stmt
 traverseStmtM stmt = traverseStmtExprsM traverseExprM stmt
 
 traverseExprM :: Expr -> State Info Expr
-traverseExprM = traverseNestedExprsM $ stately convertExpr
+traverseExprM = stately convertExpr
 
 substituteExprM :: Expr -> State Info Expr
-substituteExprM = traverseNestedExprsM $ stately substitute
+substituteExprM = stately substitute
 
 convertExpr :: Info -> Expr -> Expr
 convertExpr info (Cast (Right c) e) =
-    Cast (Right c') e
+    Cast (Right c') e'
     where
-        c' = simplify $ substitute info c
+        c' = convertExpr info $ substitute info c
+        e' = convertExpr info e
 convertExpr info (DimFn f v e) =
     DimFn f v e'
-    where
-        e' = simplify $ substitute info e
+    where e' = convertExpr info $ substitute info e
 convertExpr info (Call (Ident "$clog2") (Args [e] [])) =
-    if clog2' == clog2
-        then clog2
-        else clog2'
+    if val' == val
+        then val
+        else val'
     where
-        e' = simplify $ substitute info e
-        clog2 = Call (Ident "$clog2") (Args [e'] [])
-        clog2' = simplify clog2
+        e' = convertExpr info $ substitute info e
+        val = Call (Ident "$clog2") (Args [e'] [])
+        val' = simplifyStep val
 convertExpr info (Mux cc aa bb) =
     if before == after
-        then simplify $ Mux cc aa bb
-        else simplify $ Mux after aa bb
+        then simplifyStep $ Mux cc' aa' bb'
+        else simplifyStep $ Mux after aa' bb'
     where
-        before = substitute info cc
-        after = simplify before
-convertExpr _ (other @ Repeat{}) = traverseNestedExprs simplify other
-convertExpr _ (other @ Concat{}) = simplify other
-convertExpr _ (other @ BinOp{}) = simplify other
-convertExpr _ (other @ UniOp{}) = simplify other
-convertExpr _ other = other
+        before = substitute info cc'
+        after = convertExpr info before
+        aa' = convertExpr info aa
+        bb' = convertExpr info bb
+        cc' = convertExpr info cc
+convertExpr info (BinOp op e1 e2) =
+    simplifyStep $ BinOp op
+        (convertExpr info e1)
+        (convertExpr info e2)
+convertExpr info (UniOp op expr) =
+    simplifyStep $ UniOp op $ convertExpr info expr
+convertExpr info (Repeat expr exprs) =
+    simplifyStep $ Repeat
+        (convertExpr info expr)
+        (map (convertExpr info) exprs)
+convertExpr info (Concat exprs) =
+    simplifyStep $ Concat (map (convertExpr info) exprs)
+convertExpr info expr =
+    traverseSinglyNestedExprs (convertExpr info) expr
 
 substitute :: Info -> Expr -> Expr
 substitute info expr =
-    traverseNestedExprs substitute' $ simplify expr
+    traverseNestedExprs substitute' expr
     where
         substitute' :: Expr -> Expr
         substitute' (Ident x) =

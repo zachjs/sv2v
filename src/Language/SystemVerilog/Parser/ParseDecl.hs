@@ -183,7 +183,7 @@ parseDTsAsIntantiations (DTIdent _ name : tokens) =
                 follow = if null toks' then [] else step (tail toks')
                 asRange :: DeclToken -> Range
                 asRange (DTRange _ (NonIndexed, s)) = s
-                asRange (DTBit _ s) = (Number "0", BinOp Sub s (Number "1"))
+                asRange (DTBit _ s) = (RawNum 0, BinOp Sub s (RawNum 1))
                 asRange _ = failure
                 failure = error $ "unrecognized instantiation of " ++ name
                             ++ ": " ++ show inst
@@ -439,14 +439,14 @@ takeRanges (token : tokens) =
         _                         -> ([]            , token : tokens)
     where
         (rs, rest) = takeRanges tokens
-        asRange s = (Number "0", BinOp Sub s (Number "1"))
+        asRange s = (RawNum 0, BinOp Sub s (RawNum 1))
         autoDim :: [a] -> ([Range], [DeclToken])
         autoDim l =
             ((lo, hi) : rs, rest)
             where
                 n = length l
-                lo = Number "0"
-                hi = Number $ show (n - 1)
+                lo = RawNum 0
+                hi = RawNum $ fromIntegral $ n - 1
 
 -- Matching `AsgnOpEq` and `AsgnOpNonBlocking` here allows tripLookahead to work
 -- both for standard declarations and in `parseDTsAsDeclOrStmt`, where we're

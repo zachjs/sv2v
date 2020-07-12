@@ -22,16 +22,16 @@ convertStmt :: Stmt -> Stmt
 convertStmt (Foreach x idxs stmt) =
     (foldl (.) id $ map toLoop $ zip [1..] idxs) stmt
     where
-        toLoop :: (Int, Identifier) -> (Stmt -> Stmt)
+        toLoop :: (Integer, Identifier) -> (Stmt -> Stmt)
         toLoop (_, "") = id
         toLoop (d, i) =
             For (Left [idxDecl]) cmp [incr]
             where
-                queryFn f = DimFn f (Right $ Ident x) (Number $ show d)
+                queryFn f = DimFn f (Right $ Ident x) (RawNum d)
                 idxDecl = Variable Local (IntegerAtom TInteger Unspecified) i []
                     (queryFn FnLeft)
                 cmp =
-                    Mux (BinOp Eq (queryFn FnIncrement) (Number "1"))
+                    Mux (BinOp Eq (queryFn FnIncrement) (RawNum 1))
                         (BinOp Ge (Ident i) (queryFn FnRight))
                         (BinOp Le (Ident i) (queryFn FnRight))
                 incr = (LHSIdent i, AsgnOp Sub, queryFn FnIncrement)

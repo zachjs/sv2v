@@ -134,7 +134,7 @@ traverseModuleItem ports scopes =
                         tmp = "sv2v_tmp_" ++ instanceName ++ "_" ++ portName
                         tmpExpr = Ident tmp
                         t = Net (NetType TWire) Unspecified
-                                [(DimsFn FnBits $ Right expr, Number "1")]
+                                [(DimsFn FnBits $ Right expr, RawNum 1)]
                         items =
                             [ MIPackageItem $ Decl $ Variable Local t tmp [] Nil
                             , AlwaysC AlwaysComb $ Asgn AsgnOpEq Nothing lhs tmpExpr]
@@ -182,7 +182,7 @@ rewriteDeclM (Variable d t x a e) = do
     return $ Variable d' t' x a e
 rewriteDeclM (Param s (IntegerVector _ sg []) x e) =
     return $ Param s (Implicit sg [(zero, zero)]) x e
-    where zero = Number "0"
+    where zero = RawNum 0
 rewriteDeclM (Param s (IntegerVector _ sg rs) x e) =
     return $ Param s (Implicit sg rs) x e
 rewriteDeclM decl = return decl

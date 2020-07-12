@@ -74,9 +74,6 @@ import Language.SystemVerilog.Parser.Tokens
     | @binaryNumber
     | @hexNumber
     | @unbasedUnsizedLiteral
-@number
-    = @integralNumber
-    | @realNumber
 
 -- Strings
 
@@ -366,7 +363,8 @@ tokens :-
     @escapedIdentifier { tok Id_escaped }
     @systemIdentifier  { tok Id_system  }
 
-    @number            { tok Lit_number }
+    @realNumber        { tok Lit_real }
+    @integralNumber    { tok Lit_number }
     @string            { tok Lit_string }
     @time              { tok Lit_time }
 

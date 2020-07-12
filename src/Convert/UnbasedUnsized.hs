@@ -76,7 +76,7 @@ bindItem ports bind =
     where
         portName = lookupPort ports (bPort bind)
         size = DimsFn FnBits $ Right $ Ident portName
-        rng = (BinOp Sub size (Number "1"), Number "0")
+        rng = (BinOp Sub size (RawNum 1), RawNum 0)
         typ = Implicit Unspecified [rng]
         name = bindName bind
         expr = literalFor $ bBit bind
@@ -102,8 +102,8 @@ convertModuleItemM (Instance moduleName params instanceName [] bindings) = do
             expr'' <- traverseNestedExprsM (replaceBindingExpr port) expr'
             return (portName, expr'')
         replaceBindingExpr :: Port -> Expr -> Writer Binds Expr
-        replaceBindingExpr port (orig @ (Cast Right{} (Number num))) = do
-            let ch = last num
+        replaceBindingExpr port (orig @ (Cast Right{} (ConvertedUU a b))) = do
+            let ch = charForBit a b
             if orig == sizedLiteralFor tag ch
                 then do
                     let bind = Bind moduleName ch port
@@ -120,14 +120,24 @@ convertModuleItem =
     traverseTypes (traverseNestedTypes convertType) .
     traverseAsgns convertAsgn
 
-digits :: [Char]
-digits = ['0', '1', 'x', 'z', 'X', 'Z']
-
 literalFor :: Char -> Expr
-literalFor ch =
-    if elem ch digits
-        then Number ("1'sb" ++ [ch])
-        else error $ "unexpected unbased-unsized digit: " ++ [ch]
+literalFor 'Z' = literalFor 'z'
+literalFor 'X' = literalFor 'x'
+literalFor '0' = Number $ Based 1 True Binary 0 0
+literalFor '1' = Number $ Based 1 True Binary 1 0
+literalFor 'x' = Number $ Based 1 True Binary 0 1
+literalFor 'z' = Number $ Based 1 True Binary 1 1
+literalFor ch = error $ "unexpected unbased-unsized digit: " ++ [ch]
+
+pattern ConvertedUU :: Integer -> Integer -> Expr
+pattern ConvertedUU a b = Number (Based 1 True Binary a b)
+
+charForBit :: Integer -> Integer -> Char
+charForBit 0 0 = '0'
+charForBit 1 0 = '1'
+charForBit 0 1 = 'x'
+charForBit 1 1 = 'z'
+charForBit _ _ = error "charForBit invariant violated"
 
 sizedLiteralFor :: Expr -> Char -> Expr
 sizedLiteralFor expr ch =
@@ -206,7 +216,7 @@ convertExpr (ContextDetermined expr) (UU ch) =
 convertExpr _ other = other
 
 pattern UU :: Char -> Expr
-pattern UU ch = Number ['\'', ch]
+pattern UU ch = Number (UnbasedUnsized ch)
 
 convertType :: Type -> Type
 convertType (TypeOf e) = TypeOf $ convertExpr SelfDetermined e

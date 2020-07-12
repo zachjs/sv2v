@@ -12,6 +12,7 @@ import Data.Tuple (swap)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
+import Convert.ExprUtils
 import Convert.Scoper
 import Convert.Traverse
 import Language.SystemVerilog.AST
@@ -43,7 +44,7 @@ convertStruct' isStruct sg fields =
         then Just (unstructType, unstructFields)
         else Nothing
     where
-        zero = Number "0"
+        zero = RawNum 0
         typeRange :: Type -> Range
         typeRange t =
             case ranges of
@@ -61,13 +62,13 @@ convertStruct' isStruct sg fields =
         -- used here because SystemVerilog structs are laid out backwards
         fieldLos =
             if isStruct
-                then map simplify $ tail $ scanr (BinOp Add) (Number  "0") fieldSizes
-                else map simplify $ repeat (Number "0")
+                then map simplify $ tail $ scanr (BinOp Add) (RawNum 0) fieldSizes
+                else map simplify $ repeat (RawNum 0)
         fieldHis =
             if isStruct
                 then map simplify $ init $ scanr (BinOp Add) minusOne fieldSizes
                 else map simplify $ map (BinOp Add minusOne) fieldSizes
-        minusOne = UniOp UniSub $ Number "1"
+        minusOne = UniOp UniSub $ RawNum 1
 
         -- create the mapping structure for the unstructured fields
         keys = map snd fields
@@ -80,7 +81,7 @@ convertStruct' isStruct sg fields =
             if isStruct
                 then foldl1 (BinOp Add) fieldSizes
                 else head fieldSizes
-        packedRange = (simplify $ BinOp Sub structSize (Number "1"), zero)
+        packedRange = (simplify $ BinOp Sub structSize (RawNum 1), zero)
         unstructType = IntegerVector TLogic sg [packedRange]
 
         -- check if this struct can be packed into an integer vector; we only
@@ -208,20 +209,20 @@ convertExpr (t @ IntegerVector{}) (Concat exprs) =
         caster = Cast (Left $ dropInnerTypeRange t)
         exprs' = map caster exprs
         isUnsizedNumber :: Expr -> Bool
-        isUnsizedNumber (Number n) = not $ elem '\'' n
+        isUnsizedNumber (Number n) = not $ numberIsSized n
         isUnsizedNumber (UniOp UniSub e) = isUnsizedNumber e
         isUnsizedNumber _ = False
 convertExpr (Struct packing fields (_:rs)) (Concat exprs) =
     Concat $ map (convertExpr (Struct packing fields rs)) exprs
 convertExpr (Struct packing fields (_:rs)) (Bit e _) =
     convertExpr (Struct packing fields rs) e
-convertExpr (Struct packing fields []) (Pattern [("", Repeat (Number nStr) exprs)]) =
-    case fmap fromIntegral (readNumber nStr) of
-        Just n -> convertExpr (Struct packing fields []) $ Pattern $
-                zip (repeat "") (concat $ take n $ repeat exprs)
+convertExpr (Struct packing fields []) (Pattern [("", Repeat (Number n) exprs)]) =
+    case fmap fromIntegral (numberToInteger n) of
+        Just val -> convertExpr (Struct packing fields []) $ Pattern $
+                zip (repeat "") (concat $ replicate val exprs)
         Nothing ->
             error $ "unable to handle repeat in pattern: " ++
-                (show $ Repeat (Number nStr) exprs)
+                (show $ Repeat (Number n) exprs)
 convertExpr (struct @ (Struct _ fields [])) (Pattern itemsOrig) =
     if extraNames /= Set.empty then
         error $ "pattern " ++ show (Pattern itemsOrig) ++
@@ -332,7 +333,7 @@ convertSubExpr scopes (Dot e x) =
         (fieldType, bounds, dims) = lookupFieldInfo subExprType x
         base = fst bounds
         len = rangeSize bounds
-        undotted = if null dims || rangeSize (head dims) == Number "1"
+        undotted = if null dims || rangeSize (head dims) == RawNum 1
             then Bit e' (fst bounds)
             else Range e' IndexedMinus (base, len)
 convertSubExpr scopes (Range (Dot e x) NonIndexed rOuter) =
@@ -374,7 +375,7 @@ convertSubExpr scopes (Range (Dot e x) mode (baseO, lenO)) =
             NonIndexed   -> error "invariant violated"
         base = endianCondExpr dim baseDec baseInc
         undotted = Range e' mode (base, lenO)
-        one = Number "1"
+        one = RawNum 1
 convertSubExpr scopes (Range e mode r) =
     (dropInnerTypeRange t, Range e' mode r)
     where (t, e') = convertSubExpr scopes e

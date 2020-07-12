@@ -23,6 +23,7 @@ import Control.Monad.Writer
 import Data.List (elemIndices)
 import qualified Data.Set as Set
 
+import Convert.ExprUtils
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
@@ -72,12 +73,12 @@ traverseType (Enum (Implicit sg rl) v rs) =
         -- default to a 32 bit logic
         t' = IntegerVector TLogic sg rl'
         rl' = if null rl
-            then [(Number "31", Number "0")]
+            then [(RawNum 31, RawNum 0)]
             else rl
 traverseType (Enum t v rs) = do
     let (tf, rl) = typeRanges t
     rlParam <- case rl of
-        [ ] -> return [(Number "0", Number "0")]
+        [ ] -> return [(RawNum 0, RawNum 0)]
         [_] -> return rl
         _   -> error $ "unexpected multi-dim enum type: " ++ show (Enum t v rs)
     tell $ Set.singleton (tf rlParam, v) -- type of localparams
@@ -93,10 +94,10 @@ makeEnumItems (itemType, l) =
                 ++ show (zip keys vals)
     where
         keys = map fst l
-        vals = tail $ scanl step (UniOp UniSub $ Number "1") (map snd l)
+        vals = tail $ scanl step (UniOp UniSub $ RawNum 1) (map snd l)
         noDuplicates = all (null . tail . flip elemIndices vals) vals
         step :: Expr -> Expr -> Expr
-        step expr Nil = simplify $ BinOp Add expr (Number "1")
+        step expr Nil = simplify $ BinOp Add expr (RawNum 1)
         step _ expr = expr
         toPackageItem :: Identifier -> Expr -> PackageItem
         toPackageItem x v =

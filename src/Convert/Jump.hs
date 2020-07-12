@@ -276,23 +276,26 @@ convertLoop loop comp stmt = do
                 ]
 
 jumpStateType :: Type
-jumpStateType = IntegerVector TBit Unspecified [(Number "0", Number "1")]
+jumpStateType = IntegerVector TBit Unspecified [(RawNum 0, RawNum 1)]
 
 jumpState :: String
 jumpState = "_sv2v_jump"
 
+jsVal :: Integer -> Expr
+jsVal n = Number $ Based 2 False Binary n 0
+
 -- keep running the loop/function normally
 jsNone :: Expr
-jsNone = Number "2'b00"
+jsNone = jsVal 0
 -- skip to the next iteration of the loop (continue)
 jsContinue :: Expr
-jsContinue = Number "2'b01"
+jsContinue = jsVal 1
 -- stop running the loop immediately (break)
 jsBreak :: Expr
-jsBreak = Number "2'b10"
+jsBreak = jsVal 2
 -- stop running the function immediately (return)
 jsReturn :: Expr
-jsReturn = Number "2'b11"
+jsReturn = jsVal 3
 
 
 assertMsg :: Bool -> String -> State Info ()

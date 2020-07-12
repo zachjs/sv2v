@@ -5,6 +5,14 @@ module top;
         $display(16);
         $display(3);
 
+        $display("args %b", 2);
+        $display("args %b", 2);
+        $display("args %b", 2);
+        $display("args %b", 2);
+        $display("args %b", 2);
+        $display("args %b", 2);
+        $display("args %b", 1'bx);
+
         $display(10, 10, 16);
         $display(0, 0, 16);
         $display(9, 9, 1);

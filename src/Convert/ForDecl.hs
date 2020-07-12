@@ -23,7 +23,7 @@ convertStmt (For (Left []) cc asgns stmt) =
     convertStmt $ For (Right []) cc asgns stmt
 convertStmt (For (Right []) cc asgns stmt) =
     convertStmt $ For inits cc asgns stmt
-    where inits = Left [dummyDecl $ Number "0"]
+    where inits = Left [dummyDecl $ RawNum 0]
 convertStmt (orig @ (For (Right [_]) _ _ _)) = orig
 
 convertStmt (For (Left inits) cc asgns stmt) =
