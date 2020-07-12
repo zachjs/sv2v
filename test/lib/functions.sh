@@ -1,7 +1,7 @@
 #!/bin/bash
 
 SCRIPT_DIR=`dirname "${BASH_SOURCE[0]}"`
-SV2V="$SCRIPT_DIR/../../bin/sv2v"
+SV2V="$SCRIPT_DIR/../../bin/sv2v +RTS -N1 -RTS"
 
 assertExists() {
     file=$1
