@@ -84,8 +84,6 @@ traverseExprM =
                 sizesMatch = numberToInteger s == Just (numberBitLength n)
                 fallback = convertCastM (Number s) (Number n)
                 num = return . Number
-        convertExprM (orig @ (Cast (Right DimsFn{}) _)) =
-            return orig
         convertExprM (Cast (Right (Ident x)) e) = do
             typeMap <- get
             -- can't convert this cast yet because x could be a typename
@@ -93,7 +91,9 @@ traverseExprM =
                 then return $ Cast (Right $ Ident x) e
                 else convertCastM (Ident x) e
         convertExprM (Cast (Right s) e) =
-            convertCastM s e
+            if isSimpleExpr s
+                then convertCastM s e
+                else return $ Cast (Right s) e
         convertExprM (Cast (Left (IntegerVector _ Signed rs)) e) =
             convertCastWithSigningM (dimensionsSize rs) e Signed
         convertExprM (Cast (Left (IntegerVector _ _ rs)) e) =
@@ -120,6 +120,17 @@ traverseExprM =
             let f = castFnName s sg
             let args = Args [e] []
             return $ Call (Ident f) args
+
+isSimpleExpr :: Expr -> Bool
+isSimpleExpr =
+    null . execWriter . collectNestedExprsM collectUnresolvedExprM
+    where
+        collectUnresolvedExprM :: Expr -> Writer [Expr] ()
+        collectUnresolvedExprM (expr @ PSIdent{}) = tell [expr]
+        collectUnresolvedExprM (expr @ CSIdent{}) = tell [expr]
+        collectUnresolvedExprM (expr @ DimsFn{}) = tell [expr]
+        collectUnresolvedExprM (expr @ DimFn {}) = tell [expr]
+        collectUnresolvedExprM _ = return ()
 
 castFn :: Expr -> Signing -> Description
 castFn e sg =
