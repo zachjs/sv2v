@@ -141,7 +141,7 @@ toDec n =
         UniOp UniSub $ toDec (-n)
     else if n >= 4294967296 `div` 2 then
         let size = fromIntegral $ bits $ n * 2
-        in Number $ Decimal (negate size) True n
+        in Number $ Decimal size True n
     else
         RawNum n
     where
