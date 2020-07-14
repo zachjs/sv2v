@@ -823,7 +823,7 @@ PackageItems :: { [PackageItem] }
   | PITrace PackageItem PackageItems { $1 : $2 ++ $3 }
 PackageItem :: { [PackageItem] }
   : DeclTokens(";")    { map Decl $ parseDTsAsDecls $1 }
-  | ParameterDecl(";") { map Decl $1 }
+  | ParameterDecl(";") { map (Decl . makeLocalparam) $1 }
   | NonDeclPackageItem { $1 }
 NonDeclPackageItem :: { [PackageItem] }
   : "typedef" Type Identifier ";" { [Typedef $2 $3] }
@@ -1461,5 +1461,10 @@ validateGenCases items =
     else error $ "multiple default generate cases: " ++ show items
   where
     (exprs, _) = unzip items
+
+makeLocalparam :: Decl -> Decl
+makeLocalparam (Param _ t x e) = Param Localparam t x e
+makeLocalparam (ParamType _ x mt) = ParamType Localparam x mt
+makeLocalparam other = other
 
 }
