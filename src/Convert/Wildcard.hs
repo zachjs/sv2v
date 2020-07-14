@@ -16,9 +16,6 @@
  -
  - `!=?` is simply converted as the logical negation of `==?`, which is
  -
- - TODO: For code using actual wildcard patterns, this conversion produces code
- - which is not synthesizable.
- -
  - The conversion for `inside` produces wildcard equality comparisons as per the
  - SystemVerilog specification. However, many usages of `inside` don't depend on
  - the wildcard behavior. To avoid generating needlessly complex output, this
@@ -28,57 +25,58 @@
 
 module Convert.Wildcard (convert) where
 
-import Control.Monad.State
-import qualified Data.Map.Strict as Map
+import Data.Bits ((.|.))
 
+import Convert.Scoper
 import Convert.Traverse
 import Language.SystemVerilog.AST
-
-type Patterns = Map.Map Identifier Number
 
 convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription =
-    scopedConversion traverseDeclM traverseModuleItemM traverseStmtM Map.empty
+    partScoper traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
 
-traverseDeclM :: Decl -> State Patterns Decl
+traverseDeclM :: Decl -> Scoper Number Decl
 traverseDeclM decl = do
     case decl of
-        Param Localparam _ x (Number n) -> modify $ Map.insert x n
+        Param Localparam _ x (Number n) -> insertElem x n
         _ -> return ()
     let mi = MIPackageItem $ Decl decl
     mi' <- traverseModuleItemM mi
     let MIPackageItem (Decl decl') = mi'
     return decl'
 
-traverseModuleItemM :: ModuleItem -> State Patterns ModuleItem
+traverseModuleItemM :: ModuleItem -> Scoper Number ModuleItem
 traverseModuleItemM = traverseExprsM traverseExprM
 
-traverseStmtM :: Stmt -> State Patterns Stmt
+traverseGenItemM :: GenItem -> Scoper Number GenItem
+traverseGenItemM = traverseGenItemExprsM traverseExprM
+
+traverseStmtM :: Stmt -> Scoper Number Stmt
 traverseStmtM = traverseStmtExprsM traverseExprM
 
-traverseExprM :: Expr -> State Patterns Expr
-traverseExprM = traverseNestedExprsM $ stately convertExpr
+traverseExprM :: Expr -> Scoper Number Expr
+traverseExprM = traverseNestedExprsM $ embedScopes convertExpr
 
-isPlainPattern :: Patterns -> Expr -> Bool
-isPlainPattern _ (Number n) =
-    numberToInteger n /= Nothing
-isPlainPattern patterns (Ident x) =
-    case Map.lookup x patterns of
-        Nothing -> False
-        Just n -> isPlainPattern patterns (Number n)
-isPlainPattern _ _ = False
+lookupPattern :: Scopes Number -> Expr -> Maybe Number
+lookupPattern _ (Number n) = Just n
+lookupPattern scopes e =
+    case lookupExpr scopes e of
+        Nothing -> Nothing
+        Just (_, _, n) -> Just n
 
-convertExpr :: Patterns -> Expr -> Expr
-convertExpr patterns (BinOp WEq l r) =
-    if isPlainPattern patterns r
-        then BinOp Eq l r
-        else
-            BinOp BitAnd couldMatch $
-            BinOp BitOr  noExtraXZs $
-            Number (Based 1 False Binary 0 1)
+convertExpr :: Scopes Number -> Expr -> Expr
+convertExpr scopes (BinOp WEq l r) =
+    if maybePattern == Nothing then
+        BinOp BitAnd couldMatch $
+        BinOp BitOr  noExtraXZs $
+        Number (Based 1 False Binary 0 1)
+    else if numberToInteger pattern /= Nothing then
+        BinOp Eq l r
+    else
+        BinOp Eq (BinOp BitOr l mask) pattern'
     where
         lxl = BinOp BitXor l l
         rxr = BinOp BitXor r r
@@ -89,8 +87,14 @@ convertExpr patterns (BinOp WEq l r) =
         -- Step #2: extra X or Z
         noExtraXZs = BinOp TEq lxlxrxr rxr
         lxlxrxr = BinOp BitXor lxl rxr
-convertExpr patterns (BinOp WNe l r) =
+        -- For wildcard patterns we can find, use masking
+        maybePattern = lookupPattern scopes r
+        Just pattern = maybePattern
+        Based size signed base vals knds = pattern
+        mask = Number $ Based size signed base knds 0
+        pattern' = Number $ Based size signed base (vals .|. knds) 0
+convertExpr scopes (BinOp WNe l r) =
     UniOp LogNot $
-    convertExpr patterns $
+    convertExpr scopes $
     BinOp WEq l r
 convertExpr _ other = other

@@ -14,9 +14,14 @@ module top;
     initial $display("D", 3'bz11 inside {3'b1?1, 3'b011});
     initial $display("E", 3'bz11 inside {3'b?01, 3'b011});
 
+    generate
+        begin : patterns
+            localparam A = 3'b1?1;
+        end
+    endgenerate
     function test1;
         input logic [2:0] inp;
-        return inp inside {3'b1?1};
+        return inp inside {patterns.A};
     endfunction
     initial begin
         // should match
