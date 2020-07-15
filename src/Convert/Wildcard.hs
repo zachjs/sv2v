@@ -63,7 +63,7 @@ traverseExprM = traverseNestedExprsM $ embedScopes convertExpr
 lookupPattern :: Scopes Number -> Expr -> Maybe Number
 lookupPattern _ (Number n) = Just n
 lookupPattern scopes e =
-    case lookupExpr scopes e of
+    case lookupElem scopes e of
         Nothing -> Nothing
         Just (_, _, n) -> Just n
 

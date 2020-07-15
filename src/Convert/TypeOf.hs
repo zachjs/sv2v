@@ -55,7 +55,7 @@ traverseTypeM other = return other
 
 lookupTypeOf :: Expr -> Scoper Type Type
 lookupTypeOf expr = do
-    details <- lookupExprM expr
+    details <- lookupElemM expr
     case details of
         Nothing -> return $ TypeOf expr
         -- functions with no return type implicitly return a single bit

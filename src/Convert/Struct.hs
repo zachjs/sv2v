@@ -305,7 +305,7 @@ convertExpr _ other = other
 
 fallbackType :: Scopes Type -> Expr -> (Type, Expr)
 fallbackType scopes e =
-    case lookupExpr scopes e of
+    case lookupElem scopes e of
         Nothing -> (unknownType, e)
         Just (_, _, t) -> (t, e)
 
@@ -463,7 +463,7 @@ convertCall scopes fn (Args pnArgs kwArgs) =
         convertArg lhs (x, e) =
             (x, e')
             where
-                details = lookupLHS scopes $ LHSDot lhs x
+                details = lookupElem scopes $ LHSDot lhs x
                 typ = maybe unknownType thd3 details
                 thd3 (_, _, c) = c
                 (_, e') = convertSubExpr scopes $ convertExpr typ e

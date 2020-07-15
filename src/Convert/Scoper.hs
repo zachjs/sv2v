@@ -1,5 +1,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleInstances #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
@@ -30,15 +31,10 @@ module Convert.Scoper
     , partScoperT
     , insertElem
     , injectItem
-    , lookupExpr
-    , lookupLHS
-    , lookupIdent
-    , lookupAccesses
-    , lookupExprM
-    , lookupLHSM
-    , lookupIdentM
-    , lookupAccessesM
+    , lookupElem
+    , lookupElemM
     , Access(..)
+    , ScopeKey
     , Scopes
     , embedScopes
     , withinProcedure
@@ -104,7 +100,7 @@ enterScope :: Monad m => Identifier -> Identifier -> ScoperT a m ()
 enterScope name index = do
     s <- get
     let current' = sCurrent s ++ [Tier name index]
-    existingResult <- lookupIdentM name
+    existingResult <- lookupElemM name
     let existingElement = fmap thd3 existingResult
     let entry = Entry existingElement index Map.empty
     let mapping' = setScope current' entry $ sMapping s
@@ -149,9 +145,6 @@ exprToAccesses (Dot e x) = do
     Just $ accesses ++ [Access x Nil]
 exprToAccesses _ = Nothing
 
-lhsToAccesses :: LHS -> Maybe [Access]
-lhsToAccesses = exprToAccesses . lhsToExpr
-
 insertElem :: Monad m => Identifier -> a -> ScoperT a m ()
 insertElem name element = do
     s <- get
@@ -191,26 +184,19 @@ attemptResolve mapping (Access x e : rest) = do
 
 type LookupResult a = Maybe ([Access], Replacements, a)
 
-lookupExprM :: Monad m => Expr -> ScoperT a m (LookupResult a)
-lookupExprM = embedScopes lookupExpr
+class ScopeKey k where
+    lookupElem :: Scopes a -> k -> LookupResult a
+    lookupElemM :: Monad m => k -> ScoperT a m (LookupResult a)
+    lookupElemM = embedScopes lookupElem
 
-lookupLHSM :: Monad m => LHS -> ScoperT a m (LookupResult a)
-lookupLHSM = embedScopes lookupLHS
+instance ScopeKey Expr where
+    lookupElem scopes = join . fmap (lookupAccesses scopes) . exprToAccesses
 
-lookupIdentM :: Monad m => Identifier -> ScoperT a m (LookupResult a)
-lookupIdentM = embedScopes lookupIdent
+instance ScopeKey LHS where
+    lookupElem scopes = lookupElem scopes . lhsToExpr
 
-lookupAccessesM :: Monad m => [Access] -> ScoperT a m (LookupResult a)
-lookupAccessesM = embedScopes lookupAccesses
-
-lookupExpr :: Scopes a -> Expr -> LookupResult a
-lookupExpr scopes = join . fmap (lookupAccesses scopes) . exprToAccesses
-
-lookupLHS :: Scopes a -> LHS -> LookupResult a
-lookupLHS scopes = join . fmap (lookupAccesses scopes) . lhsToAccesses
-
-lookupIdent :: Scopes a -> Identifier -> LookupResult a
-lookupIdent scopes ident = lookupAccesses scopes [Access ident Nil]
+instance ScopeKey Identifier where
+    lookupElem scopes ident = lookupAccesses scopes [Access ident Nil]
 
 lookupAccesses :: Scopes a -> [Access] -> LookupResult a
 lookupAccesses scopes accesses = do

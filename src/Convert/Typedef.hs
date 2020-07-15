@@ -21,12 +21,12 @@ convert = map $ traverseDescriptions $ partScoper
 
 traverseTypeOrExprM :: TypeOrExpr -> Scoper Type TypeOrExpr
 traverseTypeOrExprM (Left (TypeOf (Ident x))) = do
-    details <- lookupIdentM x
+    details <- lookupElemM x
     return $ case details of
         Nothing -> Left $ TypeOf $ Ident x
         Just (_, _, typ) -> Left typ
 traverseTypeOrExprM (Right (Ident x)) = do
-    details <- lookupIdentM x
+    details <- lookupElemM x
     return $ case details of
         Nothing -> Right $ Ident x
         Just (_, _, typ) -> Left typ
@@ -84,7 +84,7 @@ traverseStmtM =
 
 traverseTypeM :: Type -> Scoper Type Type
 traverseTypeM (Alias st rs1) = do
-    details <- lookupIdentM st
+    details <- lookupElemM st
     return $ case details of
         Nothing -> Alias st rs1
         Just (_, _, typ) -> case typ of

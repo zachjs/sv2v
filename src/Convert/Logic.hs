@@ -99,7 +99,7 @@ traverseModuleItem ports scopes =
                 isRegType _ = False
                 isReg' :: LHS -> Writer [Bool] ()
                 isReg' lhs =
-                    case lookupLHS scopes lhs of
+                    case lookupElem scopes lhs of
                         Just (_, _, t) -> tell [isRegType t]
                         _ -> tell [False]
 
@@ -167,7 +167,7 @@ rewriteDeclM (Variable d t x a e) = do
     (d', t') <- case t of
         IntegerVector TLogic sg rs -> do
             insertElem x t
-            details <- lookupIdentM x
+            details <- lookupElemM x
             let Just (accesses, _, _) = details
             let location = map accessName accesses
             usedAsReg <- lift $ gets $ Set.member location
@@ -205,7 +205,7 @@ traverseStmtM stmt = do
 
 collectLHSM :: LHS -> ST ()
 collectLHSM lhs = do
-    details <- lookupLHSM lhs
+    details <- lookupElemM lhs
     case details of
         Just (accesses, _, _) -> do
             let location = map accessName accesses

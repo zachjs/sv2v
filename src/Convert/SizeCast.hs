@@ -71,7 +71,7 @@ traverseExprM =
                 fallback = convertCastM (Number s) (Number n)
                 num = return . Number
         convertExprM (Cast (Right (Ident x)) e) = do
-            details <- lookupIdentM x
+            details <- lookupElemM x
             -- can't convert this cast yet because x could be a typename
             if details == Nothing
                 then return $ Cast (Right $ Ident x) e
@@ -102,7 +102,7 @@ traverseExprM =
 
         convertCastWithSigningM :: Expr -> Expr -> Signing -> Scoper Type Expr
         convertCastWithSigningM s e sg = do
-            details <- lookupIdentM $ castFnName s sg
+            details <- lookupElemM $ castFnName s sg
             when (details == Nothing) $ injectItem $ MIPackageItem $ castFn s sg
             let f = castFnName s sg
             let args = Args [e] []
@@ -164,7 +164,7 @@ exprSigning scopes (BinOp op e1 e2) =
             ShiftAR -> curry fst
             _ -> \_ _ -> Just Unspecified
 exprSigning scopes expr =
-    case lookupExpr scopes expr of
+    case lookupElem scopes expr of
         Just (_, _, t) -> typeSigning t
         Nothing -> Just Unspecified
 

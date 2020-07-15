@@ -15,50 +15,56 @@
 module Convert.UnpackedArray (convert) where
 
 import Control.Monad.State
-import Control.Monad.Writer
-import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
+import Convert.Scoper
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type DeclMap = Map.Map Identifier Decl
-type DeclSet = Set.Set Decl
-
-type ST = StateT DeclMap (Writer DeclSet)
+type Location = [Identifier]
+type Locations = Set.Set Location
+type ST = ScoperT Decl (State Locations)
 
 convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription description =
-    traverseModuleItems (traverseDecls $ packDecl declsToPack) description'
+convertDescription (description @ (Part _ _ Module _ _ _ _)) =
+    evalState (operation description) Set.empty
     where
-        (description', declsToPack) = runWriter $
-            scopedConversionM traverseDeclM traverseModuleItemM traverseStmtM
-            Map.empty description
+        operation =
+            partScoperT traverseDeclM traverseModuleItemM noop traverseStmtM >=>
+            partScoperT rewriteDeclM noop noop noop
+        noop = return
+convertDescription other = other
 
--- collects and converts multi-dimensional packed-array declarations
+-- tracks multi-dimensional unpacked array declarations
 traverseDeclM :: Decl -> ST Decl
-traverseDeclM (orig @ (Variable dir _ x _ e)) = do
-    modify $ Map.insert x orig
-    () <- if dir /= Local || e /= Nil
-        then lift $ tell $ Set.singleton orig
+traverseDeclM (decl @ (Variable _ _ _ [] _)) = return decl
+traverseDeclM (decl @ (Variable dir _ x _ e)) = do
+    insertElem x decl
+    if dir /= Local || e /= Nil
+        then flatUsageM x
         else return ()
-    return orig
+    return decl
 traverseDeclM other = return other
 
--- pack the given decls marked for packing
-packDecl :: DeclSet -> Decl -> Decl
-packDecl decls (orig @ (Variable d t x a e)) = do
-    if Set.member orig decls
+-- pack decls marked for packing
+rewriteDeclM :: Decl -> ST Decl
+rewriteDeclM (decl @ (Variable _ _ _ [] _)) = return decl
+rewriteDeclM (decl @ (Variable d t x a e)) = do
+    insertElem x decl
+    details <- lookupElemM x
+    let Just (accesses, _, _) = details
+    let location = map accessName accesses
+    usedAsPacked <- lift $ gets $ Set.member location
+    if usedAsPacked
         then do
             let (tf, rs) = typeRanges t
             let t' = tf $ a ++ rs
-            Variable d t' x [] e
-        else orig
-packDecl _ other = other
-
+            return $ Variable d t' x [] e
+        else return decl
+rewriteDeclM other = return other
 
 traverseModuleItemM :: ModuleItem -> ST ModuleItem
 traverseModuleItemM =
@@ -73,10 +79,9 @@ traverseModuleItemM' (Instance a b c d bindings) = do
     return $ Instance a b c d bindings'
     where
         collectBinding :: PortBinding -> ST PortBinding
-        collectBinding (y, Ident x) = do
+        collectBinding (y, x) = do
             flatUsageM x
-            return (y, Ident x)
-        collectBinding other = return other
+            return (y, x)
 traverseModuleItemM' other = return other
 
 traverseStmtM :: Stmt -> ST Stmt
@@ -86,40 +91,29 @@ traverseStmtM =
     traverseStmtAsgnsM traverseAsgnM
 
 traverseExprM :: Expr -> ST Expr
-traverseExprM (Range (Ident x) mode i) = do
-    flatUsageM x
-    return $ Range (Ident x) mode i
+traverseExprM (Range x mode i) =
+    flatUsageM x >> return (Range x mode i)
 traverseExprM other = return other
 
 traverseLHSM :: LHS -> ST LHS
-traverseLHSM (LHSIdent x) = do
-    flatUsageM x
-    return $ LHSIdent x
-traverseLHSM other = return other
+traverseLHSM x = flatUsageM x >> return x
 
 traverseAsgnM :: (LHS, Expr) -> ST (LHS, Expr)
-traverseAsgnM (LHSIdent x, Mux cond (Ident y) (Ident z)) = do
+traverseAsgnM (x, Mux cond y z) = do
     flatUsageM x
     flatUsageM y
     flatUsageM z
-    return (LHSIdent x, Mux cond (Ident y) (Ident z))
-traverseAsgnM (LHSIdent x, Mux cond y (Ident z)) = do
-    flatUsageM x
-    flatUsageM z
-    return (LHSIdent x, Mux cond y (Ident z))
-traverseAsgnM (LHSIdent x, Mux cond (Ident y) z) = do
+    return (x, Mux cond y z)
+traverseAsgnM (x, y) = do
     flatUsageM x
     flatUsageM y
-    return (LHSIdent x, Mux cond (Ident y) z)
-traverseAsgnM (LHSIdent x, Ident y) = do
-    flatUsageM x
-    flatUsageM y
-    return (LHSIdent x, Ident y)
-traverseAsgnM other = return other
+    return (x, y)
 
-flatUsageM :: Identifier -> ST ()
+flatUsageM :: ScopeKey e => e -> ST ()
 flatUsageM x = do
-    declMap <- get
-    case Map.lookup x declMap of
-        Just decl -> lift $ tell $ Set.singleton decl
+    details <- lookupElemM x
+    case details of
+        Just (accesses, _, _) -> do
+            let location = map accessName accesses
+            lift $ modify $ Set.insert location
         Nothing -> return ()

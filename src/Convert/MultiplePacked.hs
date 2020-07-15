@@ -188,7 +188,7 @@ convertExpr scopes =
         fallbackLevels expr =
             fmap ((, expr) . thd3) res
             where
-                res = lookupExpr scopes expr
+                res = lookupElem scopes expr
                 thd3 (_, _, c) = c
 
         -- given an expression, returns the two most significant (innermost,
