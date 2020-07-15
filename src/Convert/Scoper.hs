@@ -29,6 +29,7 @@ module Convert.Scoper
     , partScoper
     , partScoperT
     , insertElem
+    , injectItem
     , lookupExpr
     , lookupLHS
     , lookupIdent
@@ -81,6 +82,7 @@ data Scopes a = Scopes
     { sCurrent :: [Tier]
     , sMapping :: Mapping a
     , sProcedure :: Bool
+    , sInjected :: [ModuleItem]
     } deriving Show
 
 embedScopes :: Monad m => (Scopes a -> b -> c) -> b -> ScoperT a m c
@@ -100,46 +102,37 @@ setScope (Tier name _ : tiers) newEntry =
 
 enterScope :: Monad m => Identifier -> Identifier -> ScoperT a m ()
 enterScope name index = do
-    current <- gets sCurrent
-    let current' = current ++ [Tier name index]
+    s <- get
+    let current' = sCurrent s ++ [Tier name index]
     existingResult <- lookupIdentM name
     let existingElement = fmap thd3 existingResult
     let entry = Entry existingElement index Map.empty
-    mapping <- gets sMapping
-    let mapping' = setScope current' entry mapping
-    procedure <- gets sProcedure
-    put $ Scopes current' mapping' procedure
+    let mapping' = setScope current' entry $ sMapping s
+    put $ s { sCurrent = current', sMapping = mapping'}
     where thd3 (_, _, c) = c
 
 exitScope :: Monad m => Identifier -> Identifier -> ScoperT a m ()
 exitScope name index = do
     let tier = Tier name index
-    current <- gets sCurrent
-    mapping <- gets sMapping
-    procedure <- gets sProcedure
+    s <- get
+    let current = sCurrent s
     if null current || last current /= tier
         then error "exitScope invariant violated"
-        else do
-            let current' = init current
-            put $ Scopes current' mapping procedure
+        else put $ s { sCurrent = init current}
 
 enterProcedure :: Monad m => ScoperT a m ()
 enterProcedure = do
-    current <- gets sCurrent
-    mapping <- gets sMapping
-    procedure <- gets sProcedure
-    if procedure
+    s <- get
+    if sProcedure s
         then error "enterProcedure invariant failed"
-        else put $ Scopes current mapping True
+        else put $ s { sProcedure = True }
 
 exitProcedure :: Monad m => ScoperT a m ()
 exitProcedure = do
-    current <- gets sCurrent
-    mapping <- gets sMapping
-    procedure <- gets sProcedure
-    if not procedure
+    s <- get
+    if not (sProcedure s)
         then error "exitProcedure invariant failed"
-        else put $ Scopes current mapping False
+        else put $ s { sProcedure = False }
 
 tierToAccess :: Tier -> Access
 tierToAccess (Tier x "") = Access x Nil
@@ -161,12 +154,22 @@ lhsToAccesses = exprToAccesses . lhsToExpr
 
 insertElem :: Monad m => Identifier -> a -> ScoperT a m ()
 insertElem name element = do
-    current <- gets sCurrent
-    mapping <- gets sMapping
-    procedure <- gets sProcedure
+    s <- get
+    let current = sCurrent s
+    let mapping = sMapping s
     let entry = Entry (Just element) "" Map.empty
     let mapping' = setScope (current ++ [Tier name ""]) entry mapping
-    put $ Scopes current mapping' procedure
+    put $ s { sMapping = mapping' }
+
+injectItem :: Monad m => ModuleItem -> ScoperT a m ()
+injectItem item =
+    modify' $ \s -> s { sInjected = add $ sInjected s }
+    where
+        add :: [ModuleItem] -> [ModuleItem]
+        add items =
+            if elem item items
+                then items
+                else items ++ [item]
 
 type Replacements = Map.Map Identifier Expr
 
@@ -256,10 +259,10 @@ evalScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items =
         operation :: ScoperT a m [ModuleItem]
         operation = do
             enterScope topName ""
-            items' <- mapM fullModuleItemMapper items
+            items' <- mapM wrappedModuleItemMapper items
             exitScope topName ""
             return items'
-        initialState = Scopes [] Map.empty False
+        initialState = Scopes [] Map.empty False []
 
         fullStmtMapper :: Stmt -> ScoperT a m Stmt
         fullStmtMapper (Block kw name decls stmts) = do
@@ -298,6 +301,16 @@ evalScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items =
                 argIdxDecl ParamType{} = Nothing
                 argIdxDecl CommentDecl{} = Nothing
 
+        wrappedModuleItemMapper :: ModuleItem -> ScoperT a m ModuleItem
+        wrappedModuleItemMapper item = do
+            item' <- fullModuleItemMapper item
+            injected <- gets sInjected
+            if null injected
+                then return item'
+                else do
+                    modify' $ \s -> s { sInjected = [] }
+                    injected' <- mapM fullModuleItemMapper injected
+                    return $ Generate $ map GenModuleItem $ injected' ++ [item']
         fullModuleItemMapper :: ModuleItem -> ScoperT a m ModuleItem
         fullModuleItemMapper (MIPackageItem (Function ml t x decls stmts)) = do
             enterProcedure
@@ -353,13 +366,18 @@ evalScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items =
             genItems' <- mapM fullGenItemMapper genItems
             exitScope name index
             return $ GenFor (index, a) b c (GenBlock name genItems')
+        scopeGenItemMapper (GenFor (index, a) b c genItem) = do
+            enterScope "" index
+            genItem' <- fullGenItemMapper genItem
+            exitScope "" index
+            return $ GenFor (index, a) b c genItem'
         scopeGenItemMapper (GenBlock name genItems) = do
             enterScope name ""
             genItems' <- mapM fullGenItemMapper genItems
             exitScope name ""
             return $ GenBlock name genItems'
         scopeGenItemMapper (GenModuleItem moduleItem) =
-            fullModuleItemMapper moduleItem >>= return . GenModuleItem
+            wrappedModuleItemMapper moduleItem >>= return . GenModuleItem
         scopeGenItemMapper genItem =
             traverseSinglyNestedGenItemsM fullGenItemMapper genItem
 

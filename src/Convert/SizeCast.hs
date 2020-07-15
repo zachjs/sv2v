@@ -7,63 +7,49 @@
 
 module Convert.SizeCast (convert) where
 
-import Control.Monad.State
 import Control.Monad.Writer
-import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
 
 import Convert.ExprUtils
+import Convert.Scoper
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type TypeMap = Map.Map Identifier Type
-type CastSet = Set.Set (Expr, Signing)
-
-type ST = StateT TypeMap (Writer CastSet)
-
 convert :: [AST] -> [AST]
-convert = map convertFile
+convert = map $ traverseDescriptions convertDescription
 
-convertFile :: AST -> AST
-convertFile descriptions =
-    descriptions' ++ map (uncurry castFn) funcs
-    where
-        results = map convertDescription descriptions
-        descriptions' = map fst results
-        funcs = Set.toList $ Set.unions $ map snd results
+convertDescription :: Description -> Description
+convertDescription = partScoper
+    traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
 
-convertDescription :: Description -> (Description, CastSet)
-convertDescription description =
-    (description', info)
-    where
-        (description', info) =
-            runWriter $
-                scopedConversionM traverseDeclM traverseModuleItemM traverseStmtM
-                Map.empty description
-
-traverseDeclM :: Decl -> ST Decl
+traverseDeclM :: Decl -> Scoper Type Decl
 traverseDeclM decl = do
     case decl of
-        Variable _ t x _ _ -> modify $ Map.insert x t
-        Param    _ t x   _ -> modify $ Map.insert x t
+        Variable _ t x _ _ -> insertElem x t
+        Param    _ t x   _ -> insertElem x t
         ParamType    _ _ _ -> return ()
         CommentDecl      _ -> return ()
-    return decl
+    traverseDeclExprsM traverseExprM decl
 
-traverseModuleItemM :: ModuleItem -> ST ModuleItem
-traverseModuleItemM item = traverseExprsM traverseExprM item
+traverseModuleItemM :: ModuleItem -> Scoper Type ModuleItem
+traverseModuleItemM (Genvar x) =
+    insertElem x (IntegerAtom TInteger Unspecified) >> return (Genvar x)
+traverseModuleItemM item =
+    traverseExprsM traverseExprM item
 
-traverseStmtM :: Stmt -> ST Stmt
-traverseStmtM stmt = traverseStmtExprsM traverseExprM stmt
+traverseGenItemM :: GenItem -> Scoper Type GenItem
+traverseGenItemM = return
+
+traverseStmtM :: Stmt -> Scoper Type Stmt
+traverseStmtM = traverseStmtExprsM traverseExprM
 
 pattern ConvertedUU :: Integer -> Integer -> Expr
 pattern ConvertedUU a b = Number (Based 1 True Binary a b)
 
-traverseExprM :: Expr -> ST Expr
+traverseExprM :: Expr -> Scoper Type Expr
 traverseExprM =
     traverseNestedExprsM convertExprM
     where
-        convertExprM :: Expr -> ST Expr
+        convertExprM :: Expr -> Scoper Type Expr
         convertExprM (Cast (Right (Number s)) (Number n)) =
             case n of
                 UnbasedUnsized{} -> fallback
@@ -85,9 +71,9 @@ traverseExprM =
                 fallback = convertCastM (Number s) (Number n)
                 num = return . Number
         convertExprM (Cast (Right (Ident x)) e) = do
-            typeMap <- get
+            details <- lookupIdentM x
             -- can't convert this cast yet because x could be a typename
-            if Map.notMember x typeMap
+            if details == Nothing
                 then return $ Cast (Right $ Ident x) e
                 else convertCastM (Ident x) e
         convertExprM (Cast (Right s) e) =
@@ -100,7 +86,7 @@ traverseExprM =
             convertExprM $ Cast (Right $ dimensionsSize rs) e
         convertExprM other = return other
 
-        convertCastM :: Expr -> Expr -> ST Expr
+        convertCastM :: Expr -> Expr -> Scoper Type Expr
         convertCastM (RawNum n) (ConvertedUU a b) =
             return $ Number $ Based (fromIntegral n) False Binary
                 (extend a) (extend b)
@@ -109,14 +95,15 @@ traverseExprM =
                 extend 1 = (2 ^ n) - 1
                 extend _ = error "not possible"
         convertCastM s e = do
-            typeMap <- get
-            case exprSigning typeMap e of
+            signing <- embedScopes exprSigning e
+            case signing of
                 Just sg -> convertCastWithSigningM s e sg
                 _ -> return $ Cast (Right s) e
 
-        convertCastWithSigningM :: Expr -> Expr -> Signing -> ST Expr
+        convertCastWithSigningM :: Expr -> Expr -> Signing -> Scoper Type Expr
         convertCastWithSigningM s e sg = do
-            lift $ tell $ Set.singleton (s, sg)
+            details <- lookupIdentM $ castFnName s sg
+            when (details == Nothing) $ injectItem $ MIPackageItem $ castFn s sg
             let f = castFnName s sg
             let args = Args [e] []
             return $ Call (Ident f) args
@@ -132,9 +119,8 @@ isSimpleExpr =
         collectUnresolvedExprM (expr @ DimFn {}) = tell [expr]
         collectUnresolvedExprM _ = return ()
 
-castFn :: Expr -> Signing -> Description
+castFn :: Expr -> Signing -> PackageItem
 castFn e sg =
-    PackageItem $
     Function Automatic t fnName [decl] [Return $ Ident inp]
     where
         inp = "inp"
@@ -157,16 +143,12 @@ castFnName e sg =
             _ -> shortHash e
         name = "sv2v_cast_" ++ sizeStr ++ "_" ++ show sg
 
-exprSigning :: TypeMap -> Expr -> Maybe Signing
-exprSigning typeMap (Ident x) =
-    case Map.lookup x typeMap of
-        Just t -> typeSigning t
-        Nothing -> Just Unspecified
-exprSigning typeMap (BinOp op e1 e2) =
+exprSigning :: Scopes Type -> Expr -> Maybe Signing
+exprSigning scopes (BinOp op e1 e2) =
     combiner sg1 sg2
     where
-        sg1 = exprSigning typeMap e1
-        sg2 = exprSigning typeMap e2
+        sg1 = exprSigning scopes e1
+        sg2 = exprSigning scopes e2
         combiner = case op of
             BitAnd  -> combineSigning
             BitXor  -> combineSigning
@@ -181,7 +163,10 @@ exprSigning typeMap (BinOp op e1 e2) =
             ShiftAL -> curry fst
             ShiftAR -> curry fst
             _ -> \_ _ -> Just Unspecified
-exprSigning _ _ = Just Unspecified
+exprSigning scopes expr =
+    case lookupExpr scopes expr of
+        Just (_, _, t) -> typeSigning t
+        Nothing -> Just Unspecified
 
 combineSigning :: Maybe Signing -> Maybe Signing -> Maybe Signing
 combineSigning Nothing _ = Nothing
