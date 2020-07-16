@@ -16,27 +16,25 @@
 
 module Convert.Simplify (convert) where
 
-import Control.Monad.State
-import qualified Data.Map.Strict as Map
+import Control.Monad (when)
 
 import Convert.ExprUtils
+import Convert.Scoper
 import Convert.Traverse
 import Language.SystemVerilog.AST
-
-type Info = Map.Map Identifier Expr
 
 convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription =
-    scopedConversion traverseDeclM traverseModuleItemM traverseStmtM Map.empty
+    partScoper traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
 
-traverseDeclM :: Decl -> State Info Decl
+traverseDeclM :: Decl -> Scoper Expr Decl
 traverseDeclM decl = do
     case decl of
         Param Localparam _ x e ->
-            when (isSimpleExpr e) $ modify $ Map.insert x e
+            when (isSimpleExpr e) $ insertElem x e
         _ -> return ()
     let mi = MIPackageItem $ Decl decl
     mi' <- traverseModuleItemM mi
@@ -52,7 +50,7 @@ isSimpleExpr (Bit   e _  ) = isSimpleExpr e
 isSimpleExpr (Range e _ _) = isSimpleExpr e
 isSimpleExpr _ = False
 
-traverseModuleItemM :: ModuleItem -> State Info ModuleItem
+traverseModuleItemM :: ModuleItem -> Scoper Expr ModuleItem
 traverseModuleItemM (Instance m p x rs l) = do
     p' <- mapM paramBindingMapper p
     traverseExprsM traverseExprM $ Instance m p' x rs l
@@ -63,16 +61,19 @@ traverseModuleItemM (Instance m p x rs l) = do
         paramBindingMapper (param, Right e) = return (param, Right e)
 traverseModuleItemM item = traverseExprsM traverseExprM item
 
-traverseStmtM :: Stmt -> State Info Stmt
+traverseGenItemM :: GenItem -> Scoper Expr GenItem
+traverseGenItemM = traverseGenItemExprsM traverseExprM
+
+traverseStmtM :: Stmt -> Scoper Expr Stmt
 traverseStmtM stmt = traverseStmtExprsM traverseExprM stmt
 
-traverseExprM :: Expr -> State Info Expr
-traverseExprM = stately convertExpr
+traverseExprM :: Expr -> Scoper Expr Expr
+traverseExprM = embedScopes convertExpr
 
-substituteExprM :: Expr -> State Info Expr
-substituteExprM = stately substitute
+substituteExprM :: Expr -> Scoper Expr Expr
+substituteExprM = embedScopes substitute
 
-convertExpr :: Info -> Expr -> Expr
+convertExpr :: Scopes Expr -> Expr -> Expr
 convertExpr info (Cast (Right c) e) =
     Cast (Right c') e'
     where
@@ -114,13 +115,13 @@ convertExpr info (Concat exprs) =
 convertExpr info expr =
     traverseSinglyNestedExprs (convertExpr info) expr
 
-substitute :: Info -> Expr -> Expr
-substitute info expr =
+substitute :: Scopes Expr -> Expr -> Expr
+substitute scopes expr =
     traverseNestedExprs substitute' expr
     where
         substitute' :: Expr -> Expr
         substitute' (Ident x) =
-            case Map.lookup x info of
+            case lookupElem scopes x of
                 Nothing -> Ident x
-                Just e -> e
+                Just (_, _, e) -> e
         substitute' other = other
