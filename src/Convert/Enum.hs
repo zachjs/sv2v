@@ -55,7 +55,8 @@ convertDescription' description =
     where
         -- replace and collect the enum types in this description
         (description', enums) = runWriter $
-            traverseModuleItemsM (traverseTypesM traverseType) description
+            traverseModuleItemsM traverseModuleItemM description
+        traverseModuleItemM = traverseTypesM $ traverseNestedTypesM traverseType
         -- convert the collected enums into their corresponding localparams
         enumItems = concatMap makeEnumItems $ Set.toList enums
 

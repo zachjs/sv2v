@@ -124,7 +124,7 @@ prefixPackageItem packageName idents item =
         convertLHSM other = return other
 
         convertModuleItemM =
-            traverseTypesM                       convertTypeM  >=>
+            traverseTypesM (traverseNestedTypesM convertTypeM) >=>
             traverseExprsM (traverseNestedExprsM convertExprM) >=>
             traverseLHSsM  (traverseNestedLHSsM  convertLHSM )
         convertStmtM =

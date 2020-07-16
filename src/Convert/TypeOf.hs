@@ -38,7 +38,7 @@ traverseDeclM decl = do
         CommentDecl{} -> return decl'
 
 traverseModuleItemM :: ModuleItem -> Scoper Type ModuleItem
-traverseModuleItemM = traverseTypesM traverseTypeM
+traverseModuleItemM = traverseTypesM $ traverseNestedTypesM traverseTypeM
 
 traverseGenItemM :: GenItem -> Scoper Type GenItem
 traverseGenItemM = traverseGenItemExprsM traverseExprM
@@ -47,7 +47,8 @@ traverseStmtM :: Stmt -> Scoper Type Stmt
 traverseStmtM = traverseStmtExprsM traverseExprM
 
 traverseExprM :: Expr -> Scoper Type Expr
-traverseExprM = traverseNestedExprsM $ traverseExprTypesM traverseTypeM
+traverseExprM = traverseNestedExprsM $ traverseExprTypesM $
+    traverseNestedTypesM traverseTypeM
 
 traverseTypeM :: Type -> Scoper Type Type
 traverseTypeM (TypeOf expr) = typeof expr
@@ -62,7 +63,9 @@ lookupTypeOf expr = do
         Just (_, _, Implicit Unspecified []) ->
             return $ IntegerVector TLogic Unspecified []
         Just (_, replacements, typ) ->
-            return $ rewriteType typ
+            return $ if Map.null replacements
+                then typ
+                else rewriteType typ
             where
                 rewriteType = traverseNestedTypes $ traverseTypeExprs $
                     traverseNestedExprs replace

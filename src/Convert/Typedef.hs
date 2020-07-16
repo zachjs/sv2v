@@ -57,7 +57,7 @@ traverseModuleItemM item = traverseModuleItemM' item
 
 traverseModuleItemM' :: ModuleItem -> Scoper Type ModuleItem
 traverseModuleItemM' =
-    traverseTypesM traverseTypeM >=>
+    traverseTypesM (traverseNestedTypesM traverseTypeM) >=>
     traverseExprsM (traverseNestedExprsM traverseExprM)
 
 traverseGenItemM :: GenItem -> Scoper Type GenItem

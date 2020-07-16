@@ -14,7 +14,7 @@ convert =
     map $
     traverseDescriptions $
     traverseModuleItems $
-    traverseTypes convertType
+    traverseTypes $ traverseNestedTypes convertType
 
 convertType :: Type -> Type
 convertType (IntegerAtom kw sg) = elaborateIntegerAtom $ IntegerAtom kw sg

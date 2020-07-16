@@ -18,7 +18,7 @@ convert =
     map $
     traverseDescriptions $
     traverseModuleItems $
-    traverseTypes convertType
+    traverseTypes $ traverseNestedTypes convertType
 
 convertType :: Type -> Type
 convertType (Implicit        Unsigned rs) = Implicit        Unspecified rs

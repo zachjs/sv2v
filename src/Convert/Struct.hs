@@ -24,7 +24,8 @@ convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription (description @ (Part _ _ Module _ _ _ _)) =
-    traverseModuleItems (traverseTypes' ExcludeParamTypes convertType) $
+    traverseModuleItems
+    (traverseTypes' ExcludeParamTypes $ traverseNestedTypes convertType) $
     partScoper traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
     description
 convertDescription other = other

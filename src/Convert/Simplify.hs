@@ -58,7 +58,7 @@ traverseModuleItemM (Instance m p x rs l) = do
     traverseExprsM traverseExprM $ Instance m p' x rs l
     where
         paramBindingMapper (param, Left t) = do
-            t' <- traverseTypeExprsM substituteExprM t
+            t' <- traverseNestedTypesM (traverseTypeExprsM substituteExprM) t
             return (param, Left t')
         paramBindingMapper (param, Right e) = return (param, Right e)
 traverseModuleItemM item = traverseExprsM traverseExprM item

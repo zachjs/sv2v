@@ -243,7 +243,7 @@ isSimpleType typ =
         Union    _ fields _ -> all (isSimpleType . fst) fields
         _ -> False
 
--- returns whether a type contains any dimension queries
+-- returns whether a top-level type contains any dimension queries
 typeHasQueries :: Type -> Bool
 typeHasQueries =
     not . null . execWriter . collectTypeExprsM
@@ -257,8 +257,9 @@ typeHasQueries =
         collectUnresolvedExprM _ = return ()
 
 prepareTypeIdents :: Identifier -> Type -> (Type, IdentSet)
-prepareTypeIdents prefix typ =
-    runWriter $ traverseTypeExprsM (traverseNestedExprsM prepareExprIdents) typ
+prepareTypeIdents prefix =
+    runWriter . traverseNestedTypesM
+        (traverseTypeExprsM $ traverseNestedExprsM prepareExprIdents)
     where
         prepareExprIdents :: Expr -> Writer IdentSet Expr
         prepareExprIdents (Ident x) = do
