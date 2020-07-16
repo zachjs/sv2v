@@ -43,8 +43,7 @@ module Convert.Scoper
 
 import Control.Monad.State
 import Data.Functor.Identity (runIdentity)
-import Data.List (inits)
-import Data.Maybe (catMaybes)
+import Data.Maybe (isNothing)
 import qualified Data.Map.Strict as Map
 
 import Convert.Traverse
@@ -130,10 +129,6 @@ exitProcedure = do
         then error "exitProcedure invariant failed"
         else put $ s { sProcedure = False }
 
-tierToAccess :: Tier -> Access
-tierToAccess (Tier x "") = Access x Nil
-tierToAccess (Tier x y) = Access x (Ident y)
-
 exprToAccesses :: Expr -> Maybe [Access]
 exprToAccesses (Ident x) = Just [Access x Nil]
 exprToAccesses (Bit (Ident x) y) = Just [Access x y]
@@ -166,21 +161,38 @@ injectItem item =
 
 type Replacements = Map.Map Identifier Expr
 
-attemptResolve :: Mapping a -> [Access] -> Maybe (Replacements, a)
-attemptResolve _ [] = Nothing
-attemptResolve mapping (Access x e : rest) = do
-    Entry maybeElement index subMapping <- Map.lookup x mapping
-    if null rest && e == Nil then
-        fmap (Map.empty, ) maybeElement
-    else do
-        (replacements, element) <- attemptResolve subMapping rest
-        if e /= Nil && not (null index) then do
-            let replacements' = Map.insert index e replacements
-            Just (replacements', element)
-        else if e == Nil && null index then
-            Just (replacements, element)
-        else
-            Nothing
+-- lookup accesses by direct match (no search)
+directResolve :: Mapping a -> [Access] -> Maybe (Replacements, a)
+directResolve _ [] = Nothing
+directResolve mapping [Access x Nil] = do
+    Entry maybeElement _ _ <- Map.lookup x mapping
+    fmap (Map.empty, ) maybeElement
+directResolve _ [_] = Nothing
+directResolve mapping (Access x Nil : rest) = do
+    Entry _ "" subMapping <- Map.lookup x mapping
+    directResolve subMapping rest
+directResolve mapping (Access x e : rest) = do
+    Entry _ (index @ (_ : _)) subMapping <- Map.lookup x mapping
+    (replacements, element) <- directResolve subMapping rest
+    let replacements' = Map.insert index e replacements
+    Just (replacements', element)
+
+-- lookup accesses given a current scope prefix
+resolveInScope :: Mapping a -> [Tier] -> [Access] -> LookupResult a
+resolveInScope mapping [] accesses = do
+    (replacements, element) <- directResolve mapping accesses
+    Just (accesses, replacements, element)
+resolveInScope mapping (Tier x y : rest) accesses = do
+    Entry _ _ subMapping <- Map.lookup x mapping
+    let deep = resolveInScope subMapping rest accesses
+    let side = resolveInScope subMapping [] accesses
+    let chosen = if isNothing deep then side else deep
+    (accesses', replacements, element) <- chosen
+    if null y
+        then Just (Access x Nil : accesses', replacements, element)
+        else do
+            let replacements' = Map.insert y (Ident y) replacements
+            Just (Access x (Ident y) : accesses', replacements', element)
 
 type LookupResult a = Maybe ([Access], Replacements, a)
 
@@ -200,17 +212,9 @@ instance ScopeKey Identifier where
 
 lookupAccesses :: Scopes a -> [Access] -> LookupResult a
 lookupAccesses scopes accesses = do
-    if null results
-        then Nothing
-        else Just $ last results
-    where
-        options = inits $ map tierToAccess (sCurrent scopes)
-        try option =
-            fmap toResult $ attemptResolve (sMapping scopes) full
-            where
-                full = option ++ accesses
-                toResult (a, b) = (full, a, b)
-        results = catMaybes $ map try options
+    let deep = resolveInScope (sMapping scopes) (sCurrent scopes) accesses
+    let side = resolveInScope (sMapping scopes) [] accesses
+    if isNothing deep then side else deep
 
 withinProcedureM :: Monad m => ScoperT a m Bool
 withinProcedureM = gets sProcedure
