@@ -85,9 +85,6 @@ module Convert.Traverse
 , traverseNestedLHSs
 , collectNestedLHSsM
 , traverseScopesM
-, scopedConversion
-, scopedConversionM
-, stately
 , traverseFilesM
 , traverseFiles
 , traverseSinglyNestedGenItemsM
@@ -1124,44 +1121,6 @@ traverseScopesM declMapper moduleItemMapper stmtMapper =
             item' <- redirectModuleItem item
             put prevState
             return item'
-
--- applies the given decl conversion across the description, and then performs a
--- scoped traversal for each ModuleItem in the description
-scopedConversion
-    :: (Eq s, Show s)
-    => MapperM (State s) Decl
-    -> MapperM (State s) ModuleItem
-    -> MapperM (State s) Stmt
-    -> s
-    -> Description
-    -> Description
-scopedConversion traverseDeclM traverseModuleItemM traverseStmtM s description =
-    runIdentity $ scopedConversionM traverseDeclM traverseModuleItemM traverseStmtM s description
-
-scopedConversionM
-    :: (Eq s, Show s)
-    => Monad m
-    => MapperM (StateT s m) Decl
-    -> MapperM (StateT s m) ModuleItem
-    -> MapperM (StateT s m) Stmt
-    -> s
-    -> Description
-    -> m Description
-scopedConversionM traverseDeclM traverseModuleItemM traverseStmtM s description =
-    evalStateT (initialTraverse description >>= scopedTraverse) s
-    where
-        initialTraverse = traverseModuleItemsM traverseMIPackageItemDecl
-        scopedTraverse = traverseModuleItemsM $
-            traverseScopesM traverseDeclM traverseModuleItemM traverseStmtM
-        traverseMIPackageItemDecl (MIPackageItem (Decl decl)) =
-            traverseDeclM decl >>= return . MIPackageItem . Decl
-        traverseMIPackageItemDecl other = return other
-
--- convert a basic mapper with an initial argument to a stateful mapper
-stately :: (Eq s, Show s) => (s -> Mapper a) -> MapperM (State s) a
-stately mapper thing = do
-    s <- get
-    return $ mapper s thing
 
 -- In many conversions, we want to resolve items locally first, and then fall
 -- back to looking at other source files, if necessary. This helper captures
