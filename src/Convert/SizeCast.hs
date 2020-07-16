@@ -37,7 +37,7 @@ traverseModuleItemM item =
     traverseExprsM traverseExprM item
 
 traverseGenItemM :: GenItem -> Scoper Type GenItem
-traverseGenItemM = return
+traverseGenItemM = traverseGenItemExprsM traverseExprM
 
 traverseStmtM :: Stmt -> Scoper Type Stmt
 traverseStmtM = traverseStmtExprsM traverseExprM

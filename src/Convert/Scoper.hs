@@ -349,7 +349,17 @@ evalScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items =
         -- TODO: This doesn't yet support implicit naming of generate blocks as
         -- blocks as described in Section 27.6.
         fullGenItemMapper :: GenItem -> ScoperT a m GenItem
-        fullGenItemMapper = genItemMapper >=> scopeGenItemMapper
+        fullGenItemMapper genItem = do
+            genItem' <- genItemMapper genItem
+            injected <- gets sInjected
+            if null injected
+                then scopeGenItemMapper genItem'
+                else do
+                    modify' $ \s -> s { sInjected = [] }
+                    injected' <- mapM fullModuleItemMapper injected
+                    genItem'' <- scopeGenItemMapper genItem'
+                    let genItems = map GenModuleItem injected' ++ [genItem'']
+                    return $ GenBlock "" genItems
         scopeGenItemMapper :: GenItem -> ScoperT a m GenItem
         scopeGenItemMapper (GenFor (index, a) b c (GenBlock name genItems)) = do
             enterScope name index
