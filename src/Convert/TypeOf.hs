@@ -81,6 +81,10 @@ typeof (Number n) =
         r = (RawNum $ size - 1, RawNum 0)
         size = numberBitLength n
         sg = if numberIsSigned n then Signed else Unspecified
+typeof (Call (Ident "$unsigned") (Args [e] [])) =
+    typeof e
+typeof (Call (Ident "$signed") (Args [e] [])) =
+    typeof e
 typeof (Call (Ident x) _) =
     typeof $ Ident x
 typeof (orig @ (Bit e _)) = do

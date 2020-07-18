@@ -112,6 +112,20 @@ module top;
         arr = '{default: 'x}; $display("%b", arr);
         arr = '{default: 'z}; $display("%b", arr);
     end
+
+    reg pick;
+    logic [8:0] w0, w1, w2, w3;
+    assign w0 = pick ? '1 : $unsigned(4'd0);
+    assign w1 = pick ? '1 : unsigned'(5'd0);
+    assign w2 = pick ? '1 : $signed(6'd0);
+    assign w3 = pick ? '1 : signed'(7'd0);
+    initial begin
+        $monitor("%0d %b %b %b %b %b", $time, pick, w0, w1, w2, w3);
+        #1 pick = 0;
+        #1 pick = 1;
+        #1 pick = 0;
+        #1 pick = 1;
+    end
 endmodule
 
 module M(a, b, c, d);

@@ -107,6 +107,20 @@ module top;
         arr = 1'sbx; $display("%b", arr);
         arr = 1'sbz; $display("%b", arr);
     end
+
+    reg pick;
+    wire [8:0] w0, w1, w2, w3;
+    assign w0 = pick ? 9'h1FF : 9'h000;
+    assign w1 = pick ? 9'h1FF : 9'h000;
+    assign w2 = pick ? 9'h1FF : 9'h000;
+    assign w3 = pick ? 9'h1FF : 9'h000;
+    initial begin
+        $monitor("%0d %b %b %b %b %b", $time, pick, w0, w1, w2, w3);
+        #1 pick = 0;
+        #1 pick = 1;
+        #1 pick = 0;
+        #1 pick = 1;
+    end
 endmodule
 
 module M(a, b, c, d);
