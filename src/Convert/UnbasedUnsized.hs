@@ -117,7 +117,8 @@ convertModuleItemM other = return $ convertModuleItem other
 convertModuleItem :: ModuleItem -> ModuleItem
 convertModuleItem =
     traverseExprs (convertExpr SelfDetermined) .
-    traverseTypes (traverseNestedTypes convertType)
+    traverseTypes (traverseNestedTypes convertType) .
+    traverseAsgns convertAsgn
 
 literalFor :: Char -> Expr
 literalFor 'Z' = literalFor 'z'
@@ -142,6 +143,11 @@ sizedLiteralFor :: Expr -> Char -> Expr
 sizedLiteralFor expr ch =
     Cast (Right size) (literalFor ch)
     where size = DimsFn FnBits $ Right expr
+
+convertAsgn :: (LHS, Expr) -> (LHS, Expr)
+convertAsgn (lhs, expr) =
+    (lhs, convertExpr context expr)
+    where context = ContextDetermined $ lhsToExpr lhs
 
 convertExpr :: ExprContext -> Expr -> Expr
 convertExpr _ (DimsFn fn (Right e)) =
