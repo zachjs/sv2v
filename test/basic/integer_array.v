@@ -19,4 +19,11 @@ module top;
         $display("%b %2d %2d", H, $bits(H), 8);
         $display("%b %2d %2d", I, $bits(I), 1);
     end
+
+    localparam [3:0] P = 4'b1100;
+    localparam [3:0] Q = 4'b0011;
+    initial begin
+        $display("%b %b %b", P, P[1:0], P[3:2]);
+        $display("%b %b %b", Q, Q[1:0], Q[3:2]);
+    end
 endmodule

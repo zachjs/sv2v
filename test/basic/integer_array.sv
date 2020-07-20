@@ -21,4 +21,11 @@ module top;
         `PRINT(H);
         `PRINT(I);
     end
+
+    localparam [1:0][0:1] P = '{'{default:'d1}, '{default:'d2}};
+    localparam bit [1:0][0:1] Q = '{'{default:'d2}, '{default:'d1}};
+    initial begin
+        $display("%b %b %b", P, P[0], P[1]);
+        $display("%b %b %b", Q, Q[0], Q[1]);
+    end
 endmodule

@@ -199,20 +199,27 @@ convertExpr (IntegerVector t sg (r:rs)) (Pattern [(":default", e)]) =
 -- TODO: This is a conversion for concat array literals with elements
 -- that are unsized numbers. This probably belongs somewhere else.
 convertExpr (t @ IntegerVector{}) (Pattern items) =
-    if all (null . fst) items
-        then convertExpr t $ Concat $ map snd items
+    if all null names
+        then convertExpr t $ Concat exprs'
         else Pattern items
+    where
+        (names, exprs) = unzip items
+        t' = dropInnerTypeRange t
+        exprs' = map (convertExpr t') exprs
 convertExpr (t @ IntegerVector{}) (Concat exprs) =
     if all isUnsizedNumber exprs
-        then Concat exprs'
-        else Concat exprs
+        then Concat $ map (Cast $ Left t') exprs
+        else Concat $ map (convertExpr t') exprs
     where
-        caster = Cast (Left $ dropInnerTypeRange t)
-        exprs' = map caster exprs
+        t' = dropInnerTypeRange t
         isUnsizedNumber :: Expr -> Bool
         isUnsizedNumber (Number n) = not $ numberIsSized n
         isUnsizedNumber (UniOp UniSub e) = isUnsizedNumber e
         isUnsizedNumber _ = False
+convertExpr (Implicit sg rs) expr =
+    if null rs
+        then expr
+        else convertExpr (IntegerVector TBit sg rs) expr
 convertExpr (Struct packing fields (_:rs)) (Concat exprs) =
     Concat $ map (convertExpr (Struct packing fields rs)) exprs
 convertExpr (Struct packing fields (_:rs)) (Bit e _) =
