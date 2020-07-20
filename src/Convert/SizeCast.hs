@@ -8,6 +8,7 @@
 module Convert.SizeCast (convert) where
 
 import Control.Monad.Writer
+import Data.List (isPrefixOf)
 
 import Convert.ExprUtils
 import Convert.Scoper
@@ -18,17 +19,30 @@ convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription = partScoper
+convertDescription =
+    traverseModuleItems dropDuplicateCaster . partScoper
     traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
 
 traverseDeclM :: Decl -> Scoper Type Decl
 traverseDeclM decl = do
-    case decl of
-        Variable _ t x _ _ -> insertElem x t
-        Param    _ t x   _ -> insertElem x t
-        ParamType    _ _ _ -> return ()
-        CommentDecl      _ -> return ()
-    traverseDeclExprsM traverseExprM decl
+    decl' <- case decl of
+        Variable _ t x _ _ -> do
+            details <- lookupElemM x
+            if isPrefixOf "sv2v_cast_" x && details /= Nothing
+                then return $ Variable Local DuplicateTag x [] Nil
+                else insertElem x t >> return decl
+        Param    _ t x   _ -> insertElem x t >> return decl
+        ParamType    _ _ _ -> return decl
+        CommentDecl      _ -> return decl
+    traverseDeclExprsM traverseExprM decl'
+
+pattern DuplicateTag :: Type
+pattern DuplicateTag = Alias ":duplicate_cast_to_be_removed:" []
+
+dropDuplicateCaster :: ModuleItem -> ModuleItem
+dropDuplicateCaster (MIPackageItem (Function _ DuplicateTag _ _ _)) =
+    Generate []
+dropDuplicateCaster other = other
 
 traverseModuleItemM :: ModuleItem -> Scoper Type ModuleItem
 traverseModuleItemM (Genvar x) =
