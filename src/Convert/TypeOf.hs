@@ -90,12 +90,14 @@ typeof (Call (Ident x) _) =
 typeof (orig @ (Bit e _)) = do
     t <- typeof e
     case t of
-        TypeOf _ -> lookupTypeOf orig
+        TypeOf{} -> lookupTypeOf orig
+        Alias{} -> return $ TypeOf orig
         _ -> return $ popRange t
 typeof (orig @ (Range e mode r)) = do
     t <- typeof e
     return $ case t of
-        TypeOf _ -> TypeOf orig
+        TypeOf{} -> TypeOf orig
+        Alias{} -> TypeOf orig
         _ -> replaceRange (lo, hi) t
     where
         lo = fst r
