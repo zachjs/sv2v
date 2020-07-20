@@ -78,9 +78,12 @@ traverseDeclM decl = do
         CommentDecl{} -> return decl'
 
 traverseStmtM :: Stmt -> Scoper Type Stmt
-traverseStmtM =
-    traverseStmtExprsM $ traverseNestedExprsM $
-    traverseExprTypesM traverseTypeM >=> traverseExprM
+traverseStmtM = traverseStmtExprsM $ traverseNestedExprsM traverseStmtExprM
+    where
+        traverseStmtExprM :: Expr -> Scoper Type Expr
+        traverseStmtExprM =
+            traverseExprTypesM (traverseNestedTypesM traverseTypeM) >=>
+            traverseExprM
 
 traverseTypeM :: Type -> Scoper Type Type
 traverseTypeM (Alias st rs1) = do
