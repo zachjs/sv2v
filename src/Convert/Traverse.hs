@@ -35,6 +35,9 @@ module Convert.Traverse
 , traverseDeclsM
 , traverseDecls
 , collectDeclsM
+, traverseSinglyNestedTypesM
+, traverseSinglyNestedTypes
+, collectSinglyNestedTypesM
 , traverseNestedTypesM
 , traverseNestedTypes
 , collectNestedTypesM
@@ -84,6 +87,9 @@ module Convert.Traverse
 , traverseNestedLHSsM
 , traverseNestedLHSs
 , collectNestedLHSsM
+, traverseSinglyNestedLHSsM
+, traverseSinglyNestedLHSs
+, collectSinglyNestedLHSsM
 , traverseScopesM
 , traverseFilesM
 , traverseFiles
@@ -713,19 +719,27 @@ collectLHSsM = collectify traverseLHSsM
 
 traverseNestedLHSsM :: Monad m => MapperM m LHS -> MapperM m LHS
 traverseNestedLHSsM mapper = fullMapper
-    where
-        fullMapper = mapper >=> tl
-        tl (LHSIdent  x       ) = return $ LHSIdent x
-        tl (LHSBit    l e     ) = fullMapper l >>= \l' -> return $ LHSBit    l' e
-        tl (LHSRange  l m r   ) = fullMapper l >>= \l' -> return $ LHSRange  l' m r
-        tl (LHSDot    l x     ) = fullMapper l >>= \l' -> return $ LHSDot    l' x
-        tl (LHSConcat     lhss) = mapM fullMapper lhss >>= return . LHSConcat
-        tl (LHSStream o e lhss) = mapM fullMapper lhss >>= return . LHSStream o e
+    where fullMapper = mapper >=> traverseSinglyNestedLHSsM fullMapper
 
 traverseNestedLHSs :: Mapper LHS -> Mapper LHS
 traverseNestedLHSs = unmonad traverseNestedLHSsM
 collectNestedLHSsM :: Monad m => CollectorM m LHS -> CollectorM m LHS
 collectNestedLHSsM = collectify traverseNestedLHSsM
+
+traverseSinglyNestedLHSsM :: Monad m => MapperM m LHS -> MapperM m LHS
+traverseSinglyNestedLHSsM mapper = tl
+    where
+        tl (LHSIdent  x       ) = return $ LHSIdent x
+        tl (LHSBit    l e     ) = mapper l >>= \l' -> return $ LHSBit    l' e
+        tl (LHSRange  l m r   ) = mapper l >>= \l' -> return $ LHSRange  l' m r
+        tl (LHSDot    l x     ) = mapper l >>= \l' -> return $ LHSDot    l' x
+        tl (LHSConcat     lhss) = mapM mapper lhss >>= return . LHSConcat
+        tl (LHSStream o e lhss) = mapM mapper lhss >>= return . LHSStream o e
+
+traverseSinglyNestedLHSs :: Mapper LHS -> Mapper LHS
+traverseSinglyNestedLHSs = unmonad traverseSinglyNestedLHSsM
+collectSinglyNestedLHSsM :: Monad m => CollectorM m LHS -> CollectorM m LHS
+collectSinglyNestedLHSsM = collectify traverseSinglyNestedLHSsM
 
 traverseDeclsM :: Monad m => MapperM m Decl -> MapperM m ModuleItem
 traverseDeclsM mapper item = do
@@ -751,10 +765,9 @@ traverseDecls = unmonad traverseDeclsM
 collectDeclsM :: Monad m => CollectorM m Decl -> CollectorM m ModuleItem
 collectDeclsM = collectify traverseDeclsM
 
-traverseNestedTypesM :: Monad m => MapperM m Type -> MapperM m Type
-traverseNestedTypesM mapper = fullMapper
+traverseSinglyNestedTypesM :: Monad m => MapperM m Type -> MapperM m Type
+traverseSinglyNestedTypesM mapper = tm
     where
-        fullMapper = mapper >=> tm
         typeOrExprMapper (Left t) = mapper t >>= return . Left
         typeOrExprMapper (Right e) = return $ Right e
         tm (Alias         xx    rs) = return $ Alias         xx    rs
@@ -771,19 +784,28 @@ traverseNestedTypesM mapper = fullMapper
         tm (TypeOf        expr    ) = return $ TypeOf        expr
         tm (InterfaceT x my r) = return $ InterfaceT x my r
         tm (Enum t vals r) = do
-            t' <- fullMapper t
+            t' <- mapper t
             return $ Enum t' vals r
         tm (Struct p fields r) = do
-            types <- mapM fullMapper $ map fst fields
+            types <- mapM mapper $ map fst fields
             let idents = map snd fields
             return $ Struct p (zip types idents) r
         tm (Union p fields r) = do
-            types <- mapM fullMapper $ map fst fields
+            types <- mapM mapper $ map fst fields
             let idents = map snd fields
             return $ Union p (zip types idents) r
         tm (UnpackedType t r) = do
-            t' <- fullMapper t
+            t' <- mapper t
             return $ UnpackedType t' r
+
+traverseSinglyNestedTypes :: Mapper Type -> Mapper Type
+traverseSinglyNestedTypes = unmonad traverseSinglyNestedTypesM
+collectSinglyNestedTypesM :: Monad m => CollectorM m Type -> CollectorM m Type
+collectSinglyNestedTypesM = collectify traverseSinglyNestedTypesM
+
+traverseNestedTypesM :: Monad m => MapperM m Type -> MapperM m Type
+traverseNestedTypesM mapper = fullMapper
+    where fullMapper = mapper >=> traverseSinglyNestedTypesM fullMapper
 
 traverseNestedTypes :: Mapper Type -> Mapper Type
 traverseNestedTypes = unmonad traverseNestedTypesM
