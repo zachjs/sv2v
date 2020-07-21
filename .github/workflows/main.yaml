@@ -21,7 +21,6 @@ jobs:
           - windows-2019
     steps:
       - uses: actions/checkout@v1
-      - uses: mstksg/setup-stack@v2
       - name: Build
         run: make
       - name: Prepare Artifact
