@@ -25,6 +25,7 @@
 
 module Convert.Wildcard (convert) where
 
+import Control.Monad (when)
 import Data.Bits ((.|.))
 
 import Convert.Scoper
@@ -42,6 +43,8 @@ traverseDeclM :: Decl -> Scoper Number Decl
 traverseDeclM decl = do
     case decl of
         Param Localparam _ x (Number n) -> insertElem x n
+        Param Parameter  _ x (Number n) ->
+            when (numberToInteger n /= Nothing) $ insertElem x n
         _ -> return ()
     let mi = MIPackageItem $ Decl decl
     mi' <- traverseModuleItemM mi
