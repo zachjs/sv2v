@@ -191,46 +191,7 @@ convertExpr t (Mux c e1 e2) =
     where
         e1' = convertExpr t e1
         e2' = convertExpr t e2
--- TODO: This is really a conversion for using default patterns to
--- populate arrays. Maybe this should be somewhere else?
-convertExpr (IntegerVector t sg (r:rs)) (Pattern [(":default", e)]) =
-    Repeat (rangeSize r) [e']
-    where e' = Cast (Left $ IntegerVector t sg rs) e
--- TODO: This is a conversion for concat array literals with elements
--- that are unsized numbers. This probably belongs somewhere else.
-convertExpr (t @ IntegerVector{}) (Pattern items) =
-    if all null names
-        then convertExpr t $ Concat exprs'
-        else Pattern items
-    where
-        (names, exprs) = unzip items
-        t' = dropInnerTypeRange t
-        exprs' = map (convertExpr t') exprs
-convertExpr (t @ IntegerVector{}) (Concat exprs) =
-    if all isUnsizedNumber exprs
-        then Concat $ map (Cast $ Left t') exprs
-        else Concat $ map (convertExpr t') exprs
-    where
-        t' = dropInnerTypeRange t
-        isUnsizedNumber :: Expr -> Bool
-        isUnsizedNumber (Number n) = not $ numberIsSized n
-        isUnsizedNumber (UniOp UniSub e) = isUnsizedNumber e
-        isUnsizedNumber _ = False
-convertExpr (Implicit sg rs) expr =
-    if null rs
-        then expr
-        else convertExpr (IntegerVector TBit sg rs) expr
-convertExpr (Struct packing fields (_:rs)) (Concat exprs) =
-    Concat $ map (convertExpr (Struct packing fields rs)) exprs
-convertExpr (Struct packing fields (_:rs)) (Bit e _) =
-    convertExpr (Struct packing fields rs) e
-convertExpr (Struct packing fields []) (Pattern [("", Repeat (Number n) exprs)]) =
-    case fmap fromIntegral (numberToInteger n) of
-        Just val -> convertExpr (Struct packing fields []) $ Pattern $
-                zip (repeat "") (concat $ replicate val exprs)
-        Nothing ->
-            error $ "unable to handle repeat in pattern: " ++
-                (show $ Repeat (Number n) exprs)
+
 convertExpr (struct @ (Struct _ fields [])) (Pattern itemsOrig) =
     if extraNames /= Set.empty then
         error $ "pattern " ++ show (Pattern itemsOrig) ++
@@ -295,20 +256,52 @@ convertExpr (struct @ (Struct _ fields [])) (Pattern itemsOrig) =
                 isStruct (Struct{}) = True
                 isStruct _ = False
 
-convertExpr (Struct packing fields (r : rs)) (Pattern items) =
-    if all null keys
-        then convertExpr (structTf (r : rs)) (Concat vals)
-        else Repeat (rangeSize r) [subExpr']
+convertExpr (Implicit _ []) expr = expr
+convertExpr (Implicit sg rs) expr =
+    convertExpr (IntegerVector TBit sg rs) expr
+
+-- TODO: This is a conversion for concat array literals with elements
+-- that are unsized numbers. This probably belongs somewhere else.
+convertExpr (t @ IntegerVector{}) (Concat exprs) =
+    if all isUnsizedNumber exprs
+        then Concat $ map (Cast $ Left t') exprs
+        else Concat $ map (convertExpr t') exprs
     where
-        (keys, vals) = unzip items
-        subExpr = Pattern items
-        structTf = Struct packing fields
-        subExpr' = convertExpr (structTf rs) subExpr
-convertExpr (Struct packing fields (r : rs)) subExpr =
-    Repeat (rangeSize r) [subExpr']
+        t' = dropInnerTypeRange t
+        isUnsizedNumber :: Expr -> Bool
+        isUnsizedNumber (Number n) = not $ numberIsSized n
+        isUnsizedNumber (UniOp UniSub e) = isUnsizedNumber e
+        isUnsizedNumber _ = False
+
+-- TODO: This is really a conversion for using default patterns to
+-- populate arrays. Maybe this should be somewhere else?
+convertExpr t (orig @ (Pattern [(":default", expr)])) =
+    if null rs
+        then orig
+        else Repeat count [expr']
     where
-        structTf = Struct packing fields
-        subExpr' = convertExpr (structTf rs) subExpr
+        count = rangeSize $ head rs
+        expr' = Cast (Left t') $ convertExpr t' expr
+        (_, rs) = typeRanges t
+        t' = dropInnerTypeRange t
+
+-- pattern syntax used for simple array literals
+convertExpr t (Pattern items) =
+    if all null names
+        then convertExpr t $ Concat exprs'
+        else Pattern items
+    where
+        (names, exprs) = unzip items
+        t' = dropInnerTypeRange t
+        exprs' = map (convertExpr t') exprs
+
+-- propagate types through concatenation expressions
+convertExpr t (Concat exprs) =
+    Concat exprs'
+    where
+        t' = dropInnerTypeRange t
+        exprs' = map (convertExpr t') exprs
+
 convertExpr _ other = other
 
 fallbackType :: Scopes Type -> Expr -> (Type, Expr)
