@@ -361,16 +361,13 @@ evalScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items =
                     let genItems = map GenModuleItem injected' ++ [genItem'']
                     return $ GenBlock "" genItems
         scopeGenItemMapper :: GenItem -> ScoperT a m GenItem
-        scopeGenItemMapper (GenFor (index, a) b c (GenBlock name genItems)) = do
-            enterScope name index
-            genItems' <- mapM fullGenItemMapper genItems
-            exitScope name index
-            return $ GenFor (index, a) b c (GenBlock name genItems')
         scopeGenItemMapper (GenFor (index, a) b c genItem) = do
-            enterScope "" index
-            genItem' <- fullGenItemMapper genItem
-            exitScope "" index
+            genItem' <- scopeGenItemBranchMapper index genItem
             return $ GenFor (index, a) b c genItem'
+        scopeGenItemMapper (GenIf cond thenItem elseItem) = do
+            thenItem' <- scopeGenItemBranchMapper "" thenItem
+            elseItem' <- scopeGenItemBranchMapper "" elseItem
+            return $ GenIf cond thenItem' elseItem'
         scopeGenItemMapper (GenBlock name genItems) = do
             enterScope name ""
             genItems' <- mapM fullGenItemMapper genItems
@@ -380,6 +377,18 @@ evalScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items =
             wrappedModuleItemMapper moduleItem >>= return . GenModuleItem
         scopeGenItemMapper genItem =
             traverseSinglyNestedGenItemsM fullGenItemMapper genItem
+
+        scopeGenItemBranchMapper :: Identifier -> GenItem -> ScoperT a m GenItem
+        scopeGenItemBranchMapper index (GenBlock name genItems) = do
+            enterScope name index
+            genItems' <- mapM fullGenItemMapper genItems
+            exitScope name index
+            return $ GenBlock name genItems'
+        scopeGenItemBranchMapper index genItem = do
+            enterScope "" index
+            genItem' <- fullGenItemMapper genItem
+            exitScope "" index
+            return genItem'
 
 partScoper
     :: MapperM (Scoper a) Decl
