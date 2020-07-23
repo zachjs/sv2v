@@ -343,9 +343,13 @@ parseDTsAsComponents tokens =
 parseDTsAsComponent :: [DeclToken] -> (Position, Component, [DeclToken])
 parseDTsAsComponent [] = error "parseDTsAsComponent unexpected end of tokens"
 parseDTsAsComponent l0 =
-    if l /= Nothing && l /= Just Automatic
-        then error $ "unexpected non-automatic lifetime: " ++ show l0
-        else (position, component, l5)
+    if l /= Nothing && l /= Just Automatic then
+        error $ "unexpected non-automatic lifetime: " ++ show l0
+    else if dir == Local && tf rs == Implicit Unspecified [] then
+        error $ "declaration(s) missing type information: "
+            ++ show (position, tps)
+    else
+        (position, component, l5)
     where
         (dir, l1) = takeDir      l0
         (l  , l2) = takeLifetime l1
