@@ -28,4 +28,16 @@ module top;
         $display("%b %b %b", P, P[0], P[1]);
         $display("%b %b %b", Q, Q[0], Q[1]);
     end
+
+    initial begin
+        logic [1:0][0:1][7:0] a;
+        a[0][0:1] = '{default: 1};
+        $display("a: %b", a);
+        a[1][0+:1] = '{default: 2};
+        $display("a: %b", a);
+        a[1][1-:1] = '{default: 3};
+        $display("a: %b", a);
+        a[1][1][3+:4] = '{default: '1};
+        $display("a: %b", a);
+    end
 endmodule

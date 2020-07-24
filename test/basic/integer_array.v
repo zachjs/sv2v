@@ -26,4 +26,17 @@ module top;
         $display("%b %b %b", P, P[1:0], P[3:2]);
         $display("%b %b %b", Q, Q[1:0], Q[3:2]);
     end
+
+    initial begin : block
+        reg [31:0] a;
+        a[7:0] = 1;
+        a[15:8] = 1;
+        $display("a: %b", a);
+        a[31:24] = 2;
+        $display("a: %b", a);
+        a[23:16] = 3;
+        $display("a: %b", a);
+        a[23:19] = 4'b1111;
+        $display("a: %b", a);
+    end
 endmodule

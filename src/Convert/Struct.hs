@@ -163,6 +163,17 @@ dropInnerTypeRange t =
         (_, []) -> unknownType
         (tf, rs) -> tf $ tail rs
 
+-- produces the type of the given part select, if possible
+replaceInnerTypeRange :: PartSelectMode -> Range -> Type -> Type
+replaceInnerTypeRange NonIndexed r t =
+    case typeRanges t of
+        (_, []) -> unknownType
+        (tf, rs) -> tf $ r : tail rs
+replaceInnerTypeRange IndexedPlus r t =
+    replaceInnerTypeRange NonIndexed (snd r, RawNum 1) t
+replaceInnerTypeRange IndexedMinus r t =
+    replaceInnerTypeRange NonIndexed (snd r, RawNum 1) t
+
 unknownType :: Type
 unknownType = Implicit Unspecified []
 
@@ -341,9 +352,9 @@ convertSubExpr scopes (Range (Dot e x) NonIndexed rOuter) =
     if isntStruct subExprType then
         fallbackType scopes orig'
     else if structIsntReady subExprType then
-        (dropInnerTypeRange fieldType, orig')
+        (replaceInnerTypeRange NonIndexed rOuter fieldType, orig')
     else
-        (dropInnerTypeRange fieldType, undotted)
+        (replaceInnerTypeRange NonIndexed rOuter fieldType, undotted)
     where
         (subExprType, e') = convertSubExpr scopes e
         orig' = Range (Dot e' x) NonIndexed rOuter
@@ -359,9 +370,9 @@ convertSubExpr scopes (Range (Dot e x) mode (baseO, lenO)) =
     if isntStruct subExprType then
         fallbackType scopes orig'
     else if structIsntReady subExprType then
-        (dropInnerTypeRange fieldType, orig')
+        (replaceInnerTypeRange mode (baseO, lenO) fieldType, orig')
     else
-        (dropInnerTypeRange fieldType, undotted)
+        (replaceInnerTypeRange mode (baseO, lenO) fieldType, undotted)
     where
         (subExprType, e') = convertSubExpr scopes e
         orig' = Range (Dot e' x) mode (baseO, lenO)
@@ -378,7 +389,7 @@ convertSubExpr scopes (Range (Dot e x) mode (baseO, lenO)) =
         undotted = Range e' mode (base, lenO)
         one = RawNum 1
 convertSubExpr scopes (Range e mode r) =
-    (dropInnerTypeRange t, Range e' mode r)
+    (replaceInnerTypeRange mode r t, Range e' mode r)
     where (t, e') = convertSubExpr scopes e
 convertSubExpr scopes (Bit (Dot e x) i) =
     if isntStruct subExprType then
