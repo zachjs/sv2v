@@ -89,4 +89,27 @@ module top;
     end
     initial #5 $finish;
 
+    initial begin : loops_de
+        reg unsigned [31:0] i;
+        for (i = 0; i < 5; ++i) begin
+            $display("Loop D-1:", i);
+            if (i == 3) begin
+                $display("Loop D-2:", i);
+                i = 5;
+            end
+            else
+                $display("Loop D-3:", i);
+        end
+        for (i = 0; i < 5; i++) begin
+            $display("Loop E-1:", i);
+            if (i == 2) begin
+                $display("Loop E-2:", i);
+                i = 5;
+            end
+            else
+                $display("Loop E-3:", i);
+        end
+        $display("Block F-1");
+    end
+
 endmodule

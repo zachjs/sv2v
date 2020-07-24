@@ -114,4 +114,26 @@ module top;
         end
     initial #5 $finish;
 
+    initial begin
+        for (int unsigned i = 0; i < 5; ++i) begin
+            $display("Loop D-1:", i);
+            if (i == 3) begin
+                $display("Loop D-2:", i);
+                break;
+                $display("UNREACHABLE ", `__LINE__);
+            end
+            $display("Loop D-3:", i);
+        end
+        for (int unsigned i = 0; i < 5; i++) begin
+            $display("Loop E-1:", i);
+            if (i == 2) begin
+                $display("Loop E-2:", i);
+                break;
+                $display("UNREACHABLE ", `__LINE__);
+            end
+            $display("Loop E-3:", i);
+        end
+        $display("Block F-1");
+    end
+
 endmodule

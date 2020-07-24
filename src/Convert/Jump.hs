@@ -261,13 +261,19 @@ convertLoop loop comp stmt = do
                 (BinOp Ne (Ident jumpState) jsReturn)
                 (asgn jumpState (Ident jsStackIdent))
                 Null
+    let jsCheckReturn = If NoCheck
+                (BinOp Ne (Ident jumpState) jsReturn)
+                (asgn jumpState jsNone)
+                Null
 
     return $
         if not afterHasJump then
             loop comp stmt'
         else if origLoopDepth == 0 then
             Block Seq "" []
-                [ loop comp' body ]
+                [ loop comp' body
+                , jsCheckReturn
+                ]
         else
             Block Seq ""
                 [ jsStackDecl ]
