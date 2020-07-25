@@ -31,7 +31,10 @@ traverseDeclM decl = do
             if isPrefixOf "sv2v_cast_" x && details /= Nothing
                 then return $ Variable Local DuplicateTag x [] Nil
                 else insertElem x t >> return decl
-        Param    _ t x   _ -> insertElem x t >> return decl
+        Param    _ t x   _ -> do
+            inProcedure <- withinProcedureM
+            when (not inProcedure) $ insertElem x t
+            return decl
         ParamType    _ _ _ -> return decl
         CommentDecl      _ -> return decl
     traverseDeclExprsM traverseExprM decl'

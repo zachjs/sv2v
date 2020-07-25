@@ -1,8 +1,9 @@
 package P;
     function automatic logic [7:0] f(input logic [2:0] p);
         logic [7:0] r;
-        r = '0;
-        r[p+:2] = '1;
+        localparam T = $bits(r[7:0]);
+        r = T'(1'sb0);
+        r[p+:2] = $bits(r[p+:2])'(1'sb1);
         return r;
     endfunction
 endpackage

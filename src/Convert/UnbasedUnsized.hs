@@ -102,7 +102,7 @@ convertModuleItemM (Instance moduleName params instanceName [] bindings) = do
             expr'' <- traverseNestedExprsM (replaceBindingExpr port) expr'
             return (portName, expr'')
         replaceBindingExpr :: Port -> Expr -> Writer Binds Expr
-        replaceBindingExpr port (orig @ (Cast Right{} (ConvertedUU a b))) = do
+        replaceBindingExpr port (orig @ (Repeat _ [ConvertedUU a b])) = do
             let ch = charForBit a b
             if orig == sizedLiteralFor tag ch
                 then do
@@ -141,7 +141,7 @@ charForBit _ _ = error "charForBit invariant violated"
 
 sizedLiteralFor :: Expr -> Char -> Expr
 sizedLiteralFor expr ch =
-    Cast (Right size) (literalFor ch)
+    Repeat size [literalFor ch]
     where size = DimsFn FnBits $ Right expr
 
 convertAsgn :: (LHS, Expr) -> (LHS, Expr)
