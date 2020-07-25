@@ -1,4 +1,5 @@
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TupleSections #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
@@ -6,116 +7,133 @@
  -
  - The literals are given a binary base, a size of 1, and are made signed to
  - allow sign extension. For context-determined expressions, the converted
- - literals are explicitly cast to the appropriate context-determined size.
+ - literals are repeated to match the context-determined size.
  -
  - As a special case, unbased, unsized literals which take on the size of a
- - module port binding are replaced with a hierarchical reference to an
- - appropriately sized constant which is injected into the instantiated module's
- - definition. This allows these literals to be used for parameterized ports
- - without further complicating other conversions, as hierarchical references
- - are not allowed within constant expressions.
+ - module's port are replaced as above, but with the size of the port being
+ - determined based on the parameter bindings of the instance and the definition
+ - of the instantiated module.
  -}
 
 module Convert.UnbasedUnsized (convert) where
 
 import Control.Monad.Writer
+import Data.Maybe (catMaybes)
+import qualified Data.Map.Strict as Map
 
+import Convert.ExprUtils
 import Convert.Traverse
 import Language.SystemVerilog.AST
+
+type Part = ([Identifier], [ModuleItem])
+type Parts = Map.Map Identifier Part
 
 data ExprContext
     = SelfDetermined
     | ContextDetermined Expr
     deriving (Eq, Show)
 
-type Port = Either Identifier Int
-
-data Bind = Bind
-    { bModule :: Identifier
-    , bBit :: Char
-    , bPort :: Port
-    } deriving (Eq, Show)
-
-type Binds = [Bind]
-
 convert :: [AST] -> [AST]
 convert files =
-    map (traverseDescriptions $ convertDescription binds) files'
+    map (traverseDescriptions convertDescription) files
     where
-        (files', binds) = runWriter $
-            mapM (mapM $ traverseModuleItemsM convertModuleItemM) files
+        parts = execWriter $ mapM (collectDescriptionsM collectPartsM) files
+        convertDescription = traverseModuleItems $ convertModuleItem parts
 
-convertDescription :: Binds -> Description -> Description
-convertDescription [] other = other
-convertDescription binds (Part attrs extern kw lifetime name ports items) =
-    Part attrs extern kw lifetime name ports items'
+collectPartsM :: Description -> Writer Parts ()
+collectPartsM (Part _ _ _ _ name ports items) =
+    tell $ Map.singleton name (ports, items)
+collectPartsM _ = return ()
+
+convertModuleItem :: Parts -> ModuleItem -> ModuleItem
+convertModuleItem parts (Instance moduleName params instanceName [] bindings) =
+    convertModuleItem' $ Instance moduleName params instanceName [] bindings'
     where
-        binds' = filter ((== name) . bModule) binds
-        items' = removeDupes [] $ items ++ map (bindItem ports) binds'
-        removeDupes :: [Identifier] -> [ModuleItem] -> [ModuleItem]
-        removeDupes _ [] = []
-        removeDupes existing (item @ (MIPackageItem (Decl decl)) : is) =
-            case decl of
-                Param Localparam _ x _ ->
-                    if elem x existing
-                        then removeDupes existing is
-                        else item : removeDupes (x : existing) is
-                _ -> item : removeDupes existing is
-        removeDupes existing (item : is) =
-            item : removeDupes existing is
-convertDescription _ other = other
-
-bindName :: Bind -> Identifier
-bindName (Bind _ ch (Left x)) = "sv2v_uub_" ++ ch : '_' : x
-bindName (Bind m ch (Right i)) =
-    bindName $ Bind m ch (Left $ show i)
-
-bindItem :: [Identifier] -> Bind -> ModuleItem
-bindItem ports bind =
-    MIPackageItem $ Decl $ Param Localparam typ name expr
-    where
-        portName = lookupPort ports (bPort bind)
-        size = DimsFn FnBits $ Right $ Ident portName
-        rng = (BinOp Sub size (RawNum 1), RawNum 0)
-        typ = Implicit Unspecified [rng]
-        name = bindName bind
-        expr = literalFor $ bBit bind
-
-lookupPort :: [Identifier] -> Port -> Identifier
-lookupPort _ (Left x) = x
-lookupPort ports (Right i) =
-    if i < length ports
-        then ports !! i
-        else error $ "out of bounds bort binding " ++ show (ports, i)
-
-convertModuleItemM :: ModuleItem -> Writer Binds ModuleItem
-convertModuleItemM (Instance moduleName params instanceName [] bindings) = do
-    bindings' <- mapM (uncurry convertBinding) $ zip bindings [0..]
-    let item = Instance moduleName params instanceName [] bindings'
-    return $ convertModuleItem item
-    where
-        tag = Ident ":uub:"
-        convertBinding :: PortBinding -> Int -> Writer Binds PortBinding
-        convertBinding (portName, expr) idx = do
-            let port = if null portName then Right idx else Left portName
-            let expr' = convertExpr (ContextDetermined tag) expr
-            expr'' <- traverseNestedExprsM (replaceBindingExpr port) expr'
-            return (portName, expr'')
-        replaceBindingExpr :: Port -> Expr -> Writer Binds Expr
-        replaceBindingExpr port (orig @ (Repeat _ [ConvertedUU a b])) = do
-            let ch = charForBit a b
+        bindings' = zipWith convertBinding bindings [0..]
+        (portNames, moduleItems) =
+            case Map.lookup moduleName parts of
+                Nothing -> error $ "could not find module: " ++ moduleName
+                Just partInfo -> partInfo
+        tag = Ident "~~uub~~"
+        convertBinding :: PortBinding -> Int -> PortBinding
+        convertBinding (portName, expr) idx =
+            (portName, ) $
+            traverseNestedExprs (replaceBindingExpr portName idx) $
+            convertExpr (ContextDetermined tag) expr
+        replaceBindingExpr :: Identifier -> Int -> Expr -> Expr
+        replaceBindingExpr portName idx (orig @ (Repeat _ [ConvertedUU a b])) =
             if orig == sizedLiteralFor tag ch
-                then do
-                    let bind = Bind moduleName ch port
-                    tell [bind]
-                    let expr = Dot (Ident instanceName) (bindName bind)
-                    return expr
-                else return orig
-        replaceBindingExpr _ other = return other
-convertModuleItemM other = return $ convertModuleItem other
+                then Repeat portSize [ConvertedUU a b]
+                else orig
+            where
+                ch = charForBit a b
+                portName' =
+                    if null portName
+                        then lookupBindingName portNames idx
+                        else portName
+                portSize = determinePortSize portName' params moduleItems
+        replaceBindingExpr _ _ other = other
+convertModuleItem _ other = convertModuleItem' other
 
-convertModuleItem :: ModuleItem -> ModuleItem
-convertModuleItem =
+determinePortSize :: Identifier -> [ParamBinding] -> [ModuleItem] -> Expr
+determinePortSize portName instanceParams moduleItems =
+    step initialMapping moduleItems
+    where
+        moduleParams = parameterNames moduleItems
+        initialMapping = catMaybes $
+            zipWith createParamReplacement instanceParams [0..]
+        createParamReplacement
+            :: ParamBinding -> Int -> Maybe (Identifier, Expr)
+        createParamReplacement ("", b) idx =
+            createParamReplacement (paramName, b) idx
+            where paramName = lookupBindingName moduleParams idx
+        createParamReplacement (_, Left _) _ = Nothing
+        createParamReplacement (paramName, Right expr) _ =
+            Just (paramName, tagExpr expr)
+
+        step :: [(Identifier, Expr)] -> [ModuleItem] -> Expr
+        step mapping (MIPackageItem (Decl (Param _ _ x e)) : rest) =
+            step (mapping ++ [(x, e)]) rest
+        step mapping (MIPackageItem (Decl (Variable _ t x a _)) : rest) =
+            if x == portName
+                then substituteExpr mapping size
+                else step mapping rest
+            where size = BinOp Mul (dimensionsSize a) (DimsFn FnBits $ Left t)
+        step mapping (_ : rest) = step mapping rest
+        step _ [] = error $ "could not find size of port " ++ portName
+
+substituteExpr :: [(Identifier, Expr)] -> Expr -> Expr
+substituteExpr _ (Ident (':' : x)) =
+    Ident x
+substituteExpr mapping (Ident x) =
+    case lookup x mapping of
+        Nothing -> Ident x
+        Just expr -> substituteExpr mapping expr
+substituteExpr mapping expr =
+    traverseSinglyNestedExprs (substituteExpr mapping) expr
+
+tagExpr :: Expr -> Expr
+tagExpr (Ident x) = Ident (':' : x)
+tagExpr expr = traverseSinglyNestedExprs tagExpr expr
+
+-- given a list of module items, produces the parameter names in order
+parameterNames :: [ModuleItem] -> [Identifier]
+parameterNames =
+    execWriter . mapM (collectNestedModuleItemsM $ collectDeclsM collectDeclM)
+    where
+        collectDeclM :: Decl -> Writer [Identifier] ()
+        collectDeclM (Param Parameter   _ x _) = tell [x]
+        collectDeclM (ParamType Parameter x _) = tell [x]
+        collectDeclM _ = return ()
+
+lookupBindingName :: [Identifier] -> Int -> Identifier
+lookupBindingName names idx =
+    if idx < length names
+        then names !! idx
+        else error $ "out of bounds binding " ++ show (names, idx)
+
+convertModuleItem' :: ModuleItem -> ModuleItem
+convertModuleItem' =
     traverseExprs (convertExpr SelfDetermined) .
     traverseTypes (traverseNestedTypes convertType) .
     traverseAsgns convertAsgn
