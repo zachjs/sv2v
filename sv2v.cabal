@@ -29,7 +29,7 @@ executable sv2v
     , containers
     , directory
     , filepath
-    , githash
+    , githash >= 0.1.4.0
     , hashable
     , mtl
   other-modules:
