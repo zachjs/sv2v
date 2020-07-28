@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
@@ -116,6 +117,16 @@ convertStmts stmts = do
     return stmts'
 
 
+pattern SimpleLoopInits :: Type -> Identifier -> Expr
+    -> Either [Decl] [(LHS, Expr)]
+pattern SimpleLoopInits typ var expr = Left [Variable Local typ var [] expr]
+
+pattern SimpleLoopGuard :: BinOp -> Identifier -> Expr -> Expr
+pattern SimpleLoopGuard cmp var bound = BinOp cmp (Ident var) bound
+
+pattern SimpleLoopIncrs :: Identifier -> AsgnOp -> Expr -> [(LHS, AsgnOp, Expr)]
+pattern SimpleLoopIncrs var op step = [(LHSIdent var, op, step)]
+
 -- rewrites the given statement, and returns the type of any unfinished jump
 convertStmt :: Stmt -> State Info Stmt
 
@@ -166,13 +177,22 @@ convertStmt (Case unique kw expr cases) = do
     modify $ \s -> s { sHasJump = hasJump }
     return $ Case unique kw expr cases'
 
+convertStmt (For
+    (inits @ (SimpleLoopInits _ var1 _))
+    (comp @ (SimpleLoopGuard _ var2 _))
+    (incr @ (SimpleLoopIncrs var3 _ _))
+    stmt) =
+    if var1 /= var2 || var2 /= var3
+        then convertLoop False loop comp stmt
+        else convertLoop True  loop comp stmt
+    where loop c s = For inits c incr s
 convertStmt (For inits comp incr stmt) =
-    convertLoop loop comp stmt
+    convertLoop False loop comp stmt
     where loop c s = For inits c incr s
 convertStmt (While comp stmt) =
-    convertLoop While comp stmt
+    convertLoop False While comp stmt
 convertStmt (DoWhile comp stmt) =
-    convertLoop DoWhile comp stmt
+    convertLoop False DoWhile comp stmt
 
 convertStmt (Continue) = do
     loopDepth <- gets sLoopDepth
@@ -236,8 +256,8 @@ convertSubStmt stmt = do
     put origState
     return (stmt', hasJump)
 
-convertLoop :: (Expr -> Stmt -> Stmt) -> Expr -> Stmt -> State Info Stmt
-convertLoop loop comp stmt = do
+convertLoop :: Bool -> (Expr -> Stmt -> Stmt) -> Expr -> Stmt -> State Info Stmt
+convertLoop local loop comp stmt = do
     -- save the loop state and increment loop depth
     Info { sLoopDepth = origLoopDepth, sHasJump = origHasJump } <- get
     assertMsg (not origHasJump) "has jump invariant failed"
@@ -249,11 +269,13 @@ convertLoop loop comp stmt = do
     assertMsg (origLoopDepth + 1 == afterLoopDepth) "loop depth invariant failed"
     modify $ \s -> s { sLoopDepth = origLoopDepth }
 
-    let comp' = BinOp LogAnd comp $ BinOp Lt (Ident jumpState) jsBreak
-    let body = Block Seq "" []
-            [ asgn jumpState jsNone
-            , stmt'
-            ]
+    let keepRunning = BinOp Lt (Ident jumpState) jsBreak
+    let comp' = if local then comp else BinOp LogAnd comp keepRunning
+    let body = Block Seq "" [] $
+                [ asgn jumpState jsNone
+                , stmt'
+                ]
+    let body' = if local then If NoCheck keepRunning body Null else body
     let jsStackIdent = jumpState ++ "_" ++ show origLoopDepth
     let jsStackDecl = Variable Local jumpStateType jsStackIdent []
                         (Ident jumpState)
@@ -271,13 +293,13 @@ convertLoop loop comp stmt = do
             loop comp stmt'
         else if origLoopDepth == 0 then
             Block Seq "" []
-                [ loop comp' body
+                [ loop comp' body'
                 , jsCheckReturn
                 ]
         else
             Block Seq ""
                 [ jsStackDecl ]
-                [ loop comp' body
+                [ loop comp' body'
                 , jsStackRestore
                 ]
 

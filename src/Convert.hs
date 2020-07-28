@@ -86,10 +86,10 @@ phases excludes =
     , Convert.Package.convert
     , Convert.Enum.convert
     , Convert.NestPI.convert
+    , Convert.ForDecl.convert
     , Convert.Jump.convert
     , Convert.Foreach.convert
     , selectExclude (Job.Interface, Convert.Interface.convert)
-    , Convert.ForDecl.convert
     , selectExclude (Job.Always   , Convert.AlwaysKW.convert)
     , selectExclude (Job.Succinct , Convert.RemoveComments.convert)
     ]
