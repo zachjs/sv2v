@@ -130,9 +130,10 @@ endmodule
 
 module M(a, b, c, d);
     parameter W = 1;
-    input logic [W+0:1] a;
-    input logic [W+1:1] b;
-    input logic [W+2:1] c;
-    input logic [W+3:1] d;
+    parameter type T = logic;
+    input T [W+0:1] a;
+    input T [W+1:1] b;
+    input T [W+2:1] c;
+    input T [W+3:1] d;
     initial $display("M W=%0d %b %b %b %b", W, a, b, c, d);
 endmodule

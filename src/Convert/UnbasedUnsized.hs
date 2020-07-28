@@ -47,13 +47,19 @@ collectPartsM _ = return ()
 
 convertModuleItem :: Parts -> ModuleItem -> ModuleItem
 convertModuleItem parts (Instance moduleName params instanceName [] bindings) =
-    convertModuleItem' $ Instance moduleName params instanceName [] bindings'
+    if Map.member moduleName parts && not (any isTypeParam moduleItems)
+        then convertModuleItem' $
+                Instance moduleName params instanceName [] bindings'
+        else Instance moduleName params instanceName [] bindings
     where
         bindings' = zipWith convertBinding bindings [0..]
         (portNames, moduleItems) =
             case Map.lookup moduleName parts of
                 Nothing -> error $ "could not find module: " ++ moduleName
                 Just partInfo -> partInfo
+        isTypeParam :: ModuleItem -> Bool
+        isTypeParam (MIPackageItem (Decl ParamType{})) = True
+        isTypeParam _ = False
         tag = Ident "~~uub~~"
         convertBinding :: PortBinding -> Int -> PortBinding
         convertBinding (portName, expr) idx =
