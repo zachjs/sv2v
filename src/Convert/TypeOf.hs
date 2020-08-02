@@ -38,7 +38,11 @@ traverseDeclM decl = do
         CommentDecl{} -> return decl'
 
 traverseModuleItemM :: ModuleItem -> Scoper Type ModuleItem
-traverseModuleItemM = traverseTypesM $ traverseNestedTypesM traverseTypeM
+traverseModuleItemM (Genvar x) = do
+    insertElem x $ IntegerAtom TInteger Unspecified
+    return $ Genvar x
+traverseModuleItemM item =
+    traverseTypesM (traverseNestedTypesM traverseTypeM) item
 
 traverseGenItemM :: GenItem -> Scoper Type GenItem
 traverseGenItemM = traverseGenItemExprsM traverseExprM

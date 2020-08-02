@@ -75,4 +75,14 @@ module top;
         $display("%b %d %d %d", y, y, 31, 0);
         $display("%b %d %d %d", z, z, 31, 0);
     end
+
+    generate
+        genvar i;
+        for (i = 0; i < 2; i = i + 1)
+            initial begin : block5
+                localparam a = ~i;
+                $display("%b %d %d %d", i, i, 31, 0);
+                $display("%b %d %d %d", a, a, 31, 0);
+            end
+    endgenerate
 endmodule

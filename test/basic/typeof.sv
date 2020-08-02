@@ -62,4 +62,12 @@ module top;
         $display("%b %d %d %d", y, y, $left(y), $right(y));
         $display("%b %d %d %d", z, z, $left(z), $right(z));
     end
+
+    for (genvar i = 0; i < 2; ++i)
+        initial begin
+            type(i) a;
+            a = ~i;
+            $display("%b %d %d %d", i, i, $left(i), $right(i));
+            $display("%b %d %d %d", a, a, $left(a), $right(a));
+        end
 endmodule
