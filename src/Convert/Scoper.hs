@@ -291,6 +291,14 @@ evalScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items =
                 argIdxDecl ParamType{} = Nothing
                 argIdxDecl CommentDecl{} = Nothing
 
+        redirectTFDecl :: Type -> Identifier -> ScoperT a m (Type, Identifier)
+        redirectTFDecl typ ident = do
+            res <- declMapper $ Variable Local typ ident [] Nil
+            case res of
+                Variable Local newType newName [] Nil ->
+                    return (newType, newName)
+                _ -> error $ "redirected func ret traverse failed: " ++ show res
+
         wrappedModuleItemMapper :: ModuleItem -> ScoperT a m ModuleItem
         wrappedModuleItemMapper item = do
             item' <- fullModuleItemMapper item
@@ -303,26 +311,23 @@ evalScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items =
                     return $ Generate $ map GenModuleItem $ injected' ++ [item']
         fullModuleItemMapper :: ModuleItem -> ScoperT a m ModuleItem
         fullModuleItemMapper (MIPackageItem (Function ml t x decls stmts)) = do
+            (t', x') <- redirectTFDecl t x
             enterProcedure
-            t' <- do
-                res <- declMapper $ Variable Local t x [] Nil
-                case res of
-                    Variable Local newType _ [] Nil -> return newType
-                    _ -> error $ "redirected func ret traverse failed: " ++ show res
-            enterScope x ""
+            enterScope x' ""
             decls' <- mapTFDecls decls
             stmts' <- mapM fullStmtMapper stmts
-            exitScope x ""
+            exitScope x' ""
             exitProcedure
-            return $ MIPackageItem $ Function ml t' x decls' stmts'
-        fullModuleItemMapper (MIPackageItem (Task     ml   x decls stmts)) = do
+            return $ MIPackageItem $ Function ml t' x' decls' stmts'
+        fullModuleItemMapper (MIPackageItem (Task ml x decls stmts)) = do
+            (_, x') <- redirectTFDecl (Implicit Unspecified []) x
             enterProcedure
-            enterScope x ""
+            enterScope x' ""
             decls' <- mapTFDecls decls
             stmts' <- mapM fullStmtMapper stmts
-            exitScope x ""
+            exitScope x' ""
             exitProcedure
-            return $ MIPackageItem $ Task     ml    x decls' stmts'
+            return $ MIPackageItem $ Task ml x' decls' stmts'
         fullModuleItemMapper (MIPackageItem (Decl decl)) =
             declMapper decl >>= return . MIPackageItem . Decl
         fullModuleItemMapper (AlwaysC kw stmt) = do

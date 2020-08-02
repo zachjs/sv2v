@@ -29,7 +29,7 @@ traverseDeclM decl = do
         Variable _ t x _ _ -> do
             details <- lookupElemM x
             if isPrefixOf "sv2v_cast_" x && details /= Nothing
-                then return $ Variable Local DuplicateTag x [] Nil
+                then return $ Variable Local t DuplicateTag [] Nil
                 else insertElem x t >> return decl
         Param    _ t x   _ -> do
             inProcedure <- withinProcedureM
@@ -39,11 +39,11 @@ traverseDeclM decl = do
         CommentDecl      _ -> return decl
     traverseDeclExprsM traverseExprM decl'
 
-pattern DuplicateTag :: Type
-pattern DuplicateTag = Alias ":duplicate_cast_to_be_removed:" []
+pattern DuplicateTag :: Identifier
+pattern DuplicateTag = ":duplicate_cast_to_be_removed:"
 
 dropDuplicateCaster :: ModuleItem -> ModuleItem
-dropDuplicateCaster (MIPackageItem (Function _ DuplicateTag _ _ _)) =
+dropDuplicateCaster (MIPackageItem (Function _ _ DuplicateTag _ _)) =
     Generate []
 dropDuplicateCaster other = other
 
