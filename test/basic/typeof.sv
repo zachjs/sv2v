@@ -70,4 +70,15 @@ module top;
             $display("%b %d %d %d", i, i, $left(i), $right(i));
             $display("%b %d %d %d", a, a, $left(a), $right(a));
         end
+
+    localparam X = 5'b10110;
+    localparam Y = X + 6'b00001;
+    initial begin
+        type(X) tX = X;
+        type(Y) tY = Y;
+        $display("%b %d %d %d", X, X, $left(X), $right(X));
+        $display("%b %d %d %d", Y, Y, $left(Y), $right(Y));
+        $display("%b %d %d %d", tX, tX, $left(tX), $right(tX));
+        $display("%b %d %d %d", tY, tY, $left(tY), $right(tY));
+    end
 endmodule

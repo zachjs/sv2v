@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
@@ -9,6 +10,7 @@ module Convert.TypeOf (convert) where
 import Data.Tuple (swap)
 import qualified Data.Map.Strict as Map
 
+import Convert.ExprUtils (simplify)
 import Convert.Scoper
 import Convert.Traverse
 import Language.SystemVerilog.AST
@@ -17,21 +19,28 @@ convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions $ partScoper
     traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
 
+pattern UnknownType :: Type
+pattern UnknownType = Implicit Unspecified []
+
 traverseDeclM :: Decl -> Scoper Type Decl
 traverseDeclM decl = do
     item <- traverseModuleItemM (MIPackageItem $ Decl decl)
     let MIPackageItem (Decl decl') = item
     case decl' of
+        Variable Local UnknownType ident [] Nil -> do
+            -- functions with no return type implicitly return a single bit
+            insertElem ident $ IntegerVector TLogic Unspecified []
+            return decl'
         Variable d t ident a e -> do
             let t' = injectRanges t a
             insertElem ident t'
             return $ case t' of
                 UnpackedType t'' a' -> Variable d t'' ident a' e
                 _ ->                   Variable d t'  ident [] e
-        Param    _ t ident   _ -> do
-            let t' = if t == Implicit Unspecified []
-                        then IntegerAtom TInteger Unspecified
-                        else t
+        Param    _ t ident   e -> do
+            t' <- if t == UnknownType
+                    then typeof e
+                    else return t
             insertElem ident t'
             return decl'
         ParamType{} -> return decl'
@@ -63,9 +72,6 @@ lookupTypeOf expr = do
     details <- lookupElemM expr
     case details of
         Nothing -> return $ TypeOf expr
-        -- functions with no return type implicitly return a single bit
-        Just (_, _, Implicit Unspecified []) ->
-            return $ IntegerVector TLogic Unspecified []
         Just (_, replacements, typ) ->
             return $ if Map.null replacements
                 then typ
@@ -144,24 +150,30 @@ typeof (Mux   _       a b) = return $ largerSizeType a b
 typeof (Concat      exprs) = return $ typeOfSize $ concatSize exprs
 typeof (Repeat reps exprs) = return $ typeOfSize size
     where size = BinOp Mul reps (concatSize exprs)
+typeof String{} = return UnknownType
 typeof other = lookupTypeOf other
 
 -- produces a type large enough to hold either expression
 largerSizeType :: Expr -> Expr -> Type
-largerSizeType a b =
-    typeOfSize larger
-    where
-        sizeof = DimsFn FnBits . Right
-        cond = BinOp Ge (sizeof a) (sizeof b)
-        larger = Mux cond (sizeof a) (sizeof b)
+largerSizeType a b = typeOfSize $ largerSizeOf a b
 
 -- returns the total size of concatenated list of expressions
 concatSize :: [Expr] -> Expr
 concatSize exprs =
     foldl (BinOp Add) (RawNum 0) $
     map sizeof exprs
-    where
-        sizeof = DimsFn FnBits . Right
+
+-- returns the size of an expression, with the short-circuiting
+sizeof :: Expr -> Expr
+sizeof (Number n) = RawNum $ numberBitLength n
+sizeof (Mux _ a b) = largerSizeOf a b
+sizeof expr = DimsFn FnBits $ Left $ TypeOf expr
+
+-- returns the maximum size of the two given expressions
+largerSizeOf :: Expr -> Expr -> Expr
+largerSizeOf a b =
+    simplify $ Mux cond (sizeof a) (sizeof b)
+    where cond = BinOp Ge (sizeof a) (sizeof b)
 
 -- produces a generic type of the given size
 typeOfSize :: Expr -> Type

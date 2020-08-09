@@ -85,4 +85,17 @@ module top;
                 $display("%b %d %d %d", a, a, 31, 0);
             end
     endgenerate
+
+    localparam X = 5'b10110;
+    localparam Y = X + 6'b00001;
+    initial begin : block5
+        reg [4:0] tX;
+        reg [5:0] tY;
+        tX = X;
+        tY = Y;
+        $display("%b %d %d %d", X, X, 4, 0);
+        $display("%b %d %d %d", Y, Y, 5, 0);
+        $display("%b %d %d %d", tX, tX, 4, 0);
+        $display("%b %d %d %d", tY, tY, 5, 0);
+    end
 endmodule
