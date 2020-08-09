@@ -1,18 +1,16 @@
 interface bundle;
-    logic [1:0] index;
-    logic clock;
-    logic [3:0] inp;
+    logic [1:0] index = 0;
+    logic clock = 0;
+    logic [3:0] inp = '1;
     logic out;
 endinterface
 
 module rotator(bundle b);
-    initial b.index = 0;
     always @(posedge b.clock)
         b.index <= b.index + 1;
 endmodule
 
 module setter(bundle b);
-    initial b.inp = '1;
     always @(posedge b.clock)
         b.inp[b.index] <= b.out;
 endmodule
@@ -23,7 +21,6 @@ endmodule
 
 module clocker(bundle b);
     initial begin
-        b.clock <= 0;
         forever
             #5 b.clock <= ~b.clock;
     end

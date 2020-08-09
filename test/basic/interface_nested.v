@@ -1,13 +1,23 @@
 module top;
-    wire x, f_x;
-    wire f_a_x, f_b_x;
-    assign x = 1;
-    assign f_x = x;
-    assign f_a_x = x;
-    assign f_b_x = ~x;
-
-    initial begin
-        $display("bar got %b", f_a_x);
-        $display("bar got %b", f_b_x);
-    end
+    wire x = 1;
+    generate
+        begin : f
+            wire x;
+            begin : a
+                wire x;
+                initial begin
+                    $display("bar got %b", x);
+                end
+            end
+            assign a.x = x;
+            begin : b
+                wire x;
+                initial begin
+                    $display("bar got %b", x);
+                end
+            end
+            assign b.x = ~x;
+        end
+        assign f.x = x;
+    endgenerate
 endmodule

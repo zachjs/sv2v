@@ -1,8 +1,8 @@
-module impl(b_index, b_clock, b_inp, b_out);
-    output reg [1:0] b_index;
-    output reg b_clock;
-    output reg [3:0] b_inp;
-    output wire b_out;
+module impl;
+    reg [1:0] b_index;
+    reg b_clock;
+    reg [3:0] b_inp;
+    wire b_out;
 
     initial b_index = 0;
     always @(posedge b_clock)
@@ -19,15 +19,6 @@ module impl(b_index, b_clock, b_inp, b_out);
         forever
             #5 b_clock <= ~b_clock;
     end
-endmodule
-
-module top;
-    wire [1:0] b_index;
-    wire b_clock;
-    wire [3:0] b_inp;
-    wire b_out;
-
-    impl impl(b_index, b_clock, b_inp, b_out);
 
     initial begin
         $monitor("%b %b %b %b", b_index, b_clock, b_inp, b_out);
@@ -36,3 +27,6 @@ module top;
     end
 endmodule
 
+module top;
+    impl impl();
+endmodule

@@ -12,10 +12,16 @@ module M(data);
 endmodule
 
 module top;
-    wire [31:0] x_data = 0;
-    wire [9:0] y_data = 0;
-    M #(.WIDTH(32)) a(x_data);
-    M #(.WIDTH(10)) b(y_data);
-    M #(3, 32, 4) c(x_data);
-    M #(5, 10, 6) d(y_data);
+    generate
+        begin : x
+            wire [31:0] data = 0;
+        end
+        begin : y
+            wire [9:0] data = 0;
+        end
+    endgenerate
+    M #(.WIDTH(32)) a(x.data);
+    M #(.WIDTH(10)) b(y.data);
+    M #(3, 32, 4) c(x.data);
+    M #(5, 10, 6) d(y.data);
 endmodule

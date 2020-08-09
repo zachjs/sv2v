@@ -39,6 +39,7 @@ module Convert.Scoper
     , embedScopes
     , withinProcedure
     , withinProcedureM
+    , scopeModuleItemT
     ) where
 
 import Control.Monad.State
@@ -254,6 +255,20 @@ evalScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items =
             return items'
         initialState = Scopes [] Map.empty False []
 
+        wrappedModuleItemMapper = scopeModuleItemT
+            declMapper moduleItemMapper genItemMapper stmtMapper
+
+scopeModuleItemT
+    :: forall a m. Monad m
+    => MapperM (ScoperT a m) Decl
+    -> MapperM (ScoperT a m) ModuleItem
+    -> MapperM (ScoperT a m) GenItem
+    -> MapperM (ScoperT a m) Stmt
+    -> ModuleItem
+    -> ScoperT a m ModuleItem
+scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
+    wrappedModuleItemMapper
+    where
         fullStmtMapper :: Stmt -> ScoperT a m Stmt
         fullStmtMapper (Block kw name decls stmts) = do
             enterScope name ""

@@ -25,7 +25,7 @@ module top;
         clear = 1'b1;
         last = 8'h0;
         dataIn = 8'h0;
-        repeat (3) @(posedge clock);
+        repeat (4) @(posedge clock);
         clear = 1'b0;
         for (dataIn = 8'h0; dataIn <= 9'hff; dataIn = dataIn + 8'h1) begin
             @(posedge clock);

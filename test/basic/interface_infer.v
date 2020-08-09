@@ -1,18 +1,21 @@
-module Module(input wire x);
-    initial $display("Module %d", x);
-endmodule
 module top;
-    wire i_x = 0;
+    genvar g;
     localparam SOME_VAL = 3;
-    initial $display("Interface %d %d", i_x, SOME_VAL);
-    Module m(.x(i_x));
     generate
-        genvar g;
-        for (g = 10; g < 15; g = g + 1) begin
-            initial $display(g);
+        begin : i
+            wire x = 0;
+            initial $display("Interface %d %d", x, SOME_VAL);
+            for (g = 10; g < 15; g = g + 1) begin
+                initial $display(g);
+            end
         end
-        for (g = 0; g < 5; g = g + 1) begin
-            initial $display(g);
+    endgenerate
+    generate
+        begin : m
+            initial $display("Module %d", i.x);
+            for (g = 0; g < 5; g = g + 1) begin
+                initial $display(g);
+            end
         end
     endgenerate
 endmodule

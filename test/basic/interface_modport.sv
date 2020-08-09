@@ -20,8 +20,8 @@ module ModuleA(Interface.ModportA m);
 endmodule
 
 module ModuleB(Interface.ModportB m);
+    parameter WIDTH = 0;
     initial m.x = 1;
-    localparam WIDTH = 2 * m.WIDTH;
     always @(posedge m.clock) begin
         logic temp;
         temp = m.x[WIDTH-1];
@@ -33,7 +33,10 @@ module ModuleB(Interface.ModportB m);
 endmodule
 
 module ModuleBWrapper(Interface.ModportB m);
-    ModuleB b(m);
+    parameter WIDTH = 0;
+    ModuleB #(WIDTH) b(m);
+    integer i = 0;
+    initial #1 $display("shadow i = %d, %b", i, m.x);
 endmodule
 
 module ModuleAWrapper(Interface.ModportA m);
@@ -45,7 +48,7 @@ module Tester(input clock);
     logic [WIDTH-1:0] idx1, idx2;
     Interface #(2 ** WIDTH) i(clock, '{idx1, idx2});
     ModuleAWrapper a(i);
-    ModuleBWrapper b(i);
+    ModuleBWrapper #(2 * 2 ** WIDTH) b(i);
     always @(negedge clock)
         $display("%d %0d %2d %2d %b", $time, WIDTH, idx1, idx2, i.x);
 endmodule

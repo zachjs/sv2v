@@ -597,10 +597,9 @@ traverseExprsM exprMapper = moduleItemMapper
 
     genItemMapper = traverseGenItemExprsM exprMapper
 
-    modportDeclMapper (dir, ident, t, e) = do
-        t' <- typeMapper t
+    modportDeclMapper (dir, ident, e) = do
         e' <- exprMapper e
-        return (dir, ident, t', e')
+        return (dir, ident, e')
 
 traverseExprs :: Mapper Expr -> Mapper ModuleItem
 traverseExprs = unmonad traverseExprsM
@@ -942,11 +941,6 @@ traverseTypesM' strategy mapper =
                         then mapper t >>= \t' -> return (i, Left t')
                         else return (i, Left t)
                 mapParam (i, Right e) = return $ (i, Right e)
-        miMapper (Modport name decls) =
-            mapM mapModportDecl decls >>= return . Modport name
-            where
-                mapModportDecl (d, x, t, e) =
-                    mapper t >>= \t' -> return (d, x, t', e)
         miMapper other = return other
 
 traverseTypes' :: TypeStrategy -> Mapper Type -> Mapper ModuleItem

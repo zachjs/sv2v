@@ -577,9 +577,9 @@ ParamAsgn :: { Decl }
   : Identifier "=" Expr { Param Parameter (Implicit Unspecified []) $1 $3 }
 
 PortDecls :: { ([Identifier], [ModuleItem]) }
-  : "(" DeclTokens(")") { parseDTsAsPortDecls $2 }
-  | "("            ")"  { ([], []) }
-  | {- empty -}         { ([], []) }
+  : "(" PortDeclTokens(")") { parseDTsAsPortDecls $2 }
+  | "("                ")"  { ([], []) }
+  | {- empty -}             { ([], []) }
 
 ModportItems :: { [(Identifier, [ModportDecl])] }
   : ModportItem                  { [$1] }
@@ -592,7 +592,7 @@ ModportPortsDeclarations :: { [ModportDecl] }
 ModportPortsDeclaration(delim) :: { [ModportDecl] }
   : ModportSimplePortsDeclaration(delim) { $1 }
 ModportSimplePortsDeclaration(delim) :: { [ModportDecl] }
-  : Direction ModportSimplePorts delim { map (\(a, b) -> ($1, a, TypeOf b, b)) $2 }
+  : Direction ModportSimplePorts delim { map (\(a, b) -> ($1, a, b)) $2 }
 ModportSimplePorts :: { [(Identifier, Expr)] }
   : ModportSimplePort                        { [$1] }
   | ModportSimplePorts "," ModportSimplePort { $1 ++ [$3] }
@@ -611,11 +611,13 @@ Identifiers :: { [Identifier] }
 
 -- uses delimiter propagation hack to avoid conflicts
 DeclTokens(delim) :: { [DeclToken] }
-  : DeclToken                           delim  { [$1] }
-  | DeclToken                DeclTokens(delim) { [$1] ++ $2 }
-  | Identifier ParamBindings DeclTokens(delim) {% posInject \p -> [DTIdent p $1, DTParams p $2] ++ $3 }
-  | DeclTokenAsgn ","        DeclTokens(delim) {% posInject \p -> [$1, DTComma p] ++ $3 }
-  | DeclTokenAsgn                       delim  {% posInject \p -> [$1] }
+  : DeclTokensBase(DeclTokens(delim), delim) { $1 }
+DeclTokensBase(repeat, delim) :: { [DeclToken] }
+  : DeclToken                delim  { [$1] }
+  | DeclToken                repeat { [$1] ++ $2 }
+  | Identifier ParamBindings repeat {% posInject \p -> [DTIdent p $1, DTParams p $2] ++ $3 }
+  | DeclTokenAsgn ","        repeat {% posInject \p -> [$1, DTComma p] ++ $3 }
+  | DeclTokenAsgn            delim  {% posInject \p -> [$1] }
 DeclToken :: { DeclToken }
   : ","                                {% posInject \p -> DTComma    p }
   | "[" "]"                            {% posInject \p -> DTAutoDim  p }
@@ -640,6 +642,12 @@ DeclToken :: { DeclToken }
 DeclTokenAsgn :: { DeclToken }
   : "=" opt(DelayOrEvent) Expr {% posInject \p -> DTAsgn p AsgnOpEq $2 $3 }
   | AsgnBinOp Expr             {% posInject \p -> DTAsgn p $1 Nothing $2 }
+PortDeclTokens(delim) :: { [DeclToken] }
+  : DeclTokensBase(PortDeclTokens(delim), delim) { $1 }
+  | GenericInterfaceDecl   PortDeclTokens(delim) { $1 ++ $2}
+  | GenericInterfaceDecl                  delim  { $1 }
+GenericInterfaceDecl :: { [DeclToken] }
+  : "interface" Identifier {% posInject \p -> [DTType p (\Unspecified -> InterfaceT "" Nothing), DTIdent p $2] }
 
 VariablePortIdentifiers :: { [(Identifier, Expr)] }
   : VariablePortIdentifier                             { [$1] }

@@ -10,6 +10,9 @@ module Tester(input clock);
     assign idx1 = $clog2(x[2*DATA_WIDTH-1:DATA_WIDTH]);
     assign idx2 = $clog2(x[DATA_WIDTH-1:0]);
 
+    integer i = 0;
+    initial #1 $display("shadow i = %d, %b", i, x);
+
     always @(posedge clock) begin : block
         localparam SIZE = 2 * DATA_WIDTH;
         integer i;
