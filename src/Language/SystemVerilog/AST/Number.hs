@@ -237,7 +237,7 @@ showBasedDigits base size values kinds =
         padList '0' sizeDigits digits
     else if leadingXZ && size < 0 then
         removeExtraPadding digits
-    else if leadingXZ || (32 > size && size > 0) then
+    else if leadingXZ || (256 >= size && size > 0) then
         padList '0' sizeDigits digits
     else
         digits
