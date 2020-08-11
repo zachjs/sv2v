@@ -10,7 +10,7 @@
 module Convert.KWArgs (convert) where
 
 import Data.List (elemIndex, sortOn)
-import Control.Monad.Writer
+import Control.Monad.Writer.Strict
 import qualified Data.Map.Strict as Map
 
 import Convert.Traverse

@@ -17,7 +17,7 @@
 
 module Convert.UnbasedUnsized (convert) where
 
-import Control.Monad.Writer
+import Control.Monad.Writer.Strict
 import Data.Maybe (catMaybes)
 import qualified Data.Map.Strict as Map
 

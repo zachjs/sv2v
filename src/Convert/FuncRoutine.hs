@@ -10,7 +10,7 @@
 
 module Convert.FuncRoutine (convert) where
 
-import Control.Monad.Writer
+import Control.Monad.Writer.Strict
 import qualified Data.Set as Set
 
 import Convert.Traverse

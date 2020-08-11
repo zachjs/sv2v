@@ -14,7 +14,7 @@ module Language.SystemVerilog.Parser.Preprocess
     ) where
 
 import Control.Monad.Except
-import Control.Monad.State
+import Control.Monad.State.Strict
 import Data.Char (ord)
 import Data.List (dropWhileEnd, tails, isPrefixOf, findIndex)
 import Data.Maybe (isJust, fromJust)

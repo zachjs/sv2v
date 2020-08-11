@@ -7,7 +7,7 @@
 
 module Convert.ParamType (convert) where
 
-import Control.Monad.Writer
+import Control.Monad.Writer.Strict
 import Data.Either (isLeft)
 import Data.Maybe (isJust, isNothing, fromJust)
 import qualified Data.Map.Strict as Map

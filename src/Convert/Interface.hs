@@ -8,7 +8,7 @@ module Convert.Interface (convert) where
 
 import Data.List (isPrefixOf)
 import Data.Maybe (mapMaybe)
-import Control.Monad.Writer
+import Control.Monad.Writer.Strict
 import qualified Data.Map.Strict as Map
 
 import Convert.Scoper

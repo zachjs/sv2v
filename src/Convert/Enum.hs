@@ -19,7 +19,7 @@
 
 module Convert.Enum (convert) where
 
-import Control.Monad.Writer
+import Control.Monad.Writer.Strict
 import Data.List (elemIndices)
 import qualified Data.Set as Set
 

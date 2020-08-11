@@ -6,7 +6,7 @@ module Language.SystemVerilog.Parser
     ) where
 
 import Control.Monad.Except
-import Control.Monad.State
+import Control.Monad.State.Strict
 import qualified Data.Map.Strict as Map
 import Language.SystemVerilog.AST (AST)
 import Language.SystemVerilog.Parser.Lex (lexStr)

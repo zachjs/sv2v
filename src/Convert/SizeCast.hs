@@ -7,7 +7,7 @@
 
 module Convert.SizeCast (convert) where
 
-import Control.Monad.Writer
+import Control.Monad.Writer.Strict
 import Data.List (isPrefixOf)
 
 import Convert.ExprUtils

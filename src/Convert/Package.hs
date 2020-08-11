@@ -25,8 +25,8 @@
 
 module Convert.Package (convert) where
 
-import Control.Monad.State
-import Control.Monad.Writer
+import Control.Monad.State.Strict
+import Control.Monad.Writer.Strict
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 

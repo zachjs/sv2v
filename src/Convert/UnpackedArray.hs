@@ -14,7 +14,7 @@
 
 module Convert.UnpackedArray (convert) where
 
-import Control.Monad.State
+import Control.Monad.State.Strict
 import qualified Data.Set as Set
 
 import Convert.Scoper

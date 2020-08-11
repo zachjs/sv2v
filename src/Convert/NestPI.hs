@@ -6,7 +6,7 @@
 
 module Convert.NestPI (convert, reorder) where
 
-import Control.Monad.Writer
+import Control.Monad.Writer.Strict
 import Data.Maybe (mapMaybe)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set

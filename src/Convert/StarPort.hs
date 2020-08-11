@@ -6,7 +6,7 @@
 
 module Convert.StarPort (convert) where
 
-import Control.Monad.Writer
+import Control.Monad.Writer.Strict
 import qualified Data.Map.Strict as Map
 
 import Convert.Traverse

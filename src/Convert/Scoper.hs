@@ -42,7 +42,7 @@ module Convert.Scoper
     , scopeModuleItemT
     ) where
 
-import Control.Monad.State
+import Control.Monad.State.Strict
 import Data.Functor.Identity (runIdentity)
 import Data.Maybe (isNothing)
 import qualified Data.Map.Strict as Map

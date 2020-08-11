@@ -98,8 +98,8 @@ module Convert.Traverse
 ) where
 
 import Data.Functor.Identity (Identity, runIdentity)
-import Control.Monad.State
-import Control.Monad.Writer
+import Control.Monad.State.Strict
+import Control.Monad.Writer.Strict
 import Language.SystemVerilog.AST
 
 type MapperM m t = t -> m t
