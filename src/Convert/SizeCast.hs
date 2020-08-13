@@ -118,6 +118,9 @@ traverseExprM =
                 _ -> return $ Cast (Right s) e
 
         convertCastWithSigningM :: Expr -> Expr -> Signing -> Scoper Type Expr
+        convertCastWithSigningM (RawNum size) (RawNum val) Signed =
+            return $ Number $ Decimal (fromIntegral size) True val'
+            where val' = val `mod` (2 ^ size)
         convertCastWithSigningM s e sg = do
             details <- lookupElemM $ castFnName s sg
             when (details == Nothing) $ injectItem $ MIPackageItem $ castFn s sg
