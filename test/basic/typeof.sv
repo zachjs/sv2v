@@ -31,6 +31,7 @@ module top;
         type({x, y}) b = {x, y};
         type(FLAG ? x : y) c = FLAG ? x : y;
         type(!FLAG ? x : y) d = !FLAG ? x : y;
+        type($clog2(x)) e = $clog2(x);
         $display("%b %d %d", x, $left(x), $right(x));
         $display("%b %d %d", y, $left(y), $right(y));
         $display("%b %d %d", z, $left(z), $right(z));
@@ -38,6 +39,7 @@ module top;
         $display("%b %d %d", b, $left(b), $right(b));
         $display("%b %d %d", c, $left(c), $right(c));
         $display("%b %d %d", d, $left(d), $right(d));
+        $display("%b %d %d", e, $left(e), $right(e));
     end
 
     parameter W = 4;

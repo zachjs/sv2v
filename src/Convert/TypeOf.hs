@@ -95,6 +95,8 @@ typeof (Call (Ident "$unsigned") (Args [e] [])) =
     typeof e
 typeof (Call (Ident "$signed") (Args [e] [])) =
     typeof e
+typeof (Call (Ident "$clog2") (Args [_] [])) =
+    return $ IntegerAtom TInteger Unspecified
 typeof (Call (Ident x) _) =
     typeof $ Ident x
 typeof (orig @ (Bit e _)) = do

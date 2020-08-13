@@ -33,6 +33,7 @@ module top;
         reg [31:0] a;
         reg [7:0] b;
         reg [3:0] c, d;
+        integer e;
         x = 4'b1011;
         y = x ^ 3'b111;
         z = x ^ 5'b11111;
@@ -40,6 +41,7 @@ module top;
         b = {x, y};
         c = FLAG ? x : y;
         d = !FLAG ? x : y;
+        e = $clog2(x);
         $display("%b %d %d", x, 4, 1);
         $display("%b %d %d", y, 3, 0);
         $display("%b %d %d", z, 4, 0);
@@ -47,6 +49,7 @@ module top;
         $display("%b %d %d", b, 7, 0);
         $display("%b %d %d", c, 3, 0);
         $display("%b %d %d", d, 3, 0);
+        $display("%b %d %d", e, 31, 0);
     end
 
     parameter W = 4;
