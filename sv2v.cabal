@@ -89,6 +89,7 @@ executable sv2v
     Convert.SizeCast
     Convert.StarPort
     Convert.Stream
+    Convert.StringParam
     Convert.Struct
     Convert.TFBlock
     Convert.Traverse

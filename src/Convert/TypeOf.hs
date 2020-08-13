@@ -37,12 +37,12 @@ traverseDeclM decl = do
             return $ case t' of
                 UnpackedType t'' a' -> Variable d t'' ident a' e
                 _ ->                   Variable d t'  ident [] e
-        Param    _ t ident   e -> do
-            t' <- if t == UnknownType
-                    then typeof e
-                    else return t
-            insertElem ident t'
-            return decl'
+        Param _ UnknownType ident String{} ->
+            insertElem ident UnknownType >> return decl'
+        Param _ UnknownType ident e ->
+            typeof e >>= insertElem ident >> return decl'
+        Param _ t ident _ ->
+            insertElem ident t >> return decl'
         ParamType{} -> return decl'
         CommentDecl{} -> return decl'
 
@@ -137,25 +137,39 @@ typeof (BinOp ShiftL  e _) = typeof e
 typeof (BinOp ShiftR  e _) = typeof e
 typeof (BinOp ShiftAL e _) = typeof e
 typeof (BinOp ShiftAR e _) = typeof e
-typeof (BinOp Add     a b) = return $ largerSizeType a b
-typeof (BinOp Sub     a b) = return $ largerSizeType a b
-typeof (BinOp Mul     a b) = return $ largerSizeType a b
-typeof (BinOp Div     a b) = return $ largerSizeType a b
-typeof (BinOp Mod     a b) = return $ largerSizeType a b
-typeof (BinOp BitAnd  a b) = return $ largerSizeType a b
-typeof (BinOp BitXor  a b) = return $ largerSizeType a b
-typeof (BinOp BitXnor a b) = return $ largerSizeType a b
-typeof (BinOp BitOr   a b) = return $ largerSizeType a b
-typeof (Mux   _       a b) = return $ largerSizeType a b
+typeof (BinOp Add     a b) = largerSizeType a b
+typeof (BinOp Sub     a b) = largerSizeType a b
+typeof (BinOp Mul     a b) = largerSizeType a b
+typeof (BinOp Div     a b) = largerSizeType a b
+typeof (BinOp Mod     a b) = largerSizeType a b
+typeof (BinOp BitAnd  a b) = largerSizeType a b
+typeof (BinOp BitXor  a b) = largerSizeType a b
+typeof (BinOp BitXnor a b) = largerSizeType a b
+typeof (BinOp BitOr   a b) = largerSizeType a b
+typeof (Mux   _       a b) = largerSizeType a b
 typeof (Concat      exprs) = return $ typeOfSize $ concatSize exprs
 typeof (Repeat reps exprs) = return $ typeOfSize size
     where size = BinOp Mul reps (concatSize exprs)
-typeof String{} = return UnknownType
+typeof (String str) =
+    return $ IntegerVector TBit Unspecified [r]
+    where
+        r = (RawNum $ len - 1, RawNum 0)
+        len = if null str then 1 else 8 * unescapedLength str
+        unescapedLength :: String -> Integer
+        unescapedLength [] = 0
+        unescapedLength ('\\' : _ : rest) = 1 + unescapedLength rest
+        unescapedLength (_        : rest) = 1 + unescapedLength rest
 typeof other = lookupTypeOf other
 
 -- produces a type large enough to hold either expression
-largerSizeType :: Expr -> Expr -> Type
-largerSizeType a b = typeOfSize $ largerSizeOf a b
+largerSizeType :: Expr -> Expr -> Scoper Type Type
+largerSizeType a (Number (Based 1 _ _ _ _)) = typeof a
+largerSizeType a b = do
+    t <- typeof a
+    u <- typeof b
+    return $ if t == u
+        then t
+        else typeOfSize $ largerSizeOf a b
 
 -- returns the total size of concatenated list of expressions
 concatSize :: [Expr] -> Expr

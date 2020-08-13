@@ -39,6 +39,7 @@ import qualified Convert.Simplify
 import qualified Convert.SizeCast
 import qualified Convert.StarPort
 import qualified Convert.Stream
+import qualified Convert.StringParam
 import qualified Convert.Struct
 import qualified Convert.TFBlock
 import qualified Convert.Typedef
@@ -89,6 +90,7 @@ phases excludes =
     , Convert.ForDecl.convert
     , Convert.Jump.convert
     , Convert.Foreach.convert
+    , Convert.StringParam.convert
     , selectExclude (Job.Interface, Convert.Interface.convert)
     , selectExclude (Job.Always   , Convert.AlwaysKW.convert)
     , selectExclude (Job.Succinct , Convert.RemoveComments.convert)
