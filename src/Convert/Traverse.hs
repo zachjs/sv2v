@@ -90,7 +90,6 @@ module Convert.Traverse
 , traverseSinglyNestedLHSsM
 , traverseSinglyNestedLHSs
 , collectSinglyNestedLHSsM
-, traverseScopesM
 , traverseFilesM
 , traverseFiles
 , traverseSinglyNestedGenItemsM
@@ -1073,70 +1072,6 @@ traverseNestedStmts :: Mapper Stmt -> Mapper Stmt
 traverseNestedStmts = unmonad traverseNestedStmtsM
 collectNestedStmtsM :: Monad m => CollectorM m Stmt -> CollectorM m Stmt
 collectNestedStmtsM = collectify traverseNestedStmtsM
-
--- Traverse all the declaration scopes within a ModuleItem. Note that Functions,
--- Tasks, Always/Initial/Final blocks are all NOT passed through ModuleItem
--- mapper, and Decl ModuleItems are NOT passed through the Decl mapper. The
--- state is restored to its previous value after each scope is exited. Only the
--- Decl mapper may modify the state, as we maintain the invariant that all other
--- functions restore the state on exit. The Stmt mapper must not traverse
--- statements recursively, as we add a recursive wrapper here.
-traverseScopesM
-    :: (Eq s, Show s)
-    => Monad m
-    => MapperM (StateT s m) Decl
-    -> MapperM (StateT s m) ModuleItem
-    -> MapperM (StateT s m) Stmt
-    -> MapperM (StateT s m) ModuleItem
-traverseScopesM declMapper moduleItemMapper stmtMapper =
-    fullModuleItemMapper
-    where
-
-        nestedStmtMapper =
-            stmtMapper >=> traverseSinglyNestedStmtsM fullStmtMapper
-        fullStmtMapper (Block kw name decls stmts) = do
-            prevState <- get
-            decls' <- mapM declMapper decls
-            block <- nestedStmtMapper $ Block kw name decls' stmts
-            put prevState
-            return block
-        fullStmtMapper other = nestedStmtMapper other
-
-        redirectModuleItem (MIPackageItem (Function ml t x decls stmts)) = do
-            prevState <- get
-            t' <- do
-                res <- declMapper $ Variable Local t x [] Nil
-                case res of
-                    Variable Local newType _ [] Nil -> return newType
-                    _ -> error $ "redirected func ret traverse failed: " ++ show res
-            decls' <- mapM declMapper decls
-            stmts' <- mapM fullStmtMapper stmts
-            put prevState
-            return $ MIPackageItem $ Function ml t' x decls' stmts'
-        redirectModuleItem (MIPackageItem (Task     ml   x decls stmts)) = do
-            prevState <- get
-            decls' <- mapM declMapper decls
-            stmts' <- mapM fullStmtMapper stmts
-            put prevState
-            return $ MIPackageItem $ Task     ml    x decls' stmts'
-        redirectModuleItem (AlwaysC kw stmt) =
-            fullStmtMapper stmt >>= return . AlwaysC kw
-        redirectModuleItem (Initial stmt) =
-            fullStmtMapper stmt >>= return . Initial
-        redirectModuleItem (Final stmt) =
-            fullStmtMapper stmt >>= return . Final
-        redirectModuleItem item =
-            moduleItemMapper item
-
-        -- This previously checked the invariant that the module item mappers
-        -- should not modify the state. Now we simply "enforce" it but resetting
-        -- the state to its previous value. Comparing the state, as we did
-        -- previously, incurs a noticeable performance hit.
-        fullModuleItemMapper item = do
-            prevState <- get
-            item' <- redirectModuleItem item
-            put prevState
-            return item'
 
 -- In many conversions, we want to resolve items locally first, and then fall
 -- back to looking at other source files, if necessary. This helper captures
