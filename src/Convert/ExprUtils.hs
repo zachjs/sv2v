@@ -74,6 +74,8 @@ simplifyBinOp Add (UniOp UniSub e1) e2 = BinOp Sub e2 e1
 simplifyBinOp Sub e1 (UniOp UniSub e2) = BinOp Add e1 e2
 simplifyBinOp Sub (UniOp UniSub e1) e2 = UniOp UniSub $ BinOp Add e1 e2
 
+simplifyBinOp Add (BinOp Add e (n1 @ Number{})) (n2 @ Number{}) =
+    BinOp Add e (BinOp Add n1 n2)
 simplifyBinOp Sub (n1 @ Number{}) (BinOp Sub (n2 @ Number{}) e) =
     BinOp Add (BinOp Sub n1 n2) e
 simplifyBinOp Sub (n1 @ Number{}) (BinOp Sub e (n2 @ Number{})) =
