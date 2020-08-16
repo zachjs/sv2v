@@ -178,6 +178,7 @@ rangeSizeHiLo (hi, lo) =
 -- chooses one or the other expression based on the endianness of the given
 -- range; [hi:lo] chooses the first expression
 endianCondExpr :: Range -> Expr -> Expr -> Expr
+endianCondExpr SizedRange{} e _ = e
 endianCondExpr r e1 e2 = simplify $ Mux (uncurry (BinOp Ge) r) e1 e2
 
 -- chooses one or the other range based on the endianness of the given range,
@@ -197,3 +198,8 @@ dimensionsSize ranges =
     foldl (BinOp Mul) (RawNum 1) $
     map rangeSize $
     ranges
+
+-- "sized ranges" are of the form [E-1:0], where E is any expression; in most
+-- designs, we can safely assume that E >= 1, allowing for more succinct output
+pattern SizedRange :: Expr -> Range
+pattern SizedRange expr = (BinOp Sub expr (RawNum 1), RawNum 0)
