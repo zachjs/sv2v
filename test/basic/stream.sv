@@ -32,9 +32,8 @@ module top;
 
         temp = {>>7{20'h60708}};
         $display("%h", temp);
-        // TODO: Handle this edge case.
-        //temp = {<<7{20'h60708}};
-        //$display("%h", temp);
+        temp = {<<7{20'h60708}};
+        $display("%h", temp);
 
         temp = {>>7{16'h0708}};
         $display("%h", temp);
