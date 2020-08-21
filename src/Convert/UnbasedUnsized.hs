@@ -83,7 +83,7 @@ convertModuleItem _ other = convertModuleItem' other
 
 determinePortSize :: Identifier -> [ParamBinding] -> [ModuleItem] -> Expr
 determinePortSize portName instanceParams moduleItems =
-    step initialMapping moduleItems
+    step (reverse initialMapping) moduleItems
     where
         moduleParams = parameterNames moduleItems
         initialMapping = catMaybes $
@@ -99,10 +99,10 @@ determinePortSize portName instanceParams moduleItems =
 
         step :: [(Identifier, Expr)] -> [ModuleItem] -> Expr
         step mapping (MIPackageItem (Decl (Param _ _ x e)) : rest) =
-            step (mapping ++ [(x, e)]) rest
+            step ((x, e) : mapping) rest
         step mapping (MIPackageItem (Decl (Variable _ t x a _)) : rest) =
             if x == portName
-                then substituteExpr mapping size
+                then substituteExpr (reverse mapping) size
                 else step mapping rest
             where size = BinOp Mul (dimensionsSize a) (DimsFn FnBits $ Left t)
         step mapping (_ : rest) = step mapping rest
@@ -111,6 +111,14 @@ determinePortSize portName instanceParams moduleItems =
 substituteExpr :: [(Identifier, Expr)] -> Expr -> Expr
 substituteExpr _ (Ident (':' : x)) =
     Ident x
+substituteExpr mapping (Dot (Ident x) y) =
+    case lookup x mapping of
+        Nothing -> Dot (Ident x) y
+        Just (Pattern items) ->
+            case lookup y items of
+                Just item -> substituteExpr mapping item
+                Nothing -> Dot (substituteExpr mapping (Pattern items)) y
+        Just expr -> Dot (substituteExpr mapping expr) y
 substituteExpr mapping (Ident x) =
     case lookup x mapping of
         Nothing -> Ident x
