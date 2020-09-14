@@ -134,6 +134,7 @@ typeof (orig @ (Dot e x)) = do
 typeof (Cast (Right s) _) = return $ typeOfSize s
 typeof (UniOp UniSub  e  ) = typeof e
 typeof (UniOp BitNot  e  ) = typeof e
+typeof (UniOp LogNot  _  ) = return $ IntegerVector TLogic Unspecified []
 typeof (BinOp Pow     e _) = typeof e
 typeof (BinOp ShiftL  e _) = typeof e
 typeof (BinOp ShiftR  e _) = typeof e
