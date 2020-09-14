@@ -21,6 +21,7 @@ import qualified Convert.ForDecl
 import qualified Convert.Foreach
 import qualified Convert.FuncRet
 import qualified Convert.FuncRoutine
+import qualified Convert.ImplicitNet
 import qualified Convert.Inside
 import qualified Convert.Interface
 import qualified Convert.IntTypes
@@ -63,6 +64,7 @@ phases excludes =
     , Convert.FuncRet.convert
     , Convert.FuncRoutine.convert
     , Convert.EmptyArgs.convert
+    , Convert.ImplicitNet.convert
     , Convert.Inside.convert
     , Convert.IntTypes.convert
     , Convert.KWArgs.convert
