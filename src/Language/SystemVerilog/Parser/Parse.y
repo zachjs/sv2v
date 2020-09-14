@@ -781,7 +781,7 @@ NOutputGate :: { (Expr, Identifier, [LHS], Expr) }
   : DelayControlOrNil opt(Identifier) "(" NOutputGateItems { ($1, fromMaybe "" $2, fst $4, snd $4) }
 NOutputGateItems :: { ([LHS], Expr) }
   : Expr ")" { ([], $1) }
-  | Expr "," NOutputGateItems { (fst $3 ++ [toLHS $1], snd $3) }
+  | Expr "," NOutputGateItems { (toLHS $1 : fst $3, snd $3) }
 DelayControlOrNil :: { Expr }
   : DelayControl { $1 }
   | {- empty -} { Nil }
