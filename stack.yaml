@@ -1,7 +1,4 @@
-resolver: lts-14.26
+resolver: lts-16.14
 
 packages:
     - .
-
-extra-deps:
-    - githash-0.1.4.0@sha256:e7768540ec278ca6a4252f199769ab502cf04b6e552ea0b798cd7dd4b5774f14,1572
