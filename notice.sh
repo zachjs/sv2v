@@ -4,6 +4,7 @@ dependencies=`stack ls dependencies \
     | sed -e 's/ /-/' \
     | grep -v "^sv2v-[0-9\.]\+\$" \
     | grep -v "^rts-1\.0\$" \
+    | grep -v "^ghc-boot-th" \
     `
 
 for dependency in `echo "$dependencies"`; do
