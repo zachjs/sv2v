@@ -40,12 +40,11 @@ traverseDescription defaultNetType other = (defaultNetType, other)
 traverseDeclM :: Decl -> Scoper () Decl
 traverseDeclM decl = do
     case decl of
-        Variable _ t x _ _ -> when (t /= unknownType) $ insertElem x ()
+        Variable _ _ x _ _ -> insertElem x ()
         Param _ _ x _ -> insertElem x ()
         ParamType{} -> return ()
         CommentDecl{} -> return ()
     return decl
-    where unknownType = Implicit Unspecified []
 
 traverseModuleItemM :: DefaultNetType -> ModuleItem -> Scoper () ModuleItem
 traverseModuleItemM _ (Genvar x) =
