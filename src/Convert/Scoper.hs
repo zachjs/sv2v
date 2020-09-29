@@ -40,6 +40,7 @@ module Convert.Scoper
     , withinProcedure
     , withinProcedureM
     , scopeModuleItemT
+    , Replacements
     ) where
 
 import Control.Monad.State.Strict
