@@ -8,7 +8,7 @@
     initial begin \
         for (tag``i = 0; tag``i < 40; tag``i++) begin \
             #2; \
-            $display(`"tag", $time, ": %h %30b %30b %30b %30b", in, \
+            $display(`"tag`", $time, ": %h %30b %30b %30b %30b", in, \
                 tag``one_out, tag``two_out, tag``thr_out, tag``fou_out); \
         end \
     end

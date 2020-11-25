@@ -6,15 +6,15 @@ module name(clock, in, out); \
     initial out[1+a] = 0; \
     initial out[2+a] = 0; \
     always @(posedge clock) begin \
-        $display($time, `" name @+ ", out[0+a][1+b+:1]); \
-        $display($time, `" name @+ ", out[1+a][1+b+:1]); \
-        $display($time, `" name @+ ", out[2+a][1+b+:1]); \
-        $display($time, `" name @+ ", out[0+a][1+b+:2]); \
-        $display($time, `" name @+ ", out[1+a][1+b+:2]); \
-        $display($time, `" name @+ ", out[2+a][1+b+:2]); \
-        $display($time, `" name @: ", out[0+a][1+b:1+b]); \
-        $display($time, `" name @: ", out[1+a][1+b:1+b]); \
-        $display($time, `" name @: ", out[2+a][1+b:1+b]); \
+        $display($time, `" name @+ `", out[0+a][1+b+:1]); \
+        $display($time, `" name @+ `", out[1+a][1+b+:1]); \
+        $display($time, `" name @+ `", out[2+a][1+b+:1]); \
+        $display($time, `" name @+ `", out[0+a][1+b+:2]); \
+        $display($time, `" name @+ `", out[1+a][1+b+:2]); \
+        $display($time, `" name @+ `", out[2+a][1+b+:2]); \
+        $display($time, `" name @: `", out[0+a][1+b:1+b]); \
+        $display($time, `" name @: `", out[1+a][1+b:1+b]); \
+        $display($time, `" name @: `", out[2+a][1+b:1+b]); \
  \
         out[2+a][4+b] = out[2+a][3+b]; \
         out[2+a][3+b] = out[2+a][2+b]; \

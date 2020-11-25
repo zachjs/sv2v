@@ -116,7 +116,7 @@
 
 /* removed MACRO_E because iverlog performs escaping withing normal quotes */
 
-`define MACRO_F(t) $display(`"s t = `\`"t`\`"");
+`define MACRO_F(t) $display(`"s t = `\`"t`\`"`");
 
 module top;
 initial begin
