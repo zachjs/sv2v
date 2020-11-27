@@ -1,5 +1,13 @@
 module top;
 
+    function integer sideEffect;
+        input integer inp;
+        begin
+            $display("sideEffect(%b)", inp);
+            sideEffect = inp;
+        end
+    endfunction
+
     initial begin : foo
         reg [1:0] a;
         for (a = 0; a < 3; a++) begin
@@ -15,6 +23,14 @@ module top;
     initial $display("C", 1'bx);
     initial $display("D", 1'bx);
     initial $display("E", 1'bx);
+    // TODO: Add support for inside expressions with side effects.
+    // initial begin : bar
+    //     integer tmp;
+    //     tmp = sideEffect(3'bz11);
+    //     $display("F", 1'b1);
+    //     tmp = sideEffect(3'b?11);
+    //     $display("G", 1'b1);
+    // end
 
     function test1;
         input [2:0] inp;
@@ -54,6 +70,7 @@ module top;
     function [0:31] test3;
         input integer inp;
         begin
+            inp = 1 + sideEffect(inp);
             if (16 <= inp && inp <= 23) test3 = 1;
             else if (32 <= inp && inp <= 47) test3 = 2;
             else if (inp == 0 || (60 <= inp && inp <= 61) || inp == 4) test3 = 3;

@@ -19,6 +19,7 @@ module Convert.Inside (convert) where
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
+import Control.Monad.Writer
 import Data.Maybe (fromMaybe)
 
 convert :: [AST] -> [AST]
@@ -54,12 +55,19 @@ convertStmt (Case u kw expr items) =
         Case u kw expr items
     else if kw /= CaseN then
         error $ "cannot use inside with " ++ show kw
+    else if hasSideEffects expr then
+        Block Seq "" [decl] [stmt]
     else
         foldr ($) defaultStmt $
         map (uncurry $ If NoCheck) $
         zip comps stmts
     where
         exprs = map fst items
+        -- evaluate expressions with side effects once
+        tmp = "sv2v_temp_" ++ shortHash expr
+        decl = Variable Local (TypeOf expr) tmp [] expr
+        stmt = convertStmt (Case u kw (Ident tmp) items)
+        -- underlying inside case elaboration
         itemsNonDefault = filter (not . null . fst) items
         isSpecialInside :: [Expr] -> Bool
         isSpecialInside [Inside Nil _] = True
@@ -71,3 +79,11 @@ convertStmt (Case u kw expr items) =
         stmts = map snd itemsNonDefault
         defaultStmt = fromMaybe Null (lookup [] items)
 convertStmt other = other
+
+hasSideEffects :: Expr -> Bool
+hasSideEffects expr =
+    getAny $ execWriter $ collectNestedExprsM write expr
+    where
+        write :: Expr -> Writer Any ()
+        write Call{} = tell $ Any True
+        write _ = return ()

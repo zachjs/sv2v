@@ -1,5 +1,11 @@
 module top;
 
+    function integer sideEffect;
+        input integer inp;
+        $display("sideEffect(%b)", inp);
+        sideEffect = inp;
+    endfunction
+
     initial
         for (logic [1:0] a = 0; a < 3; a++) begin
             if (a inside {2'b01, 2'b00})
@@ -13,6 +19,9 @@ module top;
     initial $display("C", 3'bz11 inside {3'b011});
     initial $display("D", 3'bz11 inside {3'b1?1, 3'b011});
     initial $display("E", 3'bz11 inside {3'b?01, 3'b011});
+    // TODO: Add support for inside expressions with side effects.
+    // initial $display("F", sideEffect(3'bz11) inside {3'b?11});
+    // initial $display("G", 3'bz11 inside {sideEffect(3'b?11)});
 
     generate
         begin : patterns
@@ -53,7 +62,7 @@ module top;
 
     function integer test3;
         input integer inp;
-        case (inp) inside
+        case (1 + sideEffect(inp)) inside
             [16:23]: return 1;
             [32:47]: return 2;
             default: return 0;
