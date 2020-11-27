@@ -475,7 +475,7 @@ tokens :-
 -- our custom lexer state
 data AlexUserState = LS
     { lsToks      :: [Token] -- tokens read so far, *in reverse order* for efficiency
-    , lsPositions :: [Position] -- character positions in reverse order
+    , lsPositions :: [Position] -- character positions
     } deriving (Eq, Show)
 
 -- this initial user state does not contain the initial token positions; alex
@@ -487,7 +487,7 @@ alexInitUserState = LS [] []
 -- lexer entrypoint
 lexStr :: String -> [Position] -> IO (Either String [Token])
 lexStr chars positions = do
-    let setEnv = modify $ \s -> s { lsPositions = reverse positions }
+    let setEnv = modify $ \s -> s { lsPositions = positions }
     let result = runAlex chars $ setEnv >> alexMonadScan >> get
     return $ case result of
         Left msg -> Left msg
@@ -540,16 +540,10 @@ modify f = Alex func
     where func s = Right (s { alex_ust = new }, ())
             where new = f (alex_ust s)
 
-getPosition :: Int -> Alex Position
-getPosition lookback = do
-    (_, _, _, str) <- alexGetInput
-    positions <- get >>= return . lsPositions
-    return $ positions !! (lookback + length str)
-
 tok :: TokenName -> AlexInput -> Int -> Alex ()
-tok tokId (_, _, _, input) len = do
+tok tokId (AlexPn pos _ _, _, _, input) len = do
     let tokStr = take len input
-    tokPos <- getPosition (len - 1)
+    tokPos <- get >>= return . (!! pos) . lsPositions
     let t = Token tokId tokStr tokPos
     modify $ \s -> s { lsToks = t : (lsToks s) }
     alexMonadScan
