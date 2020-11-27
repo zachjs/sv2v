@@ -96,10 +96,6 @@ annotate _ env path = do
             else loadFile path
     let positions = scanl advance (Position path 1 1) contents
     return $ Right (zip contents positions, env)
-    where
-        advance :: Position -> Char -> Position
-        advance (Position f l _) '\n' = Position f (l + 1) 1
-        advance (Position f l c) _    = Position f l (c + 1)
 
 -- read in the given file
 loadFile :: FilePath -> IO String
@@ -500,7 +496,11 @@ preprocessInput = do
                     '`' <- takeChar
                     return ()
         '`' : _ -> handleDirective False
-        _ : _ -> consumeWithSubstitution
+        _ : _ -> do
+            condStack <- getCondStack
+            if null macroStack && all (== CurrentlyTrue) condStack
+                then consumeMany
+                else consumeWithSubstitution
         [] -> return ()
     if str == []
         then return ()
@@ -538,6 +538,18 @@ consume = do
     advancePosition ch
     setInput chs
     pushChar ch pos
+
+-- consumeMany processes chars in a batch until a potential delimiter is reached
+consumeMany :: PPS ()
+consumeMany = do
+    consume -- always consume first character
+    (str, pos) <- getBuffer
+    let (content, rest) = break (flip elem stopChars) str
+    let positions = scanl advance pos content
+    output <- getOutput
+    setOutput $ (reverse $ zip content positions) ++ output
+    setBuffer (rest, last positions)
+    where stopChars = ['`', '"', '/']
 
 -- preprocess a leading string literal; this routine is largely necessary to
 -- avoid doing any macro or directive related manipulations within standard
@@ -838,6 +850,11 @@ advancePositions :: String -> PPS ()
 advancePositions str = do
     _ <- mapM advancePosition str
     return ()
+
+-- update the given position based on the movement of the given character
+advance :: Position -> Char -> Position
+advance (Position f l _) '\n' = Position f (l + 1) 1
+advance (Position f l c) _    = Position f l (c + 1)
 
 -- adds a character (and its position) to the output state
 pushChar :: Char -> Position -> PPS ()
