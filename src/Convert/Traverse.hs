@@ -26,6 +26,7 @@ module Convert.Traverse
 , traverseExprsM
 , traverseExprs
 , collectExprsM
+, traverseNodesM
 , traverseStmtExprsM
 , traverseStmtExprs
 , collectStmtExprsM
@@ -84,6 +85,9 @@ module Convert.Traverse
 , traverseSinglyNestedExprsM
 , traverseSinglyNestedExprs
 , collectSinglyNestedExprsM
+, traverseLHSExprsM
+, traverseLHSExprs
+, collectLHSExprsM
 , traverseNestedLHSsM
 , traverseNestedLHSs
 , collectNestedLHSsM
@@ -503,6 +507,11 @@ traverseLHSExprsM exprMapper =
             return $ LHSStream o e' ls
         lhsMapper other = return other
 
+traverseLHSExprs :: Mapper Expr -> Mapper LHS
+traverseLHSExprs = unmonad traverseLHSExprsM
+collectLHSExprsM :: Monad m => CollectorM m Expr -> CollectorM m LHS
+collectLHSExprsM = collectify traverseLHSExprsM
+
 mapBothM :: Monad m => MapperM m t -> MapperM m (t, t)
 mapBothM mapper (a, b) = do
     a' <- mapper a
@@ -510,13 +519,30 @@ mapBothM mapper (a, b) = do
     return (a', b')
 
 traverseExprsM :: Monad m => MapperM m Expr -> MapperM m ModuleItem
-traverseExprsM exprMapper = moduleItemMapper
+traverseExprsM exprMapper =
+    traverseNodesM exprMapper declMapper typeMapper lhsMapper stmtMapper
     where
-
     declMapper = traverseDeclExprsM exprMapper
     typeMapper = traverseNestedTypesM (traverseTypeExprsM exprMapper)
     lhsMapper = traverseNestedLHSsM (traverseLHSExprsM exprMapper)
     stmtMapper = traverseNestedStmtsM (traverseStmtExprsM exprMapper)
+
+traverseExprs :: Mapper Expr -> Mapper ModuleItem
+traverseExprs = unmonad traverseExprsM
+collectExprsM :: Monad m => CollectorM m Expr -> CollectorM m ModuleItem
+collectExprsM = collectify traverseExprsM
+
+traverseNodesM
+    :: Monad m
+    => MapperM m Expr
+    -> MapperM m Decl
+    -> MapperM m Type
+    -> MapperM m LHS
+    -> MapperM m Stmt
+    -> MapperM m ModuleItem
+traverseNodesM exprMapper declMapper typeMapper lhsMapper stmtMapper =
+    moduleItemMapper
+    where
 
     portBindingMapper (p, e) =
         exprMapper e >>= \e' -> return (p, e')
@@ -599,11 +625,6 @@ traverseExprsM exprMapper = moduleItemMapper
     modportDeclMapper (dir, ident, e) = do
         e' <- exprMapper e
         return (dir, ident, e')
-
-traverseExprs :: Mapper Expr -> Mapper ModuleItem
-traverseExprs = unmonad traverseExprsM
-collectExprsM :: Monad m => CollectorM m Expr -> CollectorM m ModuleItem
-collectExprsM = collectify traverseExprsM
 
 traverseStmtExprsM :: Monad m => MapperM m Expr -> MapperM m Stmt
 traverseStmtExprsM exprMapper = flatStmtMapper
