@@ -41,7 +41,6 @@ module Language.SystemVerilog.Parser.ParseDecl
 , parseDTsAsPortDecls
 , parseDTsAsModuleItems
 , parseDTsAsDecls
-, parseDTsAsDecl
 , parseDTsAsDeclOrStmt
 , parseDTsAsDeclsOrAsgns
 ) where
@@ -225,16 +224,10 @@ parseDTsAsDecl tokens =
 -- [PUBLIC]: parser for single block item declarations or assign or arg-less
 -- subroutine call statements
 parseDTsAsDeclOrStmt :: [DeclToken] -> ([Decl], [Stmt])
-parseDTsAsDeclOrStmt [DTIdent pos f] =
-    ([], [traceStmt pos, Subroutine (Ident f) (Args [] [])])
-parseDTsAsDeclOrStmt [DTPSIdent pos ps f] =
-    ([], [traceStmt pos, Subroutine (PSIdent ps f) (Args [] [])])
-parseDTsAsDeclOrStmt [DTCSIdent pos ps pm f] =
-    ([], [traceStmt pos, Subroutine (CSIdent ps pm f) (Args [] [])])
 parseDTsAsDeclOrStmt (DTAsgn pos (AsgnOp op) mt e : tok : toks) =
     parseDTsAsDeclOrStmt $ (tok : toks) ++ [DTAsgn pos (AsgnOp op) mt e]
 parseDTsAsDeclOrStmt tokens =
-    if (isStmt (last tokens) || tripLookahead tokens) && maybeLhs /= Nothing
+    if not hasLeadingDecl
         then ([], [traceStmt pos, stmt])
         else (parseDTsAsDecl tokens, [])
     where
@@ -242,13 +235,15 @@ parseDTsAsDeclOrStmt tokens =
         stmt = case last tokens of
             DTAsgn  _ op mt e -> Asgn op mt lhs e
             DTInstance _ args -> Subroutine (lhsToExpr lhs) (instanceToArgs args)
-            _ -> error $ "invalid block item decl or stmt: " ++ (show tokens)
-        maybeLhs = takeLHS $ init tokens
-        Just lhs = maybeLhs
-        isStmt :: DeclToken -> Bool
-        isStmt (DTAsgn{}) = True
-        isStmt (DTInstance{}) = True
-        isStmt _ = False
+            _ -> case takeLHS tokens of
+                Just fullLHS -> Subroutine (lhsToExpr fullLHS) (Args [] [])
+                _ -> error $ "invalid block item decl or stmt: " ++ show tokens
+        Just lhs = takeLHS $ init tokens
+        hasLeadingDecl = tokens /= l4 && tripLookahead l4
+        (_, l1) = takeDir      tokens
+        (_, l2) = takeLifetime l1
+        (_, l3) = takeType     l2
+        (_, l4) = takeRanges   l3
 
 traceStmt :: Position -> Stmt
 traceStmt pos = CommentStmt $ "Trace: " ++ show pos
