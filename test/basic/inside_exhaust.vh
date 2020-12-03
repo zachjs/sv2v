@@ -32,6 +32,8 @@ initial begin : x
         for (j = 0; j < 4**WIDTH; ++j) begin
             $display("%b ==? %b = 1'b%b",
                 a, b, test_weq(a, b));
+            $display("%b !=? %b = 1'b%b",
+                a, b, test_wne(a, b));
             for (k = 0; k < 4**WIDTH; ++k) begin
                 $display("%b inside {%b, %b} = 1'b%b",
                     a, b, c, test_inside(a, b, c));

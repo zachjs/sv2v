@@ -20,6 +20,11 @@ module Suite;
         end
     endfunction
 
+    function [0:0] test_wne;
+        input [WIDTH-1:0] x, y;
+        test_wne = !test_weq(x, y);
+    endfunction
+
     function [0:0] test_inside;
         input [WIDTH-1:0] x, y, z;
         test_inside = |{test_weq(x, y), test_weq(x, z)};
