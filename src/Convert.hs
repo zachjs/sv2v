@@ -75,7 +75,6 @@ phases excludes =
     , Convert.ParamType.convert
     , Convert.SizeCast.convert
     , Convert.Simplify.convert
-    , Convert.StarPort.convert
     , Convert.Stream.convert
     , Convert.Struct.convert
     , Convert.TFBlock.convert
@@ -94,6 +93,7 @@ phases excludes =
     , Convert.Foreach.convert
     , Convert.StringParam.convert
     , selectExclude (Job.Interface, Convert.Interface.convert)
+    , Convert.StarPort.convert
     , selectExclude (Job.Always   , Convert.AlwaysKW.convert)
     , selectExclude (Job.Succinct , Convert.RemoveComments.convert)
     ]
