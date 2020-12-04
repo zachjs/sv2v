@@ -630,6 +630,10 @@ handleBacktickString = do
                     if null macroStack
                         then lexicalError "`\\`\" is not allowed outside of macros"
                         else loop
+                '`' : '`' : _ -> do
+                    '`' <- takeChar
+                    '`' <- takeChar
+                    loop
                 '`' : _ -> do
                     handleDirective True
                     loop
