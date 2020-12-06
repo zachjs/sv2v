@@ -31,8 +31,7 @@ convertDescription other = other
 
 traverseFunctionsM :: ModuleItem -> Writer Idents ModuleItem
 traverseFunctionsM (MIPackageItem (Function ml t f decls stmts)) = do
-    let dummyDecl = Variable Input (Implicit Unspecified []) "_sv2v_unused" [] Nil
-    decls' <- do
+    decls' <-
         if any isInput decls
             then return decls
             else do
@@ -40,6 +39,8 @@ traverseFunctionsM (MIPackageItem (Function ml t f decls stmts)) = do
                 return $ dummyDecl : decls
     return $ MIPackageItem $ Function ml t f decls' stmts
     where
+        dummyType = IntegerVector TReg Unspecified []
+        dummyDecl = Variable Input dummyType "_sv2v_unused" [] Nil
         isInput :: Decl -> Bool
         isInput (Variable Input _ _ _ _) = True
         isInput _ = False
