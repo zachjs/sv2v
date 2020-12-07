@@ -36,6 +36,7 @@ simplifyStep (UniOp LogNot (BinOp Ne a b)) = BinOp Eq a b
 simplifyStep (UniOp UniSub (UniOp UniSub e)) = e
 simplifyStep (UniOp UniSub (BinOp Sub e1 e2)) = BinOp Sub e2 e1
 
+simplifyStep (e @ (Concat [Pattern{}])) = e
 simplifyStep (Concat [e]) = e
 simplifyStep (Concat es) = Concat $ filter (/= Concat []) es
 simplifyStep (Repeat (Dec 0) _) = Concat []
