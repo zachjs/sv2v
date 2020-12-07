@@ -188,6 +188,8 @@ convertExpr _ (Cast te e) =
     Cast te $ convertExpr SelfDetermined e
 convertExpr _ (Concat exprs) =
     Concat $ map (convertExpr SelfDetermined) exprs
+convertExpr context (Pattern [(":default", e @ UU{})]) =
+    convertExpr context e
 convertExpr _ (Pattern items) =
     Pattern $ zip
     (map fst items)
