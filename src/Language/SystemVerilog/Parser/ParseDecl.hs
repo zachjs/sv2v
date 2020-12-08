@@ -69,6 +69,7 @@ data DeclToken
     | DTDot      Position Identifier
     | DTSigning  Position Signing
     | DTLifetime Position Lifetime
+    | DTAttr     Position Attr
     deriving (Show, Eq)
 
 -- entrypoints besides `parseDTsAsDeclOrStmt` use this to disallow `DTAsgn` with
@@ -93,7 +94,7 @@ parseDTsAsPortDecls pieces =
     forbidNonEqAsgn pieces $
     if isSimpleList
         then (simpleIdents, [])
-        else (portNames declarations, map (MIPackageItem . Decl) declarations)
+        else (portNames declarations, applyAttrs [] pieces declarations)
     where
         commaIdxs = findIndices isComma pieces
         identIdxs = findIndices isIdent pieces
@@ -104,9 +105,14 @@ parseDTsAsPortDecls pieces =
             length pieces == length commaIdxs + length identIdxs
 
         simpleIdents = map extractIdent $ filter isIdent pieces
-        declarations = propagateDirections Input $ parseDTsAsDecls pieces
+        declarations = propagateDirections Input $ parseDTsAsDecls pieces'
 
         extractIdent = \(DTIdent _ x) -> x
+
+        pieces' = filter (not . isDTAttr) pieces
+        isDTAttr :: DeclToken -> Bool
+        isDTAttr DTAttr{} = True
+        isDTAttr _ = False
 
         propagateDirections :: Direction -> [Decl] -> [Decl]
         propagateDirections dir (decl @ (Variable _ InterfaceT{} _ _ _) : decls) =
@@ -127,6 +133,23 @@ parseDTsAsPortDecls pieces =
         portName CommentDecl{} = ""
         portName decl =
             error $ "unexpected non-variable port declaration: " ++ (show decl)
+
+        applyAttrs :: [Attr] -> [DeclToken] -> [Decl] -> [ModuleItem]
+        applyAttrs _ [] [] = []
+        applyAttrs _ tokens (CommentDecl c : decls) =
+            MIPackageItem (Decl $ CommentDecl c) : applyAttrs [] tokens decls
+        applyAttrs attrs (DTAttr _ attr : tokens) decls =
+            applyAttrs (attr : attrs) tokens decls
+        applyAttrs attrs [] [decl] =
+            [wrapDecl attrs decl]
+        applyAttrs attrs (DTComma{} : tokens) (decl : decls) =
+            wrapDecl attrs decl : applyAttrs attrs tokens decls
+        applyAttrs attrs (_ : tokens) decls =
+            applyAttrs attrs tokens decls
+        applyAttrs _ [] _ = error "applyAttrs internal invariant failed"
+
+        wrapDecl :: [Attr] -> Decl -> ModuleItem
+        wrapDecl attrs decl = foldr MIAttr (MIPackageItem $ Decl decl) attrs
 
 
 -- [PUBLIC]: parser for single (semicolon-terminated) declarations (including
@@ -494,3 +517,4 @@ tokPos (DTStream   p _ _ _) = p
 tokPos (DTDot      p _) = p
 tokPos (DTSigning  p _) = p
 tokPos (DTLifetime p _) = p
+tokPos (DTAttr     p _) = p
