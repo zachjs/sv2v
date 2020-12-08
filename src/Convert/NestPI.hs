@@ -49,7 +49,7 @@ convertDescription pis (orig @ Part{}) =
         else Part attrs extern kw lifetime name ports items'
     where
         Part attrs extern kw lifetime name ports items = orig
-        items' = addItems pis Set.empty items
+        items' = addItems pis Set.empty (map addUsedPIs items)
 convertDescription _ other = other
 
 -- attempt to fix simple declaration order issues
@@ -57,7 +57,7 @@ reorderDescription :: Description -> Description
 reorderDescription (Part attrs extern kw lifetime name ports items) =
     Part attrs extern kw lifetime name ports items'
     where
-        items' = addItems localPIs Set.empty items
+        items' = addItems localPIs Set.empty (map addUsedPIs items)
         localPIs = Map.fromList $ mapMaybe toPIElem items
         toPIElem :: ModuleItem -> Maybe (Identifier, PackageItem)
         toPIElem (MIPackageItem item) = Just (piName item, item)
@@ -65,8 +65,8 @@ reorderDescription (Part attrs extern kw lifetime name ports items) =
 reorderDescription other = other
 
 -- iteratively inserts missing package items exactly where they are needed
-addItems :: PIs -> Idents -> [ModuleItem] -> [ModuleItem]
-addItems pis existingPIs (item : items) =
+addItems :: PIs -> Idents -> [(ModuleItem, Idents)] -> [ModuleItem]
+addItems pis existingPIs ((item, usedPIs) : items) =
     if not $ Set.disjoint existingPIs thisPI then
         -- this item was re-imported earlier in the module
         addItems pis existingPIs items
@@ -75,17 +75,24 @@ addItems pis existingPIs (item : items) =
         item : addItems pis (Set.union existingPIs thisPI) items
     else
         -- this item has at least one un-met dependency
-        addItems pis existingPIs (head itemsToAdd : item : items)
+        addItems pis existingPIs (addUsedPIs chosen : (item, usedPIs) : items)
     where
         thisPI = execWriter $ collectPIsM item
+        neededPIs = Set.difference (Set.difference usedPIs existingPIs) thisPI
+        itemsToAdd = map MIPackageItem $ Map.elems $
+            Map.restrictKeys pis neededPIs
+        chosen = head itemsToAdd
+addItems _ _ [] = []
+
+-- augment a module item with the set of identifiers it uses
+addUsedPIs :: ModuleItem -> (ModuleItem, Idents)
+addUsedPIs item =
+    (item, usedPIs)
+    where
         usedPIs = execWriter $
             traverseNestedModuleItemsM (traverseIdentsM writeIdent) item
         writeIdent :: Identifier -> Writer Idents Identifier
         writeIdent x = tell (Set.singleton x) >> return x
-        neededPIs = Set.difference (Set.difference usedPIs existingPIs) thisPI
-        itemsToAdd = map MIPackageItem $ Map.elems $
-            Map.restrictKeys pis neededPIs
-addItems _ _ [] = []
 
 -- writes down the names of package items
 collectPIsM :: ModuleItem -> Writer Idents ()
