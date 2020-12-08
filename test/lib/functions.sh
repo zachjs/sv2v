@@ -85,7 +85,14 @@ simpleTest() {
     tb=$3
 
     assertConverts $sv
-    assertConverts $ve
+
+    # some tests use inputs compatible with iverilog directly and so omit the
+    # reference manually converted file
+    if [ ! -f $ve ]; then
+        ve=$sv
+    else
+        assertConverts $ve
+    fi
 
     # some tests don't have a separate testbench, instead having the top-level
     # module defined in both of the input files
