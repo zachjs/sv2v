@@ -10,9 +10,6 @@
  - `begin_keywords` and `end_keywords` lexer directives are handled here.
  -}
 
--- This pragma gets rid of a warning caused by alex 3.2.5.
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
-
 module Language.SystemVerilog.Parser.Lex
     ( lexStr
     ) where
@@ -20,12 +17,13 @@ module Language.SystemVerilog.Parser.Lex
 import Control.Monad.Except
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Data.Vector as Vector
 
 import Language.SystemVerilog.Parser.Keywords (specMap)
 import Language.SystemVerilog.Parser.Tokens
 }
 
-%wrapper "monadUserState"
+%wrapper "posn"
 
 -- Numbers
 
@@ -472,28 +470,14 @@ tokens :-
     .                  { tok Unknown }
 
 {
--- our custom lexer state
-data AlexUserState = LS
-    { lsToks      :: [Token] -- tokens read so far, *in reverse order* for efficiency
-    , lsPositions :: [Position] -- character positions
-    } deriving (Eq, Show)
-
--- this initial user state does not contain the initial token positions; alex
--- requires that this be defined; we override it before we begin the actual
--- lexing procedure
-alexInitUserState :: AlexUserState
-alexInitUserState = LS [] []
-
 -- lexer entrypoint
-lexStr :: String -> [Position] -> IO (Either String [Token])
-lexStr chars positions = do
-    let setEnv = modify $ \s -> s { lsPositions = positions }
-    let result = runAlex chars $ setEnv >> alexMonadScan >> get
-    return $ case result of
-        Left msg -> Left msg
-        Right finalState ->
-            runExcept $ postProcess [] tokens
-            where tokens = reverse $ lsToks finalState
+lexStr :: String -> [Position] -> Either String [Token]
+lexStr chars positions =
+    runExcept $ postProcess [] tokens
+    where
+        tokensRaw = alexScanTokens chars
+        positionsVec = Vector.fromList positions
+        tokens = map (\tkf -> tkf positionsVec) tokensRaw
 
 -- process begin/end keywords directives
 postProcess :: [Set.Set TokenName] -> [Token] -> Except String [Token]
@@ -526,25 +510,8 @@ postProcess stack (t : ts) = do
                 then Token Id_simple ('_' : str) pos
                 else t
 
--- invoked by alexMonadScan
-alexEOF :: Alex ()
-alexEOF = return ()
-
--- get the current user state
-get :: Alex AlexUserState
-get = Alex $ \s -> Right (s, alex_ust s)
-
--- apply a transformation to the current user state
-modify :: (AlexUserState -> AlexUserState) -> Alex ()
-modify f = Alex func
-    where func s = Right (s { alex_ust = new }, ())
-            where new = f (alex_ust s)
-
-tok :: TokenName -> AlexInput -> Int -> Alex ()
-tok tokId (AlexPn pos _ _, _, _, input) len = do
-    let tokStr = take len input
-    tokPos <- get >>= return . (!! pos) . lsPositions
-    let t = Token tokId tokStr tokPos
-    modify $ \s -> s { lsToks = t : (lsToks s) }
-    alexMonadScan
+tok :: TokenName -> AlexPosn -> String -> Vector.Vector Position -> Token
+tok tokId (AlexPn charPos _ _) tokStr positions =
+    Token tokId tokStr tokPos
+    where tokPos = positions Vector.! charPos
 }

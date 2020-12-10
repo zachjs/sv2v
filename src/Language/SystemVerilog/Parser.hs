@@ -36,8 +36,7 @@ parseFile' includePaths env skipPreprocessor path = do
     let runner = if skipPreprocessor then annotate else preprocess
     preResult <- liftIO $ runner includePaths env path
     (contents, env') <- liftEither preResult
-    result <- liftIO $ uncurry lexStr $ unzip contents
-    tokens <- liftEither result
+    tokens <- liftEither $ uncurry lexStr $ unzip contents
     let position =
             if null tokens
                 then Position path 1 1

@@ -32,6 +32,7 @@ executable sv2v
     , githash
     , hashable
     , mtl
+    , vector
   other-modules:
     -- SystemVerilog modules
     Language.SystemVerilog
