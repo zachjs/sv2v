@@ -78,7 +78,7 @@ parseNumber' str =
             if rawSize /= 0 then
                 rawSize
             else if maybeBase /= Nothing then
-                negate $ max 32 (bitsPerDigit * numDigits)
+                negate $ bitsPerDigit * numDigits
             else
                 -32
         bitsPerDigit = bits $ baseSize base - 1
@@ -170,7 +170,11 @@ baseSize Hex    = 16
 numberBitLength :: Number -> Integer
 numberBitLength UnbasedUnsized{} = 32
 numberBitLength (Decimal size _ _) = fromIntegral $ abs size
-numberBitLength (Based size _ _ _ _) = fromIntegral $ abs size
+numberBitLength (Based size _ _ _ _) =
+    fromIntegral $
+    if size < 0
+        then max 32 $ negate size
+        else size
 
 -- get whether or not a number is signed
 numberIsSized :: Number -> Bool
@@ -226,16 +230,16 @@ instance Show Number where
             sizeStr = if size > 0 then show size else ""
             signedStr = if signed then "s" else ""
             [baseCh] = show base
-            valueStr = showBasedDigits (baseSize base) size value kinds
+            valueStr = showBasedDigits signed (baseSize base) size value kinds
 
-showBasedDigits :: Int -> Int -> Integer -> Integer -> String
-showBasedDigits base size values kinds =
+showBasedDigits :: Bool -> Int -> Int -> Integer -> Integer -> String
+showBasedDigits signed base size values kinds =
     if numDigits > sizeDigits then
         error $ "invalid based literal digits: "
             ++ show (base, size, values, kinds, numDigits, sizeDigits)
-    else if size < -32 then
+    else if size < -32 || (size < 0 && signed) then
         padList '0' sizeDigits digits
-    else if leadingXZ && size < 0 then
+    else if leadingXZ && size < 0 && sizeDigits == numDigits then
         removeExtraPadding digits
     else if leadingXZ || (256 >= size && size > 0) then
         padList '0' sizeDigits digits

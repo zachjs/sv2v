@@ -37,5 +37,19 @@ module top;
         `TEST('h01xz01xz) `TEST('h101xz01xz)
         `TEST(36'h01xz01xz) `TEST(37'h01xz01xz)
         `TEST(36'hb01xz01xz) `TEST(37'hb01xz01xz)
+
+        `TEST('sb0) `TEST('sb1)
+        `TEST('sb00) `TEST('sb10) `TEST('sb01) `TEST('sb11)
+        `TEST('sb000) `TEST('sb001) `TEST('sb010) `TEST('sb011)
+        `TEST('sb100) `TEST('sb101) `TEST('sb110) `TEST('sb111)
+
+        `TEST('b0) `TEST('b1)
+        `TEST('b00) `TEST('b10) `TEST('b01) `TEST('b11)
+        `TEST('b000) `TEST('b001) `TEST('b010) `TEST('b011)
+        `TEST('b100) `TEST('b101) `TEST('b110) `TEST('b111)
+
+        `TEST('b0x) `TEST('sb0x) `TEST('b0z) `TEST('sb0z)
+        `TEST('o0x) `TEST('so0x) `TEST('o0z) `TEST('so0z)
+        `TEST('h0x) `TEST('sh0x) `TEST('h0z) `TEST('sh0z)
     end
 endmodule
