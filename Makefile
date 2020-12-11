@@ -12,3 +12,10 @@ clean:
 
 test:
 	(cd test && ./run-all.sh)
+
+coverage:
+	stack install --local-bin-path bin --ghc-options=-fhpc
+	rm -f test/*/sv2v.tix
+	make test
+	stack exec hpc -- sum test/*/sv2v.tix --union --output=.hpc/combined.tix
+	stack exec hpc -- markup .hpc/combined.tix --destdir=.hpc
