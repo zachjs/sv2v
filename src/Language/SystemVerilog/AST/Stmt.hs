@@ -25,7 +25,7 @@ module Language.SystemVerilog.AST.Stmt
 
 import Text.Printf (printf)
 
-import Language.SystemVerilog.AST.ShowHelp (commas, indent, unlines', showPad)
+import Language.SystemVerilog.AST.ShowHelp (commas, indent, unlines', showPad, showBlock)
 import Language.SystemVerilog.AST.Attr (Attr)
 import Language.SystemVerilog.AST.Decl (Decl)
 import Language.SystemVerilog.AST.Expr (Expr(Inside, Nil), Args(..), showExprOrRange)
@@ -57,13 +57,13 @@ data Stmt
     deriving Eq
 
 instance Show Stmt where
+    showList l _ = unlines' $ map show l
     show (StmtAttr attr stmt) = printf "%s\n%s" (show attr) (show stmt)
     show (Block kw name decls stmts) =
         printf "%s%s\n%s\n%s" (show kw) header body (blockEndToken kw)
         where
             header = if null name then "" else " : " ++ name
-            bodyLines = (map show decls) ++ (map show stmts)
-            body = indent $ unlines' bodyLines
+            body = showBlock decls stmts
     show (Case u kw e cs) =
         printf "%s%s (%s)\n%s\nendcase" (showPad u) (show kw) (show e) bodyStr
         where bodyStr = indent $ unlines' $ map showCase cs
@@ -104,9 +104,8 @@ instance Show Stmt where
             else "// " ++ c
 
 showBranch :: Stmt -> String
-showBranch (Block Seq "" [] [CommentStmt c, stmt]) =
-    '\n' : (indent $ unlines' $ map show stmts)
-    where stmts = [CommentStmt c, stmt]
+showBranch (Block Seq "" [] (stmts @ [CommentStmt{}, _])) =
+    '\n' : (indent $ show stmts)
 showBranch (block @ Block{}) = ' ' : show block
 showBranch stmt = '\n' : (indent $ show stmt)
 

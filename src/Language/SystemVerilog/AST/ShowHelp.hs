@@ -13,6 +13,7 @@ module Language.SystemVerilog.AST.ShowHelp
     , commas
     , indentedParenList
     , showEither
+    , showBlock
     ) where
 
 import Data.List (intercalate)
@@ -52,3 +53,8 @@ indentedParenList l = "(\n" ++ (indent $ intercalate ",\n" l) ++ "\n)"
 showEither :: (Show a, Show b) => Either a b -> String
 showEither (Left  v) = show v
 showEither (Right v) = show v
+
+showBlock :: (Show a, Show b) => [a] -> [b] -> String
+showBlock a [] = indent $ show a
+showBlock [] b = indent $ show b
+showBlock a b = indent $ show a ++ "\n" ++ show b

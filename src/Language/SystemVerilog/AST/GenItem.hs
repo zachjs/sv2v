@@ -33,7 +33,7 @@ instance Show GenItem where
     show (GenBlock x i)  =
         printf "begin%s\n%s\nend"
             (if null x then "" else " : " ++ x)
-            (indent $ unlines' $ map show i)
+            (indent $ show i)
     show (GenCase e cs) =
         printf "case (%s)\n%s\nendcase" (show e) bodyStr
         where bodyStr = indent $ unlines' $ map showGenCase cs

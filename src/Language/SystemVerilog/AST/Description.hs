@@ -13,7 +13,6 @@ module Language.SystemVerilog.AST.Description
     ) where
 
 import Data.Maybe (fromMaybe)
-import Data.List (intercalate)
 import Text.Printf (printf)
 
 import Language.SystemVerilog.AST.ShowHelp
@@ -31,7 +30,7 @@ data Description
     deriving Eq
 
 instance Show Description where
-    showList descriptions _ = intercalate "\n" $ map show descriptions
+    showList l _ = unlines' $ map show l
     show (Part attrs True  kw lifetime name _ items) =
         printf "%sextern %s %s%s %s;"
             (concatMap showPad attrs)
@@ -66,13 +65,11 @@ data PackageItem
 instance Show PackageItem where
     show (Typedef t x) = printf "typedef %s %s;" (show t) x
     show (Function ml t x i b) =
-        printf "function %s%s%s;\n%s\n%s\nendfunction"
-            (showPad ml) (showPad t) x (indent $ show i)
-            (indent $ unlines' $ map show b)
+        printf "function %s%s%s;\n%s\nendfunction" (showPad ml) (showPad t) x
+        (showBlock i b)
     show (Task ml x i b) =
-        printf "task %s%s;\n%s\n%s\nendtask"
-            (showPad ml) x (indent $ show i)
-            (indent $ unlines' $ map show b)
+        printf "task %s%s;\n%s\nendtask"
+            (showPad ml) x (showBlock i b)
     show (Import x y) = printf "import %s::%s;" x (fromMaybe "*" y)
     show (Export Nothing) = "export *::*";
     show (Export (Just (x, y))) = printf "export %s::%s;" x (fromMaybe "*" y)

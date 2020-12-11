@@ -54,7 +54,7 @@ instance Show ModuleItem where
     show (Assign    o a b) = printf "assign %s%s = %s;" (showPad o) (show a) (show b)
     show (Defparam    a b) = printf "defparam %s = %s;" (show a) (show b)
     show (Genvar      x  ) = printf "genvar %s;" x
-    show (Generate    b  ) = printf "generate\n%s\nendgenerate" (indent $ unlines' $ map show b)
+    show (Generate    b  ) = printf "generate\n%s\nendgenerate" (indent $ show b)
     show (Modport     x l) = printf "modport %s(\n%s\n);" x (indent $ intercalate ",\n" $ map showModportDecl l)
     show (Initial     s  ) = printf "initial %s" (show s)
     show (Final       s  ) = printf   "final %s" (show s)
