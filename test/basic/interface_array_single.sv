@@ -33,6 +33,13 @@ module ModuleN(intf);
     Interface intf;
     `SHADOW
     initial #1 $display("ModuleN got %0d", intf.x);
+
+    typedef struct packed {
+        logic a, b;
+    } Struct;
+    Struct [1:0] structs;
+    assign structs[1].a = structs[0].b;
+    assign structs[0].a = structs[1].b;
 endmodule
 
 module top;

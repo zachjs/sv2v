@@ -24,7 +24,7 @@ data PartInfo = PartInfo
     } deriving Eq
 type PartInfos = Map.Map Identifier PartInfo
 
-type ModportInstances = [(Identifier, (Identifier, Identifier))]
+type ModportInstances = [(Identifier, Identifier)]
 type ModportBinding = (Identifier, (Substitutions, Expr))
 type Substitutions = [(Expr, Expr)]
 
@@ -185,7 +185,7 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                 bindingIsBundle = lookupElem modports (Dot expr "") /= Nothing
                 portIsBundle = null modportName
                 modportName = case lookup portName modportInstances of
-                    Just (_, x) -> x
+                    Just x -> x
                     Nothing -> error $ "can't deduce modport for interface "
                         ++ show expr ++ " bound to port " ++ portName
 
@@ -259,15 +259,15 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                         Just info = maybeInfo
                 collectDecl _ = return ()
 
-        extractModportInfo :: Type -> Maybe (Identifier, Identifier)
-        extractModportInfo (InterfaceT "" Nothing []) = Just ("", "")
+        extractModportInfo :: Type -> Maybe Identifier
+        extractModportInfo (InterfaceT "" Nothing []) = Just ""
         extractModportInfo (InterfaceT interfaceName (Just modportName) []) =
             if isInterface interfaceName
-                then Just (interfaceName, modportName)
+                then Just modportName
                 else Nothing
         extractModportInfo (Alias interfaceName []) =
             if isInterface interfaceName
-                then Just (interfaceName, "")
+                then Just ""
                 else Nothing
         extractModportInfo _ = Nothing
 
@@ -285,9 +285,8 @@ impliedModport =
     execWriter . mapM (collectNestedModuleItemsM collectModportDecls)
     where
         collectModportDecls :: ModuleItem -> Writer [ModportDecl] ()
-        collectModportDecls (MIPackageItem (Decl (Variable d _ x _ _))) =
-            tell [(d', x, Ident x)]
-            where d' = if d == Local then Inout else d
+        collectModportDecls (MIPackageItem (Decl (Variable _ _ x _ _))) =
+            tell [(Inout, x, Ident x)]
         collectModportDecls _ = return ()
 
 -- convert an interface-bound module instantiation or an interface instantiation
@@ -379,10 +378,6 @@ inlineInstance ranges modportBindings items
             case lookup (LHSDot (LHSBit lhs Tag) field) lhsReplacements of
                 Just resolved -> replaceLHSArrTag elt resolved
                 Nothing -> LHSDot (replaceLHS $ LHSBit lhs elt) field
-        replaceLHS (LHSBit lhs elt) =
-            case lookup (LHSBit lhs Tag) lhsReplacements of
-                Just resolved -> replaceLHSArrTag elt resolved
-                Nothing -> LHSBit (replaceLHS lhs) elt
         replaceLHS lhs =
             case lookup lhs lhsReplacements of
                 Just lhs' -> lhs'
@@ -402,12 +397,10 @@ inlineInstance ranges modportBindings items
         tagExpr :: Bool -> Scopes Expr -> Expr -> Expr
         tagExpr substitute scopes expr =
             case lookupElem scopes expr of
-                Just (_, _, Nil) -> Dot expr "@"
-                Just ([_, _], replacements, expr') ->
-                    if substitute && Map.null replacements
+                Just (_, _, expr') ->
+                    if substitute && expr' /= Nil
                         then Dot expr' "@"
                         else Dot expr "@"
-                Just (_, _, _) -> Dot expr "@"
                 Nothing ->
                     traverseSinglyNestedExprs (tagExpr substitute scopes) expr
         replaceExpr :: Expr -> Expr
