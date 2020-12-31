@@ -62,7 +62,7 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
         Part attrs extern Module lifetime name ports items'
     else
         PackageItem $ Decl $ CommentDecl $
-            "removed interface-using module: " ++ name
+            "removed module with interface ports: " ++ name
     where
         items' = evalScoper return traverseModuleItemM return return name items
 
@@ -80,15 +80,21 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                 convertNested $ Generate $ map GenModuleItem $
                     inlineInstance rs []
                     partItems instanceName paramBindings portBindings
-            else if not $ null (extractModportInstances partInfo) then do
-                modports <- embedScopes (\l () -> l) ()
-                -- inline instantiation of a module
-                convertNested $ Generate $ map GenModuleItem $
-                    inlineInstance rs
-                        (modportBindings modports)
-                        partItems instanceName paramBindings portBindings
-            else
+            else if null modportInstances then
                 return instanceItem
+            else do
+                -- inline instantiation of a module
+                modportBindings <-
+                    embedScopes (\l () -> getModportBindings l) ()
+                if length modportInstances /= length modportBindings
+                    then
+                        error $ "instance " ++ instanceName ++ " of " ++ part
+                            ++ " has interface ports "
+                            ++ showKeys modportInstances ++ ", but only "
+                            ++ showKeys modportBindings ++ " are connected"
+                    else convertNested $ Generate $ map GenModuleItem $
+                            inlineInstance rs modportBindings partItems
+                            instanceName paramBindings portBindings
             where
                 Instance part rawParamBindings instanceName rs rawPortBindings =
                     instanceItem
@@ -101,10 +107,11 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                 portBindings = resolveBindings partPorts rawPortBindings
 
                 modportInstances = extractModportInstances partInfo
-                modportBindings modports = mapMaybe
+                getModportBindings modports = mapMaybe
                     (inferModportBinding modports modportInstances) $
                     map (second $ addImpliedSlice modports) portBindings
                 second f = \(a, b) -> (a, f b)
+                showKeys = show . map fst
 
         traverseModuleItemM other = return other
 
@@ -317,7 +324,7 @@ inlineInstance ranges modportBindings items
         inlineKind =
             if null modportBindings
                 then "interface"
-                else "interface-using module"
+                else "module"
 
         comment = MIPackageItem $ Decl $ CommentDecl $
             "expanded " ++ inlineKind ++ " instance: " ++ instanceName
