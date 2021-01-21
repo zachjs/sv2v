@@ -443,6 +443,10 @@ Description :: { [Description] }
   | PackageDeclaration                { [$1] }
   | PackageItem { map PackageItem $1 }
 
+OptAsgn :: { Expr }
+  : {- empty -} { Nil }
+  | "=" Expr    { $2  }
+
 Type :: { Type }
   : TypeNonIdent { $1 }
   | TypeAlias    { $1 }
@@ -654,8 +658,7 @@ VariablePortIdentifiers :: { [(Identifier, Expr)] }
   : VariablePortIdentifier                             { [$1] }
   | VariablePortIdentifiers "," VariablePortIdentifier { $1 ++ [$3] }
 VariablePortIdentifier :: { (Identifier, Expr) }
-  : Identifier          { ($1, Nil) }
-  | Identifier "=" Expr { ($1, $3 ) }
+  : Identifier OptAsgn { ($1,$2) }
 
 Direction :: { Direction }
   : "inout"  { Inout  }
@@ -766,8 +769,7 @@ AttrSpecs :: { [AttrSpec] }
   : AttrSpec               { [$1] }
   | AttrSpecs "," AttrSpec { $1 ++ [$3] }
 AttrSpec :: { AttrSpec }
-  : Identifier "=" Expr { ($1, $3 ) }
-  | Identifier          { ($1, Nil) }
+  : Identifier OptAsgn { ($1, $2) }
 
 NInputGates :: { [(Expr, Identifier, LHS, [Expr])] }
   : NInputGate                 { [$1] }
@@ -921,10 +923,7 @@ DeclAsgns :: { [(Identifier, Expr, [Range])] }
   : DeclAsgn               { [$1] }
   | DeclAsgns "," DeclAsgn { $1 ++ [$3] }
 DeclAsgn :: { (Identifier, Expr, [Range]) }
-  : Identifier                    "=" Expr { ($1,  $3, []) }
-  | Identifier DimensionsNonEmpty "=" Expr { ($1,  $4, $2) }
-  | Identifier                             { ($1, Nil, []) }
-  | Identifier DimensionsNonEmpty          { ($1, Nil, $2) }
+  : Identifier Dimensions OptAsgn { ($1, $3, $2) }
 
 Range :: { Range }
   : "[" Expr ":"  Expr "]" { ($2, $4) }
