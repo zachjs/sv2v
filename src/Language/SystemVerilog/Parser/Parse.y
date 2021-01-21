@@ -921,8 +921,10 @@ DeclAsgns :: { [(Identifier, Expr, [Range])] }
   : DeclAsgn               { [$1] }
   | DeclAsgns "," DeclAsgn { $1 ++ [$3] }
 DeclAsgn :: { (Identifier, Expr, [Range]) }
-  : Identifier                    "=" Expr { ($1, $3, []) }
-  | Identifier DimensionsNonEmpty "=" Expr { ($1, $4, $2) }
+  : Identifier                    "=" Expr { ($1,  $3, []) }
+  | Identifier DimensionsNonEmpty "=" Expr { ($1,  $4, $2) }
+  | Identifier                             { ($1, Nil, []) }
+  | Identifier DimensionsNonEmpty          { ($1, Nil, $2) }
 
 Range :: { Range }
   : "[" Expr ":"  Expr "]" { ($2, $4) }

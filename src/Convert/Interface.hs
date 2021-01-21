@@ -588,19 +588,6 @@ pattern InstArrKey expr = Dot (Bit expr (RawNum 0)) InstArrName
 pattern InstArrEncoded :: Expr -> Expr -> ModuleItem
 pattern InstArrEncoded l r = Modport InstArrName (InstArrVal l r)
 
-type Binding t = (Identifier, t)
--- give a set of bindings explicit names
-resolveBindings :: Show t => [Identifier] -> [Binding t] -> [Binding t]
-resolveBindings available bindings =
-    zipWith resolveBinding bindings [0..]
-    where
-        resolveBinding ("", e) idx =
-            if idx < length available
-                then (available !! idx, e)
-                else error $ "binding " ++ show e ++ " is out of range "
-                        ++ show available
-        resolveBinding other _ = other
-
 -- given a list of module items, produces the parameter names in order
 parameterNames :: [ModuleItem] -> [Identifier]
 parameterNames =

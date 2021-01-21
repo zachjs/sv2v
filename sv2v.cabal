@@ -83,6 +83,7 @@ executable sv2v
     Convert.NamedBlock
     Convert.NestPI
     Convert.Package
+    Convert.ParamNoDefault
     Convert.ParamType
     Convert.RemoveComments
     Convert.Scoper

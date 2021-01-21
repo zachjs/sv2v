@@ -29,6 +29,7 @@ module Language.SystemVerilog.AST
     , exprToLHS
     , lhsToExpr
     , shortHash
+    , resolveBindings
     ) where
 
 import Text.Printf (printf)
@@ -84,3 +85,16 @@ shortHash :: (Show a) => a -> String
 shortHash x =
     take 5 $ printf "%05X" val
     where val = hash $ show x
+
+type Binding t = (Identifier, t)
+-- give a set of bindings explicit names
+resolveBindings :: Show t => [Identifier] -> [Binding t] -> [Binding t]
+resolveBindings available bindings =
+    zipWith resolveBinding bindings [0..]
+    where
+        resolveBinding ("", e) idx =
+            if idx < length available
+                then (available !! idx, e)
+                else error $ "binding " ++ show e ++ " is out of range "
+                        ++ show available
+        resolveBinding other _ = other

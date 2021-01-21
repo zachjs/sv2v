@@ -33,6 +33,7 @@ import qualified Convert.MultiplePacked
 import qualified Convert.NamedBlock
 import qualified Convert.NestPI
 import qualified Convert.Package
+import qualified Convert.ParamNoDefault
 import qualified Convert.ParamType
 import qualified Convert.RemoveComments
 import qualified Convert.SignCast
@@ -109,7 +110,9 @@ run excludes = foldr (.) id $ phases excludes
 
 convert :: [Job.Exclude] -> Phase
 convert excludes =
-    convert' . Convert.NestPI.reorder
+    convert'
+        . Convert.NestPI.reorder
+        . Convert.ParamNoDefault.convert
     where
         convert' :: Phase
         convert' descriptions =

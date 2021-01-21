@@ -28,7 +28,7 @@ data Decl
 
 instance Show Decl where
     showList l _ = unlines' $ map show l
-    show (Param s t x e) = printf "%s %s%s = %s;" (show s) (showPad t) x (show e)
+    show (Param s t x e) = printf "%s %s%s%s;" (show s) (showPad t) x (showAssignment e)
     show (ParamType s x mt) = printf "%s type %s%s;" (show s) x tStr
         where tStr = maybe "" ((" = " ++) . show) mt
     show (Variable d t x a e) = printf "%s%s%s%s%s;" (showPad d) (showPad t) x (showRanges a) (showAssignment e)
