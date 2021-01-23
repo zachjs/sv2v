@@ -31,7 +31,6 @@ import qualified Convert.Logic
 import qualified Convert.LogOp
 import qualified Convert.MultiplePacked
 import qualified Convert.NamedBlock
-import qualified Convert.NestPI
 import qualified Convert.Package
 import qualified Convert.ParamNoDefault
 import qualified Convert.ParamType
@@ -86,9 +85,7 @@ phases excludes =
     , Convert.Unsigned.convert
     , Convert.SignCast.convert
     , Convert.Wildcard.convert
-    , Convert.Package.convert
     , Convert.Enum.convert
-    , Convert.NestPI.convert
     , Convert.ForDecl.convert
     , Convert.Jump.convert
     , Convert.Foreach.convert
@@ -111,7 +108,7 @@ run excludes = foldr (.) id $ phases excludes
 convert :: [Job.Exclude] -> Phase
 convert excludes =
     convert'
-        . Convert.NestPI.reorder
+        . Convert.Package.convert
         . Convert.ParamNoDefault.convert
     where
         convert' :: Phase

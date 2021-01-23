@@ -12,7 +12,6 @@ module Language.SystemVerilog.AST.Description
     , Lifetime    (..)
     ) where
 
-import Data.Maybe (fromMaybe)
 import Text.Printf (printf)
 
 import Language.SystemVerilog.AST.ShowHelp
@@ -56,8 +55,8 @@ data PackageItem
     = Typedef Type Identifier
     | Function Lifetime Type Identifier [Decl] [Stmt]
     | Task     Lifetime      Identifier [Decl] [Stmt]
-    | Import Identifier (Maybe Identifier)
-    | Export (Maybe (Identifier, Maybe Identifier))
+    | Import Identifier Identifier
+    | Export Identifier Identifier
     | Decl Decl
     | Directive String
     deriving Eq
@@ -70,11 +69,14 @@ instance Show PackageItem where
     show (Task ml x i b) =
         printf "task %s%s;\n%s\nendtask"
             (showPad ml) x (showBlock i b)
-    show (Import x y) = printf "import %s::%s;" x (fromMaybe "*" y)
-    show (Export Nothing) = "export *::*";
-    show (Export (Just (x, y))) = printf "export %s::%s;" x (fromMaybe "*" y)
+    show (Import x y) = printf "import %s::%s;" x (showWildcard y)
+    show (Export x y) = printf "export %s::%s;" (showWildcard x) (showWildcard y)
     show (Decl decl) = show decl
     show (Directive str) = str
+
+showWildcard :: Identifier -> String
+showWildcard "" = "*"
+showWildcard x = x
 
 data PartKW
     = Module

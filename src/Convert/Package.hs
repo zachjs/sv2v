@@ -1,32 +1,32 @@
+{-# LANGUAGE TupleSections #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
- - Conversion for packages, exports, and imports
+ - Conversion for packages and global declarations
  -
- - TODO: We do not yet handle exports.
- - TODO: The scoping rules are not being entirely followed yet.
- - TODO: Explicit imports may introduce name conflicts because of carried items.
+ - This conversion first makes a best-effort pass at resolving any simple
+ - declaration ordering issues in the input. Many conversions require that
+ - declarations precede their first usage.
  -
- - The SystemVerilog scoping rules for exports and imports are not entirely
- - trivial. We do not explicitly handle the "error" scenarios detailed Table
- - 26-1 of Section 26-3 of IEEE 1800-2017. Users generally shouldn't be relying
- - on this tool to catch and report such wild naming conflicts that are outlined
- - there.
+ - The main phase elaborates packages and resolves imported identifiers. An
+ - identifier (perhaps implicitly) referring to `P::X` is rewritten to `P_X`.
+ - This conversion assumes such renaming will not cause conflicts. The full
+ - semantics of imports and exports are followed.
  -
- - Summary:
- - * In scopes which have a local declaration of an identifier, that identifier
- -   refers to that local declaration.
- - * If there is no local declaration, the identifier refers to the imported
- -   declaration.
- - * If there is an explicit import of that identifier, the identifier refers to
- -   the imported declaration.
- - * Usages of conflicting wildcard imports are not allowed.
+ - Finally, because Verilog doesn't allow declarations to exist outside of
+ - modules, declarations within packages and in the global scope are injected
+ - into modules and interfaces as needed.
  -}
 
-module Convert.Package (convert) where
+module Convert.Package
+    ( convert
+    , inject
+    ) where
 
 import Control.Monad.State.Strict
 import Control.Monad.Writer.Strict
+import Data.List (insert, intercalate)
+import Data.Maybe (mapMaybe)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
@@ -34,112 +34,296 @@ import Convert.Scoper
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type Packages = Map.Map Identifier PackageItems
-type PackageItems = [(Identifier, PackageItem)]
+type Packages = Map.Map Identifier Package
+type Package = (IdentStateMap, [PackageItem])
 type Idents = Set.Set Identifier
+type PIs = Map.Map Identifier PackageItem
 
 convert :: [AST] -> [AST]
-convert = step
+convert files =
+    map (traverseDescriptions $ convertDescription pis) files'
     where
-        step :: [AST] -> [AST]
-        step curr =
-            if next == curr
-                then curr
-                else step next
+        (files', packages') = convertPackages files
+        pis = Map.fromList $
+            concatMap (concatMap toPackageItems . snd) $
+            filter (not . Map.null . fst) $
+            Map.elems packages'
+        toPackageItems :: PackageItem -> [(Identifier, PackageItem)]
+        toPackageItems item = map (, item) (piNames item)
+
+-- utility for inserting package items into a set of module items as needed
+inject :: [PackageItem] -> [ModuleItem] -> [ModuleItem]
+inject packageItems items =
+    addItems localPIs Set.empty (map addUsedPIs items)
+    where
+        localPIs = Map.fromList $ concatMap toPIElem packageItems
+        toPIElem :: PackageItem -> [(Identifier, PackageItem)]
+        toPIElem item = map (, item) (piNames item)
+
+-- collect packages and global package items
+collectPackageM :: Description -> Writer (Packages, [PackageItem]) ()
+collectPackageM (PackageItem item) =
+    when (not $ null $ piNames item) $
+        tell (Map.empty, [item])
+collectPackageM (Package _ name items) =
+    tell (Map.singleton name (Map.empty, items), [])
+collectPackageM _ = return ()
+
+-- elaborate all packages and their usages
+convertPackages :: [AST] -> ([AST], Packages)
+convertPackages files =
+    (files', packages')
+    where
+        (files', ([], packages')) = runState op ([], packages)
+        op = mapM (traverseDescriptionsM traverseDescriptionM) files
+        packages = Map.insert "" (Map.empty, globalItems) realPackages
+        (realPackages, globalItems) =
+            execWriter $ mapM (collectDescriptionsM collectPackageM) files
+
+type PackagesState = State ([Identifier], Packages)
+
+traverseDescriptionM :: Description -> PackagesState Description
+traverseDescriptionM (PackageItem item) = do
+    return $ PackageItem $ case piNames item of
+        [] -> item
+        idents -> Decl $ CommentDecl $ "removed " ++ show idents
+traverseDescriptionM (Package _ name _) =
+    return $ PackageItem $ Decl $ CommentDecl $ "removed package " ++ show name
+traverseDescriptionM (Part attrs extern kw liftetime name ports items) = do
+    (_, items') <- processItems name "" items
+    return $ Part attrs extern kw liftetime name ports items'
+
+data IdentState
+    = Available [Identifier]
+    | Imported Identifier
+    | Declared
+    deriving Eq
+
+isImported :: IdentState -> Bool
+isImported Imported{} = True
+isImported _ = False
+
+isDeclared :: IdentState -> Bool
+isDeclared Declared{} = True
+isDeclared _ = False
+
+type IdentStateMap = Map.Map Identifier IdentState
+type Scope = ScoperT IdentState PackagesState
+
+-- produce the partial mapping for a particular export and ensure its validity
+resolveExport
+    :: IdentStateMap -> Identifier -> Identifier -> PackagesState IdentStateMap
+resolveExport mapping "" "" =
+    return $ Map.filter isImported mapping
+resolveExport mapping pkg "" =
+    fmap (Map.mapMaybeWithKey checkExport . fst) (findPackage pkg)
+    where
+        checkExport :: Identifier -> IdentState -> Maybe IdentState
+        checkExport ident exportedIdentState =
+            if localIdentState == expectedIdentState
+                then localIdentState
+                else Nothing
             where
-                next = traverseFiles
-                    (collectDescriptionsM collectDescriptionM)
-                    convertFile curr
+                localIdentState = Map.lookup ident mapping
+                expectedIdentState = Just $ Imported $
+                    toRootPackage pkg exportedIdentState
+resolveExport mapping pkg ident =
+    case Map.lookup ident mapping of
+        Just (Imported importedPkg) -> do
+            exportedPkg <- resolveRootPackage pkg ident
+            if importedPkg == exportedPkg
+                then return $ Map.singleton ident $ Imported importedPkg
+                else error $ "export of " ++ pkg ++ "::" ++ ident
+                        ++ " differs from import of " ++ importedPkg
+                        ++ "::" ++ ident
+        _ -> error $ "export of " ++ pkg ++ "::" ++ ident
+                ++ ", but " ++ ident ++ " was never imported"
 
-convertFile :: Packages -> AST -> AST
-convertFile packages ast =
-    (++) globalItems $
-    filter (not . isCollected) $
-    concatMap (traverseDescription packages) $
-    ast
+-- lookup the state of the identifier only within the current scope
+lookupLocalIdentState :: Identifier -> Scope (Maybe IdentState)
+lookupLocalIdentState =
+    fmap (fmap thd3) . lookupLocalIdentM
+    where thd3 (_, _, c) = c
+
+-- make a particular identifier within a package available for import
+wildcardImport :: Identifier -> Identifier -> Scope ()
+wildcardImport pkg ident = do
+    rootPkg <- lift $ resolveRootPackage pkg ident
+    maybeIdentState <- lookupLocalIdentState ident
+    insertElem ident $
+        case maybeIdentState of
+            Nothing -> Available [rootPkg]
+            Just Declared -> Declared
+            Just (Imported existingRootPkg) -> Imported existingRootPkg
+            Just (Available rootPkgs) ->
+                if elem rootPkg rootPkgs
+                    then Available rootPkgs
+                    else Available $ insert rootPkg rootPkgs
+
+-- make all exported identifiers within a package available for import
+wildcardImports :: Identifier -> Scope ()
+wildcardImports pkg = do
+    (exports, _) <- lift $ findPackage pkg
+    _ <- mapM (wildcardImport pkg) (Map.keys exports)
+    return ()
+
+-- resolve and store an explicit (non-wildcard) import
+explicitImport :: Identifier -> Identifier -> Scope ()
+explicitImport pkg ident = do
+    rootPkg <- lift $ resolveRootPackage pkg ident
+    maybeIdentState <- lookupLocalIdentState ident
+    insertElem ident $
+        case maybeIdentState of
+            Nothing -> Imported rootPkg
+            Just Declared ->
+                error $ "import of " ++ pkg ++ "::" ++ ident
+                    ++ " conflicts with prior declaration of " ++ ident
+            Just Available{} -> Imported rootPkg
+            Just (Imported otherPkg) ->
+                if otherPkg == rootPkg
+                    then Imported rootPkg
+                    else error $ "import of " ++ pkg ++ "::" ++ ident
+                            ++ " conflicts with prior import of "
+                            ++ otherPkg ++ "::" ++ ident
+
+-- main logic responsible for translating packages, resolving imports and
+-- exports, and rewriting identifiers referring to package declarations
+processItems :: Identifier -> Identifier -> [ModuleItem]
+    -> PackagesState (IdentStateMap, [ModuleItem])
+processItems topName packageName moduleItems = do
+    (moduleItems', scopes) <- runScoperT
+        traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
+        topName (reorderItems moduleItems)
+    let rawIdents = extractMapping scopes
+    externalIdentMaps <- mapM (resolveExportMI rawIdents) moduleItems
+    let externalIdents = Map.unions externalIdentMaps
+    let declaredIdents = Map.filter isDeclared rawIdents
+    let exports = Map.union declaredIdents externalIdents
+    let exports' = if null packageName
+                    then rawIdents
+                    else exports
+    seq exports return (exports', moduleItems')
     where
-        globalItems = map PackageItem $
-             concatMap (uncurry globalPackageItems) $ Map.toList packages
-        isCollected :: Description -> Bool
-        isCollected (Package _ name _) = Map.member name packages
-        isCollected _ = False
+        -- produces partial mappings of exported identifiers, while also
+        -- checking the validity of the exports
+        resolveExportMI :: IdentStateMap -> ModuleItem -> PackagesState IdentStateMap
+        resolveExportMI mapping (MIPackageItem (item @ (Export pkg ident))) =
+            if null packageName
+                then error $ "invalid " ++ (init $ show item)
+                        ++ " outside of package"
+                else resolveExport mapping pkg ident
+        resolveExportMI _ _ = return Map.empty
 
-globalPackageItems :: Identifier -> PackageItems -> [PackageItem]
-globalPackageItems name items =
-    prefixPackageItems name (packageItemIdents items) (map snd items)
+        -- declare an identifier, prefixing it if within a package
+        prefixIdent :: Identifier -> Scope Identifier
+        prefixIdent x = do
+            inProcedure <- withinProcedureM
+            maybeIdentState <- lookupLocalIdentState x
+            case maybeIdentState of
+                Just (Imported rootPkg) -> error $ "declaration of " ++ x
+                    ++ " conflicts with prior import of " ++ rootPkg
+                    ++ "::" ++ x
+                _ -> do
+                    insertElem x Declared
+                    if inProcedure || null packageName
+                        then return x
+                        else return $ packageName ++ '_' : x
 
-packageItemIdents :: PackageItems -> Idents
-packageItemIdents items =
-    Set.union
-        (Set.fromList $ map fst items)
-        (Set.unions $ map (packageItemSubIdents . snd) items)
-    where
-        packageItemSubIdents :: PackageItem -> Idents
-        packageItemSubIdents (Typedef (Enum _ enumItems _) _) =
-            Set.fromList $ map fst enumItems
-        packageItemSubIdents _ = Set.empty
+        -- check the global scope for declarations or imports
+        resolveGlobalIdent :: Identifier -> Scope Identifier
+        resolveGlobalIdent x = do
+            (exports, _) <- lift $ findPackage ""
+            case Map.lookup x exports of
+                Nothing -> return x
+                Just identState -> do
+                    -- inject the exact state outside of the module scope,
+                    -- allowing wildcard imports to be handled correctly
+                    insertElem [Access x Nil] identState
+                    resolveIdent x
 
-prefixPackageItems :: Identifier -> Idents -> [PackageItem] -> [PackageItem]
-prefixPackageItems packageName idents items =
-    map unwrap $ evalScoper
-    traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
-    packageName $ map (wrap . initialPrefix) items
-    where
-        wrap :: PackageItem -> ModuleItem
-        wrap = MIPackageItem
-        unwrap :: ModuleItem -> PackageItem
-        unwrap (MIPackageItem item) = item
-        unwrap _ = error "unwrap invariant violated"
-
-        initialPrefix :: PackageItem -> PackageItem
-        initialPrefix item =
-            case item of
-                Function       a b x c d  -> Function       a b (prefix x) c d
-                Task           a   x c d  -> Task           a   (prefix x) c d
-                Typedef          a x      -> Typedef          a (prefix x)
-                Decl (Variable a b x c d) -> Decl (Variable a b (prefix x) c d)
-                Decl (Param    a b x c  ) -> Decl (Param    a b (prefix x) c  )
-                Decl (ParamType  a x b  ) -> Decl (ParamType  a (prefix x) b  )
-                other -> other
-
-        prefix :: Identifier -> Identifier
-        prefix x =
-            if Set.member x idents
-                then packageName ++ '_' : x
-                else x
-        prefixM :: Identifier -> Scoper () Identifier
-        prefixM x = do
+        -- remap an identifier if needed based on declarations, explicit
+        -- imports, or names available for import
+        resolveIdent :: Identifier -> Scope Identifier
+        resolveIdent x = do
             details <- lookupElemM x
-            if details == Nothing
-                then return $ prefix x
-                else return x
+            case details of
+                Nothing ->
+                    if null topName
+                        then return x
+                        else resolveGlobalIdent x
+                Just ([_, _], _, Declared) ->
+                    if null packageName
+                        then return x
+                        else return $ packageName ++ '_' : x
+                Just (_, _, Declared) -> return x
+                Just (_, _, Imported rootPkg) ->
+                    return $ rootPkg ++ '_' : x
+                Just (accesses, _, Available [rootPkg]) -> do
+                    insertElem accesses $ Imported rootPkg
+                    return $ rootPkg ++ '_' : x
+                Just (_, _, Available rootPkgs) ->
+                    error $ "identifier " ++ show x
+                        ++ " ambiguously refers to the definitions in any of "
+                        ++ intercalate ", " rootPkgs
 
-        traverseDeclM :: Decl -> Scoper () Decl
+        traversePackageItemM :: PackageItem -> Scope PackageItem
+        -- TODO: fold this in with type parameters
+        traversePackageItemM (Typedef t x) = do
+            t' <- traverseTypeM t
+            x' <- prefixIdent x
+            t'' <- traverseNestedTypesM (traverseTypeExprsM traverseExprM) t'
+            return $ Typedef t'' x'
+        traversePackageItemM (orig @ (Import pkg ident)) = do
+            if null ident
+                then wildcardImports pkg
+                else explicitImport pkg ident
+            return $ Decl $ CommentDecl $ "removed " ++ show orig
+        traversePackageItemM (orig @ (Export pkg ident)) = do
+            () <- when (not (null pkg || null ident)) $ do
+                localName <- resolveIdent ident
+                rootPkg <- lift $ resolveRootPackage pkg ident
+                localName `seq` rootPkg `seq` return ()
+            return $ Decl $ CommentDecl $ "removed " ++ show orig
+        traversePackageItemM other = return other
+
+        traverseDeclM :: Decl -> Scope Decl
         traverseDeclM decl = do
-            case decl of
-                Variable _ _ x _ _ -> insertElem x ()
-                Param _ _ x _      -> insertElem x ()
-                ParamType _ x _    -> insertElem x ()
-                CommentDecl{} -> return ()
-            traverseDeclTypesM traverseTypeM decl >>=
+            decl' <- case decl of
+                Variable d t x a e -> declHelp x $ \x' -> Variable d t x' a e
+                Param    p t x   e -> declHelp x $ \x' -> Param    p t x'   e
+                ParamType  p x   t -> declHelp x $ \x' -> ParamType  p x'   t
+                CommentDecl c -> return $ CommentDecl c
+            traverseDeclTypesM traverseTypeM decl' >>=
                 traverseDeclExprsM traverseExprM
+            where declHelp x f = prefixIdent x >>= return . f
 
-        traverseTypeM :: Type -> Scoper () Type
+        traverseTypeM :: Type -> Scope Type
+        traverseTypeM (PSAlias p x rs) = do
+            x' <- lift $ resolvePSIdent p x
+            return $ Alias x' rs
         traverseTypeM (Alias x rs) =
-            prefixM x >>= \x' -> return $ Alias x' rs
+            resolveIdent x >>= \x' -> return $ Alias x' rs
         traverseTypeM (Enum t enumItems rs) = do
             enumItems' <- mapM prefixEnumItem enumItems
             return $ Enum t enumItems' rs
-            where  prefixEnumItem (x, e) = prefixM x >>= \x' -> return (x', e)
+            where prefixEnumItem (x, e) = prefixIdent x >>= \x' -> return (x', e)
         traverseTypeM other = traverseSinglyNestedTypesM traverseTypeM other
 
-        traverseExprM (Ident x) = prefixM x >>= return . Ident
+        traverseExprM (PSIdent p x) = do
+            x' <- lift $ resolvePSIdent p x
+            return $ Ident x'
+        traverseExprM (Ident x) = resolveIdent x >>= return . Ident
         traverseExprM other = traverseSinglyNestedExprsM traverseExprM other
-        traverseLHSM (LHSIdent x) = prefixM x >>= return . LHSIdent
+        traverseLHSM (LHSIdent x) = resolveIdent x >>= return . LHSIdent
         traverseLHSM other = traverseSinglyNestedLHSsM traverseLHSM other
 
-        traverseGenItemM = error "not possible"
-        traverseModuleItemM =
+        traverseGenItemM = traverseGenItemExprsM traverseExprM
+        traverseModuleItemM (MIPackageItem item) = do
+            item' <- traversePackageItemM item
+            return $ MIPackageItem item'
+        traverseModuleItemM other =
+            traverseModuleItemM' other
+        traverseModuleItemM' =
             traverseTypesM traverseTypeM >=>
             traverseExprsM traverseExprM >=>
             traverseLHSsM  traverseLHSM
@@ -147,84 +331,200 @@ prefixPackageItems packageName idents items =
             traverseStmtExprsM traverseExprM >=>
             traverseStmtLHSsM  traverseLHSM
 
-collectDescriptionM :: Description -> Writer Packages ()
-collectDescriptionM (Package _ name items) =
-    if any isImport items
-        then return ()
-        else tell $ Map.singleton name itemList
-    where
-        itemList = concatMap toPackageItems items
-        toPackageItems :: PackageItem -> PackageItems
-        toPackageItems item =
-            case piName item of
-                "" -> []
-                x -> [(x, item)]
-        isImport :: PackageItem -> Bool
-        isImport (Import _ _) = True
-        isImport _ = False
-collectDescriptionM _ = return ()
+-- locate a package by name, processing its contents if necessary
+findPackage :: Identifier -> PackagesState Package
+findPackage packageName = do
+    (stack, packages) <- get
+    let maybePackage = Map.lookup packageName packages
+    assertMsg (maybePackage /= Nothing) $
+        "could not find package " ++ show packageName
+    -- because this conversion doesn't enforce declaration ordering of packages,
+    -- it must check for dependency loops to avoid infinite recursion
+    let first : rest = reverse $ packageName : stack
+    assertMsg (not $ elem packageName stack) $
+        "package dependency loop: " ++ show first ++ " depends on "
+            ++ intercalate ", which depends on " (map show rest)
+    let Just (package @ (exports, _))= maybePackage
+    if Map.null exports
+        then do
+            -- process and resolve this package
+            put (packageName : stack, packages)
+            package' <- processPackage packageName $ snd package
+            packages' <- gets snd
+            put (stack, Map.insert packageName package' packages')
+            return package'
+        else return package
 
-traverseDescription :: Packages -> Description -> [Description]
-traverseDescription packages (PackageItem (Import x y)) =
-    map (\(MIPackageItem item) -> PackageItem item) items
+-- helper for elaborating a package when it is first referenced
+processPackage :: Identifier -> [PackageItem] -> PackagesState Package
+processPackage packageName packageItems = do
+    (exports, moduleItems') <- processItems packageName packageName wrapped
+    let packageItems' = map unwrap moduleItems'
+    let package' = (exports, packageItems')
+    return package'
     where
-        orig = Part [] False Module Inherit "DNE" []
-            [MIPackageItem $ Import x y]
-        [orig'] = traverseDescription packages orig
-        Part [] False Module Inherit "DNE" [] items = orig'
-traverseDescription packages description =
-    [description']
+        wrapped = map wrap packageItems
+        wrap :: PackageItem -> ModuleItem
+        wrap = MIPackageItem
+        unwrap :: ModuleItem -> PackageItem
+        unwrap packageItem = item
+            where MIPackageItem item = packageItem
+
+-- resolve a package scoped identifier to its unique global name
+resolvePSIdent :: Identifier -> Identifier -> PackagesState Identifier
+resolvePSIdent packageName itemName = do
+    rootPkg <- resolveRootPackage packageName itemName
+    return $ rootPkg ++ '_' : itemName
+
+-- determines the root package contained the given package scoped identifier
+resolveRootPackage :: Identifier -> Identifier -> PackagesState Identifier
+resolveRootPackage packageName itemName = do
+    (exports, _) <- findPackage packageName
+    let maybeIdentState = Map.lookup itemName exports
+    assertMsg (maybeIdentState /= Nothing) $
+        "could not find " ++ show itemName ++ " in package " ++ show packageName
+    let Just identState = maybeIdentState
+    return $ toRootPackage packageName identState
+
+-- errors with the given message when the check is false
+assertMsg :: Monad m => Bool -> String -> m ()
+assertMsg check msg = when (not check) $ error msg
+
+-- helper for taking an ident which is either declared or exported form a
+-- package and determine its true root source package
+toRootPackage :: Identifier -> IdentState -> Identifier
+toRootPackage sourcePackage identState =
+    if identState == Declared
+        then sourcePackage
+        else rootPackage
+    where Imported rootPackage = identState
+
+-- nests packages items missing from modules
+convertDescription :: PIs -> Description -> Description
+convertDescription pis (orig @ Part{}) =
+    if Map.null pis
+        then orig
+        else Part attrs extern kw lifetime name ports items'
     where
-        description' = traverseModuleItems
-            (traverseModuleItem existingItemNames packages)
-            description
-        existingItemNames = execWriter $
-            collectModuleItemsM writePIName description
-        writePIName :: ModuleItem -> Writer Idents ()
-        writePIName (MIPackageItem (Import _ (Just x))) =
-            tell $ Set.singleton x
-        writePIName (MIPackageItem item) =
-            case piName item of
-                "" -> return ()
-                x -> tell $ Set.singleton x
-        writePIName _ = return ()
+        Part attrs extern kw lifetime name ports items = orig
+        items' = addItems pis Set.empty (map addUsedPIs items)
+convertDescription _ other = other
 
-traverseModuleItem :: Idents -> Packages -> ModuleItem -> ModuleItem
-traverseModuleItem existingItemNames packages (MIPackageItem (Import x y)) =
-    if Map.member x packages
-        then Generate $ map (GenModuleItem . MIPackageItem) itemsRenamed
-        else MIPackageItem $ Import x y
+-- attempt to fix simple declaration order issues
+reorderItems :: [ModuleItem] -> [ModuleItem]
+reorderItems items =
+    addItems localPIs Set.empty (map addUsedPIs items)
     where
-        packageItems = packages Map.! x
-        namesToAvoid = case y of
-            Nothing -> existingItemNames
-            Just ident -> Set.delete ident existingItemNames
-        itemsRenamed =
-            prefixPackageItems x namesToAvoid
-            (map snd packageItems)
-traverseModuleItem _ _ item =
-    (traverseExprs $ traverseNestedExprs traverseExpr) $
-    (traverseTypes $ traverseNestedTypes traverseType) $
-    item
+        localPIs = Map.fromList $ concat $ mapMaybe toPIElem items
+        toPIElem :: ModuleItem -> Maybe [(Identifier, PackageItem)]
+        toPIElem (MIPackageItem item) = Just $ map (, item) (piNames item)
+        toPIElem _ = Nothing
+
+-- iteratively inserts missing package items exactly where they are needed
+addItems :: PIs -> Idents -> [(ModuleItem, Idents)] -> [ModuleItem]
+addItems pis existingPIs ((item, usedPIs) : items) =
+    if not $ Set.disjoint existingPIs thisPI then
+        -- this item was re-imported earlier in the module
+        addItems pis existingPIs items
+    else if null itemsToAdd then
+        -- this item has no additional dependencies
+        item : addItems pis (Set.union existingPIs thisPI) items
+    else
+        -- this item has at least one un-met dependency
+        addItems pis existingPIs (addUsedPIs chosen : (item, usedPIs) : items)
     where
+        thisPI = case item of
+            MIPackageItem packageItem ->
+                Set.fromList $ piNames packageItem
+            _ -> Set.empty
+        neededPIs = Set.difference (Set.difference usedPIs existingPIs) thisPI
+        itemsToAdd = map MIPackageItem $ Map.elems $
+            Map.restrictKeys pis neededPIs
+        chosen = head itemsToAdd
+addItems _ _ [] = []
 
-        traverseExpr :: Expr -> Expr
-        traverseExpr (PSIdent x y) = Ident $ x ++ "_" ++ y
-        traverseExpr other = other
+-- augment a module item with the set of identifiers it uses
+addUsedPIs :: ModuleItem -> (ModuleItem, Idents)
+addUsedPIs item =
+    (item, usedPIs)
+    where
+        usedPIs = execWriter $
+            traverseNestedModuleItemsM (traverseIdentsM writeIdent) item
+        writeIdent :: Identifier -> Writer Idents Identifier
+        writeIdent x = tell (Set.singleton x) >> return x
 
-        traverseType :: Type -> Type
-        traverseType (PSAlias ps xx rs) = Alias (ps ++ "_" ++ xx) rs
-        traverseType other = other
+-- visits all identifiers in a module item
+traverseIdentsM :: Monad m => MapperM m Identifier -> MapperM m ModuleItem
+traverseIdentsM identMapper = traverseNodesM
+    (traverseExprIdentsM identMapper)
+    (traverseDeclIdentsM identMapper)
+    (traverseTypeIdentsM identMapper)
+    (traverseLHSIdentsM  identMapper)
+    (traverseStmtIdentsM identMapper)
 
--- returns the "name" of a package item, if it has one
-piName :: PackageItem -> Identifier
-piName (Function _ _ ident _ _) = ident
-piName (Task     _   ident _ _) = ident
-piName (Typedef    _ ident    ) = ident
-piName (Decl (Variable _ _ ident _ _)) = ident
-piName (Decl (Param    _ _ ident   _)) = ident
-piName (Decl (ParamType  _ ident   _)) = ident
-piName (Decl (CommentDecl          _)) = ""
-piName (Import  _ _) = ""
-piName (Export    _) = ""
-piName (Directive _) = ""
+-- visits all identifiers in an expression
+traverseExprIdentsM :: Monad m => MapperM m Identifier -> MapperM m Expr
+traverseExprIdentsM identMapper = fullMapper
+    where
+        fullMapper = exprMapper >=> traverseSinglyNestedExprsM fullMapper
+        exprMapper (Call (Ident x) args) =
+            identMapper x >>= \x' -> return $ Call (Ident x') args
+        exprMapper (Ident x) = identMapper x >>= return . Ident
+        exprMapper other = return other
+
+-- visits all identifiers in a type
+traverseTypeIdentsM :: Monad m => MapperM m Identifier -> MapperM m Type
+traverseTypeIdentsM identMapper = fullMapper
+    where
+        fullMapper = typeMapper
+            >=> traverseTypeExprsM (traverseExprIdentsM identMapper)
+            >=> traverseSinglyNestedTypesM fullMapper
+        typeMapper (Alias       x t) = aliasHelper (Alias      ) x t
+        typeMapper (PSAlias p   x t) = aliasHelper (PSAlias p  ) x t
+        typeMapper (CSAlias c p x t) = aliasHelper (CSAlias c p) x t
+        typeMapper other = return other
+        aliasHelper constructor x t =
+            identMapper x >>= \x' -> return $ constructor x' t
+
+-- visits all identifiers in an LHS
+traverseLHSIdentsM :: Monad m => MapperM m Identifier -> MapperM m LHS
+traverseLHSIdentsM identMapper = fullMapper
+    where
+        fullMapper = lhsMapper
+            >=> traverseLHSExprsM (traverseExprIdentsM identMapper)
+            >=> traverseSinglyNestedLHSsM fullMapper
+        lhsMapper (LHSIdent x) = identMapper x >>= return . LHSIdent
+        lhsMapper other = return other
+
+-- visits all identifiers in a statement
+traverseStmtIdentsM :: Monad m => MapperM m Identifier -> MapperM m Stmt
+traverseStmtIdentsM identMapper = fullMapper
+    where
+        fullMapper = stmtMapper
+            >=> traverseStmtExprsM (traverseExprIdentsM identMapper)
+            >=> traverseStmtLHSsM  (traverseLHSIdentsM  identMapper)
+            >=> traverseSinglyNestedStmtsM fullMapper
+        stmtMapper (Subroutine (Ident x) args) =
+            identMapper x >>= \x' -> return $ Subroutine (Ident x') args
+        stmtMapper other = return other
+
+-- visits all identifiers in a declaration
+traverseDeclIdentsM :: Monad m => MapperM m Identifier -> MapperM m Decl
+traverseDeclIdentsM identMapper =
+    traverseDeclExprsM (traverseExprIdentsM identMapper) >=>
+    traverseDeclTypesM (traverseTypeIdentsM identMapper)
+
+-- returns any names defined by a package item
+piNames :: PackageItem -> [Identifier]
+piNames (Function _ _ ident _ _) = [ident]
+piNames (Task     _   ident _ _) = [ident]
+piNames (Decl (Variable _ _ ident _ _)) = [ident]
+piNames (Decl (Param    _ _ ident   _)) = [ident]
+piNames (Decl (ParamType  _ ident   _)) = [ident]
+piNames (Decl (CommentDecl          _)) = []
+piNames (Import x y) = [show $ Import x y]
+piNames (Export x y) = [show $ Export x y]
+piNames (Directive _) = []
+piNames (Typedef (Enum _ enumItems _) ident) =
+    ident : map fst enumItems
+piNames (Typedef _ ident) = [ident]

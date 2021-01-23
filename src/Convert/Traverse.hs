@@ -613,8 +613,8 @@ traverseNodesM exprMapper declMapper typeMapper lhsMapper stmtMapper =
         return $ MIPackageItem $ Directive c
     moduleItemMapper (MIPackageItem (Import x y)) =
         return $ MIPackageItem $ Import x y
-    moduleItemMapper (MIPackageItem (Export x)) =
-        return $ MIPackageItem $ Export x
+    moduleItemMapper (MIPackageItem (Export x y)) =
+        return $ MIPackageItem $ Export x y
     moduleItemMapper (AssertionItem (mx, a)) = do
         a' <- traverseAssertionStmtsM stmtMapper a
         a'' <- traverseAssertionExprsM exprMapper a'
@@ -864,6 +864,11 @@ traverseTypeExprsM exprMapper =
             let pm' = zip (map fst pm) vals'
             rs' <- mapM (mapBothM exprMapper) rs
             return $ CSAlias ps pm' xx rs'
+        typeMapper (Enum t enumItems rs) = do
+            enumItems' <- mapM enumItemMapper enumItems
+            rs' <- mapM (mapBothM exprMapper) rs
+            return $ Enum t enumItems' rs'
+            where enumItemMapper (x, e) = exprMapper e >>= \e' -> return (x, e')
         typeMapper t = do
             let (tf, rs) = typeRanges t
             rs' <- mapM (mapBothM exprMapper) rs

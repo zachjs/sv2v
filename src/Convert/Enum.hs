@@ -3,10 +3,11 @@
  -
  - Conversion for `enum`
  -
- - This conversion replaces the enum items with localparams declared at the
- - global scope. We leave it to the package item nesting conversion to determine
- - where the generated localparams are needed. The localparams are explicitly
- - sized to match the size of the converted enum type.
+ - This conversion replaces the enum items with localparams. The localparams are
+ - explicitly sized to match the size of the converted enum type. For packages
+ - and enums used in the global scope, these localparams are inserted in place.
+ - For enums used within a module or interface, the localparams are injected as
+ - needed using a nesting procedure from the package conversion.
  -
  - SystemVerilog allows for enums to have any number of the items' values
  - specified or unspecified. If the first one is unspecified, it is 0. All other
@@ -24,6 +25,7 @@ import Data.List (elemIndices)
 import qualified Data.Set as Set
 
 import Convert.ExprUtils
+import Convert.Package (inject)
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
@@ -36,9 +38,14 @@ convert = map $ concatMap convertDescription
 convertDescription :: Description -> [Description]
 convertDescription (Package ml name items) =
     [Package ml name $ concatMap convertPackageItem items]
-convertDescription description =
-    (map PackageItem enumItems) ++ [description']
-    where (description', enumItems) = convertDescription' description
+convertDescription (description @ Part{}) =
+    [Part attrs extern kw lifetime name ports items']
+    where
+        items' = inject enumItems items -- only keep what's used
+        Part attrs extern kw lifetime name ports items = description'
+        (description', enumItems) = convertDescription' description
+convertDescription (PackageItem item) =
+    map PackageItem $ convertPackageItem item
 
 -- explode a package item with its corresponding enum items
 convertPackageItem :: PackageItem -> [PackageItem]

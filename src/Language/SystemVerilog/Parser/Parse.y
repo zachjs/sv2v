@@ -843,8 +843,8 @@ NonDeclPackageItem :: { [PackageItem] }
   | "function" Lifetime "void" Identifier TFItems DeclsAndStmts "endfunction" opt(Tag) { [Task     $2 $4                (map defaultFuncInput $ $5 ++ fst $6) (snd $6)] }
   | "task"     Lifetime Identifier        TFItems DeclsAndStmts "endtask"     opt(Tag) { [Task     $2 $3                (map defaultFuncInput $ $4 ++ fst $5) (snd $5)] }
   | "import" PackageImportItems ";" { map (uncurry Import) $2 }
-  | "export" PackageImportItems ";" { map (Export .  Just) $2 }
-  | "export" "*" "::" "*" ";"       { [Export Nothing] } -- "Nothing" being no restrictions
+  | "export" PackageImportItems ";" { map (uncurry Export) $2 }
+  | "export" "*" "::" "*" ";"       { [Export "" ""] }
   | ForwardTypedef ";"              { $1 }
   | TimeunitsDeclaration            { $1 }
   | Directive                       { [Directive $1] }
@@ -872,12 +872,12 @@ DefaultNetType :: { String }
   : NetType { show $1 }
   | Identifier { $1 }
 
-PackageImportItems :: { [(Identifier, Maybe Identifier)] }
+PackageImportItems :: { [(Identifier, Identifier)] }
   : PackageImportItem                        { [$1] }
   | PackageImportItems "," PackageImportItem { $1 ++ [$3] }
-PackageImportItem :: { (Identifier, Maybe Identifier) }
-  : Identifier "::" Identifier { ($1, Just $3) }
-  | Identifier "::" "*"        { ($1, Nothing) }
+PackageImportItem :: { (Identifier, Identifier) }
+  : Identifier "::" Identifier { ($1, $3) }
+  | Identifier "::" "*"        { ($1, "") }
 
 FuncRetAndName :: { (Type, Identifier) }
   : Type                       Identifier { ($1                     , $2) }
@@ -987,6 +987,8 @@ StmtAsgn :: { Stmt }
   | IncOrDecOperator LHS ";" { Asgn (AsgnOp $1) Nothing $2 (RawNum 1) }
   | LHS          ";" { Subroutine (lhsToExpr $1) (Args [] []) }
   | LHS CallArgs ";" { Subroutine (lhsToExpr $1) $2 }
+  | Identifier "::" Identifier          ";" { Subroutine (PSIdent $1 $3) (Args [] []) }
+  | Identifier "::" Identifier CallArgs ";" { Subroutine (PSIdent $1 $3) $4 }
 StmtNonAsgn :: { Stmt }
   : StmtBlock(BlockKWSeq, "end" ) { $1 }
   | StmtBlock(BlockKWPar, "join") { $1 }

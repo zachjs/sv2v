@@ -81,7 +81,6 @@ executable sv2v
     Convert.LogOp
     Convert.MultiplePacked
     Convert.NamedBlock
-    Convert.NestPI
     Convert.Package
     Convert.ParamNoDefault
     Convert.ParamType

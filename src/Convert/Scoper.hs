@@ -27,6 +27,7 @@ module Convert.Scoper
     , ScoperT
     , evalScoper
     , evalScoperT
+    , runScoperT
     , partScoper
     , partScoperT
     , insertElem
@@ -36,9 +37,12 @@ module Convert.Scoper
     , Access(..)
     , ScopeKey
     , Scopes
+    , extractMapping
     , embedScopes
     , withinProcedure
     , withinProcedureM
+    , lookupLocalIdent
+    , lookupLocalIdentM
     , scopeModuleItemT
     , Replacements
     ) where
@@ -81,6 +85,12 @@ data Scopes a = Scopes
     , sProcedure :: Bool
     , sInjected :: [ModuleItem]
     } deriving Show
+
+extractMapping :: Scopes a -> Map.Map Identifier a
+extractMapping =
+    Map.mapMaybe eElement .
+    eMapping . snd .
+    Map.findMin . sMapping
 
 embedScopes :: Monad m => (Scopes a -> b -> c) -> b -> ScoperT a m c
 embedScopes func x = do
@@ -142,13 +152,26 @@ exprToAccesses (Dot e x) = do
     Just $ accesses ++ [Access x Nil]
 exprToAccesses _ = Nothing
 
-insertElem :: Monad m => Identifier -> a -> ScoperT a m ()
-insertElem name element = do
+class ScopePath k where
+    toTiers :: Scopes a -> k -> [Tier]
+
+instance ScopePath Identifier where
+    toTiers scopes name = sCurrent scopes ++ [Tier name ""]
+
+instance ScopePath [Access] where
+    toTiers _ = map toTier
+        where
+            toTier :: Access -> Tier
+            toTier (Access x Nil) = Tier x ""
+            toTier (Access x iy) = Tier x y
+                where Ident y = iy
+
+insertElem :: Monad m => ScopePath k => k -> a -> ScoperT a m ()
+insertElem key element = do
     s <- get
-    let current = sCurrent s
     let mapping = sMapping s
     let entry = Entry (Just element) "" Map.empty
-    let mapping' = setScope (current ++ [Tier name ""]) entry mapping
+    let mapping' = setScope (toTiers s key) entry mapping
     put $ s { sMapping = mapping' }
 
 injectItem :: Monad m => ModuleItem -> ScoperT a m ()
@@ -218,6 +241,19 @@ lookupAccesses scopes accesses = do
     let side = resolveInScope (sMapping scopes) [] accesses
     if isNothing deep then side else deep
 
+lookupLocalIdent :: Scopes a -> Identifier -> LookupResult a
+lookupLocalIdent scopes ident = do
+    (replacements, element) <- directResolve (sMapping scopes) accesses
+    Just (accesses, replacements, element)
+    where
+        accesses = map toAccess (sCurrent scopes) ++ [Access ident Nil]
+        toAccess :: Tier -> Access
+        toAccess (Tier x "") = Access x Nil
+        toAccess (Tier x y) = Access x (Ident y)
+
+lookupLocalIdentM :: Monad m => Identifier -> ScoperT a m (LookupResult a)
+lookupLocalIdentM = embedScopes lookupLocalIdent
+
 withinProcedureM :: Monad m => ScoperT a m Bool
 withinProcedureM = gets sProcedure
 
@@ -245,8 +281,23 @@ evalScoperT
     -> Identifier
     -> [ModuleItem]
     -> m [ModuleItem]
-evalScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items =
-    evalStateT operation initialState
+evalScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items = do
+    (items', _) <- runScoperT
+        declMapper moduleItemMapper genItemMapper stmtMapper
+        topName items
+    return items'
+
+runScoperT
+    :: forall a m. Monad m
+    => MapperM (ScoperT a m) Decl
+    -> MapperM (ScoperT a m) ModuleItem
+    -> MapperM (ScoperT a m) GenItem
+    -> MapperM (ScoperT a m) Stmt
+    -> Identifier
+    -> [ModuleItem]
+    -> m ([ModuleItem], Scopes a)
+runScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items =
+    runStateT operation initialState
     where
         operation :: ScoperT a m [ModuleItem]
         operation = do
