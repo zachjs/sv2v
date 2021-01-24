@@ -442,10 +442,36 @@ addUsedPIs :: ModuleItem -> (ModuleItem, Idents)
 addUsedPIs item =
     (item, usedPIs)
     where
-        usedPIs = execWriter $
-            traverseNestedModuleItemsM (traverseIdentsM writeIdent) item
-        writeIdent :: Identifier -> Writer Idents Identifier
-        writeIdent x = tell (Set.singleton x) >> return x
+        usedPIs = execWriter $ evalScoperT
+            writeDeclIdents writeModuleItemIdents writeGenItemIdents writeStmtIdents
+            "" [item]
+
+type IdentWriter = ScoperT () (Writer Idents)
+
+writeDeclIdents :: Decl -> IdentWriter Decl
+writeDeclIdents decl = do
+    case decl of
+        Variable _ _ x _ _ -> insertElem x ()
+        Param    _ _ x   _ -> insertElem x ()
+        ParamType  _ x   _ -> insertElem x ()
+        CommentDecl{} -> return ()
+    traverseDeclIdentsM writeIdent decl
+
+writeModuleItemIdents :: ModuleItem -> IdentWriter ModuleItem
+writeModuleItemIdents = traverseIdentsM writeIdent
+
+writeGenItemIdents :: GenItem -> IdentWriter GenItem
+writeGenItemIdents =
+    traverseGenItemExprsM $ traverseExprIdentsM writeIdent
+
+writeStmtIdents :: Stmt -> IdentWriter Stmt
+writeStmtIdents = traverseStmtIdentsM writeIdent
+
+writeIdent :: Identifier -> IdentWriter Identifier
+writeIdent x = do
+    details <- lookupElemM x
+    when (details == Nothing) $ tell (Set.singleton x)
+    return x
 
 -- visits all identifiers in a module item
 traverseIdentsM :: Monad m => MapperM m Identifier -> MapperM m ModuleItem

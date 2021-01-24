@@ -27,7 +27,7 @@ traverseDeclM :: Decl -> Scoper Type Decl
 traverseDeclM decl = do
     decl' <- case decl of
         Variable _ t x _ _ -> do
-            details <- lookupElemM x
+            details <- lookupLocalIdentM x
             if isPrefixOf "sv2v_cast_" x && details /= Nothing
                 then return $ Variable Local t DuplicateTag [] Nil
                 else insertElem x t >> return decl
@@ -122,7 +122,7 @@ traverseExprM =
             return $ Number $ Decimal (fromIntegral size) True val'
             where val' = val `mod` (2 ^ size)
         convertCastWithSigningM s e sg = do
-            details <- lookupElemM $ castFnName s sg
+            details <- lookupLocalIdentM $ castFnName s sg
             when (details == Nothing) $ injectItem $ MIPackageItem $ castFn s sg
             let f = castFnName s sg
             let args = Args [e] []

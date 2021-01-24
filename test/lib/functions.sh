@@ -51,13 +51,8 @@ assertConverts() {
     ac_tmpb=$SHUNIT_TMPDIR/ac-conv-tmpb.v
     $SV2V $ac_tmpa 2> /dev/null > $ac_tmpb
     assertTrue "2nd conversion of $ac_file failed" $?
-    if [ -n "$(diff $ac_tmpa $ac_tmpb)" ]; then
-        ac_tmpc=$SHUNIT_TMPDIR/ac-conv-tmpc.v
-        $SV2V $ac_tmpb 2> /dev/null > $ac_tmpc
-        assertTrue "3rd conversion of $ac_file failed" $?
-        diff $ac_tmpb $ac_tmpc > /dev/null
-        assertTrue "conversion of $ac_file not stable after the second iteration" $?
-    fi
+    diff $ac_tmpa $ac_tmpb > /dev/null
+    assertTrue "conversion of $ac_file not stable after the first iteration" $?
     $SV2V -v $ac_file 2> /dev/null > /dev/null
     assertTrue "verbose conversion of $ac_file failed" $?
     # using sed to remove quoted strings
