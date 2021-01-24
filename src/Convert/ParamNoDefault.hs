@@ -55,12 +55,12 @@ traverseDeclM (Param Parameter t x e) = do
     return $ if e == Nil
         then Param Parameter t x $ RawNum 0
         else Param Parameter t x e
-traverseDeclM (ParamType Localparam x Nothing) =
+traverseDeclM (ParamType Localparam x UnknownType) =
     error $ "localparam type " ++ show x ++ " has no default value"
-traverseDeclM (ParamType Parameter x mt) = do
+traverseDeclM (ParamType Parameter x t) = do
     -- parameter types are rewritten separately, so no fake default here
-    tell [(x, mt == Nothing)]
-    return $ ParamType Parameter x mt
+    tell [(x, t == UnknownType)]
+    return $ ParamType Parameter x t
 traverseDeclM other = return other
 
 -- check for instances missing values for parameters without defaults

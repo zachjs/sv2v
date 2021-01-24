@@ -116,7 +116,7 @@ convert files =
                     traverseModuleItems (traverseDecls rewriteDecl) part
                 rewriteDecl :: Decl -> Decl
                 rewriteDecl (ParamType Parameter x _) =
-                    ParamType Parameter x Nothing
+                    ParamType Parameter x UnknownType
                 rewriteDecl other = other
         removeDefaultTypeParams _ = error "not possible"
 
@@ -152,7 +152,7 @@ convert files =
                 items' = map (traverseDecls rewriteDecl) items
                 rewriteDecl :: Decl -> Decl
                 rewriteDecl (ParamType Parameter x _) =
-                    ParamType Localparam x (Just $ fst $ typeMap Map.! x)
+                    ParamType Localparam x (fst $ typeMap Map.! x)
                 rewriteDecl other = other
                 additionalParamItems = concatMap makeAddedParams $
                     Map.toList $ Map.map snd typeMap
@@ -170,7 +170,7 @@ convert files =
                         typ = Alias (addedParamTypeName paramName ident) []
                         name = addedParamName paramName ident
                 toTypeParam :: Identifier -> Decl
-                toTypeParam ident = ParamType Parameter name Nothing
+                toTypeParam ident = ParamType Parameter name UnknownType
                     where name = addedParamTypeName paramName ident
 
 -- write down module parameter names and type parameters
@@ -184,9 +184,13 @@ collectDescriptionM (part @ (Part _ _ _ _ name _ _)) =
         maybeTypeMap = Map.fromList $
             map (\(x, y) -> (x, fromJust y)) $
             filter (isJust . snd) params
+            --- TODO FIXME XXX
         collectDeclM :: Decl -> Writer [(Identifier, Maybe (Maybe Type))] ()
         collectDeclM (Param   Parameter _ x _) = tell [(x, Nothing)]
-        collectDeclM (ParamType Parameter x v) = tell [(x, Just v )]
+        collectDeclM (ParamType Parameter x v) =
+            if v == UnknownType
+                then tell [(x, Just Nothing)]
+                else tell [(x, Just $ Just v)]
         collectDeclM _ = return ()
 collectDescriptionM _ = return ()
 

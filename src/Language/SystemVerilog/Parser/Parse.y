@@ -1077,12 +1077,12 @@ ParameterDeclKW :: { ParamScope }
   : "parameter"  { Parameter  }
   | "localparam" { Localparam }
 
-TypeAsgns :: { [(Identifier, Maybe Type)] }
+TypeAsgns :: { [(Identifier, Type)] }
   : TypeAsgn               { [$1] }
   | TypeAsgns "," TypeAsgn { $1 ++ [$3] }
-TypeAsgn :: { (Identifier, Maybe Type) }
-  : Identifier "=" Type { ($1, Just $3) }
-  | Identifier          { ($1, Nothing) }
+TypeAsgn :: { (Identifier, Type) }
+  : Identifier "=" Type { ($1, $3) }
+  | Identifier          { ($1, UnknownType) }
 
 -- TODO: This does not allow for @identifier
 ClockingEvent :: { Sense }
@@ -1476,7 +1476,7 @@ validateGenCases items =
 
 makeLocalparam :: Decl -> Decl
 makeLocalparam (Param _ t x e) = Param Localparam t x e
-makeLocalparam (ParamType _ x mt) = ParamType Localparam x mt
+makeLocalparam (ParamType _ x t) = ParamType Localparam x t
 makeLocalparam other = other
 
 }

@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
@@ -51,9 +50,6 @@ parameterNames =
         collectDeclM (Param Parameter   _ x _) = tell [x]
         collectDeclM (ParamType Parameter x _) = tell [x]
         collectDeclM _ = return ()
-
-pattern UnknownType :: Type
-pattern UnknownType = Implicit Unspecified []
 
 -- rewrite an existing string parameter
 traverseModuleItemM :: ModuleItem -> Writer [Identifier] ModuleItem

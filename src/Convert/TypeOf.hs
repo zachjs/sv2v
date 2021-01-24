@@ -27,10 +27,6 @@ convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions $ partScoper
     traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
 
--- internal representation of a fully implicit type
-pattern UnknownType :: Type
-pattern UnknownType = Implicit Unspecified []
-
 -- single bit 4-state `logic` type
 pattern UnitType :: Type
 pattern UnitType = IntegerVector TLogic Unspecified []

@@ -913,9 +913,9 @@ traverseDeclExprsM exprMapper =
             t' <- typeMapper t
             e' <- exprMapper e
             return $ Param s t' x e'
-        declMapper (ParamType s x mt) = do
-            mt' <- mapM typeMapper mt
-            return $ ParamType s x mt'
+        declMapper (ParamType s x t) = do
+            t' <- typeMapper t
+            return $ ParamType s x t'
         declMapper (Variable d t x a e) = do
             t' <- typeMapper t
             a' <- mapM (mapBothM exprMapper) a
@@ -932,8 +932,8 @@ collectDeclExprsM = collectify traverseDeclExprsM
 traverseDeclTypesM :: Monad m => MapperM m Type -> MapperM m Decl
 traverseDeclTypesM mapper (Param s t x e) =
     mapper t >>= \t' -> return $ Param s t' x e
-traverseDeclTypesM mapper (ParamType s x mt) =
-    mapM mapper mt >>= \mt' -> return $ ParamType s x mt'
+traverseDeclTypesM mapper (ParamType s x t) =
+    mapper t >>= \t' -> return $ ParamType s x t'
 traverseDeclTypesM mapper (Variable d t x a e) =
     mapper t >>= \t' -> return $ Variable d t' x a e
 traverseDeclTypesM _ (CommentDecl c) = return $ CommentDecl c

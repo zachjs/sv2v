@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  - Initial Verilog AST Author: Tom Hawkins <tomahawkins@gmail.com>
@@ -16,12 +17,12 @@ module Language.SystemVerilog.AST.Decl
 import Text.Printf (printf)
 
 import Language.SystemVerilog.AST.ShowHelp (showPad, unlines')
-import Language.SystemVerilog.AST.Type (Type, Identifier)
+import Language.SystemVerilog.AST.Type (Type, Identifier, pattern UnknownType)
 import Language.SystemVerilog.AST.Expr (Expr, Range, showRanges, showAssignment)
 
 data Decl
     = Param     ParamScope Type Identifier Expr
-    | ParamType ParamScope Identifier (Maybe Type)
+    | ParamType ParamScope Identifier Type
     | Variable   Direction Type Identifier [Range] Expr
     | CommentDecl String
     deriving (Eq, Ord)
@@ -29,8 +30,8 @@ data Decl
 instance Show Decl where
     showList l _ = unlines' $ map show l
     show (Param s t x e) = printf "%s %s%s%s;" (show s) (showPad t) x (showAssignment e)
-    show (ParamType s x mt) = printf "%s type %s%s;" (show s) x tStr
-        where tStr = maybe "" ((" = " ++) . show) mt
+    show (ParamType s x t) = printf "%s type %s%s;" (show s) x tStr
+        where tStr = if t == UnknownType then "" else  " = " ++ show t
     show (Variable d t x a e) = printf "%s%s%s%s%s;" (showPad d) (showPad t) x (showRanges a) (showAssignment e)
     show (CommentDecl c) =
         if elem '\n' c

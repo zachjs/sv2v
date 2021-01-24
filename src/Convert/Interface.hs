@@ -490,7 +490,7 @@ inlineInstance ranges modportBindings items
         parameterBinds = map makeParameterBind instanceParams
         makeParameterBind :: ParamBinding -> Decl
         makeParameterBind (x, Left t) =
-            ParamType Localparam (paramTmp ++ x) (Just t)
+            ParamType Localparam (paramTmp ++ x) t
         makeParameterBind (x, Right e) =
             Param Localparam (TypeOf e) (paramTmp ++ x) e
 
@@ -501,11 +501,11 @@ inlineInstance ranges modportBindings items
                 Just (Right _) -> Param Localparam t x (Ident $ paramTmp ++ x)
                 Just (Left t') -> error $ inlineKind ++ " param " ++ x
                         ++ " expected expr, found type: " ++ show t'
-        overrideParam (ParamType Parameter x mt) =
+        overrideParam (ParamType Parameter x t) =
             case lookup x instanceParams of
-                Nothing -> ParamType Localparam x mt
+                Nothing -> ParamType Localparam x t
                 Just (Left _) ->
-                    ParamType Localparam x (Just $ Alias (paramTmp ++ x) [])
+                    ParamType Localparam x $ Alias (paramTmp ++ x) []
                 Just (Right e') -> error $ inlineKind ++ " param " ++ x
                         ++ " expected type, found expr: " ++ show e'
         overrideParam other = other

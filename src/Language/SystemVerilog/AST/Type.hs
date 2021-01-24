@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE PatternSynonyms #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  - Initial Verilog AST Author: Tom Hawkins <tomahawkins@gmail.com>
@@ -21,6 +22,7 @@ module Language.SystemVerilog.AST.Type
     , Strength0          (..)
     , Strength1          (..)
     , ChargeStrength     (..)
+    , pattern UnknownType
     , typeRanges
     , nullRange
     , elaborateIntegerAtom
@@ -79,6 +81,10 @@ showFields items = itemsStr
     where
         itemsStr = indent $ unlines' $ map showItem items
         showItem (t, x) = printf "%s %s;" (show t) x
+
+-- internal representation of a fully implicit or unknown type
+pattern UnknownType :: Type
+pattern UnknownType = Implicit Unspecified []
 
 instance Show ([Range] -> Type) where
     show tf = show (tf [])
