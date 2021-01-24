@@ -267,12 +267,6 @@ processItems topName packageName moduleItems = do
                         ++ intercalate ", " rootPkgs
 
         traversePackageItemM :: PackageItem -> Scope PackageItem
-        -- TODO: fold this in with type parameters
-        traversePackageItemM (Typedef t x) = do
-            t' <- traverseTypeM t
-            x' <- prefixIdent x
-            t'' <- traverseNestedTypesM (traverseTypeExprsM traverseExprM) t'
-            return $ Typedef t'' x'
         traversePackageItemM (orig @ (Import pkg ident)) = do
             if null ident
                 then wildcardImports pkg
@@ -516,6 +510,8 @@ traverseDeclIdentsM identMapper =
 
 -- returns any names defined by a package item
 piNames :: PackageItem -> [Identifier]
+piNames (Decl (ParamType _ ident (Enum _ enumItems _))) =
+    ident : map fst enumItems
 piNames (Function _ _ ident _ _) = [ident]
 piNames (Task     _   ident _ _) = [ident]
 piNames (Decl (Variable _ _ ident _ _)) = [ident]
@@ -525,6 +521,3 @@ piNames (Decl (CommentDecl          _)) = []
 piNames (Import x y) = [show $ Import x y]
 piNames (Export x y) = [show $ Export x y]
 piNames (Directive _) = []
-piNames (Typedef (Enum _ enumItems _) ident) =
-    ident : map fst enumItems
-piNames (Typedef _ ident) = [ident]

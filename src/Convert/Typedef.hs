@@ -45,10 +45,6 @@ traverseExprM (DimFn f v e) = do
 traverseExprM other = return other
 
 traverseModuleItemM :: ModuleItem -> Scoper Type ModuleItem
-traverseModuleItemM (MIPackageItem (Typedef t x)) = do
-    t' <- traverseNestedTypesM traverseTypeM t
-    insertElem x t'
-    return $ Generate []
 traverseModuleItemM (Instance m params x rs p) = do
     let mapParam (i, v) = traverseTypeOrExprM v >>= \v' -> return (i, v')
     params' <- mapM mapParam params

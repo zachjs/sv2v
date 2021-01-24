@@ -52,8 +52,7 @@ instance Show Description where
     show (PackageItem i) = show i
 
 data PackageItem
-    = Typedef Type Identifier
-    | Function Lifetime Type Identifier [Decl] [Stmt]
+    = Function Lifetime Type Identifier [Decl] [Stmt]
     | Task     Lifetime      Identifier [Decl] [Stmt]
     | Import Identifier Identifier
     | Export Identifier Identifier
@@ -62,7 +61,6 @@ data PackageItem
     deriving Eq
 
 instance Show PackageItem where
-    show (Typedef t x) = printf "typedef %s %s;" (show t) x
     show (Function ml t x i b) =
         printf "function %s%s%s;\n%s\nendfunction" (showPad ml) (showPad t) x
         (showBlock i b)

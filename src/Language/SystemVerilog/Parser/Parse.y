@@ -837,8 +837,8 @@ PackageItem :: { [PackageItem] }
   | ParameterDecl(";") { map (Decl . makeLocalparam) $1 }
   | NonDeclPackageItem { $1 }
 NonDeclPackageItem :: { [PackageItem] }
-  : "typedef" Type Identifier ";" { [Typedef $2 $3] }
-  | "typedef" Type Identifier DimensionsNonEmpty ";" { [Typedef (UnpackedType $2 $4) $3] }
+  : "typedef" Type Identifier ";" { [Decl $ ParamType Localparam $3 $2] }
+  | "typedef" Type Identifier DimensionsNonEmpty ";" { [Decl $ ParamType Localparam $3 (UnpackedType $2 $4)] }
   | "function" Lifetime FuncRetAndName    TFItems DeclsAndStmts "endfunction" opt(Tag) { [Function $2 (fst $3) (snd $3) (map defaultFuncInput $ (map makeInput $4) ++ fst $5) (snd $5)] }
   | "function" Lifetime "void" Identifier TFItems DeclsAndStmts "endfunction" opt(Tag) { [Task     $2 $4                (map defaultFuncInput $ $5 ++ fst $6) (snd $6)] }
   | "task"     Lifetime Identifier        TFItems DeclsAndStmts "endtask"     opt(Tag) { [Task     $2 $3                (map defaultFuncInput $ $4 ++ fst $5) (snd $5)] }

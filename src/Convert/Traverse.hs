@@ -555,9 +555,6 @@ traverseNodesM exprMapper declMapper typeMapper lhsMapper stmtMapper =
     moduleItemMapper (MIAttr attr mi) =
         -- note: we exclude expressions in attributes from conversion
         return $ MIAttr attr mi
-    moduleItemMapper (MIPackageItem (Typedef t x)) = do
-        t' <- typeMapper t
-        return $ MIPackageItem $ Typedef t' x
     moduleItemMapper (MIPackageItem (Decl decl)) =
         declMapper decl >>= return . MIPackageItem . Decl
     moduleItemMapper (Defparam lhs expr) = do
@@ -951,8 +948,6 @@ traverseTypesM' strategy mapper =
     where
         exprMapper = traverseExprTypesM mapper
         declMapper = traverseDeclTypesM mapper
-        miMapper (MIPackageItem (Typedef t x)) =
-            mapper t >>= \t' -> return $ MIPackageItem $ Typedef t' x
         miMapper (MIPackageItem (Function l t x d s)) =
             mapper t >>= \t' -> return $ MIPackageItem $ Function l t' x d s
         miMapper (MIPackageItem (other @ (Task _ _ _ _))) =
