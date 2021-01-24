@@ -41,9 +41,10 @@ traverseDeclM decl = do
     item <- traverseModuleItemM (MIPackageItem $ Decl decl)
     let MIPackageItem (Decl decl') = item
     case decl' of
-        Variable Local UnknownType ident [] Nil -> do
-            -- functions with no return type implicitly return a single bit
-            insertElem ident UnitType
+        Variable Local (Implicit sg rs) ident [] Nil -> do
+            -- implicit types, which are commonly found in function return
+            -- types, are recast as logics to avoid outputting bare ranges
+            insertElem ident $ IntegerVector TLogic sg rs
             return decl'
         Variable d t ident a e -> do
             let t' = injectRanges t a
