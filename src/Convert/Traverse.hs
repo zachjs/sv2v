@@ -978,9 +978,8 @@ collectTypesM = collectTypesM' IncludeParamTypes
 traverseGenItemsM :: Monad m => MapperM m GenItem -> MapperM m ModuleItem
 traverseGenItemsM mapper = moduleItemMapper
     where
-        fullMapper = traverseNestedGenItemsM mapper
         moduleItemMapper (Generate genItems) =
-            mapM fullMapper genItems >>= return . Generate
+            mapM mapper genItems >>= return . Generate
         moduleItemMapper other = return other
 
 traverseGenItems :: Mapper GenItem -> Mapper ModuleItem

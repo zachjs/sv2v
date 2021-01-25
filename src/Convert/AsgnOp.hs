@@ -14,8 +14,8 @@ import Language.SystemVerilog.AST
 convert :: [AST] -> [AST]
 convert =
     map $ traverseDescriptions $ traverseModuleItems $
-    ( traverseStmts    convertStmt
-    . traverseGenItems convertGenItem
+    ( traverseStmts convertStmt
+    . traverseGenItems (traverseNestedGenItems convertGenItem)
     )
 
 convertGenItem :: GenItem -> GenItem

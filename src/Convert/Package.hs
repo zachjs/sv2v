@@ -407,12 +407,26 @@ convertDescription _ other = other
 -- attempt to fix simple declaration order issues
 reorderItems :: [ModuleItem] -> [ModuleItem]
 reorderItems items =
-    addItems localPIs Set.empty (map addUsedPIs items)
+    addItems localPIs Set.empty $ map addUsedPIs $
+        map (traverseGenItems $ traverseNestedGenItems reorderGenItem) items
     where
         localPIs = Map.fromList $ concat $ mapMaybe toPIElem items
         toPIElem :: ModuleItem -> Maybe [(Identifier, PackageItem)]
         toPIElem (MIPackageItem item) = Just $ map (, item) (piNames item)
         toPIElem _ = Nothing
+
+-- attempt to declaration order issues within generate blocks
+reorderGenItem :: GenItem -> GenItem
+reorderGenItem (GenBlock name genItems) =
+    GenBlock name $ map unwrap $ reorderItems $ map wrap genItems
+    where
+        wrap :: GenItem -> ModuleItem
+        wrap (GenModuleItem item) = item
+        wrap item = Generate [item]
+        unwrap :: ModuleItem -> GenItem
+        unwrap (Generate [item]) = item
+        unwrap item = GenModuleItem item
+reorderGenItem item = item
 
 -- iteratively inserts missing package items exactly where they are needed
 addItems :: PIs -> Idents -> [(ModuleItem, Idents)] -> [ModuleItem]
@@ -523,7 +537,6 @@ traverseStmtIdentsM identMapper = fullMapper
         fullMapper = stmtMapper
             >=> traverseStmtExprsM (traverseExprIdentsM identMapper)
             >=> traverseStmtLHSsM  (traverseLHSIdentsM  identMapper)
-            >=> traverseSinglyNestedStmtsM fullMapper
         stmtMapper (Subroutine (Ident x) args) =
             identMapper x >>= \x' -> return $ Subroutine (Ident x') args
         stmtMapper other = return other
