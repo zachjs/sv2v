@@ -38,7 +38,7 @@ instance Show GenItem where
         printf "case (%s)\n%s\nendcase" (show e) bodyStr
         where bodyStr = indent $ unlines' $ map showGenCase cs
     show (GenIf e a GenNull) = printf "if (%s) %s"          (show e) (show a)
-    show (GenIf e a b      ) = printf "if (%s) %s\nelse %s" (show e) (show a) (show b)
+    show (GenIf e a b      ) = printf "if (%s) %s\nelse %s" (show e) (showBlockedBranch a) (show b)
     show (GenFor (x1, e1) c (x2, o2, e2) s) =
         printf "for (%s = %s; %s; %s %s %s) %s"
             x1 (show e1)
@@ -47,6 +47,20 @@ instance Show GenItem where
             (if s == GenNull then "begin end" else show s)
     show (GenNull) = ";"
     show (GenModuleItem item) = show item
+
+showBlockedBranch :: GenItem -> String
+showBlockedBranch genItem =
+    show $
+    if isControl genItem
+        then GenBlock "" [genItem]
+        else genItem
+    where
+        isControl :: GenItem -> Bool
+        isControl GenIf{} = True
+        isControl GenFor{} = True
+        isControl GenCase{} = True
+        isControl GenModuleItem{} = True
+        isControl _ = False
 
 type GenCase = ([Expr], GenItem)
 
