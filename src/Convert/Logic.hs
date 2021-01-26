@@ -115,7 +115,8 @@ traverseModuleItem ports scopes =
                     , AlwaysC AlwaysComb $ Asgn AsgnOpEq Nothing lhs (Ident x)
                     ]
             where
-                t = TypeOf expr
+                t = Net (NetType TWire) Unspecified
+                        [(DimsFn FnBits $ Right expr, RawNum 1)]
                 x = "sv2v_tmp_" ++ shortHash (lhs, expr)
         -- rewrite port bindings to use temporary nets where necessary
         fixModuleItem (Instance moduleName params instanceName rs bindings) =
