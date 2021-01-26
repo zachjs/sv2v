@@ -77,12 +77,16 @@ module top;
 
     localparam X = 5'b10110;
     localparam Y = X + 6'b00001;
+    localparam [7:0] Z = 234;
     initial begin
         type(X) tX = X;
         type(Y) tY = Y;
+        type(Z) tZ = Z;
         $display("%b %d %d %d", X, X, $left(X), $right(X));
         $display("%b %d %d %d", Y, Y, $left(Y), $right(Y));
+        $display("%b %d %d %d", Z, Z, $left(Z), $right(Z));
         $display("%b %d %d %d", tX, tX, $left(tX), $right(tX));
         $display("%b %d %d %d", tY, tY, $left(tY), $right(tY));
+        $display("%b %d %d %d", tZ, tZ, $left(tZ), $right(tZ));
     end
 endmodule

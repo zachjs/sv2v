@@ -106,21 +106,17 @@ traverseModuleItem ports scopes =
         fixModuleItem :: ModuleItem -> ModuleItem
         -- rewrite bad continuous assignments to use procedural assignments
         fixModuleItem (Assign AssignOptionNone lhs expr) =
-            if not (isReg lhs) then
-                Assign AssignOptionNone lhs expr
-            else if isConstant expr then
-                Initial $ Asgn AsgnOpEq Nothing lhs expr
-            else
-                AlwaysC AlwaysComb $ Asgn AsgnOpEq Nothing lhs expr
+            if not (isReg lhs)
+                then Assign AssignOptionNone lhs expr
+                else
+                    Generate $ map GenModuleItem
+                    [ MIPackageItem (Decl (Variable Local t x [] Nil))
+                    , Assign AssignOptionNone (LHSIdent x) expr
+                    , AlwaysC AlwaysComb $ Asgn AsgnOpEq Nothing lhs (Ident x)
+                    ]
             where
-                -- only handles expressions which are trivially constant for now
-                isConstant :: Expr -> Bool
-                isConstant Number{} = True
-                isConstant (Repeat _ es) = all isConstant es
-                isConstant (Concat   es) = all isConstant es
-                isConstant (BinOp _ e1 e2) = isConstant e1 && isConstant e2
-                isConstant (UniOp _ e) = isConstant e
-                isConstant _ = False
+                t = TypeOf expr
+                x = "sv2v_tmp_" ++ shortHash (lhs, expr)
         -- rewrite port bindings to use temporary nets where necessary
         fixModuleItem (Instance moduleName params instanceName rs bindings) =
             if null newItems

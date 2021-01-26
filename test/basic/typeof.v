@@ -94,14 +94,19 @@ module top;
 
     localparam X = 5'b10110;
     localparam Y = X + 6'b00001;
+    localparam [7:0] Z = 234;
     initial begin : block5
         reg [4:0] tX;
         reg [5:0] tY;
+        reg [7:0] tZ;
         tX = X;
         tY = Y;
+        tZ = Z;
         $display("%b %d %d %d", X, X, 4, 0);
         $display("%b %d %d %d", Y, Y, 5, 0);
+        $display("%b %d %d %d", Z, Z, 7, 0);
         $display("%b %d %d %d", tX, tX, 4, 0);
         $display("%b %d %d %d", tY, tY, 5, 0);
+        $display("%b %d %d %d", tZ, tZ, 7, 0);
     end
 endmodule
