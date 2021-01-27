@@ -45,11 +45,15 @@ convert files =
     where
         (files', packages') = convertPackages files
         pis = Map.fromList $
-            concatMap (concatMap toPackageItems . snd) $
+            concatMap (concatMap (toPackageItems . makeLocal) . snd) $
             filter (not . Map.null . fst) $
             Map.elems packages'
         toPackageItems :: PackageItem -> [(Identifier, PackageItem)]
         toPackageItems item = map (, item) (piNames item)
+        makeLocal :: PackageItem -> PackageItem
+        makeLocal (Decl (Param _ t x e)) = Decl $ Param Localparam t x e
+        makeLocal (Decl (ParamType _ x t)) = Decl $ ParamType Localparam x t
+        makeLocal other = other
 
 -- utility for inserting package items into a set of module items as needed
 inject :: [PackageItem] -> [ModuleItem] -> [ModuleItem]
