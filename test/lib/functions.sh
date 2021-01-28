@@ -131,3 +131,10 @@ runTest() {
     test=$1
     simpleTest "${test}.sv" "${test}.v" "${test}_tb.v"
 }
+
+runAndCapture() {
+    $SV2V "$@" > "$SHUNIT_TMPDIR/stdout" 2> "$SHUNIT_TMPDIR/stderr"
+    result=$?
+    stdout=`cat $SHUNIT_TMPDIR/stdout`
+    stderr=`cat $SHUNIT_TMPDIR/stderr`
+}

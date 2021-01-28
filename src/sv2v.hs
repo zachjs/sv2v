@@ -4,12 +4,15 @@
  - conversion entry point
  -}
 
-import System.IO
-import System.Exit
+import System.Directory (doesFileExist)
+import System.IO (hPrint, hPutStrLn, stderr, stdout)
+import System.Exit (exitFailure, exitSuccess)
 
-import Data.List (elemIndex)
-import Job (readJob, files, exclude, incdir, define, siloed, skipPreprocessor)
+import Control.Monad (filterM, when, zipWithM_)
+import Data.List (elemIndex, intercalate)
+
 import Convert (convert)
+import Job (readJob, Job(..), Write(..))
 import Language.SystemVerilog.AST
 import Language.SystemVerilog.Parser (parseFiles)
 
@@ -32,14 +35,38 @@ emptyWarnings before after =
     if all null before || any (not . null) after then
         return ()
     else if any (any isInterface) before then
-        hPutStr stderr $ "Warning: Source includes an interface but output is "
-            ++ "empty because there is no top-level module which has no ports "
-            ++ "which are interfaces."
+        hPutStrLn stderr $ "Warning: Source includes an interface but output is"
+            ++ " empty because there is no top-level module which has no ports"
+            ++ " which are interfaces."
     else if any (any isPackage) before then
-        hPutStr stderr $ "Warning: Source includes packages but no modules. "
-            ++ "Please convert packages alongside the modules that use them."
+        hPutStrLn stderr $ "Warning: Source includes packages but no modules."
+            ++ " Please convert packages alongside the modules that use them."
     else
         return ()
+
+rewritePath :: FilePath -> IO FilePath
+rewritePath path = do
+    when (end /= ext) $ do
+        hPutStrLn stderr $ "Refusing to write adjacent to " ++ show path
+            ++ " because that path does not end in " ++ show ext
+        exitFailure
+    return $ base ++ ".v"
+    where
+        ext = ".sv"
+        (base, end) = splitAt (length path - length ext) path
+
+writeOutput :: Write -> [FilePath] -> [AST] -> IO ()
+writeOutput Stdout _ asts =
+    hPrint stdout $ concat asts
+writeOutput Adjacent inPaths asts = do
+    outPaths <- mapM rewritePath inPaths
+    badPaths <- filterM doesFileExist outPaths
+    when (not $ null badPaths) $ do
+        hPutStrLn stderr $ "Refusing to write output because the following"
+            ++ " files would be overwritten: " ++ intercalate ", " badPaths
+        exitFailure
+    let results = map (++ "\n") $ map show asts
+    zipWithM_ writeFile outPaths results
 
 main :: IO ()
 main = do
@@ -50,12 +77,12 @@ main = do
         (skipPreprocessor job) (files job)
     case result of
         Left msg -> do
-            hPutStr stderr $ msg ++ "\n"
+            hPutStrLn stderr msg
             exitFailure
         Right asts -> do
             -- convert the files
             let asts' = convert (exclude job) asts
             emptyWarnings asts asts'
-            -- print the converted files out
-            hPrint stdout $ concat asts'
+            -- write the converted files out
+            writeOutput (write job) (files job) asts'
             exitSuccess

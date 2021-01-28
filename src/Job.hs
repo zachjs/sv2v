@@ -21,6 +21,14 @@ data Exclude
     | Succinct
     deriving (Show, Typeable, Data, Eq)
 
+data Write
+    = Stdout
+    | Adjacent
+    deriving (Show, Typeable, Data, Eq)
+
+instance Default Write where
+    def = Stdout
+
 data Job = Job
     { files :: [FilePath]
     , incdir :: [FilePath]
@@ -29,6 +37,7 @@ data Job = Job
     , skipPreprocessor :: Bool
     , exclude :: [Exclude]
     , verbose :: Bool
+    , write :: Write
     } deriving (Show, Typeable, Data)
 
 defaultJob :: Job
@@ -47,6 +56,9 @@ defaultJob = Job
             ++ " or logic)")
         &= groupname "Conversion"
     , verbose = nam "verbose" &= help "Retain certain conversion artifacts"
+    , write = nam_ "write" &= name "w" &= typ "MODE"
+        &= help ("How to write output; default is 'stdout'; use 'adjacent' to"
+            ++ " create a .v file next to each input")
     }
     &= program "sv2v"
     &= summary ("sv2v " ++ giDescribe $$tGitInfoCwd)

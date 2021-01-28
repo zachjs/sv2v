@@ -1,11 +1,11 @@
 #!/bin/bash
 
-validateOutput() {
-    stdout_len=`wc -l < $SHUNIT_TMPDIR/stdout`
-    assertEquals "stdout should be empty" 0 $stdout_len
-    stderr=`cat $SHUNIT_TMPDIR/stderr`
+runErrorTest() {
+    runAndCapture $1.sv
+    assertFalse "conversion should have failed" $result
+    assertNull "stdout should be empty" "$stdout"
     assertNotNull "stderr should not be empty" "$stderr"
-    line=`head -n1 $1`
+    line=`head -n1 $1.sv`
     if [[ "$line" =~ \/\/\ pattern:\ .* ]]; then
         pattern=${line:12}
         if [[ ! "$stderr" =~ $pattern ]]; then
@@ -16,11 +16,7 @@ validateOutput() {
 
 addTest() {
     test=$1
-    eval "test_$test() { \
-        $SV2V $test.sv 2> $SHUNIT_TMPDIR/stderr > $SHUNIT_TMPDIR/stdout; \
-        assertFalse \"conversion should have failed\" \$?; \
-        validateOutput $test.sv; \
-    }"
+    eval "test_$test() { runErrorTest $test; }"
     suite_addTest test_$test
 }
 
