@@ -117,16 +117,18 @@ typeof (Number n) =
 typeof (Call (Ident x) args) = typeofCall x args
 typeof (orig @ (Bit e _)) = do
     t <- typeof e
+    let t' = popRange t
     case t of
         TypeOf{} -> lookupTypeOf orig
         Alias{} -> return $ TypeOf orig
-        _ -> return $ popRange t
+        _ -> return $ typeSignednessOverride t' Unsigned t'
 typeof (orig @ (Range e mode r)) = do
     t <- typeof e
+    let t' = replaceRange (lo, hi) t
     return $ case t of
         TypeOf{} -> TypeOf orig
         Alias{} -> TypeOf orig
-        _ -> replaceRange (lo, hi) t
+        _ -> typeSignednessOverride t' Unsigned t'
     where
         lo = fst r
         hi = case mode of
@@ -145,12 +147,12 @@ typeof (orig @ (Dot e x)) = do
             case lookup x $ map swap fields of
                 Just typ -> typ
                 Nothing -> TypeOf orig
-typeof (Cast (Right s) _) = return $ typeOfSize s
 typeof (UniOp op expr) = typeofUniOp op expr
 typeof (BinOp op a b) = typeofBinOp op a b
 typeof (Mux   _       a b) = largerSizeType a b
-typeof (Concat      exprs) = return $ typeOfSize $ concatSize exprs
-typeof (Repeat reps exprs) = return $ typeOfSize size
+typeof (Concat      exprs) = return $ typeOfSize Unsigned $ concatSize exprs
+typeof (Stream _ _  exprs) = return $ typeOfSize Unsigned $ concatSize exprs
+typeof (Repeat reps exprs) = return $ typeOfSize Unsigned size
     where size = BinOp Mul reps (concatSize exprs)
 typeof (String str) =
     return $ IntegerVector TBit Unspecified [r]
@@ -167,11 +169,21 @@ unescapedLength (_        : rest) = 1 + unescapedLength rest
 
 -- type of a standard (non-member) function call
 typeofCall :: String -> Args -> Scoper Type Type
-typeofCall "$unsigned" (Args [e] []) = typeof e
-typeofCall "$signed"   (Args [e] []) = typeof e
+typeofCall "$unsigned" (Args [e] []) = return $ typeOfSize Unsigned $ sizeof e
+typeofCall "$signed"   (Args [e] []) = return $ typeOfSize Signed   $ sizeof e
 typeofCall "$clog2"    (Args [_] []) =
     return $ IntegerAtom TInteger Unspecified
 typeofCall fnName _ = typeof $ Ident fnName
+
+-- replaces the signing of a type if possible
+typeSignednessOverride :: Type -> Signing -> Type -> Type
+typeSignednessOverride fallback sg t =
+    case t of
+        IntegerVector base _ rs -> IntegerVector base sg rs
+        IntegerAtom   base _    -> IntegerAtom   base sg
+        Net           base _ rs -> Net           base sg rs
+        Implicit           _ rs -> Implicit           sg rs
+        _ -> fallback
 
 -- type of a unary operator expression
 typeofUniOp :: UniOp -> Expr -> Scoper Type Type
@@ -222,9 +234,36 @@ largerSizeType a (Number (Based 1 _ _ _ _)) = typeof a
 largerSizeType a b = do
     t <- typeof a
     u <- typeof b
-    return $ if t == u
-        then t
-        else typeOfSize $ largerSizeOf a b
+    let sg = binopSignedness (typeSignedness t) (typeSignedness u)
+    return $
+        if t == u then
+            t
+        else if sg == Unspecified then
+            TypeOf $ BinOp Add a b
+        else
+            typeOfSize sg $ largerSizeOf a b
+
+-- returns the signedness of a traditional arithmetic binop, if possible
+binopSignedness :: Signing -> Signing -> Signing
+binopSignedness Unspecified _ = Unspecified
+binopSignedness _ Unspecified = Unspecified
+binopSignedness Unsigned _ = Unsigned
+binopSignedness _ Unsigned = Unsigned
+binopSignedness Signed Signed = Signed
+
+-- returns the signedness of the given type, if possible
+typeSignedness :: Type -> Signing
+typeSignedness (Net           _ sg _) = signednessFallback Unsigned sg
+typeSignedness (Implicit        sg _) = signednessFallback Unsigned sg
+typeSignedness (IntegerVector _ sg _) = signednessFallback Unsigned sg
+typeSignedness (IntegerAtom   t sg  ) = signednessFallback fallback sg
+    where fallback = if t == TTime then Unsigned else Signed
+typeSignedness _ = Unspecified
+
+-- helper for producing the former signing when the latter is unspecified
+signednessFallback :: Signing -> Signing -> Signing
+signednessFallback fallback Unspecified = fallback
+signednessFallback _ sg = sg
 
 -- returns the total size of concatenated list of expressions
 concatSize :: [Expr] -> Expr
@@ -245,12 +284,10 @@ largerSizeOf a b =
     where cond = BinOp Ge (sizeof a) (sizeof b)
 
 -- produces a generic type of the given size
-typeOfSize :: Expr -> Type
-typeOfSize size =
+typeOfSize :: Signing -> Expr -> Type
+typeOfSize sg size =
     IntegerVector TLogic sg [(hi, RawNum 0)]
-    where
-        sg = Unspecified -- suitable for now
-        hi = BinOp Sub size (RawNum 1)
+    where hi = BinOp Sub size (RawNum 1)
 
 -- combines a type with unpacked ranges
 injectRanges :: Type -> [Range] -> Type

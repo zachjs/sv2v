@@ -34,6 +34,9 @@ module top;
         $display("args %b", $size(RamPair, 1'dx));
 
         `EXHAUST(Ram);
+        `EXHAUST(Ram[0]);
+        `EXHAUST($unsigned(Ram[0]));
+        `EXHAUST($signed(Ram[0]));
         `EXHAUST(Ram[0+:2]);
         `EXHAUST(Ram[1+:2]);
         `EXHAUST(Ram[0][2-:1]);

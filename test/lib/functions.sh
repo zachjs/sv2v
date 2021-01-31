@@ -63,7 +63,7 @@ assertConverts() {
     assertFalse "conversion of $ac_file still contains dimension queries" $?
     echo "$filtered" | egrep "\s(int\|bit\|logic\|byte\|struct\|enum\|longint\|shortint)\s"
     assertFalse "conversion of $ac_file still contains SV types" $?
-    echo "$filtered" | grep "[^\$a-zA-Z_]unsigned" > /dev/null
+    echo "$filtered" | grep "[^\$a-zA-Z_]unsigned" | grep -v "integer unsigned" > /dev/null
     assertFalse "conversion of $ac_file still contains unsigned keyword" $?
 }
 

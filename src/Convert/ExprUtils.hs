@@ -36,8 +36,13 @@ simplifyStep (UniOp LogNot (BinOp Ne a b)) = BinOp Eq a b
 simplifyStep (UniOp UniSub (UniOp UniSub e)) = e
 simplifyStep (UniOp UniSub (BinOp Sub e1 e2)) = BinOp Sub e2 e1
 
-simplifyStep (e @ (Concat [Pattern{}])) = e
-simplifyStep (Concat [e]) = e
+simplifyStep (Concat [Number (Decimal size _ value)]) =
+    Number $ Decimal size False value
+simplifyStep (Concat [Number (Based size _ base value kinds)]) =
+    Number $ Based size False base value kinds
+simplifyStep (Concat [e @ Stream{}]) = e
+simplifyStep (Concat [e @ Concat{}]) = e
+simplifyStep (Concat [e @ Repeat{}]) = e
 simplifyStep (Concat es) = Concat $ filter (/= Concat []) es
 simplifyStep (Repeat (Dec 0) _) = Concat []
 simplifyStep (Repeat (Dec 1) es) = Concat es
@@ -107,7 +112,6 @@ simplifyBinOp op e1 e2 =
         (Dec    x, SizDec y) -> constantFold orig op   x    y
         (Bas    x, Dec    y) -> constantFold orig op   x    y
         (Dec    x, Bas    y) -> constantFold orig op   x    y
-        (Bas    x, Bas    y) -> constantFold orig op   x    y
         (NegDec x, Dec    y) -> constantFold orig op (-x)   y
         (Dec    x, NegDec y) -> constantFold orig op   x  (-y)
         (NegDec x, NegDec y) -> constantFold orig op (-x) (-y)

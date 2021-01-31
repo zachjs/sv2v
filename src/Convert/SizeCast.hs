@@ -59,9 +59,6 @@ traverseGenItemM = traverseGenItemExprsM traverseExprM
 traverseStmtM :: Stmt -> Scoper Type Stmt
 traverseStmtM = traverseStmtExprsM traverseExprM
 
-pattern ConvertedUU :: Integer -> Integer -> Expr
-pattern ConvertedUU a b = Number (Based 1 True Binary a b)
-
 traverseExprM :: Expr -> Scoper Type Expr
 traverseExprM =
     traverseNestedExprsM convertExprM
@@ -104,10 +101,24 @@ traverseExprM =
         convertExprM other = return other
 
         convertCastM :: Expr -> Expr -> Scoper Type Expr
-        convertCastM (RawNum n) (ConvertedUU a b) =
+        convertCastM (RawNum n) (Number (Based 1 True Binary a b)) =
+            return $ Number $ Based (fromIntegral n) True Binary
+                (extend a) (extend b)
+            where
+                extend 0 = 0
+                extend 1 = (2 ^ n) - 1
+                extend _ = error "not possible"
+        convertCastM (RawNum n) (Number (UnbasedUnsized ch)) =
             return $ Number $ Based (fromIntegral n) False Binary
                 (extend a) (extend b)
             where
+                (a, b) = case ch of
+                    '0' -> (0, 0)
+                    '1' -> (1, 0)
+                    'x' -> (0, 1)
+                    'z' -> (1, 1)
+                    _ -> error $ "unexpected unbased-unsized digit: " ++ [ch]
+                extend :: Integer -> Integer
                 extend 0 = 0
                 extend 1 = (2 ^ n) - 1
                 extend _ = error "not possible"
@@ -183,6 +194,10 @@ exprSigning scopes (BinOp op e1 e2) =
             ShiftAL -> curry fst
             ShiftAR -> curry fst
             _ -> \_ _ -> Just Unspecified
+exprSigning _ (Number n) =
+    Just $ if numberIsSigned n
+        then Signed
+        else Unsigned
 exprSigning scopes expr =
     case lookupElem scopes expr of
         Just (_, _, t) -> typeSigning t
@@ -191,11 +206,11 @@ exprSigning scopes expr =
 combineSigning :: Maybe Signing -> Maybe Signing -> Maybe Signing
 combineSigning Nothing _ = Nothing
 combineSigning _ Nothing = Nothing
-combineSigning (Just Unspecified) msg = msg
-combineSigning msg (Just Unspecified) = msg
-combineSigning (Just Signed) _ = Just Signed
-combineSigning _ (Just Signed) = Just Signed
+combineSigning (Just Unspecified) _ = Just Unspecified
+combineSigning _ (Just Unspecified) = Just Unspecified
 combineSigning (Just Unsigned) _ = Just Unsigned
+combineSigning _ (Just Unsigned) = Just Unsigned
+combineSigning (Just Signed) (Just Signed) = Just Signed
 
 typeSigning :: Type -> Maybe Signing
 typeSigning (Net           _ sg _) = Just sg
