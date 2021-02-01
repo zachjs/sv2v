@@ -8,7 +8,7 @@
 
 module Convert.TFBlock (convert) where
 
-import Data.List (isPrefixOf)
+import Data.List (intersect, isPrefixOf)
 
 import Convert.Traverse
 import Language.SystemVerilog.AST
@@ -41,14 +41,34 @@ stmtsToStmt stmts = Block Seq "" [] stmts
 
 flattenOuterBlocks :: Stmt -> ([Decl], [Stmt])
 flattenOuterBlocks (Block Seq "" declsA [stmt]) =
-    (declsA ++ declsB, stmtsB)
+    if canCombine declsA declsB
+        then (declsA ++ declsB, stmtsB)
+        else (declsA, [stmt])
     where (declsB, stmtsB) = flattenOuterBlocks stmt
 flattenOuterBlocks (Block Seq "" declsA (Block Seq name declsB stmtsA : stmtsB)) =
-    flattenOuterBlocks $ Block Seq name (declsA ++ declsB) (stmtsA ++ stmtsB)
+    if canCombine declsA declsB
+        then flattenOuterBlocks $
+                Block Seq name (declsA ++ declsB) (stmtsA ++ stmtsB)
+        else (declsA, Block Seq name declsB stmtsA : stmtsB)
 flattenOuterBlocks (Block Seq name decls stmts)
     | notscope name = (decls, stmts)
     | otherwise = ([], [Block Seq name decls stmts])
 flattenOuterBlocks stmt = ([], [stmt])
+
+canCombine :: [Decl] -> [Decl] -> Bool
+canCombine [] _ = True
+canCombine _ [] = True
+canCombine declsA declsB =
+    null $ intersect (declNames declsA) (declNames declsB)
+
+declNames :: [Decl] -> [Identifier]
+declNames = filter (not . null) . map declName
+
+declName :: Decl -> Identifier
+declName (Variable _ _ x _ _) = x
+declName (Param _ _ x _) = x
+declName (ParamType _ x _) = x
+declName CommentDecl{} = ""
 
 notscope :: Identifier -> Bool
 notscope "" = True
