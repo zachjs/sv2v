@@ -1,17 +1,26 @@
-`define EXHAUST(t) \
-        $display($size(t), $size(t,1), $size(t,2)); \
-        $display($left(t), $left(t,1), $left(t,2)); \
-        $display($right(t), $right(t,1), $right(t,2)); \
-        $display($high(t), $high(t,1), $high(t,2)); \
-        $display($low(t), $low(t,1), $low(t,2)); \
-        $display($increment(t), $increment(t,1), $increment(t,2)); \
-        $display($dimensions(t)); \
-        $display($unpacked_dimensions(t)); \
-        $display($bits(t));
+`define DUMP_DIM(typ, dim) \
+        $display("    $size      %0d", $size     (typ, dim)); \
+        $display("    $left      %0d", $left     (typ, dim)); \
+        $display("    $right     %0d", $right    (typ, dim)); \
+        $display("    $high      %0d", $high     (typ, dim)); \
+        $display("    $low       %0d", $low      (typ, dim)); \
+        $display("    $increment %0d", $increment(typ, dim));
+
+`define EXHAUST(typ) \
+    $display(`"Dumping info for typ`"); \
+    $display("  $dimensions %0d", $dimensions(typ)); \
+    $display("  $unpacked_dimensions %0d", $unpacked_dimensions(typ)); \
+    $display("  $bits %0d", $bits(typ)); \
+    $display("  1st dimension"); \
+    `DUMP_DIM(typ, 1) \
+    $display("  2nd dimension"); \
+    `DUMP_DIM(typ, 2)
 
 module top;
     typedef logic [16:1] Word;
     Word Ram[0:9];
+    typedef logic [1:16] WordFlip;
+    WordFlip RamFlip[9:0];
     type(Ram) RamPair [2];
     integer ints [3:0];
     integer ints_rev [0:3];
@@ -39,12 +48,26 @@ module top;
         `EXHAUST($signed(Ram[0]));
         `EXHAUST(Ram[0+:2]);
         `EXHAUST(Ram[1+:2]);
+        `EXHAUST(Ram[2-:2]);
+        `EXHAUST(Ram[3-:2]);
         `EXHAUST(Ram[0][2-:1]);
+        `EXHAUST(Ram[0][2-:2]);
+
+        `EXHAUST(RamFlip);
+        `EXHAUST(RamFlip[0]);
+        `EXHAUST($unsigned(RamFlip[0]));
+        `EXHAUST($signed(RamFlip[0]));
+        `EXHAUST(RamFlip[0+:2]);
+        `EXHAUST(RamFlip[1+:2]);
+        `EXHAUST(RamFlip[2-:2]);
+        `EXHAUST(RamFlip[3-:2]);
+        `EXHAUST(RamFlip[0][2-:1]);
+        `EXHAUST(RamFlip[0][2-:2]);
+
         `EXHAUST(RamPair);
         `EXHAUST(RamPair[0]);
         `EXHAUST(Word);
         `EXHAUST(integer);
-        `EXHAUST(bit);
         `EXHAUST(byte);
         `EXHAUST(ints);
         `EXHAUST(ints_rev);
@@ -54,5 +77,7 @@ module top;
         `EXHAUST(type(ints[2][3:0]));
         `EXHAUST(type(ints[1:0]));
         `EXHAUST(type(ints_rev[0:1]));
+        `EXHAUST(type(ints[2:1]));
+        `EXHAUST(type(ints_rev[1:2]));
     end
 endmodule

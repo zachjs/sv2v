@@ -18,7 +18,7 @@ module Convert.TypeOf (convert) where
 import Data.Tuple (swap)
 import qualified Data.Map.Strict as Map
 
-import Convert.ExprUtils (simplify)
+import Convert.ExprUtils (endianCondRange, simplify)
 import Convert.Scoper
 import Convert.Traverse
 import Language.SystemVerilog.AST
@@ -122,19 +122,27 @@ typeof (orig @ (Bit e _)) = do
         TypeOf{} -> lookupTypeOf orig
         Alias{} -> return $ TypeOf orig
         _ -> return $ typeSignednessOverride t' Unsigned t'
-typeof (orig @ (Range e mode r)) = do
+typeof (orig @ (Range e NonIndexed r)) = do
     t <- typeof e
-    let t' = replaceRange (lo, hi) t
+    let t' = replaceRange r t
     return $ case t of
         TypeOf{} -> TypeOf orig
         Alias{} -> TypeOf orig
         _ -> typeSignednessOverride t' Unsigned t'
+typeof (Range expr mode (base, len)) =
+    typeof $ Range expr NonIndexed $
+        endianCondRange index (base, end) (end, base)
     where
-        lo = fst r
-        hi = case mode of
-            NonIndexed   -> snd r
-            IndexedPlus  -> BinOp Sub (uncurry (BinOp Add) r) (RawNum 1)
-            IndexedMinus -> BinOp Add (uncurry (BinOp Sub) r) (RawNum 1)
+        index =
+            if mode == IndexedPlus
+                then (boundR, boundL)
+                else (boundL, boundR)
+        boundL = DimFn FnLeft  (Left $ TypeOf expr) (RawNum 1)
+        boundR = DimFn FnRight (Left $ TypeOf expr) (RawNum 1)
+        end =
+            if mode == IndexedPlus
+                then BinOp Sub (BinOp Add base len) (RawNum 1)
+                else BinOp Add (BinOp Sub base len) (RawNum 1)
 typeof (orig @ (Dot e x)) = do
     t <- typeof e
     case t of
