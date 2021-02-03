@@ -30,15 +30,19 @@ isPackage :: Description -> Bool
 isPackage Package{} = True
 isPackage _ = False
 
-emptyWarnings :: [AST] -> [AST] -> IO ()
+isComment :: Description -> Bool
+isComment (PackageItem (Decl CommentDecl{})) = True
+isComment _ = False
+
+emptyWarnings :: AST -> AST -> IO ()
 emptyWarnings before after =
-    if all null before || any (not . null) after then
+    if all isComment before || not (all isComment after) then
         return ()
-    else if any (any isInterface) before then
+    else if any isInterface before then
         hPutStrLn stderr $ "Warning: Source includes an interface but output is"
             ++ " empty because there is no top-level module which has no ports"
             ++ " which are interfaces."
-    else if any (any isPackage) before then
+    else if any isPackage before then
         hPutStrLn stderr $ "Warning: Source includes packages but no modules."
             ++ " Please convert packages alongside the modules that use them."
     else
@@ -82,7 +86,7 @@ main = do
         Right asts -> do
             -- convert the files
             let asts' = convert (exclude job) asts
-            emptyWarnings asts asts'
+            emptyWarnings (concat asts) (concat asts')
             -- write the converted files out
             writeOutput (write job) (files job) asts'
             exitSuccess
