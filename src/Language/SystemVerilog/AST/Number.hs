@@ -168,7 +168,7 @@ baseSize Hex    = 16
 
 -- get the number of bits in a number
 numberBitLength :: Number -> Integer
-numberBitLength UnbasedUnsized{} = 32
+numberBitLength UnbasedUnsized{} = 1
 numberBitLength (Decimal size _ _) = fromIntegral $ abs size
 numberBitLength (Based size _ _ _ _) =
     fromIntegral $

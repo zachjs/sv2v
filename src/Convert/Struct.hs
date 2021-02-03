@@ -281,7 +281,9 @@ convertExpr (t @ IntegerVector{}) (Concat exprs) =
         t' = dropInnerTypeRange t
         isUnsizedNumber :: Expr -> Bool
         isUnsizedNumber (Number n) = not $ numberIsSized n
-        isUnsizedNumber (UniOp UniSub e) = isUnsizedNumber e
+        isUnsizedNumber (UniOp _ e) = isUnsizedNumber e
+        isUnsizedNumber (BinOp _ e1 e2) =
+            isUnsizedNumber e1 || isUnsizedNumber e2
         isUnsizedNumber _ = False
 
 -- TODO: This is really a conversion for using default patterns to

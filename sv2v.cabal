@@ -62,6 +62,7 @@ executable sv2v
     Convert.AsgnOp
     Convert.Assertion
     Convert.BlockDecl
+    Convert.Cast
     Convert.DimensionQuery
     Convert.DuplicateGenvar
     Convert.EmptyArgs
@@ -86,9 +87,7 @@ executable sv2v
     Convert.ParamType
     Convert.RemoveComments
     Convert.Scoper
-    Convert.SignCast
     Convert.Simplify
-    Convert.SizeCast
     Convert.StarPort
     Convert.Stream
     Convert.StringParam

@@ -61,4 +61,16 @@ module top;
         $display("%b", j_extended);
     end
 
+    initial begin
+        $display("T1 %0d", -1);
+        $display("T2 %0d", -1);
+        $display("T3 %0d", 32'hFFFF_FFFF);
+        $display("T1 %0d", 1);
+        $display("T2 %0d", 1);
+        $display("T3 %0d", 1);
+        $display("T1 %0d", 1);
+        $display("T2 %0d", 1);
+        $display("T3 %0d", 1);
+    end
+
 endmodule

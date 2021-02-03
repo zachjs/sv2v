@@ -11,6 +11,13 @@
  - concatenation conversions, defer the resolution of type information to this
  - conversion pass by producing nodes with the `type` operator during
  - elaboration.
+ -
+ - This conversion also elaborates sign and size casts to their primitive types.
+ - Sign casts take on the size of the underlying expression. Size casts take on
+ - the sign of the underlying expression. This conversion incorporates this
+ - elaboration as the canonical source for type information. It also enables the
+ - removal of unnecessary casts often resulting from struct literals or casts in
+ - the source intended to appease certain lint rules.
  -}
 
 module Convert.TypeOf (convert) where
@@ -18,7 +25,7 @@ module Convert.TypeOf (convert) where
 import Data.Tuple (swap)
 import qualified Data.Map.Strict as Map
 
-import Convert.ExprUtils (endianCondRange, simplify)
+import Convert.ExprUtils (dimensionsSize, endianCondRange, simplify)
 import Convert.Scoper
 import Convert.Traverse
 import Language.SystemVerilog.AST
@@ -34,8 +41,8 @@ pattern UnitType = IntegerVector TLogic Unspecified []
 -- insert the given declaration into the scope, and convert an TypeOfs within
 traverseDeclM :: Decl -> Scoper Type Decl
 traverseDeclM decl = do
-    item <- traverseModuleItemM (MIPackageItem $ Decl decl)
-    let MIPackageItem (Decl decl') = item
+    decl' <- traverseDeclExprsM traverseExprM decl
+        >>= traverseDeclTypesM traverseTypeM
     case decl' of
         Variable _ (Implicit sg rs) ident a _ ->
             -- implicit types, which are commonly found in function return
@@ -66,7 +73,8 @@ traverseModuleItemM (Genvar x) = do
     insertElem x $ IntegerAtom TInteger Unspecified
     return $ Genvar x
 traverseModuleItemM item =
-    traverseTypesM (traverseNestedTypesM traverseTypeM) item
+    traverseNodesM traverseExprM return traverseTypeM traverseLHSM return item
+    where traverseLHSM = traverseLHSExprsM traverseExprM
 
 -- convert TypeOf in a GenItem
 traverseGenItemM :: GenItem -> Scoper Type GenItem
@@ -76,14 +84,57 @@ traverseGenItemM = traverseGenItemExprsM traverseExprM
 traverseStmtM :: Stmt -> Scoper Type Stmt
 traverseStmtM = traverseStmtExprsM traverseExprM
 
--- convert TypeOf in a Expr
+-- convert TypeOf in an Expr
 traverseExprM :: Expr -> Scoper Type Expr
-traverseExprM = traverseNestedExprsM $ traverseExprTypesM $
-    traverseNestedTypesM traverseTypeM
+traverseExprM (Cast (Left (Implicit sg [])) expr) =
+    -- `signed'(foo)` and `unsigned'(foo)` are syntactic sugar for the `$signed`
+    -- and `$unsigned` system functions present in Verilog-2005
+    traverseExprM $ Call (Ident fn) $ Args [expr] []
+    where fn = if sg == Signed then "$signed" else "$unsigned"
+traverseExprM (Cast (Left t) (Number (UnbasedUnsized ch))) =
+    -- defer until this expression becomes explicit
+    return $ Cast (Left t) (Number (UnbasedUnsized ch))
+traverseExprM (Cast (Left (t @ (IntegerAtom TInteger _))) expr) =
+    -- convert to cast to an integer vector type
+    traverseExprM $ Cast (Left t') expr
+    where
+        (tf, []) = typeRanges t
+        t' = tf [(RawNum 1, RawNum 1)]
+traverseExprM (Cast (Left t1) expr) = do
+    expr' <- traverseExprM expr
+    t1' <- traverseTypeM t1
+    t2 <- typeof expr'
+    if typeCastUnneeded t1' t2
+        then traverseExprM $ makeExplicit expr'
+        else return $ Cast (Left t1') expr'
+traverseExprM (Cast (Right (Ident x)) expr) = do
+    expr' <- traverseExprM expr
+    details <- lookupElemM x
+    if details == Nothing
+        then return $ Cast (Left $ Alias x []) expr'
+        else elaborateSizeCast (Ident x) expr'
+traverseExprM (Cast (Right size) expr) = do
+    expr' <- traverseExprM expr
+    elaborateSizeCast size expr'
+traverseExprM other =
+    traverseExprTypesM traverseTypeM other
+    >>= traverseSinglyNestedExprsM traverseExprM
 
+-- carry forward the signedness of the expression when cast to the given size
+elaborateSizeCast :: Expr -> Expr -> Scoper Type Expr
+elaborateSizeCast size value = do
+    t <- typeof value
+    case typeSignedness t of
+        Unspecified -> return $ Cast (Right size) value
+        sg -> traverseExprM $ Cast (Left $ typeOfSize sg size) value
+
+-- convert TypeOf in a Type
 traverseTypeM :: Type -> Scoper Type Type
-traverseTypeM (TypeOf expr) = typeof expr
-traverseTypeM other = return other
+traverseTypeM (TypeOf expr) =
+    traverseExprM expr >>= typeof
+traverseTypeM other =
+    traverseTypeExprsM traverseExprM other
+    >>= traverseSinglyNestedTypesM traverseTypeM
 
 -- attempts to find the given (potentially hierarchical or generate-scoped)
 -- expression in the available scope information
@@ -92,11 +143,15 @@ lookupTypeOf expr = do
     details <- lookupElemM expr
     case details of
         Nothing -> return $ TypeOf expr
-        Just (_, replacements, typ) ->
+        Just (_, replacements, typ) -> do
+            let typ' = toVarType typ
             return $ if Map.null replacements
-                then typ
-                else rewriteType replacements typ
+                then typ'
+                else rewriteType replacements typ'
     where
+        toVarType :: Type -> Type
+        toVarType (Net _ sg rs) = IntegerVector TLogic sg rs
+        toVarType other = other
         rewriteType :: Replacements -> Type -> Type
         rewriteType replacements = traverseNestedTypes $ traverseTypeExprs $
             traverseNestedExprs (replace replacements)
@@ -155,6 +210,7 @@ typeof (orig @ (Dot e x)) = do
             case lookup x $ map swap fields of
                 Just typ -> typ
                 Nothing -> TypeOf orig
+typeof (Cast (Left t) _) = traverseTypeM t
 typeof (UniOp op expr) = typeofUniOp op expr
 typeof (BinOp op a b) = typeofBinOp op a b
 typeof (Mux   _       a b) = largerSizeType a b
@@ -190,7 +246,6 @@ typeSignednessOverride fallback sg t =
         IntegerVector base _ rs -> IntegerVector base sg rs
         IntegerAtom   base _    -> IntegerAtom   base sg
         Net           base _ rs -> Net           base sg rs
-        Implicit           _ rs -> Implicit           sg rs
         _ -> fallback
 
 -- type of a unary operator expression
@@ -262,7 +317,6 @@ binopSignedness Signed Signed = Signed
 -- returns the signedness of the given type, if possible
 typeSignedness :: Type -> Signing
 typeSignedness (Net           _ sg _) = signednessFallback Unsigned sg
-typeSignedness (Implicit        sg _) = signednessFallback Unsigned sg
 typeSignedness (IntegerVector _ sg _) = signednessFallback Unsigned sg
 typeSignedness (IntegerAtom   t sg  ) = signednessFallback fallback sg
     where fallback = if t == TTime then Unsigned else Signed
@@ -295,7 +349,7 @@ largerSizeOf a b =
 typeOfSize :: Signing -> Expr -> Type
 typeOfSize sg size =
     IntegerVector TLogic sg [(hi, RawNum 0)]
-    where hi = BinOp Sub size (RawNum 1)
+    where hi = simplify $ BinOp Sub size (RawNum 1)
 
 -- combines a type with unpacked ranges
 injectRanges :: Type -> [Range] -> Type
@@ -321,3 +375,32 @@ replaceRange r (IntegerAtom TInteger sg) =
 replaceRange r t =
     tf (r : rs)
     where (tf, _ : rs) = typeRanges t
+
+-- checks for a cast type which already trivially matches the expression type
+typeCastUnneeded :: Type -> Type -> Bool
+typeCastUnneeded t1 t2 =
+    sg1 == sg2 && sz1 == sz2 && sz1 /= Nothing && sz2 /= Nothing
+    where
+        sg1 = typeSignedness t1
+        sg2 = typeSignedness t2
+        sz1 = typeSize t1
+        sz2 = typeSize t2
+        typeSize :: Type -> Maybe Expr
+        typeSize (Net           _ _ rs) = Just $ dimensionsSize rs
+        typeSize (IntegerVector _ _ rs) = Just $ dimensionsSize rs
+        typeSize (t @ IntegerAtom{}) =
+            typeSize $ tf [(RawNum 1, RawNum 1)]
+            where (tf, []) = typeRanges t
+        typeSize _ = Nothing
+
+-- explicitly sizes top level numbers used in arithmetic expressions
+makeExplicit :: Expr -> Expr
+makeExplicit (Number (Decimal size signed values)) =
+    Number $ Decimal (abs size) signed values
+makeExplicit (Number (Based size base signed values kinds)) =
+    Number $ Based (abs size) base signed values kinds
+makeExplicit (BinOp op e1 e2) =
+    BinOp op (makeExplicit e1) (makeExplicit e2)
+makeExplicit (UniOp op e) =
+    UniOp op $ makeExplicit e
+makeExplicit other = other

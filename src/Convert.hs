@@ -13,6 +13,7 @@ import qualified Convert.AlwaysKW
 import qualified Convert.AsgnOp
 import qualified Convert.Assertion
 import qualified Convert.BlockDecl
+import qualified Convert.Cast
 import qualified Convert.DimensionQuery
 import qualified Convert.DuplicateGenvar
 import qualified Convert.EmptyArgs
@@ -35,9 +36,7 @@ import qualified Convert.Package
 import qualified Convert.ParamNoDefault
 import qualified Convert.ParamType
 import qualified Convert.RemoveComments
-import qualified Convert.SignCast
 import qualified Convert.Simplify
-import qualified Convert.SizeCast
 import qualified Convert.StarPort
 import qualified Convert.Stream
 import qualified Convert.StringParam
@@ -70,11 +69,11 @@ phases excludes =
     , Convert.KWArgs.convert
     , Convert.LogOp.convert
     , Convert.MultiplePacked.convert
+    , Convert.UnbasedUnsized.convert
+    , Convert.Cast.convert
     , Convert.TypeOf.convert
     , Convert.DimensionQuery.convert
     , Convert.ParamType.convert
-    , Convert.UnbasedUnsized.convert
-    , Convert.SizeCast.convert
     , Convert.Simplify.convert
     , Convert.Stream.convert
     , Convert.Struct.convert
@@ -83,7 +82,6 @@ phases excludes =
     , Convert.Unique.convert
     , Convert.UnpackedArray.convert
     , Convert.Unsigned.convert
-    , Convert.SignCast.convert
     , Convert.Wildcard.convert
     , Convert.Enum.convert
     , Convert.ForDecl.convert

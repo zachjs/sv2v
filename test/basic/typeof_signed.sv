@@ -192,4 +192,8 @@ module top;
     `ASSERT_UNSIGNED(arr[5:0])
     `ASSERT_UNSIGNED(arr[1+:2])
     `ASSERT_UNSIGNED(arr[1-:2])
+    `ASSERT_UNSIGNED(integer_signed[0])
+    `ASSERT_UNSIGNED(integer_signed[1])
+    `ASSERT_UNSIGNED(integer_unsigned[0])
+    `ASSERT_UNSIGNED(integer_unsigned[1])
 endmodule

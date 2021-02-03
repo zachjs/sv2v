@@ -32,6 +32,7 @@ module Convert.Scoper
     , partScoperT
     , insertElem
     , injectItem
+    , injectDecl
     , lookupElem
     , lookupElemM
     , Access(..)
@@ -83,7 +84,8 @@ data Scopes a = Scopes
     { sCurrent :: [Tier]
     , sMapping :: Mapping a
     , sProcedure :: Bool
-    , sInjected :: [ModuleItem]
+    , sInjectedItems :: [ModuleItem]
+    , sInjectedDecls :: [Decl]
     } deriving Show
 
 extractMapping :: Scopes a -> Map.Map Identifier a
@@ -176,13 +178,25 @@ insertElem key element = do
 
 injectItem :: Monad m => ModuleItem -> ScoperT a m ()
 injectItem item =
-    modify' $ \s -> s { sInjected = add $ sInjected s }
-    where
-        add :: [ModuleItem] -> [ModuleItem]
-        add items =
-            if elem item items
-                then items
-                else items ++ [item]
+    modify' $ \s -> s { sInjectedItems = item : sInjectedItems s }
+
+injectDecl :: Monad m => Decl -> ScoperT a m ()
+injectDecl decl =
+    modify' $ \s -> s { sInjectedDecls = decl : sInjectedDecls s }
+
+consumeInjectedItems :: Monad m => ScoperT a m [ModuleItem]
+consumeInjectedItems = do
+    injected <- gets sInjectedItems
+    when (not $ null injected) $
+        modify' $ \s -> s { sInjectedItems = [] }
+    return $ reverse injected
+
+consumeInjectedDecls :: Monad m => ScoperT a m [Decl]
+consumeInjectedDecls = do
+    injected <- gets sInjectedDecls
+    when (not $ null injected) $
+        modify' $ \s -> s { sInjectedDecls = [] }
+    return $ reverse injected
 
 type Replacements = Map.Map Identifier Expr
 
@@ -305,7 +319,7 @@ runScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items =
             items' <- mapM wrappedModuleItemMapper items
             exitScope topName ""
             return items'
-        initialState = Scopes [] Map.empty False []
+        initialState = Scopes [] Map.empty False [] []
 
         wrappedModuleItemMapper = scopeModuleItemT
             declMapper moduleItemMapper genItemMapper stmtMapper
@@ -324,13 +338,28 @@ scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
         fullStmtMapper :: Stmt -> ScoperT a m Stmt
         fullStmtMapper (Block kw name decls stmts) = do
             enterScope name ""
-            decls' <- mapM declMapper decls
+            decls' <- fmap concat $ mapM declMapper' decls
             stmts' <- mapM fullStmtMapper stmts
             exitScope name ""
             return $ Block kw name decls' stmts'
         -- TODO: Do we need to support the various procedural loops?
-        fullStmtMapper stmt =
-            stmtMapper stmt >>= traverseSinglyNestedStmtsM fullStmtMapper
+        fullStmtMapper stmt = do
+            stmt' <- stmtMapper stmt
+            injected <- consumeInjectedDecls
+            if null injected
+                then traverseSinglyNestedStmtsM fullStmtMapper stmt'
+                else fullStmtMapper $ Block Seq "" injected [stmt']
+
+        -- converts a decl and adds decls injected during conversion
+        declMapper' :: Decl -> ScoperT a m [Decl]
+        declMapper' decl = do
+            decl' <- declMapper decl
+            injected <- consumeInjectedDecls
+            if null injected
+                then return [decl']
+                else do
+                    injected' <- mapM declMapper injected
+                    return $ injected' ++ [decl']
 
         mapTFDecls :: [Decl] -> ScoperT a m [Decl]
         mapTFDecls = mapTFDecls' 0
@@ -340,14 +369,14 @@ scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
                 mapTFDecls' idx (decl : decls) =
                     case argIdxDecl decl of
                         Nothing -> do
-                            decl' <- declMapper decl
+                            decl' <- declMapper' decl
                             decls' <- mapTFDecls' idx decls
-                            return $ decl' : decls'
+                            return $ decl' ++ decls'
                         Just declFunc -> do
                             _ <- declMapper $ declFunc idx
-                            decl' <- declMapper decl
+                            decl' <- declMapper' decl
                             decls' <- mapTFDecls' (idx + 1) decls
-                            return $ decl' : decls'
+                            return $ decl' ++ decls'
 
                 argIdxDecl :: Decl -> Maybe (Int -> Decl)
                 argIdxDecl (Variable d t _ a e) =
@@ -369,11 +398,10 @@ scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
         wrappedModuleItemMapper :: ModuleItem -> ScoperT a m ModuleItem
         wrappedModuleItemMapper item = do
             item' <- fullModuleItemMapper item
-            injected <- gets sInjected
+            injected <- consumeInjectedItems
             if null injected
                 then return item'
                 else do
-                    modify' $ \s -> s { sInjected = [] }
                     injected' <- mapM fullModuleItemMapper injected
                     return $ Generate $ map GenModuleItem $ injected' ++ [item']
         fullModuleItemMapper :: ModuleItem -> ScoperT a m ModuleItem
@@ -423,11 +451,10 @@ scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
         fullGenItemMapper :: GenItem -> ScoperT a m GenItem
         fullGenItemMapper genItem = do
             genItem' <- genItemMapper genItem
-            injected <- gets sInjected
+            injected <- consumeInjectedItems
             if null injected
                 then scopeGenItemMapper genItem'
                 else do
-                    modify' $ \s -> s { sInjected = [] }
                     injected' <- mapM fullModuleItemMapper injected
                     genItem'' <- scopeGenItemMapper genItem'
                     let genItems = map GenModuleItem injected' ++ [genItem'']

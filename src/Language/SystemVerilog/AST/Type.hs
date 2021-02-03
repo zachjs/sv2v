@@ -121,7 +121,8 @@ nullRange t [] = t
 nullRange t [(RawNum 0, RawNum 0)] = t
 nullRange (IntegerAtom TInteger sg) rs =
     -- integer arrays are allowed in SystemVerilog but not in Verilog
-    IntegerVector TBit sg (rs ++ [(RawNum 31, RawNum 0)])
+    IntegerVector TBit sg' (rs ++ [(RawNum 31, RawNum 0)])
+    where sg' = if sg == Unsigned then Unsigned else Signed
 nullRange t rs1 =
     if t == t'
         then error $ "non-vector type " ++ show t ++

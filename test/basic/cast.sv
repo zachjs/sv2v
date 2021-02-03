@@ -52,4 +52,19 @@ module top;
         $display("%b", W'(j));
     end
 
+    typedef integer T1;
+    typedef integer signed T2;
+    typedef integer unsigned T3;
+    initial begin
+        $display("T1 %0d", T1'(1'sb1));
+        $display("T2 %0d", T2'(1'sb1));
+        $display("T3 %0d", T3'(1'sb1));
+        $display("T1 %0d", T1'(32'sd1));
+        $display("T2 %0d", T2'(32'sd1));
+        $display("T3 %0d", T3'(32'sd1));
+        $display("T1 %0d", T1'(32'd1));
+        $display("T2 %0d", T2'(32'd1));
+        $display("T3 %0d", T3'(32'd1));
+    end
+
 endmodule

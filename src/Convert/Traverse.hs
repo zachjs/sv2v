@@ -460,12 +460,10 @@ traverseSinglyNestedExprsM exprMapper = em
             e2' <- exprMapper e2
             e3' <- exprMapper e3
             return $ Mux e1' e2' e3'
-        em (Cast (Left t) e) =
-            exprMapper e >>= return . Cast (Left t)
-        em (Cast (Right e1) e2) = do
-            e1' <- exprMapper e1
-            e2' <- exprMapper e2
-            return $ Cast (Right e1') e2'
+        em (Cast tore e) = do
+            tore' <- typeOrExprMapper tore
+            e' <- exprMapper e
+            return $ Cast tore' e'
         em (DimsFn f tore) =
             typeOrExprMapper tore >>= return . DimsFn f
         em (DimFn f tore e) = do
@@ -834,8 +832,8 @@ traverseExprTypesM mapper = exprMapper
         typeOrExprMapper (Right e) = return $ Right e
         typeOrExprMapper (Left t) =
             mapper t >>= return . Left
-        exprMapper (Cast (Left t) e) =
-            mapper t >>= \t' -> return $ Cast (Left t') e
+        exprMapper (Cast tore e) =
+            typeOrExprMapper tore >>= return . flip Cast e
         exprMapper (DimsFn f tore) =
             typeOrExprMapper tore >>= return . DimsFn f
         exprMapper (DimFn f tore e) = do
