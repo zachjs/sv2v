@@ -79,7 +79,7 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                 -- inline instantiation of an interface
                 convertNested $ Generate $ map GenModuleItem $
                     inlineInstance rs []
-                    partItems instanceName paramBindings portBindings
+                    partItems part instanceName paramBindings portBindings
             else if null modportInstances then
                 return instanceItem
             else do
@@ -94,7 +94,7 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                             ++ showKeys modportBindings ++ " are connected"
                     else convertNested $ Generate $ map GenModuleItem $
                             inlineInstance rs modportBindings partItems
-                            instanceName paramBindings portBindings
+                            part instanceName paramBindings portBindings
             where
                 Instance part rawParamBindings instanceName rs rawPortBindings =
                     instanceItem
@@ -242,7 +242,7 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                     case Map.lookup x replacements of
                         Just replacement -> replacement
                         Nothing ->
-                            if "_tmp_" `isPrefixOf` x
+                            if "_param_" `isPrefixOf` x
                                 then Ident x
                                 else Dot instanceE x
                 prefixExpr other = traverseSinglyNestedExprs prefixExpr other
@@ -298,9 +298,9 @@ impliedModport =
 
 -- convert an interface-bound module instantiation or an interface instantiation
 -- into a series of equivalent inlined module items
-inlineInstance :: [Range] -> [ModportBinding] -> [ModuleItem]
+inlineInstance :: [Range] -> [ModportBinding] -> [ModuleItem] -> Identifier
     -> Identifier -> [ParamBinding] -> [PortBinding] -> [ModuleItem]
-inlineInstance ranges modportBindings items
+inlineInstance ranges modportBindings items partName
     instanceName instanceParams instancePorts =
     comment :
     map (MIPackageItem . Decl) bindingBaseParams ++
@@ -314,6 +314,8 @@ inlineInstance ranges modportBindings items
             if null modportBindings
                 then dimensionModport : bundleModport : items
                 else items
+
+        key = shortHash (partName, instanceName)
 
         -- synthetic modports to be collected and removed after inlining
         bundleModport = Modport "" (impliedModport items)
@@ -472,7 +474,7 @@ inlineInstance ranges modportBindings items
             case makeBindingBaseExpr modportE of
                 Just expr -> localparam (bindingBaseName ++ portName) expr
                 Nothing -> CommentDecl "no-op"
-        bindingBaseName = "_sv2v_bind_base_" ++ shortHash instanceName ++ "_"
+        bindingBaseName = "_bbase_" ++ key ++ "_"
         makeBindingBaseExpr :: Expr -> Maybe Expr
         makeBindingBaseExpr modportE =
             case modportE of
@@ -485,7 +487,7 @@ inlineInstance ranges modportBindings items
         localparam :: Identifier -> Expr -> Decl
         localparam = Param Localparam (Implicit Unspecified [])
 
-        paramTmp = "_tmp_" ++ (shortHash (items, instanceName)) ++ "_"
+        paramTmp = "_param_" ++ key ++ "_"
 
         parameterBinds = map makeParameterBind instanceParams
         makeParameterBind :: ParamBinding -> Decl
@@ -545,7 +547,7 @@ inlineInstance ranges modportBindings items
                     ++ " output to " ++ show expr ++ " but that can't be an LHS"
 
         -- for instance arrays, a unique identifier to be used as a genvar
-        loopVar = "_sv2v_arr_" ++ shortHash (instanceName, ranges)
+        loopVar = "_arr_" ++ key
 
         isArray = not $ null ranges
         [arrayRange @ (arrayLeft, arrayRight)] = ranges
@@ -574,7 +576,7 @@ pattern Tag :: Expr
 pattern Tag = Ident "%"
 
 modportBaseName :: Identifier -> Identifier
-modportBaseName = (++) "_sv2v_base_"
+modportBaseName = (++) "_mbase_"
 
 -- the dimensions of interface instance arrays are encoded as synthetic modports
 -- during inlining, enabling subsequent modport bindings to implicitly use the
