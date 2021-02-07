@@ -115,7 +115,8 @@ traverseExprM (Cast (Right (Ident x)) expr) = do
         else elaborateSizeCast (Ident x) expr'
 traverseExprM (Cast (Right size) expr) = do
     expr' <- traverseExprM expr
-    elaborateSizeCast size expr'
+    size' <- traverseExprM size
+    elaborateSizeCast size' expr'
 traverseExprM other =
     traverseExprTypesM traverseTypeM other
     >>= traverseSinglyNestedExprsM traverseExprM

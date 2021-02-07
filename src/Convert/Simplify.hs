@@ -32,22 +32,29 @@ convertDescription =
 
 traverseDeclM :: Decl -> Scoper Expr Decl
 traverseDeclM decl = do
-    case decl of
-        Param Localparam _ x e ->
-            when (isSimpleExpr e) $ insertElem x e
+    decl' <- traverseDeclExprsM traverseExprM decl
+    case decl' of
+        Param Localparam UnknownType x e ->
+            insertExpr x e
+        Param Localparam (Implicit Signed [(RawNum 31, RawNum 0)]) x e ->
+            insertExpr x e
+        Param Localparam (Implicit sg rs) x e ->
+            insertExpr x $ Cast (Left t) e
+            where t = IntegerVector TLogic sg rs
+        Param Localparam t x e ->
+            insertExpr x $ Cast (Left t) e
         _ -> return ()
-    let mi = MIPackageItem $ Decl decl
-    mi' <- traverseModuleItemM mi
-    let MIPackageItem (Decl decl') = mi'
     return decl'
 
+insertExpr :: Identifier -> Expr -> Scoper Expr ()
+insertExpr ident expr = do
+    expr' <- substituteExprM expr
+    when (isSimpleExpr expr') $ insertElem ident expr'
+
 isSimpleExpr :: Expr -> Bool
-isSimpleExpr Ident{}   = True
 isSimpleExpr Number{}  = True
 isSimpleExpr String{}  = True
-isSimpleExpr (Dot   e _  ) = isSimpleExpr e
-isSimpleExpr (Bit   e _  ) = isSimpleExpr e
-isSimpleExpr (Range e _ _) = isSimpleExpr e
+isSimpleExpr (Cast Left{} e) = isSimpleExpr e
 isSimpleExpr _ = False
 
 traverseModuleItemM :: ModuleItem -> Scoper Expr ModuleItem
@@ -117,11 +124,12 @@ convertExpr info expr =
 
 substitute :: Scopes Expr -> Expr -> Expr
 substitute scopes expr =
-    traverseNestedExprs substitute' expr
+    substitute' expr
     where
         substitute' :: Expr -> Expr
         substitute' (Ident x) =
             case lookupElem scopes x of
                 Nothing -> Ident x
                 Just (_, _, e) -> e
-        substitute' other = other
+        substitute' other =
+            traverseSinglyNestedExprs substitute' other

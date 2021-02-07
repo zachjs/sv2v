@@ -92,10 +92,13 @@ traverseStmtM stmt = do
     return stmt'
 
 traverseExprM :: Expr -> ST Expr
-traverseExprM (Cast (Left (IntegerVector _ sg rs)) e) = do
-    e' <- traverseExprM e
-    convertCastM (dimensionsSize rs) e' signed
-    where signed = sg == Signed
+traverseExprM (Cast (Left (IntegerVector _ sg rs)) value) = do
+    value' <- traverseExprM value
+    size' <- traverseExprM size
+    convertCastM size' value' signed
+    where
+        signed = sg == Signed
+        size = dimensionsSize rs
 traverseExprM other =
     traverseSinglyNestedExprsM traverseExprM other
 

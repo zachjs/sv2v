@@ -52,6 +52,8 @@ simplifyStep (Mux (Number n) e1 e2) =
         Just _ -> e1
         Nothing -> Mux (Number n) e1 e2
 
+simplifyStep (Call (Ident "$clog2") (Args [SizDec k] [])) =
+    simplifyStep $ Call (Ident "$clog2") (Args [RawNum k] [])
 simplifyStep (Call (Ident "$clog2") (Args [Dec k] [])) =
     toDec $ clog2 k
     where
