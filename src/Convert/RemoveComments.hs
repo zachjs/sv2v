@@ -45,8 +45,10 @@ convertPackageItem other = other
 convertStmt :: Stmt -> Stmt
 convertStmt (CommentStmt _) = Null
 convertStmt (Block kw name decls stmts) =
-    Block kw name decls' stmts
-    where decls' = convertDecls decls
+    Block kw name decls' stmts'
+    where
+        decls' = convertDecls decls
+        stmts' = filter (/= Null) stmts
 convertStmt (For (Left decls) cond incr stmt) =
     For (Left decls') cond incr stmt
     where decls' = convertDecls decls

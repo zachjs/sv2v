@@ -103,6 +103,8 @@ traverseModuleItem ports scopes =
                         Just (_, _, t) -> tell [isRegType t]
                         _ -> tell [False]
 
+        always_comb = AlwaysC Always . Timing (Event SenseStar)
+
         fixModuleItem :: ModuleItem -> ModuleItem
         -- rewrite bad continuous assignments to use procedural assignments
         fixModuleItem (Assign AssignOptionNone lhs expr) =
@@ -112,7 +114,7 @@ traverseModuleItem ports scopes =
                     Generate $ map GenModuleItem
                     [ MIPackageItem (Decl (Variable Local t x [] Nil))
                     , Assign AssignOptionNone (LHSIdent x) expr
-                    , AlwaysC AlwaysComb $ Asgn AsgnOpEq Nothing lhs (Ident x)
+                    , always_comb $ Asgn AsgnOpEq Nothing lhs (Ident x)
                     ]
             where
                 t = Net (NetType TWire) Unspecified
@@ -146,7 +148,7 @@ traverseModuleItem ports scopes =
                                 [(DimsFn FnBits $ Right expr, RawNum 1)]
                         items =
                             [ MIPackageItem $ Decl $ Variable Local t tmp [] Nil
-                            , AlwaysC AlwaysComb $ Asgn AsgnOpEq Nothing lhs tmpExpr]
+                            , always_comb $ Asgn AsgnOpEq Nothing lhs tmpExpr]
                         lhs = case exprToLHS expr of
                             Just l -> l
                             Nothing ->

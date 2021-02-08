@@ -139,9 +139,8 @@ convertStmt (Block Par x decls stmts) = do
     modify $ \s -> s { sJumpAllowed = jumpAllowed, sReturnAllowed = returnAllowed }
     return $ Block Par x decls stmts'
 
-convertStmt (Block Seq x decls stmts) = do
-    stmts' <- step stmts
-    return $ Block Seq x decls $ filter (/= Null) stmts'
+convertStmt (Block Seq x decls stmts) =
+    step stmts >>= return . Block Seq x decls
     where
         step :: [Stmt] -> State Info [Stmt]
         step [] = return []

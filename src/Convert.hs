@@ -51,15 +51,19 @@ import qualified Convert.Unsigned
 import qualified Convert.Wildcard
 
 type Phase = [AST] -> [AST]
+type Selector = Job.Exclude -> Phase -> Phase
 
-phases :: [Job.Exclude] -> [Phase]
-phases excludes =
-    [ Convert.AsgnOp.convert
-    , Convert.NamedBlock.convert
-    , selectExclude (Job.Assert   , Convert.Assertion.convert)
-    , Convert.BlockDecl.convert
+finalPhases :: Selector -> [Phase]
+finalPhases _ =
+    [ Convert.NamedBlock.convert
     , Convert.DuplicateGenvar.convert
-    , selectExclude (Job.Logic    , Convert.Logic.convert)
+    ]
+
+mainPhases :: Selector -> [Phase]
+mainPhases selectExclude =
+    [ Convert.AsgnOp.convert
+    , Convert.BlockDecl.convert
+    , selectExclude Job.Logic Convert.Logic.convert
     , Convert.FuncRet.convert
     , Convert.FuncRoutine.convert
     , Convert.EmptyArgs.convert
@@ -67,7 +71,6 @@ phases excludes =
     , Convert.Inside.convert
     , Convert.IntTypes.convert
     , Convert.KWArgs.convert
-    , Convert.LogOp.convert
     , Convert.MultiplePacked.convert
     , Convert.UnbasedUnsized.convert
     , Convert.Cast.convert
@@ -79,39 +82,45 @@ phases excludes =
     , Convert.Struct.convert
     , Convert.TFBlock.convert
     , Convert.Typedef.convert
-    , Convert.Unique.convert
     , Convert.UnpackedArray.convert
     , Convert.Unsigned.convert
     , Convert.Wildcard.convert
     , Convert.Enum.convert
     , Convert.ForDecl.convert
-    , Convert.Jump.convert
-    , Convert.Foreach.convert
     , Convert.StringParam.convert
-    , selectExclude (Job.Interface, Convert.Interface.convert)
-    , Convert.StarPort.convert
-    , selectExclude (Job.Always   , Convert.AlwaysKW.convert)
-    , selectExclude (Job.Succinct , Convert.RemoveComments.convert)
+    , selectExclude Job.Interface Convert.Interface.convert
+    , selectExclude Job.Succinct Convert.RemoveComments.convert
     ]
-    where
-        selectExclude :: (Job.Exclude, Phase) -> Phase
-        selectExclude (exclude, phase) =
-            if elem exclude excludes
-                then id
-                else phase
 
-run :: [Job.Exclude] -> Phase
-run excludes = foldr (.) id $ phases excludes
+initialPhases :: Selector -> [Phase]
+initialPhases selectExclude =
+    [ Convert.Jump.convert
+    , Convert.Unique.convert
+    , Convert.LogOp.convert
+    , Convert.Foreach.convert
+    , Convert.StarPort.convert
+    , selectExclude Job.Assert Convert.Assertion.convert
+    , selectExclude Job.Always Convert.AlwaysKW.convert
+    , Convert.Package.convert
+    , Convert.ParamNoDefault.convert
+    ]
 
 convert :: [Job.Exclude] -> Phase
 convert excludes =
-    convert'
-        . Convert.Package.convert
-        . Convert.ParamNoDefault.convert
+    final . loopMain . initial
     where
-        convert' :: Phase
-        convert' descriptions =
+        final = combine $ finalPhases selectExclude
+        main = combine $ mainPhases selectExclude
+        initial = combine $ initialPhases selectExclude
+        combine = foldr1 (.)
+        loopMain :: Phase
+        loopMain descriptions =
             if descriptions == descriptions'
                 then descriptions
-                else convert' descriptions'
-            where descriptions' = run excludes descriptions
+                else loopMain descriptions'
+            where descriptions' = main descriptions
+        selectExclude :: Selector
+        selectExclude exclude phase =
+            if elem exclude excludes
+                then id
+                else phase
