@@ -438,21 +438,23 @@ addItems pis existingPIs ((item, usedPIs) : items) =
     if not $ Set.disjoint existingPIs thisPI then
         -- this item was re-imported earlier in the module
         addItems pis existingPIs items
-    else if null itemsToAdd then
+    else if Map.null itemsToAdd then
         -- this item has no additional dependencies
         item : addItems pis (Set.union existingPIs thisPI) items
     else
         -- this item has at least one un-met dependency
-        addItems pis existingPIs (addUsedPIs chosen : (item, usedPIs) : items)
+        addItems remainingPIs existingPIs
+            (addUsedPIs chosenItem : (item, usedPIs) : items)
     where
         thisPI = case item of
             MIPackageItem packageItem ->
                 Set.fromList $ piNames packageItem
             _ -> Set.empty
         neededPIs = Set.difference (Set.difference usedPIs existingPIs) thisPI
-        itemsToAdd = map MIPackageItem $ Map.elems $
-            Map.restrictKeys pis neededPIs
-        chosen = head itemsToAdd
+        itemsToAdd = Map.restrictKeys pis neededPIs
+        (chosenName, chosenPI) = Map.findMin itemsToAdd
+        chosenItem = MIPackageItem chosenPI
+        remainingPIs = Map.delete chosenName pis
 addItems _ _ [] = []
 
 -- augment a module item with the set of identifiers it uses
