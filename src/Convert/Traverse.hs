@@ -101,7 +101,6 @@ module Convert.Traverse
 ) where
 
 import Data.Functor.Identity (Identity, runIdentity)
-import Control.Monad.State.Strict
 import Control.Monad.Writer.Strict
 import Language.SystemVerilog.AST
 
@@ -1120,5 +1119,5 @@ traverseFiles
     -> (w -> Mapper AST)
     -> Mapper [AST]
 traverseFiles fileCollectorM fileMapper files =
-    evalState (traverseFilesM fileCollectorM fileMapperM  files) ()
+    runIdentity (traverseFilesM fileCollectorM fileMapperM  files)
     where fileMapperM = (\w -> return . fileMapper w)
