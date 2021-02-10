@@ -22,6 +22,7 @@ import qualified Convert.ForDecl
 import qualified Convert.Foreach
 import qualified Convert.FuncRet
 import qualified Convert.FuncRoutine
+import qualified Convert.HierConst
 import qualified Convert.ImplicitNet
 import qualified Convert.Inside
 import qualified Convert.Interface
@@ -74,6 +75,7 @@ mainPhases selectExclude =
     , Convert.MultiplePacked.convert
     , Convert.UnbasedUnsized.convert
     , Convert.Cast.convert
+    , Convert.HierConst.convert
     , Convert.TypeOf.convert
     , Convert.DimensionQuery.convert
     , Convert.ParamType.convert

@@ -23,7 +23,6 @@
 module Convert.TypeOf (convert) where
 
 import Data.Tuple (swap)
-import qualified Data.Map.Strict as Map
 
 import Convert.ExprUtils (dimensionsSize, endianCondRange, simplify)
 import Convert.Scoper
@@ -38,8 +37,10 @@ convert = map $ traverseDescriptions $ partScoper
 pattern UnitType :: Type
 pattern UnitType = IntegerVector TLogic Unspecified []
 
+type ST = Scoper (Type, Bool)
+
 -- insert the given declaration into the scope, and convert an TypeOfs within
-traverseDeclM :: Decl -> Scoper Type Decl
+traverseDeclM :: Decl -> ST Decl
 traverseDeclM decl = do
     decl' <- traverseDeclExprsM traverseExprM decl
         >>= traverseDeclTypesM traverseTypeM
@@ -47,45 +48,61 @@ traverseDeclM decl = do
         Variable _ (Implicit sg rs) ident a _ ->
             -- implicit types, which are commonly found in function return
             -- types, are recast as logics to avoid outputting bare ranges
-            insertElem ident t' >> return decl'
+            insertType ident t' >> return decl'
             where t' = injectRanges (IntegerVector TLogic sg rs) a
         Variable d t ident a e -> do
             let t' = injectRanges t a
-            insertElem ident t'
+            insertType ident t'
             return $ case t' of
                 UnpackedType t'' a' -> Variable d t'' ident a' e
                 _ ->                   Variable d t'  ident [] e
         Param _ UnknownType ident String{} ->
-            insertElem ident UnknownType >> return decl'
+            insertType ident UnknownType >> return decl'
         Param _ UnknownType ident e ->
-            typeof e >>= insertElem ident >> return decl'
+            typeof e >>= insertType ident >> return decl'
         Param _ (Implicit sg rs) ident _ ->
-            insertElem ident t' >> return decl'
+            insertType ident t' >> return decl'
             where t' = IntegerVector TLogic sg rs
         Param _ t ident _ ->
-            insertElem ident t >> return decl'
+            insertType ident t >> return decl'
         ParamType{} -> return decl'
         CommentDecl{} -> return decl'
 
+-- rewrite and store a non-genvar data declaration's type information
+insertType :: Identifier -> Type -> ST ()
+insertType ident typ = do
+    typ' <- traverseNestedTypesM (traverseTypeExprsM scopeExpr) typ
+    insertElem ident (typ', False)
+
+-- rewrite an expression so that any identifiers it contains unambiguously refer
+-- refer to currently visible declarations so it can be substituted elsewhere
+scopeExpr :: Expr -> ST Expr
+scopeExpr expr = do
+    expr' <- traverseSinglyNestedExprsM scopeExpr expr
+    details <- lookupElemM expr'
+    case details of
+        Just (accesses, _, (_, False)) -> return $ accessesToExpr accesses
+        _ -> return expr'
+
 -- convert TypeOf in a ModuleItem
-traverseModuleItemM :: ModuleItem -> Scoper Type ModuleItem
-traverseModuleItemM (Genvar x) = do
-    insertElem x $ IntegerAtom TInteger Unspecified
-    return $ Genvar x
+traverseModuleItemM :: ModuleItem -> ST ModuleItem
+traverseModuleItemM (Genvar x) =
+    insertElem x (t, True) >> return (Genvar x)
+    where t = IntegerAtom TInteger Unspecified
 traverseModuleItemM item =
     traverseNodesM traverseExprM return traverseTypeM traverseLHSM return item
     where traverseLHSM = traverseLHSExprsM traverseExprM
 
 -- convert TypeOf in a GenItem
-traverseGenItemM :: GenItem -> Scoper Type GenItem
+traverseGenItemM :: GenItem -> ST GenItem
 traverseGenItemM = traverseGenItemExprsM traverseExprM
 
 -- convert TypeOf in a Stmt
-traverseStmtM :: Stmt -> Scoper Type Stmt
+traverseStmtM :: Stmt -> ST Stmt
 traverseStmtM = traverseStmtExprsM traverseExprM
 
 -- convert TypeOf in an Expr
-traverseExprM :: Expr -> Scoper Type Expr
+traverseExprM :: Expr -> ST Expr
 traverseExprM (Cast (Left (Implicit sg [])) expr) =
     -- `signed'(foo)` and `unsigned'(foo)` are syntactic sugar for the `$signed`
     -- and `$unsigned` system functions present in Verilog-2005
@@ -122,7 +139,7 @@ traverseExprM other =
     >>= traverseSinglyNestedExprsM traverseExprM
 
 -- carry forward the signedness of the expression when cast to the given size
-elaborateSizeCast :: Expr -> Expr -> Scoper Type Expr
+elaborateSizeCast :: Expr -> Expr -> ST Expr
 elaborateSizeCast size value = do
     t <- typeof value
     case typeSignedness t of
@@ -130,7 +147,7 @@ elaborateSizeCast size value = do
         sg -> traverseExprM $ Cast (Left $ typeOfSize sg size) value
 
 -- convert TypeOf in a Type
-traverseTypeM :: Type -> Scoper Type Type
+traverseTypeM :: Type -> ST Type
 traverseTypeM (TypeOf expr) =
     traverseExprM expr >>= typeof
 traverseTypeM other =
@@ -139,31 +156,22 @@ traverseTypeM other =
 
 -- attempts to find the given (potentially hierarchical or generate-scoped)
 -- expression in the available scope information
-lookupTypeOf :: Expr -> Scoper Type Type
+lookupTypeOf :: Expr -> ST Type
 lookupTypeOf expr = do
     details <- lookupElemM expr
     case details of
         Nothing -> return $ TypeOf expr
-        Just (_, replacements, typ) -> do
+        Just (_, replacements, (typ, _)) -> do
             let typ' = toVarType typ
-            return $ if Map.null replacements
-                then typ'
-                else rewriteType replacements typ'
+            return $ replaceInType replacements typ'
     where
         toVarType :: Type -> Type
         toVarType (Net _ sg rs) = IntegerVector TLogic sg rs
         toVarType other = other
-        rewriteType :: Replacements -> Type -> Type
-        rewriteType replacements = traverseNestedTypes $ traverseTypeExprs $
-            traverseNestedExprs (replace replacements)
-        replace :: Replacements -> Expr -> Expr
-        replace replacements (Ident x) =
-            Map.findWithDefault (Ident x) x replacements
-        replace _ other = other
 
 -- determines the type of an expression based on the available scope information
 -- according the semantics defined in IEEE 1800-2017, especially Section 11.6
-typeof :: Expr -> Scoper Type Type
+typeof :: Expr -> ST Type
 typeof (Number n) =
     return $ IntegerVector TLogic sg [r]
     where
@@ -233,7 +241,7 @@ unescapedLength ('\\' : _ : rest) = 1 + unescapedLength rest
 unescapedLength (_        : rest) = 1 + unescapedLength rest
 
 -- type of a standard (non-member) function call
-typeofCall :: String -> Args -> Scoper Type Type
+typeofCall :: String -> Args -> ST Type
 typeofCall "$unsigned" (Args [e] []) = return $ typeOfSize Unsigned $ sizeof e
 typeofCall "$signed"   (Args [e] []) = return $ typeOfSize Signed   $ sizeof e
 typeofCall "$clog2"    (Args [_] []) =
@@ -250,7 +258,7 @@ typeSignednessOverride fallback sg t =
         _ -> fallback
 
 -- type of a unary operator expression
-typeofUniOp :: UniOp -> Expr -> Scoper Type Type
+typeofUniOp :: UniOp -> Expr -> ST Type
 typeofUniOp UniAdd e = typeof e
 typeofUniOp UniSub e = typeof e
 typeofUniOp BitNot e = typeof e
@@ -259,7 +267,7 @@ typeofUniOp _ _ =
     return UnitType
 
 -- type of a binary operator expression (Section 11.6.1)
-typeofBinOp :: BinOp -> Expr -> Expr -> Scoper Type Type
+typeofBinOp :: BinOp -> Expr -> Expr -> ST Type
 typeofBinOp op a b =
     case op of
         LogAnd  -> unitType
@@ -293,7 +301,7 @@ typeofBinOp op a b =
     where unitType = return UnitType
 
 -- produces a type large enough to hold either expression
-largerSizeType :: Expr -> Expr -> Scoper Type Type
+largerSizeType :: Expr -> Expr -> ST Type
 largerSizeType a (Number (Based 1 _ _ _ _)) = typeof a
 largerSizeType a b = do
     t <- typeof a

@@ -72,6 +72,7 @@ executable sv2v
     Convert.Foreach
     Convert.FuncRet
     Convert.FuncRoutine
+    Convert.HierConst
     Convert.ImplicitNet
     Convert.Inside
     Convert.Interface

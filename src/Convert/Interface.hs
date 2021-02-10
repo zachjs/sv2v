@@ -214,13 +214,6 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                         Nothing -> accessesToExpr $ init accesses
                             where Just (accesses, _, _) =
                                     lookupElem modports (Dot e "")
-                accessesToExpr :: [Access] -> Expr
-                accessesToExpr accesses =
-                    foldl accessToExpr (Ident topName) rest
-                    where Access topName Nil : rest = accesses
-                accessToExpr :: Expr -> Access -> Expr
-                accessToExpr e (Access x Nil) = Dot e x
-                accessToExpr e (Access x i) = Bit (Dot e x) i
 
         -- expand a modport binding into a series of expression substitutions
         genSubstitutions :: Scopes [ModportDecl] -> Expr -> Expr -> Expr

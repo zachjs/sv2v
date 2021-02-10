@@ -27,9 +27,13 @@ module Convert.Scoper
     , ScoperT
     , evalScoper
     , evalScoperT
+    , runScoper
     , runScoperT
     , partScoper
     , partScoperT
+    , accessesToExpr
+    , replaceInType
+    , replaceInExpr
     , insertElem
     , injectItem
     , injectDecl
@@ -153,6 +157,34 @@ exprToAccesses (Dot e x) = do
     accesses <- exprToAccesses e
     Just $ accesses ++ [Access x Nil]
 exprToAccesses _ = Nothing
+
+accessesToExpr :: [Access] -> Expr
+accessesToExpr accesses =
+    foldl accessToExpr (Ident topName) rest
+    where Access topName Nil : rest = accesses
+
+accessToExpr :: Expr -> Access -> Expr
+accessToExpr e (Access x Nil) = Dot e x
+accessToExpr e (Access x i) = Bit (Dot e x) i
+
+replaceInType :: Replacements -> Type -> Type
+replaceInType replacements =
+    if Map.null replacements
+        then id
+        else traverseNestedTypes $ traverseTypeExprs $
+                replaceInExpr' replacements
+
+replaceInExpr :: Replacements -> Expr -> Expr
+replaceInExpr replacements =
+    if Map.null replacements
+        then id
+        else replaceInExpr' replacements
+
+replaceInExpr' :: Replacements -> Expr -> Expr
+replaceInExpr' replacements (Ident x) =
+    Map.findWithDefault (Ident x) x replacements
+replaceInExpr' replacements other =
+    traverseSinglyNestedExprs (replaceInExpr replacements) other
 
 class ScopePath k where
     toTiers :: Scopes a -> k -> [Tier]
@@ -300,6 +332,18 @@ evalScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items =
         declMapper moduleItemMapper genItemMapper stmtMapper
         topName items
     return items'
+
+runScoper
+    :: MapperM (Scoper a) Decl
+    -> MapperM (Scoper a) ModuleItem
+    -> MapperM (Scoper a) GenItem
+    -> MapperM (Scoper a) Stmt
+    -> Identifier
+    -> [ModuleItem]
+    -> ([ModuleItem], Scopes a)
+runScoper declMapper moduleItemMapper genItemMapper stmtMapper topName items =
+    runIdentity $ runScoperT
+    declMapper moduleItemMapper genItemMapper stmtMapper topName items
 
 runScoperT
     :: forall a m. Monad m
