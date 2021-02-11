@@ -14,6 +14,7 @@ module Language.SystemVerilog.AST.Number
     , numberToInteger
     ) where
 
+import Data.Bits (shiftL)
 import Data.Char (digitToInt, intToDigit, toLower)
 import Data.List (elemIndex)
 import Text.Read (readMaybe)
@@ -300,3 +301,35 @@ chunk base n0 =
                 0 -> [d']
                 _ -> d' : chunkStep (quotRem n base)
             where d' = fromIntegral d
+
+-- number concatenation
+instance Semigroup Number where
+    (n1 @ Based{}) <> (n2 @ Based{}) =
+        Based size signed base values kinds
+        where
+            size = size1 + size2
+            signed = False
+            base =
+                if kinds1 == 0 && kinds2 == 0
+                    then min base1 base2
+                    else Binary
+            values = values2 + shiftL values1 size2
+            kinds = kinds2 + shiftL kinds1 size2
+            size1 = fromIntegral $ numberBitLength n1
+            size2 = fromIntegral $ numberBitLength n2
+            Based _ _ base1 values1 kinds1 = n1
+            Based _ _ base2 values2 kinds2 = n2
+    n1 <> n2 =
+        toBased n1 <> toBased n2
+        where
+            toBased (n @ Based{}) = n
+            toBased (Decimal size signed num) =
+                Based size signed Hex num 0
+            toBased (UnbasedUnsized ch) =
+                case ch of
+                    '0' -> based 0 0
+                    '1' -> based 1 0
+                    'x' -> based 0 1
+                    'z' -> based 1 1
+                    _ -> error $ "invalid unbased unsized char: " ++ show ch
+                where based = Based 1 False Binary

@@ -36,6 +36,10 @@ simplifyStep (UniOp LogNot (BinOp Ne a b)) = BinOp Eq a b
 simplifyStep (UniOp UniSub (UniOp UniSub e)) = e
 simplifyStep (UniOp UniSub (BinOp Sub e1 e2)) = BinOp Sub e2 e1
 
+simplifyStep (Concat (Number n1 : Number n2 : rest)) =
+    simplifyStep $ Concat $ Number n : rest
+    where n = n1 <> n2
+
 simplifyStep (Concat [Number (Decimal size _ value)]) =
     Number $ Decimal size False value
 simplifyStep (Concat [Number (Based size _ base value kinds)]) =
