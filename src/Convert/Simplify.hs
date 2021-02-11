@@ -113,9 +113,14 @@ convertExpr info (Mux cc aa bb) =
         bb' = convertExpr info bb
         cc' = convertExpr info cc
 convertExpr info (BinOp op e1 e2) =
-    simplifyStep $ BinOp op
-        (convertExpr info e1)
-        (convertExpr info e2)
+    case simplifyStep $ BinOp op e1'Sub e2'Sub of
+        Number n -> Number n
+        _ -> simplifyStep $ BinOp op e1' e2'
+    where
+        e1' = convertExpr info e1
+        e2' = convertExpr info e2
+        e1'Sub = substituteIdent info e1'
+        e2'Sub = substituteIdent info e2'
 convertExpr info (UniOp op expr) =
     simplifyStep $ UniOp op $ convertExpr info expr
 convertExpr info (Repeat expr exprs) =
@@ -138,3 +143,10 @@ substitute scopes expr =
                 Just (_, _, e) -> e
         substitute' other =
             traverseSinglyNestedExprs substitute' other
+
+substituteIdent :: Scopes Expr -> Expr -> Expr
+substituteIdent scopes (Ident x) =
+    case lookupElem scopes x of
+        Just (_, _, n @ Number{}) -> n
+        _ -> Ident x
+substituteIdent _ other = other
