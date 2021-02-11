@@ -124,7 +124,11 @@ substituteExpr mapping (Ident x) =
         Nothing -> Ident x
         Just expr -> substituteExpr mapping expr
 substituteExpr mapping expr =
-    traverseSinglyNestedExprs (substituteExpr mapping) expr
+    traverseExprTypes typeMapper $
+    traverseSinglyNestedExprs exprMapper expr
+    where
+        exprMapper = substituteExpr mapping
+        typeMapper = traverseNestedTypes $ traverseTypeExprs exprMapper
 
 tagExpr :: Expr -> Expr
 tagExpr (Ident x) = Ident (':' : x)
@@ -254,7 +258,7 @@ pattern UU ch = Number (UnbasedUnsized ch)
 
 convertType :: Type -> Type
 convertType (TypeOf e) = TypeOf $ convertExpr SelfDetermined e
-convertType other = other
+convertType other = traverseTypeExprs (convertExpr SelfDetermined) other
 
 isParentSizedBinOp :: BinOp -> Bool
 isParentSizedBinOp BitAnd  = True

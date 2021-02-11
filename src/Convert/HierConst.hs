@@ -82,10 +82,13 @@ traverseDeclM decl = do
 scopeExpr :: Expr -> ST Expr
 scopeExpr expr = do
     expr' <- traverseSinglyNestedExprsM scopeExpr expr
+                >>= traverseExprTypesM scopeType
     details <- lookupElemM expr'
     case details of
         Just (accesses, _, _) -> return $ accessesToExpr accesses
         _ -> return expr'
+scopeType :: Type -> ST Type
+scopeType = traverseNestedTypesM $ traverseTypeExprsM scopeExpr
 
 -- substitute hierarchical references to constants
 traverseExprM :: Expr -> ST Expr

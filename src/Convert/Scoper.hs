@@ -171,8 +171,11 @@ replaceInType :: Replacements -> Type -> Type
 replaceInType replacements =
     if Map.null replacements
         then id
-        else traverseNestedTypes $ traverseTypeExprs $
-                replaceInExpr' replacements
+        else replaceInType' replacements
+
+replaceInType' :: Replacements -> Type -> Type
+replaceInType' replacements =
+    traverseNestedTypes $ traverseTypeExprs $ replaceInExpr' replacements
 
 replaceInExpr :: Replacements -> Expr -> Expr
 replaceInExpr replacements =
@@ -184,7 +187,8 @@ replaceInExpr' :: Replacements -> Expr -> Expr
 replaceInExpr' replacements (Ident x) =
     Map.findWithDefault (Ident x) x replacements
 replaceInExpr' replacements other =
-    traverseSinglyNestedExprs (replaceInExpr replacements) other
+    traverseExprTypes (replaceInType' replacements) $
+    traverseSinglyNestedExprs (replaceInExpr' replacements) other
 
 class ScopePath k where
     toTiers :: Scopes a -> k -> [Tier]

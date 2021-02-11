@@ -402,9 +402,7 @@ collectNestedExprsM = collectify traverseNestedExprsM
 traverseSinglyNestedExprsM :: Monad m => MapperM m Expr -> MapperM m Expr
 traverseSinglyNestedExprsM exprMapper = em
     where
-        typeMapper = traverseNestedTypesM (traverseTypeExprsM exprMapper)
-        typeOrExprMapper (Left t) =
-            typeMapper t >>= return . Left
+        typeOrExprMapper (Left t) = return $ Left t
         typeOrExprMapper (Right e) =
             exprMapper e >>= return . Right
         exprOrRangeMapper (Left e) =

@@ -71,7 +71,7 @@ traverseDeclM decl = do
 -- rewrite and store a non-genvar data declaration's type information
 insertType :: Identifier -> Type -> ST ()
 insertType ident typ = do
-    typ' <- traverseNestedTypesM (traverseTypeExprsM scopeExpr) typ
+    typ' <- scopeType typ
     insertElem ident (typ', False)
 
 -- rewrite an expression so that any identifiers it contains unambiguously refer
@@ -79,10 +79,13 @@ insertType ident typ = do
 scopeExpr :: Expr -> ST Expr
 scopeExpr expr = do
     expr' <- traverseSinglyNestedExprsM scopeExpr expr
+                >>= traverseExprTypesM scopeType
     details <- lookupElemM expr'
     case details of
         Just (accesses, _, (_, False)) -> return $ accessesToExpr accesses
         _ -> return expr'
+scopeType :: Type -> ST Type
+scopeType = traverseNestedTypesM $ traverseTypeExprsM scopeExpr
 
 -- convert TypeOf in a ModuleItem
 traverseModuleItemM :: ModuleItem -> ST ModuleItem
@@ -135,8 +138,8 @@ traverseExprM (Cast (Right size) expr) = do
     size' <- traverseExprM size
     elaborateSizeCast size' expr'
 traverseExprM other =
-    traverseExprTypesM traverseTypeM other
-    >>= traverseSinglyNestedExprsM traverseExprM
+    traverseSinglyNestedExprsM traverseExprM other
+    >>= traverseExprTypesM traverseTypeM
 
 -- carry forward the signedness of the expression when cast to the given size
 elaborateSizeCast :: Expr -> Expr -> ST Expr
@@ -151,8 +154,8 @@ traverseTypeM :: Type -> ST Type
 traverseTypeM (TypeOf expr) =
     traverseExprM expr >>= typeof
 traverseTypeM other =
-    traverseTypeExprsM traverseExprM other
-    >>= traverseSinglyNestedTypesM traverseTypeM
+    traverseSinglyNestedTypesM traverseTypeM other
+    >>= traverseTypeExprsM traverseExprM
 
 -- attempts to find the given (potentially hierarchical or generate-scoped)
 -- expression in the available scope information

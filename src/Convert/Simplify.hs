@@ -36,7 +36,7 @@ traverseDeclM decl = do
     case decl' of
         Param Localparam UnknownType x e ->
             insertExpr x e
-        Param Localparam (Implicit Signed [(RawNum 31, RawNum 0)]) x e ->
+        Param Localparam (Implicit _ [(RawNum 31, RawNum 0)]) x e ->
             insertExpr x e
         Param Localparam (Implicit sg rs) x e ->
             insertExpr x $ Cast (Left t) e
@@ -81,6 +81,11 @@ substituteExprM :: Expr -> Scoper Expr Expr
 substituteExprM = embedScopes substitute
 
 convertExpr :: Scopes Expr -> Expr -> Expr
+convertExpr info (Cast (Left t) e) =
+    Cast (Left t') e'
+    where
+        t' = traverseNestedTypes (traverseTypeExprs $ substitute info) t
+        e' = convertExpr info e
 convertExpr info (Cast (Right c) e) =
     Cast (Right c') e'
     where

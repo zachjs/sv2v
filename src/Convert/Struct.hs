@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
@@ -150,32 +151,28 @@ traverseStmtM' =
     traverseStmtAsgnsM traverseAsgnM
 
 traverseExprM :: Expr -> Scoper Type Expr
-traverseExprM = traverseNestedExprsM $
-    embedScopes convertSubExpr >=> return . snd
+traverseExprM = embedScopes convertSubExpr >=> return . snd
 
 traverseLHSM :: LHS -> Scoper Type LHS
-traverseLHSM = traverseNestedLHSsM $ convertLHS >=> return . snd
+traverseLHSM = convertLHS >=> return . snd
 
 -- removes the innermost range from the given type, if possible
 dropInnerTypeRange :: Type -> Type
 dropInnerTypeRange t =
     case typeRanges t of
-        (_, []) -> unknownType
+        (_, []) -> UnknownType
         (tf, rs) -> tf $ tail rs
 
 -- produces the type of the given part select, if possible
 replaceInnerTypeRange :: PartSelectMode -> Range -> Type -> Type
 replaceInnerTypeRange NonIndexed r t =
     case typeRanges t of
-        (_, []) -> unknownType
+        (_, []) -> UnknownType
         (tf, rs) -> tf $ r : tail rs
 replaceInnerTypeRange IndexedPlus r t =
     replaceInnerTypeRange NonIndexed (snd r, RawNum 1) t
 replaceInnerTypeRange IndexedMinus r t =
     replaceInnerTypeRange NonIndexed (snd r, RawNum 1) t
-
-unknownType :: Type
-unknownType = Implicit Unspecified []
 
 traverseAsgnM :: (LHS, Expr) -> Scoper Type (LHS, Expr)
 traverseAsgnM (lhs, expr) = do
@@ -319,9 +316,11 @@ convertExpr _ other = other
 
 fallbackType :: Scopes Type -> Expr -> (Type, Expr)
 fallbackType scopes e =
-    case lookupElem scopes e of
-        Nothing -> (unknownType, e)
-        Just (_, _, t) -> (t, e)
+    (t, e)
+    where
+        t = case lookupElem scopes e of
+                Nothing -> UnknownType
+                Just (_, _, typ) -> typ
 
 -- converting LHSs by looking at the innermost types first
 convertLHS :: LHS -> Scoper Type (Type, LHS)
@@ -354,65 +353,78 @@ convertSubExpr scopes (Range (Dot e x) NonIndexed rOuter) =
     if isntStruct subExprType then
         fallbackType scopes orig'
     else if structIsntReady subExprType then
-        (replaceInnerTypeRange NonIndexed rOuter fieldType, orig')
+        (replaceInnerTypeRange NonIndexed rOuter' fieldType, orig')
     else
-        (replaceInnerTypeRange NonIndexed rOuter fieldType, undotted)
+        (replaceInnerTypeRange NonIndexed rOuter' fieldType, undotted)
     where
+        (roLeft, roRight) = rOuter
         (subExprType, e') = convertSubExpr scopes e
-        orig' = Range (Dot e' x) NonIndexed rOuter
+        (_, roLeft') = convertSubExpr scopes roLeft
+        (_, roRight') = convertSubExpr scopes roRight
+        rOuter' = (roLeft', roRight')
+        orig' = Range (Dot e' x) NonIndexed rOuter'
         (fieldType, bounds, dims) = lookupFieldInfo subExprType x
         [dim] = dims
-        rangeLeft = ( BinOp Sub (fst bounds) $ BinOp Sub (fst dim) (fst rOuter)
-                    , BinOp Sub (fst bounds) $ BinOp Sub (fst dim) (snd rOuter) )
-        rangeRight =( BinOp Add (snd bounds) $ BinOp Sub (snd dim) (fst rOuter)
-                    , BinOp Add (snd bounds) $ BinOp Sub (snd dim) (snd rOuter) )
+        rangeLeft = ( BinOp Sub (fst bounds) $ BinOp Sub (fst dim) roLeft'
+                    , BinOp Sub (fst bounds) $ BinOp Sub (fst dim) roRight' )
+        rangeRight =( BinOp Add (snd bounds) $ BinOp Sub (snd dim) roLeft'
+                    , BinOp Add (snd bounds) $ BinOp Sub (snd dim) roRight' )
         undotted = Range e' NonIndexed $
             endianCondRange dim rangeLeft rangeRight
 convertSubExpr scopes (Range (Dot e x) mode (baseO, lenO)) =
     if isntStruct subExprType then
         fallbackType scopes orig'
     else if structIsntReady subExprType then
-        (replaceInnerTypeRange mode (baseO, lenO) fieldType, orig')
+        (replaceInnerTypeRange mode (baseO', lenO') fieldType, orig')
     else
-        (replaceInnerTypeRange mode (baseO, lenO) fieldType, undotted)
+        (replaceInnerTypeRange mode (baseO', lenO') fieldType, undotted)
     where
         (subExprType, e') = convertSubExpr scopes e
-        orig' = Range (Dot e' x) mode (baseO, lenO)
+        (_, baseO') = convertSubExpr scopes baseO
+        (_, lenO') = convertSubExpr scopes lenO
+        orig' = Range (Dot e' x) mode (baseO', lenO')
         (fieldType, bounds, dims) = lookupFieldInfo subExprType x
         [dim] = dims
-        baseLeft  = BinOp Sub (fst bounds) $ BinOp Sub (fst dim) baseO
-        baseRight = BinOp Add (snd bounds) $ BinOp Sub (snd dim) baseO
+        baseLeft  = BinOp Sub (fst bounds) $ BinOp Sub (fst dim) baseO'
+        baseRight = BinOp Add (snd bounds) $ BinOp Sub (snd dim) baseO'
         baseDec = baseLeft
         baseInc = case mode of
-            IndexedPlus  -> BinOp Add (BinOp Sub baseRight lenO) one
-            IndexedMinus -> BinOp Sub (BinOp Add baseRight lenO) one
+            IndexedPlus  -> BinOp Add (BinOp Sub baseRight lenO') one
+            IndexedMinus -> BinOp Sub (BinOp Add baseRight lenO') one
             NonIndexed   -> error "invariant violated"
         base = endianCondExpr dim baseDec baseInc
-        undotted = Range e' mode (base, lenO)
+        undotted = Range e' mode (base, lenO')
         one = RawNum 1
-convertSubExpr scopes (Range e mode r) =
-    (replaceInnerTypeRange mode r t, Range e' mode r)
-    where (t, e') = convertSubExpr scopes e
+convertSubExpr scopes (Range e mode (left, right)) =
+    (replaceInnerTypeRange mode r' t, Range e' mode r')
+    where
+        (t, e') = convertSubExpr scopes e
+        (_, left') = convertSubExpr scopes left
+        (_, right') = convertSubExpr scopes right
+        r' = (left', right')
 convertSubExpr scopes (Bit (Dot e x) i) =
     if isntStruct subExprType then
         fallbackType scopes orig'
     else if structIsntReady subExprType then
         (dropInnerTypeRange fieldType, orig')
     else
-        (dropInnerTypeRange fieldType, Bit e' i')
+        (dropInnerTypeRange fieldType, Bit e' iFlat)
     where
         (subExprType, e') = convertSubExpr scopes e
-        orig' = Bit (Dot e' x) i
+        (_, i') = convertSubExpr scopes i
+        orig' = Bit (Dot e' x) i'
         (fieldType, bounds, dims) = lookupFieldInfo subExprType x
         [dim] = dims
-        iLeft  = BinOp Sub (fst bounds) $ BinOp Sub (fst dim) i
-        iRight = BinOp Add (snd bounds) $ BinOp Sub (snd dim) i
-        i' = endianCondExpr dim iLeft iRight
+        left  = BinOp Sub (fst bounds) $ BinOp Sub (fst dim) i'
+        right = BinOp Add (snd bounds) $ BinOp Sub (snd dim) i'
+        iFlat = endianCondExpr dim left right
 convertSubExpr scopes (Bit e i) =
-    if t == unknownType
-        then fallbackType scopes $ Bit e' i
-        else (dropInnerTypeRange t, Bit e' i)
-    where (t, e') = convertSubExpr scopes e
+    if t == UnknownType
+        then fallbackType scopes $ Bit e' i'
+        else (dropInnerTypeRange t, Bit e' i')
+    where
+        (t, e') = convertSubExpr scopes e
+        (_, i') = convertSubExpr scopes i
 convertSubExpr scopes (Call e args) =
     (retType, Call e args')
     where
@@ -423,8 +435,8 @@ convertSubExpr scopes (Cast (Left t) e) =
     where (_, e') = convertSubExpr scopes e
 convertSubExpr scopes (Pattern items) =
     if all (== "") $ map fst items'
-        then (unknownType, Concat $ map snd items')
-        else (unknownType, Pattern items')
+        then (UnknownType, Concat $ map snd items')
+        else (UnknownType, Pattern items')
     where
         items' = map mapItem items
         mapItem (x, e) = (x, e')
@@ -435,8 +447,15 @@ convertSubExpr scopes (Mux a b c) =
         (_, a') = convertSubExpr scopes a
         (t, b') = convertSubExpr scopes b
         (_, c') = convertSubExpr scopes c
-convertSubExpr scopes other =
-    fallbackType scopes other
+convertSubExpr scopes (Ident x) =
+    fallbackType scopes (Ident x)
+convertSubExpr scopes e =
+    (UnknownType, ) $
+        traverseExprTypes typeMapper $
+        traverseSinglyNestedExprs exprMapper e
+    where
+        exprMapper = snd . convertSubExpr scopes
+        typeMapper = traverseNestedTypes $ traverseTypeExprs exprMapper
 
 -- get the fields and type function of a struct or union
 getFields :: Type -> Maybe [Field]
@@ -478,6 +497,6 @@ convertCall scopes fn (Args pnArgs kwArgs) =
             (x, e')
             where
                 details = lookupElem scopes $ LHSDot lhs x
-                typ = maybe unknownType thd3 details
+                typ = maybe UnknownType thd3 details
                 thd3 (_, _, c) = c
                 (_, e') = convertSubExpr scopes $ convertExpr typ e
