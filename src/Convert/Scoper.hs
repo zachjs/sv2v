@@ -117,46 +117,32 @@ enterScope :: Monad m => Identifier -> Identifier -> ScoperT a m ()
 enterScope name index = do
     s <- get
     let current' = sCurrent s ++ [Tier name index]
-    existingResult <- lookupElemM name
+    let existingResult = lookupLocalIdent s name
     let existingElement = fmap thd3 existingResult
     let entry = Entry existingElement index Map.empty
     let mapping' = setScope current' entry $ sMapping s
     put $ s { sCurrent = current', sMapping = mapping'}
     where thd3 (_, _, c) = c
 
-exitScope :: Monad m => Identifier -> Identifier -> ScoperT a m ()
-exitScope name index = do
-    let tier = Tier name index
-    s <- get
-    let current = sCurrent s
-    if null current || last current /= tier
-        then error "exitScope invariant violated"
-        else put $ s { sCurrent = init current}
+exitScope :: Monad m => ScoperT a m ()
+exitScope = modify' $ \s -> s { sCurrent = init $ sCurrent s }
 
 enterProcedure :: Monad m => ScoperT a m ()
-enterProcedure = do
-    s <- get
-    if sProcedure s
-        then error "enterProcedure invariant failed"
-        else put $ s { sProcedure = True }
+enterProcedure = modify' $ \s -> s { sProcedure = True }
 
 exitProcedure :: Monad m => ScoperT a m ()
-exitProcedure = do
-    s <- get
-    if not (sProcedure s)
-        then error "exitProcedure invariant failed"
-        else put $ s { sProcedure = False }
+exitProcedure = modify' $ \s -> s { sProcedure = False }
 
-exprToAccesses :: Expr -> Maybe [Access]
-exprToAccesses (Ident x) = Just [Access x Nil]
-exprToAccesses (Bit (Ident x) y) = Just [Access x y]
-exprToAccesses (Bit (Dot e x) y) = do
-    accesses <- exprToAccesses e
-    Just $ accesses ++ [Access x y]
-exprToAccesses (Dot e x) = do
-    accesses <- exprToAccesses e
-    Just $ accesses ++ [Access x Nil]
-exprToAccesses _ = Nothing
+exprToAccesses :: [Access] -> Expr -> Maybe [Access]
+exprToAccesses accesses (Ident x) =
+    Just $ Access x Nil : accesses
+exprToAccesses accesses (Bit (Ident x) y) =
+    Just $ Access x y : accesses
+exprToAccesses accesses (Bit (Dot e x) y) =
+    exprToAccesses (Access x y : accesses) e
+exprToAccesses accesses (Dot e x) =
+    exprToAccesses (Access x Nil : accesses) e
+exprToAccesses _ _ = Nothing
 
 accessesToExpr :: [Access] -> Expr
 accessesToExpr accesses =
@@ -277,7 +263,7 @@ class ScopeKey k where
     lookupElemM = embedScopes lookupElem
 
 instance ScopeKey Expr where
-    lookupElem scopes = join . fmap (lookupAccesses scopes) . exprToAccesses
+    lookupElem scopes = join . fmap (lookupAccesses scopes) . exprToAccesses []
 
 instance ScopeKey LHS where
     lookupElem scopes = lookupElem scopes . lhsToExpr
@@ -364,9 +350,7 @@ runScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items =
         operation :: ScoperT a m [ModuleItem]
         operation = do
             enterScope topName ""
-            items' <- mapM wrappedModuleItemMapper items
-            exitScope topName ""
-            return items'
+            mapM wrappedModuleItemMapper items
         initialState = Scopes [] Map.empty False [] []
 
         wrappedModuleItemMapper = scopeModuleItemT
@@ -388,7 +372,7 @@ scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
             enterScope name ""
             decls' <- fmap concat $ mapM declMapper' decls
             stmts' <- mapM fullStmtMapper stmts
-            exitScope name ""
+            exitScope
             return $ Block kw name decls' stmts'
         -- TODO: Do we need to support the various procedural loops?
         fullStmtMapper stmt = do
@@ -438,10 +422,8 @@ scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
         redirectTFDecl :: Type -> Identifier -> ScoperT a m (Type, Identifier)
         redirectTFDecl typ ident = do
             res <- declMapper $ Variable Local typ ident [] Nil
-            case res of
-                Variable Local newType newName [] Nil ->
-                    return (newType, newName)
-                _ -> error $ "redirected func ret traverse failed: " ++ show res
+            let Variable Local newType newName [] Nil = res
+            return (newType, newName)
 
         wrappedModuleItemMapper :: ModuleItem -> ScoperT a m ModuleItem
         wrappedModuleItemMapper item = do
@@ -459,7 +441,7 @@ scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
             enterScope x' ""
             decls' <- mapTFDecls decls
             stmts' <- mapM fullStmtMapper stmts
-            exitScope x' ""
+            exitScope
             exitProcedure
             return $ MIPackageItem $ Function ml t' x' decls' stmts'
         fullModuleItemMapper (MIPackageItem (Task ml x decls stmts)) = do
@@ -468,7 +450,7 @@ scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
             enterScope x' ""
             decls' <- mapTFDecls decls
             stmts' <- mapM fullStmtMapper stmts
-            exitScope x' ""
+            exitScope
             exitProcedure
             return $ MIPackageItem $ Task ml x' decls' stmts'
         fullModuleItemMapper (MIPackageItem (Decl decl)) =
@@ -518,7 +500,7 @@ scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
         scopeGenItemMapper (GenBlock name genItems) = do
             enterScope name ""
             genItems' <- mapM fullGenItemMapper genItems
-            exitScope name ""
+            exitScope
             return $ GenBlock name genItems'
         scopeGenItemMapper (GenModuleItem moduleItem) =
             wrappedModuleItemMapper moduleItem >>= return . GenModuleItem
@@ -529,12 +511,12 @@ scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
         scopeGenItemBranchMapper index (GenBlock name genItems) = do
             enterScope name index
             genItems' <- mapM fullGenItemMapper genItems
-            exitScope name index
+            exitScope
             return $ GenBlock name genItems'
         scopeGenItemBranchMapper index genItem = do
             enterScope "" index
             genItem' <- fullGenItemMapper genItem
-            exitScope "" index
+            exitScope
             return genItem'
 
 partScoper
