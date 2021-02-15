@@ -313,8 +313,9 @@ instance Semigroup Number where
                 if kinds1 == 0 && kinds2 == 0
                     then min base1 base2
                     else Binary
-            values = values2 + shiftL values1 size2
-            kinds = kinds2 + shiftL kinds1 size2
+            trim = flip mod . (2 ^)
+            values = trim size2 values2 + shiftL (trim size1 values1) size2
+            kinds = trim size2 kinds2 + shiftL (trim size1 kinds1) size2
             size1 = fromIntegral $ numberBitLength n1
             size2 = fromIntegral $ numberBitLength n2
             Based _ _ base1 values1 kinds1 = n1
