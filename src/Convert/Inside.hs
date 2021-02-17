@@ -32,8 +32,6 @@ convertModuleItem item =
     item
 
 convertExpr :: Expr -> Expr
-convertExpr (Inside Nil valueRanges) =
-    Inside Nil valueRanges
 convertExpr (Inside expr valueRanges) =
     if length checks == 1
         then head checks
@@ -50,31 +48,25 @@ convertExpr (Inside expr valueRanges) =
 convertExpr other = other
 
 convertStmt :: Stmt -> Stmt
-convertStmt (Case u kw expr items) =
-    if not $ any isSpecialInside exprs then
-        Case u kw expr items
-    else if kw /= CaseN then
-        error $ "cannot use inside with " ++ show kw
-    else if hasSideEffects expr then
+convertStmt (Case u CaseInside expr items) =
+    if hasSideEffects expr then
         Block Seq "" [decl] [stmt]
     else
         foldr ($) defaultStmt $
         map (uncurry $ If NoCheck) $
         zip comps stmts
     where
-        exprs = map fst items
         -- evaluate expressions with side effects once
         tmp = "sv2v_temp_" ++ shortHash expr
         decl = Variable Local (TypeOf expr) tmp [] expr
-        stmt = convertStmt (Case u kw (Ident tmp) items)
+        stmt = convertStmt (Case u CaseInside (Ident tmp) items)
         -- underlying inside case elaboration
         itemsNonDefault = filter (not . null . fst) items
-        isSpecialInside :: [Expr] -> Bool
-        isSpecialInside [Inside Nil _] = True
-        isSpecialInside _ = False
         makeComp :: [Expr] -> Expr
-        makeComp [Inside Nil ovr] = Inside expr ovr
-        makeComp _ = error "internal invariant violated"
+        makeComp = Inside expr . map unwrap
+        unwrap :: Expr -> ExprOrRange
+        unwrap (Range Nil NonIndexed r) = Right r
+        unwrap e = Left e
         comps = map (makeComp . fst) itemsNonDefault
         stmts = map snd itemsNonDefault
         defaultStmt = fromMaybe Null (lookup [] items)

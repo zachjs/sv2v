@@ -1002,7 +1002,7 @@ StmtNonBlock :: { Stmt }
   | Unique "if" "(" Expr ")" Stmt "else" Stmt  { If $1 $4 $6 $8   }
   | Unique "if" "(" Expr ")" Stmt %prec NoElse { If $1 $4 $6 Null }
   | "for" "(" ForInit ForCond ForStep ")" Stmt { For $3 $4 $5 $7 }
-  | Unique CaseKW "(" Expr ")" Cases "endcase" { Case $1 $2 $4 $6 }
+  | CaseStmt                                   { $1 }
   | TimingControl Stmt                         { Timing $1 $2 }
   | "return" ExprOrNil ";"                     { Return $2 }
   | "break"       ";"                          { Break }
@@ -1017,6 +1017,10 @@ StmtNonBlock :: { Stmt }
   | AttributeInstance Stmt                     { StmtAttr $1 $2 }
   | ProceduralAssertionStatement               { Assertion $1 }
   | "void" "'" "(" Expr CallArgs ")" ";"       { Subroutine $4 $5 }
+
+CaseStmt :: { Stmt }
+  : Unique CaseKW "(" Expr ")"          Cases       "endcase" { Case $1 $2                   $4 $ validateCases $5 $6 }
+  | Unique CaseKW "(" Expr ")" "inside" InsideCases "endcase" { Case $1 (caseInsideKW $3 $2) $4 $ validateCases $5 $7 }
 
 BlockKWPar :: { BlockKW }
   : "fork" { Par }
@@ -1127,12 +1131,16 @@ CaseKW :: { CaseKW }
   | "casez" { CaseZ }
 
 Cases :: { [Case] }
-  : opt("inside") InsideCases { validateCases $1 $2 }
-InsideCases :: { [([ExprOrRange], Stmt)] }
+  : Case       { [$1] }
+  | Case Cases { $1 : $2 }
+Case :: { Case }
+  : Exprs ":"  Stmt { ($1, $3) }
+  | "default" opt(":") Stmt { ([], $3) }
+InsideCases :: { [Case] }
   : InsideCase             { [$1] }
-  | InsideCases InsideCase { $1 ++ [$2] }
-InsideCase :: { ([ExprOrRange], Stmt) }
-  : OpenRangeList ":"  Stmt { ($1, $3) }
+  | InsideCase InsideCases { $1 : $2 }
+InsideCase :: { Case }
+  : OpenRangeList ":"  Stmt { (map rangeAsExpr $1, $3) }
   | "default" opt(":") Stmt { ([], $3) }
 
 Real :: { String }
@@ -1299,7 +1307,7 @@ GenItem :: { GenItem }
 ConditionalGenerateConstruct :: { GenItem }
   : "if" "(" Expr ")" GenItemOrNull "else" GenItemOrNull { GenIf $3 $5 $7      }
   | "if" "(" Expr ")" GenItemOrNull %prec NoElse         { GenIf $3 $5 GenNull }
-  | "case" "(" Expr ")" GenCases "endcase" { GenCase $3 $5 }
+  | "case" "(" Expr ")" GenCases "endcase" { GenCase $3 $ validateCases $4 $5 }
 LoopGenerateConstruct :: { GenItem }
   : "for" "(" GenvarInitialization ";" Expr ";" GenvarIteration ")" GenItem { $3 $5 $7 $9 }
 
@@ -1308,7 +1316,7 @@ GenBlock :: { (Identifier, [GenItem]) }
 
 GenCases :: { [GenCase] }
   : GenCase          { [$1] }
-  | GenCases GenCase { validateGenCases $ $1 ++ [$2] }
+  | GenCase GenCases { $1 : $2 }
 GenCase :: { GenCase }
   : Exprs         ":"  GenItemOrNull { ($1, $3) }
   | "default" opt(":") GenItemOrNull { ([], $3) }
@@ -1444,34 +1452,21 @@ fieldDecl t (x, rs2) =
   (tf $ rs2 ++ rs1, x)
   where (tf, rs1) = typeRanges t
 
-validateCases :: Maybe Token -> [([ExprOrRange], Stmt)] -> [Case]
-validateCases Nothing items =
-  if length (filter null exprs) <= 1
-    then zip exprs' stmts
-    else error $ "multiple default cases: " ++ show items
-  where
-    (exprs, stmts) = unzip items
-    exprs' = map (map unwrap) exprs
-    unwrap (Left expr) = expr
-    unwrap (Right range) =
-      error $ "illegal use of a range (" ++ show range
-        ++ ") in a non-inside case"
-validateCases (Just _) items =
-  if length (filter null sets) <= 1
-    then zip sets' stmts
-    else error $ "multiple default cases: " ++ show items
-  where
-    (sets, stmts) = unzip items
-    sets' = map unwrap sets
-    unwrap [] = []
-    unwrap ls = [Inside Nil ls]
-
-validateGenCases :: [GenCase] -> [GenCase]
-validateGenCases items =
-  if length (filter null exprs) <= 1
+validateCases :: Token -> [([Expr], a)] -> [([Expr], a)]
+validateCases tok items =
+  if length (filter (null . fst) items) <= 1
     then items
-    else error $ "multiple default generate cases: " ++ show items
-  where
-    (exprs, _) = unzip items
+    else error $ show (tokenPosition tok)
+          ++ ": Parse error: case has multiple defaults"
+
+caseInsideKW :: Token -> CaseKW -> CaseKW
+caseInsideKW _ CaseN = CaseInside
+caseInsideKW tok kw =
+  error $ show (tokenPosition tok)
+    ++ ": Parse error: cannot use inside with " ++ show kw
+
+rangeAsExpr :: ExprOrRange -> Expr
+rangeAsExpr (Left e) = e
+rangeAsExpr (Right r) = Range Nil NonIndexed r
 
 }

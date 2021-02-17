@@ -28,7 +28,7 @@ import Text.Printf (printf)
 import Language.SystemVerilog.AST.ShowHelp (commas, indent, unlines', showPad, showBlock)
 import Language.SystemVerilog.AST.Attr (Attr)
 import Language.SystemVerilog.AST.Decl (Decl)
-import Language.SystemVerilog.AST.Expr (Expr(Inside, Nil), Args(..), showExprOrRange)
+import Language.SystemVerilog.AST.Expr (Expr(Nil), Args(..))
 import Language.SystemVerilog.AST.LHS (LHS)
 import Language.SystemVerilog.AST.Op (AsgnOp(AsgnOpEq))
 import Language.SystemVerilog.AST.Type (Identifier)
@@ -65,8 +65,11 @@ instance Show Stmt where
             header = if null name then "" else " : " ++ name
             body = showBlock decls stmts
     show (Case u kw e cs) =
-        printf "%s%s (%s)\n%s\nendcase" (showPad u) (show kw) (show e) bodyStr
-        where bodyStr = indent $ unlines' $ map showCase cs
+        printf "%s%s (%s)%s\n%s\nendcase" (showPad u) (show kw) (show e)
+            insideStr bodyStr
+        where
+            insideStr = if kw == CaseInside then " inside" else ""
+            bodyStr = indent $ unlines' $ map showCase cs
     show (For inits cond assigns stmt) =
         printf "for (%s; %s; %s)\n%s"
             (showInits inits)
@@ -140,19 +143,20 @@ showCase (a, b) = printf "%s:%s" exprStr (showShortBranch b)
     where
         exprStr = case a of
             [] -> "default"
-            [Inside Nil c] -> commas $ map showExprOrRange c
             _ -> commas $ map show a
 
 data CaseKW
     = CaseN
     | CaseZ
     | CaseX
+    | CaseInside
     deriving Eq
 
 instance Show CaseKW where
     show CaseN = "case"
     show CaseZ = "casez"
     show CaseX = "casex"
+    show CaseInside = "case"
 
 type Case = ([Expr], Stmt)
 
