@@ -1140,7 +1140,7 @@ InsideCases :: { [Case] }
   : InsideCase             { [$1] }
   | InsideCase InsideCases { $1 : $2 }
 InsideCase :: { Case }
-  : OpenRangeList ":"  Stmt { (map rangeAsExpr $1, $3) }
+  : OpenRangeList ":"  Stmt { ($1, $3) }
   | "default" opt(":") Stmt { ([], $3) }
 
 Real :: { String }
@@ -1183,12 +1183,12 @@ TypeOrExpr :: { TypeOrExpr }
   : TypeNonIdent { Left $1 }
   | Expr         { Right $1 }
 
-OpenRangeList :: { [ExprOrRange] }
+OpenRangeList :: { [Expr] }
   : ValueRange                   { [$1] }
   | OpenRangeList "," ValueRange { $1 ++ [$3] }
-ValueRange :: { ExprOrRange }
-  : Expr  { Left  $1 }
-  | Range { Right $1 }
+ValueRange :: { Expr }
+  : Expr  { $1 }
+  | Range { Range Nil NonIndexed $1 }
 
 Expr :: { Expr }
   : "(" Expr ")"                { $2 }
@@ -1464,10 +1464,6 @@ caseInsideKW _ CaseN = CaseInside
 caseInsideKW tok kw =
   error $ show (tokenPosition tok)
     ++ ": Parse error: cannot use inside with " ++ show kw
-
-rangeAsExpr :: ExprOrRange -> Expr
-rangeAsExpr (Left e) = e
-rangeAsExpr (Right r) = Range Nil NonIndexed r
 
 addMIAttr :: Attr -> ModuleItem -> ModuleItem
 addMIAttr _ (item @ (MIPackageItem (Decl CommentDecl{}))) = item

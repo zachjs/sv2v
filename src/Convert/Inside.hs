@@ -38,13 +38,13 @@ convertExpr (Inside expr valueRanges) =
         else UniOp RedOr $ Concat checks
     where
         checks = map toCheck valueRanges
-        toCheck :: ExprOrRange -> Expr
-        toCheck (Left pattern) =
-            BinOp WEq expr pattern
-        toCheck (Right (lo, hi)) =
+        toCheck :: Expr -> Expr
+        toCheck (Range Nil NonIndexed (lo, hi)) =
             BinOp LogAnd
                 (BinOp Le lo expr)
                 (BinOp Ge hi expr)
+        toCheck pattern =
+            BinOp WEq expr pattern
 convertExpr other = other
 
 convertStmt :: Stmt -> Stmt
@@ -62,12 +62,7 @@ convertStmt (Case u CaseInside expr items) =
         stmt = convertStmt (Case u CaseInside (Ident tmp) items)
         -- underlying inside case elaboration
         itemsNonDefault = filter (not . null . fst) items
-        makeComp :: [Expr] -> Expr
-        makeComp = Inside expr . map unwrap
-        unwrap :: Expr -> ExprOrRange
-        unwrap (Range Nil NonIndexed r) = Right r
-        unwrap e = Left e
-        comps = map (makeComp . fst) itemsNonDefault
+        comps = map (Inside expr . fst) itemsNonDefault
         stmts = map snd itemsNonDefault
         defaultStmt = fromMaybe Null (lookup [] items)
 convertStmt other = other

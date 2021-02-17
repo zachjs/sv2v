@@ -405,12 +405,6 @@ traverseSinglyNestedExprsM exprMapper = em
         typeOrExprMapper (Left t) = return $ Left t
         typeOrExprMapper (Right e) =
             exprMapper e >>= return . Right
-        exprOrRangeMapper (Left e) =
-            exprMapper e >>= return . Left
-        exprOrRangeMapper (Right (e1, e2)) = do
-            e1' <- exprMapper e1
-            e2' <- exprMapper e2
-            return $ Right (e1', e2')
         em (String s) = return $ String s
         em (Real   s) = return $ Real   s
         em (Number n) = return $ Number n
@@ -475,7 +469,7 @@ traverseSinglyNestedExprsM exprMapper = em
             return $ Pattern $ zip names exprs
         em (Inside e l) = do
             e' <- exprMapper e
-            l' <- mapM exprOrRangeMapper l
+            l' <- mapM exprMapper l
             return $ Inside e' l'
         em (MinTypMax e1 e2 e3) = do
             e1' <- exprMapper e1
