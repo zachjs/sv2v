@@ -689,7 +689,7 @@ NonGenerateModuleItem :: { [ModuleItem] }
   | NonDeclPackageItem                   { map MIPackageItem $1 }
   | NInputGateKW  NInputGates  ";"       { map (\(a, b, c, d) -> NInputGate  $1 a b c d) $2 }
   | NOutputGateKW NOutputGates ";"       { map (\(a, b, c, d) -> NOutputGate $1 a b c d) $2 }
-  | AttributeInstance ModuleItem         { map (MIAttr $1) $2 }
+  | AttributeInstance ModuleItem         { map (addMIAttr $1) $2 }
   | AssertionItem                        { [AssertionItem $1] }
 
 AssignOption :: { AssignOption }
@@ -1468,5 +1468,9 @@ caseInsideKW tok kw =
 rangeAsExpr :: ExprOrRange -> Expr
 rangeAsExpr (Left e) = e
 rangeAsExpr (Right r) = Range Nil NonIndexed r
+
+addMIAttr :: Attr -> ModuleItem -> ModuleItem
+addMIAttr _ (item @ (MIPackageItem (Decl CommentDecl{}))) = item
+addMIAttr attr item = MIAttr attr item
 
 }
