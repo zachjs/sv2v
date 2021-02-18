@@ -36,24 +36,13 @@ convert :: [AST] -> [AST]
 convert = map $ concatMap convertDescription
 
 convertDescription :: Description -> [Description]
-convertDescription (Package ml name items) =
-    [Package ml name $ concatMap convertPackageItem items]
 convertDescription (description @ Part{}) =
     [Part attrs extern kw lifetime name ports items']
     where
         items' = inject enumItems items -- only keep what's used
         Part attrs extern kw lifetime name ports items = description'
         (description', enumItems) = convertDescription' description
-convertDescription (PackageItem item) =
-    map PackageItem $ convertPackageItem item
-
--- explode a package item with its corresponding enum items
-convertPackageItem :: PackageItem -> [PackageItem]
-convertPackageItem item = do
-    item' : enumItems
-    where
-        (PackageItem item', enumItems) =
-            convertDescription' $ PackageItem item
+convertDescription other = [other]
 
 -- replace and collect the enum types in a description
 convertDescription' :: Description -> (Description, [PackageItem])
