@@ -1,28 +1,28 @@
 typedef union packed {
-  logic [4:0] x;
-  logic [4:0] y;
+    logic [4:0] x;
+    logic [4:0] y;
 } A;
 
 typedef union packed {
-  logic [4:0] x;
-  logic [0:4] y;
+    logic [4:0] x;
+    logic [0:4] y;
 } B;
 
 typedef union packed {
-  logic [4:0] x;
-  logic [1:5] y;
+    logic [4:0] x;
+    logic [1:5] y;
 } C;
 
 typedef union packed {
-  logic [4:0] x;
-  struct packed {
-    logic [2:0] a;
-    logic [1:0] b;
-  } y;
-  struct packed {
-    logic [1:0] a;
-    logic [0:2] b;
-  } z;
+    logic [4:0] x;
+    struct packed {
+        logic [2:0] a;
+        logic [1:0] b;
+    } y;
+    struct packed {
+        logic [1:0] a;
+        logic [0:2] b;
+    } z;
 } D;
 
 module wrap;

@@ -182,7 +182,7 @@ popCondStack directive = do
     cs <- getCondStack
     case cs of
         [] -> lexicalError $
-              "`" ++ directive ++ " directive outside of an `if/`endif block"
+                "`" ++ directive ++ " directive outside of an `if/`endif block"
         c : cs' -> setCondStack cs' >> return c
 
 isIdentChar :: Char -> Bool

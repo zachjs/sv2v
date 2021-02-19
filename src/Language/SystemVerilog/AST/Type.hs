@@ -256,42 +256,42 @@ instance Show DriveStrength where
     show (DriveStrength s0 s1) = printf "(%s, %s)" (show s0) (show s1)
 
 data Strength0
-  = Supply0
-  | Strong0
-  | Pull0
-  | Weak0
-  | Highz0
-  deriving (Eq, Ord)
+    = Supply0
+    | Strong0
+    | Pull0
+    | Weak0
+    | Highz0
+    deriving (Eq, Ord)
 
 instance Show Strength0 where
-  show Supply0 = "supply0"
-  show Strong0 = "strong0"
-  show Pull0   = "pull0"
-  show Weak0   = "weak0"
-  show Highz0  = "highz0"
+    show Supply0 = "supply0"
+    show Strong0 = "strong0"
+    show Pull0   = "pull0"
+    show Weak0   = "weak0"
+    show Highz0  = "highz0"
 
 data Strength1
-  = Supply1
-  | Strong1
-  | Pull1
-  | Weak1
-  | Highz1
-  deriving (Eq, Ord)
+    = Supply1
+    | Strong1
+    | Pull1
+    | Weak1
+    | Highz1
+    deriving (Eq, Ord)
 
 instance Show Strength1 where
-  show Supply1 = "supply1"
-  show Strong1 = "strong1"
-  show Pull1   = "pull1"
-  show Weak1   = "weak1"
-  show Highz1  = "highz1"
+    show Supply1 = "supply1"
+    show Strong1 = "strong1"
+    show Pull1   = "pull1"
+    show Weak1   = "weak1"
+    show Highz1  = "highz1"
 
 data ChargeStrength
-  = Small
-  | Medium
-  | Large
-  deriving (Eq, Ord)
+    = Small
+    | Medium
+    | Large
+    deriving (Eq, Ord)
 
 instance Show ChargeStrength where
-  show Small  = "(small)"
-  show Medium = "(medium)"
-  show Large  = "(large)"
+    show Small  = "(small)"
+    show Medium = "(medium)"
+    show Large  = "(large)"
