@@ -184,7 +184,6 @@ collectDescriptionM (part @ (Part _ _ _ _ name _ _)) =
         maybeTypeMap = Map.fromList $
             map (\(x, y) -> (x, fromJust y)) $
             filter (isJust . snd) params
-            --- TODO FIXME XXX
         collectDeclM :: Decl -> Writer [(Identifier, Maybe (Maybe Type))] ()
         collectDeclM (Param   Parameter _ x _) = tell [(x, Nothing)]
         collectDeclM (ParamType Parameter x v) =

@@ -1,5 +1,4 @@
-// TODO Add support for parameters without default values.
-module Module #(parameter type T, parameter N = 1);
+module Module #(parameter type T, parameter N);
     T t;
     type(t.a) x;
     type(t.b) y;

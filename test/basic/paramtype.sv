@@ -52,12 +52,11 @@ module n_tdef #(
     end
 endmodule
 
-// TODO Add support for parameters without default values.
 module o_nodef #(
-    parameter a = 0,
+    parameter a,
     parameter type T,
     parameter type U,
-    parameter b = 0
+    parameter b
 );
     T x = a;
     U y = b;
