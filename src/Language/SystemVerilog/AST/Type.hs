@@ -24,7 +24,6 @@ module Language.SystemVerilog.AST.Type
     , ChargeStrength     (..)
     , pattern UnknownType
     , typeRanges
-    , nullRange
     , elaborateIntegerAtom
     ) where
 
@@ -101,20 +100,22 @@ instance Ord (Signing -> [Range] -> Type) where
     compare tf1 tf2 = compare (tf1 Unspecified) (tf2 Unspecified)
 
 typeRanges :: Type -> ([Range] -> Type, [Range])
-typeRanges (Alias         xx    rs) = (Alias         xx   , rs)
-typeRanges (PSAlias ps    xx    rs) = (PSAlias ps    xx   , rs)
-typeRanges (CSAlias ps pm xx    rs) = (CSAlias ps pm xx   , rs)
-typeRanges (Net           kw sg rs) = (Net           kw sg, rs)
-typeRanges (Implicit         sg rs) = (Implicit         sg, rs)
-typeRanges (IntegerVector kw sg rs) = (IntegerVector kw sg, rs)
-typeRanges (IntegerAtom   kw sg   ) = (nullRange $ IntegerAtom kw sg, [])
-typeRanges (NonInteger    kw      ) = (nullRange $ NonInteger  kw   , [])
-typeRanges (Enum   t v r) = (Enum   t v, r)
-typeRanges (Struct p l r) = (Struct p l, r)
-typeRanges (Union  p l r) = (Union  p l, r)
-typeRanges (InterfaceT x my r) = (InterfaceT x my, r)
-typeRanges (TypeOf expr) = (UnpackedType $ TypeOf expr, [])
-typeRanges (UnpackedType t rs) = (UnpackedType t, rs)
+typeRanges typ =
+    case typ of
+        Net           kw sg rs -> (Net           kw sg, rs)
+        Implicit         sg rs -> (Implicit         sg, rs)
+        IntegerVector kw sg rs -> (IntegerVector kw sg, rs)
+        Enum            t v rs -> (Enum            t v, rs)
+        Struct          p l rs -> (Struct          p l, rs)
+        Union           p l rs -> (Union           p l, rs)
+        InterfaceT     x my rs -> (InterfaceT     x my, rs)
+        Alias            xx rs -> (Alias            xx, rs)
+        PSAlias    ps    xx rs -> (PSAlias    ps    xx, rs)
+        CSAlias    ps pm xx rs -> (CSAlias    ps pm xx, rs)
+        UnpackedType  t     rs -> (UnpackedType      t, rs)
+        IntegerAtom   kw sg    -> (nullRange $ IntegerAtom kw sg, [])
+        NonInteger    kw       -> (nullRange $ NonInteger  kw   , [])
+        TypeOf            expr -> (nullRange $ TypeOf       expr, [])
 
 nullRange :: Type -> ([Range] -> Type)
 nullRange t [] = t

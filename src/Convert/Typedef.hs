@@ -86,19 +86,6 @@ traverseTypeM (Alias st rs1) = do
     details <- lookupElemM st
     return $ case details of
         Nothing -> Alias st rs1
-        Just (_, _, typ) -> case typ of
-            Net           kw sg rs2 -> Net           kw sg $ rs1 ++ rs2
-            Implicit         sg rs2 -> Implicit         sg $ rs1 ++ rs2
-            IntegerVector kw sg rs2 -> IntegerVector kw sg $ rs1 ++ rs2
-            Enum            t v rs2 -> Enum            t v $ rs1 ++ rs2
-            Struct          p l rs2 -> Struct          p l $ rs1 ++ rs2
-            Union           p l rs2 -> Union           p l $ rs1 ++ rs2
-            InterfaceT     x my rs2 -> InterfaceT     x my $ rs1 ++ rs2
-            Alias            xx rs2 -> Alias            xx $ rs1 ++ rs2
-            PSAlias    ps    xx rs2 -> PSAlias    ps    xx $ rs1 ++ rs2
-            CSAlias    ps pm xx rs2 -> CSAlias    ps pm xx $ rs1 ++ rs2
-            UnpackedType  t     rs2 -> UnpackedType      t $ rs1 ++ rs2
-            IntegerAtom   kw sg     -> nullRange (IntegerAtom kw sg) rs1
-            NonInteger    kw        -> nullRange (NonInteger  kw   ) rs1
-            TypeOf             expr -> nullRange (TypeOf       expr) rs1
+        Just (_, _, typ) -> tf $ rs1 ++ rs2
+            where (tf, rs2) = typeRanges typ
 traverseTypeM other = return other
