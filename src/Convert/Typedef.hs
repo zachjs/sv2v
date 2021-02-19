@@ -35,14 +35,19 @@ traverseTypeOrExprM other = return other
 traverseExprM :: Expr -> Scoper Type Expr
 traverseExprM (Cast v e) = do
     v' <- traverseTypeOrExprM v
-    return $ Cast v' e
+    traverseExprM' $ Cast v' e
 traverseExprM (DimsFn f v) = do
     v' <- traverseTypeOrExprM v
-    return $ DimsFn f v'
+    traverseExprM' $ DimsFn f v'
 traverseExprM (DimFn f v e) = do
     v' <- traverseTypeOrExprM v
-    return $ DimFn f v' e
-traverseExprM other = return other
+    traverseExprM' $ DimFn f v' e
+traverseExprM other = traverseExprM' other
+
+traverseExprM' :: Expr -> Scoper Type Expr
+traverseExprM' =
+    traverseSinglyNestedExprsM traverseExprM
+    >=> traverseExprTypesM traverseTypeM
 
 traverseModuleItemM :: ModuleItem -> Scoper Type ModuleItem
 traverseModuleItemM (Instance m params x rs p) = do
@@ -53,39 +58,42 @@ traverseModuleItemM item = traverseModuleItemM' item
 
 traverseModuleItemM' :: ModuleItem -> Scoper Type ModuleItem
 traverseModuleItemM' =
-    traverseTypesM (traverseNestedTypesM traverseTypeM) >=>
-    traverseExprsM (traverseNestedExprsM traverseExprM)
+    traverseNodesM traverseExprM return traverseTypeM traverseLHSM return
+    where traverseLHSM = traverseLHSExprsM traverseExprM
 
 traverseGenItemM :: GenItem -> Scoper Type GenItem
-traverseGenItemM = traverseGenItemExprsM (traverseNestedExprsM traverseExprM)
+traverseGenItemM = traverseGenItemExprsM traverseExprM
 
 traverseDeclM :: Decl -> Scoper Type Decl
 traverseDeclM decl = do
-    item <- traverseModuleItemM (MIPackageItem $ Decl decl)
-    let MIPackageItem (Decl decl') = item
+    decl' <- traverseDeclExprsM traverseExprM decl
+        >>= traverseDeclTypesM traverseTypeM
     case decl' of
         Variable{} -> return decl'
         Param{} -> return decl'
         ParamType Localparam x t -> do
-            t' <- traverseNestedTypesM traverseTypeM t
-            insertElem x t'
+            traverseTypeM t >>= insertElem x
             return $ CommentDecl $ "removed localparam type " ++ x
         ParamType{} -> return decl'
         CommentDecl{} -> return decl'
 
 traverseStmtM :: Stmt -> Scoper Type Stmt
-traverseStmtM = traverseStmtExprsM $ traverseNestedExprsM traverseStmtExprM
-    where
-        traverseStmtExprM :: Expr -> Scoper Type Expr
-        traverseStmtExprM =
-            traverseExprTypesM (traverseNestedTypesM traverseTypeM) >=>
-            traverseExprM
+traverseStmtM = traverseStmtExprsM traverseExprM
 
 traverseTypeM :: Type -> Scoper Type Type
 traverseTypeM (Alias st rs1) = do
     details <- lookupElemM st
+    rs1' <- mapM traverseRangeM rs1
     return $ case details of
-        Nothing -> Alias st rs1
-        Just (_, _, typ) -> tf $ rs1 ++ rs2
+        Nothing -> Alias st rs1'
+        Just (_, _, typ) -> tf $ rs1' ++ rs2
             where (tf, rs2) = typeRanges typ
-traverseTypeM other = return other
+traverseTypeM other =
+    traverseSinglyNestedTypesM traverseTypeM other
+    >>= traverseTypeExprsM traverseExprM
+
+traverseRangeM :: Range -> Scoper Type Range
+traverseRangeM (a, b) = do
+    a' <- traverseExprM a
+    b' <- traverseExprM b
+    return (a', b')
