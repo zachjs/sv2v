@@ -149,13 +149,25 @@ convert files =
             where
                 Part attrs extern kw ml m p items = part
                 m' = moduleInstanceName m typeMap
-                items' = map (traverseDecls rewriteDecl) items
+                items' = map (traverseExprs rewriteExpr) $
+                    map (traverseDecls rewriteDecl) items
                 rewriteDecl :: Decl -> Decl
                 rewriteDecl (ParamType Parameter x _) =
                     ParamType Localparam x (fst $ typeMap Map.! x)
                 rewriteDecl other = other
                 additionalParamItems = concatMap makeAddedParams $
                     Map.toList $ Map.map snd typeMap
+                rewriteExpr :: Expr -> Expr
+                rewriteExpr (orig @ (Dot (Ident x) y)) =
+                    if x == m
+                        then Dot (Ident m') y
+                        else orig
+                rewriteExpr other =
+                    traverseExprTypes rewriteType $
+                    traverseSinglyNestedExprs rewriteExpr other
+                rewriteType :: Type -> Type
+                rewriteType =
+                    traverseNestedTypes $ traverseTypeExprs rewriteExpr
 
         makeAddedParams :: (Identifier, IdentSet) -> [ModuleItem]
         makeAddedParams (paramName, identSet) =
@@ -235,7 +247,7 @@ exprToType _ = Nothing
 -- checks where a type is sufficiently resolved to be substituted
 isSimpleType :: Type -> Bool
 isSimpleType typ =
-    (not $ typeHasQueries typ) &&
+    (not $ typeIsUnresolved typ) &&
     case typ of
         IntegerVector{} -> True
         IntegerAtom  {} -> True
@@ -246,17 +258,19 @@ isSimpleType typ =
         Union    _ fields _ -> all (isSimpleType . fst) fields
         _ -> False
 
--- returns whether a top-level type contains any dimension queries
-typeHasQueries :: Type -> Bool
-typeHasQueries =
-    not . null . execWriter . collectTypeExprsM
+-- returns whether a top-level type contains any dimension queries or
+-- hierarchical references
+typeIsUnresolved :: Type -> Bool
+typeIsUnresolved =
+    getAny . execWriter . collectTypeExprsM
     (collectNestedExprsM collectUnresolvedExprM)
     where
-        collectUnresolvedExprM :: Expr -> Writer [Expr] ()
-        collectUnresolvedExprM (expr @ PSIdent{}) = tell [expr]
-        collectUnresolvedExprM (expr @ CSIdent{}) = tell [expr]
-        collectUnresolvedExprM (expr @ DimsFn{}) = tell [expr]
-        collectUnresolvedExprM (expr @ DimFn {}) = tell [expr]
+        collectUnresolvedExprM :: Expr -> Writer Any ()
+        collectUnresolvedExprM PSIdent{} = tell $ Any True
+        collectUnresolvedExprM CSIdent{} = tell $ Any True
+        collectUnresolvedExprM DimsFn {} = tell $ Any True
+        collectUnresolvedExprM DimFn  {} = tell $ Any True
+        collectUnresolvedExprM Dot    {} = tell $ Any True
         collectUnresolvedExprM _ = return ()
 
 prepareTypeIdents :: Identifier -> Type -> (Type, IdentSet)
