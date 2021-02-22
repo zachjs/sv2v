@@ -74,19 +74,6 @@ insertType ident typ = do
     typ' <- scopeType typ
     insertElem ident typ'
 
--- rewrite an expression so that any identifiers it contains unambiguously refer
--- refer to currently visible declarations so it can be substituted elsewhere
-scopeExpr :: Expr -> ST Expr
-scopeExpr expr = do
-    expr' <- traverseSinglyNestedExprsM scopeExpr expr
-                >>= traverseExprTypesM scopeType
-    details <- lookupElemM expr'
-    case details of
-        Just (accesses, _, _) -> return $ accessesToExpr accesses
-        _ -> return expr'
-scopeType :: Type -> ST Type
-scopeType = traverseNestedTypesM $ traverseTypeExprsM scopeExpr
-
 -- convert TypeOf in a ModuleItem
 traverseModuleItemM :: ModuleItem -> ST ModuleItem
 traverseModuleItemM =

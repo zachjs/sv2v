@@ -34,6 +34,8 @@ module Convert.Scoper
     , accessesToExpr
     , replaceInType
     , replaceInExpr
+    , scopeExpr
+    , scopeType
     , insertElem
     , injectItem
     , injectDecl
@@ -177,6 +179,22 @@ replaceInExpr' replacements (Ident x) =
 replaceInExpr' replacements other =
     traverseExprTypes (replaceInType' replacements) $
     traverseSinglyNestedExprs (replaceInExpr' replacements) other
+
+-- rewrite an expression so that any identifiers it contains unambiguously refer
+-- refer to currently visible declarations so it can be substituted elsewhere
+scopeExpr :: Monad m => Expr -> ScoperT a m Expr
+scopeExpr expr = do
+    expr' <- traverseSinglyNestedExprsM scopeExpr expr
+                >>= traverseExprTypesM scopeType
+    details <- lookupElemM expr'
+    case details of
+        Just (accesses, _, _) -> return $ accessesToExpr accesses
+        _ -> return expr'
+scopeType :: Monad m => Type -> ScoperT a m Type
+scopeType = traverseNestedTypesM $ traverseTypeExprsM scopeExpr
+
+{-# INLINABLE scopeExpr #-}
+{-# INLINABLE scopeType #-}
 
 class ScopePath k where
     toTiers :: Scopes a -> k -> [Tier]

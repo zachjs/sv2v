@@ -24,11 +24,13 @@ traverseTypeOrExprM (Left (TypeOf (Ident x))) = do
     details <- lookupElemM x
     return $ case details of
         Nothing -> Left $ TypeOf $ Ident x
+        Just (_, _, UnknownType) -> Left $ TypeOf $ Ident x
         Just (_, _, typ) -> Left typ
 traverseTypeOrExprM (Right (Ident x)) = do
     details <- lookupElemM x
     return $ case details of
         Nothing -> Right $ Ident x
+        Just (_, _, UnknownType) -> Right $ Ident x
         Just (_, _, typ) -> Left typ
 traverseTypeOrExprM other = return other
 
@@ -70,9 +72,10 @@ traverseDeclM decl = do
         >>= traverseDeclTypesM traverseTypeM
     case decl' of
         Variable{} -> return decl'
-        Param{} -> return decl'
+        Param _ _ x _ ->
+            insertElem x UnknownType >> return decl'
         ParamType Localparam x t -> do
-            traverseTypeM t >>= insertElem x
+            traverseTypeM t >>= scopeType >>= insertElem x
             return $ CommentDecl $ "removed localparam type " ++ x
         ParamType{} -> return decl'
         CommentDecl{} -> return decl'
@@ -86,6 +89,7 @@ traverseTypeM (Alias st rs1) = do
     rs1' <- mapM traverseRangeM rs1
     return $ case details of
         Nothing -> Alias st rs1'
+        Just (_, _, UnknownType) -> Alias st rs1'
         Just (_, _, typ) -> tf $ rs1' ++ rs2
             where (tf, rs2) = typeRanges typ
 traverseTypeM other =

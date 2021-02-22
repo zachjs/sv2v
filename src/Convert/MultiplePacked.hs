@@ -54,7 +54,8 @@ traverseDeclM other = traverseDeclExprsM traverseExprM other
 
 traverseTypeM :: Type -> [Range] -> Identifier -> Scoper TypeInfo Type
 traverseTypeM t a ident = do
-    insertElem ident (t, a)
+    tScoped <- scopeType t
+    insertElem ident (tScoped, a)
     t' <- case t of
         Struct pk fields rs -> do
             fields' <- flattenFields fields
@@ -83,7 +84,8 @@ traverseModuleItemM (Instance m p x rs l) = do
         then return rs
         else do
             let t = Implicit Unspecified rs
-            insertElem x (t, [])
+            tScoped <- scopeType t
+            insertElem x (tScoped, [])
             let r1 : r2 : rest = rs
             return $ (combineRanges r1 r2) : rest
     traverseExprsM traverseExprM $ Instance m p x rs' l

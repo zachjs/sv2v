@@ -111,11 +111,11 @@ traverseDeclM decl = do
         Variable d t x a e -> do
             let (tf, rs) = typeRanges t
             when (isRangeable t) $
-                insertElem x (tf $ a ++ rs)
+                scopeType (tf $ a ++ rs) >>= insertElem x
             let e' = convertExpr t e
             return $ Variable d t x a e'
         Param s t x e -> do
-            insertElem x t
+            scopeType t >>= insertElem x
             let e' = convertExpr t e
             return $ Param s t x e'
         ParamType{} -> return decl

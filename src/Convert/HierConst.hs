@@ -76,20 +76,6 @@ traverseDeclM decl = do
         _ -> return ()
     traverseDeclExprsM traverseExprM decl
 
--- rewrite an expression so that any constant identifiers it contains
--- unambiguously refer refer to currently visible constant declarations so it
--- can be substituted elsewhere
-scopeExpr :: Expr -> ST Expr
-scopeExpr expr = do
-    expr' <- traverseSinglyNestedExprsM scopeExpr expr
-                >>= traverseExprTypesM scopeType
-    details <- lookupElemM expr'
-    case details of
-        Just (accesses, _, _) -> return $ accessesToExpr accesses
-        _ -> return expr'
-scopeType :: Type -> ST Type
-scopeType = traverseNestedTypesM $ traverseTypeExprsM scopeExpr
-
 -- substitute hierarchical references to constants
 traverseExprM :: Expr -> ST Expr
 traverseExprM (expr @ (Dot _ x)) = do
