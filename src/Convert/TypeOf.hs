@@ -37,7 +37,7 @@ convert = map $ traverseDescriptions $ partScoper
 pattern UnitType :: Type
 pattern UnitType = IntegerVector TLogic Unspecified []
 
-type ST = Scoper (Type, Bool)
+type ST = Scoper Type
 
 -- insert the given declaration into the scope, and convert an TypeOfs within
 traverseDeclM :: Decl -> ST Decl
@@ -72,7 +72,7 @@ traverseDeclM decl = do
 insertType :: Identifier -> Type -> ST ()
 insertType ident typ = do
     typ' <- scopeType typ
-    insertElem ident (typ', False)
+    insertElem ident typ'
 
 -- rewrite an expression so that any identifiers it contains unambiguously refer
 -- refer to currently visible declarations so it can be substituted elsewhere
@@ -82,18 +82,15 @@ scopeExpr expr = do
                 >>= traverseExprTypesM scopeType
     details <- lookupElemM expr'
     case details of
-        Just (accesses, _, (_, False)) -> return $ accessesToExpr accesses
+        Just (accesses, _, _) -> return $ accessesToExpr accesses
         _ -> return expr'
 scopeType :: Type -> ST Type
 scopeType = traverseNestedTypesM $ traverseTypeExprsM scopeExpr
 
 -- convert TypeOf in a ModuleItem
 traverseModuleItemM :: ModuleItem -> ST ModuleItem
-traverseModuleItemM (Genvar x) =
-    insertElem x (t, True) >> return (Genvar x)
-    where t = IntegerAtom TInteger Unspecified
-traverseModuleItemM item =
-    traverseNodesM traverseExprM return traverseTypeM traverseLHSM return item
+traverseModuleItemM =
+    traverseNodesM traverseExprM return traverseTypeM traverseLHSM return
     where traverseLHSM = traverseLHSExprsM traverseExprM
 
 -- convert TypeOf in a GenItem
@@ -130,7 +127,8 @@ traverseExprM (Cast (Left t1) expr) = do
 traverseExprM (Cast (Right (Ident x)) expr) = do
     expr' <- traverseExprM expr
     details <- lookupElemM x
-    if details == Nothing
+    isGenvar <- isLoopVarM x
+    if details == Nothing && not isGenvar
         then return $ Cast (Left $ Alias x []) expr'
         else elaborateSizeCast (Ident x) expr'
 traverseExprM (Cast (Right size) expr) = do
@@ -163,8 +161,14 @@ lookupTypeOf :: Expr -> ST Type
 lookupTypeOf expr = do
     details <- lookupElemM expr
     case details of
-        Nothing -> return $ TypeOf expr
-        Just (_, replacements, (typ, _)) -> do
+        Nothing -> case expr of
+            Ident x -> do
+                isGenvar <- isLoopVarM x
+                return $ if isGenvar
+                    then IntegerAtom TInteger Unspecified
+                    else TypeOf expr
+            _ -> return $ TypeOf expr
+        Just (_, replacements, typ) -> do
             let typ' = toVarType typ
             return $ replaceInType replacements typ'
     where

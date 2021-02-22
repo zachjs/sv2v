@@ -46,6 +46,8 @@ module Convert.Scoper
     , embedScopes
     , withinProcedure
     , withinProcedureM
+    , isLoopVar
+    , isLoopVarM
     , lookupLocalIdent
     , lookupLocalIdentM
     , scopeModuleItemT
@@ -295,6 +297,13 @@ withinProcedureM = gets sProcedure
 
 withinProcedure :: Scopes a -> Bool
 withinProcedure = sProcedure
+
+isLoopVar :: Scopes a -> Identifier -> Bool
+isLoopVar scopes x = any matches $ sCurrent scopes
+    where matches = (== x) . tierIndex
+
+isLoopVarM :: Monad m => Identifier -> ScoperT a m Bool
+isLoopVarM = embedScopes isLoopVar
 
 evalScoper
     :: MapperM (Scoper a) Decl
