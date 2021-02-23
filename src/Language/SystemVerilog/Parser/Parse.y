@@ -454,6 +454,10 @@ TypeAlias :: { Type }
   :                               Identifier Dimensions { Alias   $1       $2 }
   | Identifier               "::" Identifier Dimensions { PSAlias $1    $3 $4 }
   | Identifier ParamBindings "::" Identifier Dimensions { CSAlias $1 $2 $4 $5 }
+PartialTypeAlias :: { Signing -> [Range] -> Type }
+  :                               Identifier { \Unspecified -> Alias   $1       }
+  | Identifier               "::" Identifier { \Unspecified -> PSAlias $1    $3 }
+  | Identifier ParamBindings "::" Identifier { \Unspecified -> CSAlias $1 $2 $4 }
 TypeNonIdent :: { Type }
   : PartialType OptSigning Dimensions { $1 $2 $3 }
   | "type" "(" Expr ")" { TypeOf $3 }
@@ -636,6 +640,7 @@ DeclToken :: { DeclToken }
   | Signing                            {% posInject \p -> DTSigning  p $1 }
   | ExplicitLifetime                   {% posInject \p -> DTLifetime p $1 }
   | "const" PartialType                {% posInject \p -> DTType     p $2 }
+  | "const" PartialTypeAlias           {% posInject \p -> DTType     p $2 }
   | "{" StreamOp StreamSize Concat "}" {% posInject \p -> DTStream   p $2 $3           (map toLHS $4) }
   | "{" StreamOp            Concat "}" {% posInject \p -> DTStream   p $2 (RawNum 1) (map toLHS $3) }
   | opt("var") "type" "(" Expr ")"     {% posInject \p -> DTType     p (\Unspecified -> \[] -> TypeOf $4) }
