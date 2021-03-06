@@ -19,8 +19,6 @@ convert =
     traverseStmts convertStmt
 
 convertStmt :: Stmt -> Stmt
-convertStmt (For (Left []) cc asgns stmt) =
-    convertStmt $ For (Right []) cc asgns stmt
 convertStmt (For (Right []) cc asgns stmt) =
     convertStmt $ For inits cc asgns stmt
     where inits = Left [dummyDecl $ RawNum 0]
@@ -47,12 +45,9 @@ convertStmt (For (Right origPairs) cc asgns stmt) =
 convertStmt other = other
 
 splitDecl :: Decl -> (Decl, (LHS, Expr))
-splitDecl (decl @ (Variable _ _ _ _ Nil)) =
-    error $ "invalid for loop decl: " ++ show decl
-splitDecl (Variable d t ident a e) =
-    (Variable d t ident a Nil, (LHSIdent ident, e))
 splitDecl decl =
-    error $ "invalid for loop decl: " ++ show decl
+    (Variable d t ident a Nil, (LHSIdent ident, e))
+    where Variable d t ident a e = decl
 
 isComment :: Decl -> Bool
 isComment CommentDecl{} = True

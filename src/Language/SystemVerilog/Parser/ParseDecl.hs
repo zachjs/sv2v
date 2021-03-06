@@ -287,7 +287,7 @@ parseDTsAsDeclsOrAsgns tokens =
     forbidNonEqAsgn tokens $
     if hasLeadingAsgn || tripLookahead tokens
         then Right $ parseDTsAsAsgns tokens
-        else Left  $ parseDTsAsDecls tokens
+        else Left $ map checkDecl $ parseDTsAsDecls tokens
     where
         hasLeadingAsgn =
             -- if there is an asgn token before the next comma
@@ -295,6 +295,11 @@ parseDTsAsDeclsOrAsgns tokens =
                 (Just a, Just b) -> a > b
                 (Nothing, Just _) -> True
                 _ -> False
+        checkDecl :: Decl -> Decl
+        checkDecl (decl @ (Variable _ _ _ _ Nil)) =
+            error $ "for loop declaration missing initialization: "
+                ++ init (show decl)
+        checkDecl decl = decl
 
 -- internal parser for basic assignment lists
 parseDTsAsAsgns :: [DeclToken] -> [(LHS, Expr)]
