@@ -438,9 +438,9 @@ Descriptions :: { [Description] }
   | Descriptions Description { $1 ++ $2 }
 
 Description :: { [Description] }
-  : Part(ModuleKW   , "endmodule"   ) { [$1] }
-  | Part(InterfaceKW, "endinterface") { [$1] }
-  | PackageDeclaration                { [$1] }
+  : Part(ModuleKW   , endmodule   ) { [$1] }
+  | Part(InterfaceKW, endinterface) { [$1] }
+  | PackageDeclaration              { [$1] }
   | PackageItem { map PackageItem $1 }
 
 OptAsgn :: { Expr }
@@ -554,7 +554,7 @@ InterfaceKW :: { PartKW }
   : "interface" { Interface }
 
 PackageDeclaration :: { Description }
-  : "package" Lifetime Identifier ";" PackageItems "endpackage" opt(Tag) { Package $2 $3 $5 }
+  : "package" Lifetime Identifier ";" PackageItems endpackage opt(Tag) { Package $2 $3 $5 }
 
 Tag :: { Identifier }
   : ":" Identifier { $2 }
@@ -677,9 +677,9 @@ ModuleItems :: { [ModuleItem] }
 
 ModuleItem :: { [ModuleItem] }
   : NonGenerateModuleItem { $1 }
-  | ConditionalGenerateConstruct      { [Generate [$1]] }
-  | LoopGenerateConstruct             { [Generate [$1]] }
-  | "generate" GenItems "endgenerate" { [Generate $2] }
+  | ConditionalGenerateConstruct    { [Generate [$1]] }
+  | LoopGenerateConstruct           { [Generate [$1]] }
+  | "generate" GenItems endgenerate { [Generate $2] }
 NonGenerateModuleItem :: { [ModuleItem] }
   -- This item covers module instantiations and all declarations
   : DeclTokens(";")                      { parseDTsAsModuleItems $1 }
@@ -844,9 +844,9 @@ PackageItem :: { [PackageItem] }
 NonDeclPackageItem :: { [PackageItem] }
   : "typedef" Type Identifier ";" { [Decl $ ParamType Localparam $3 $2] }
   | "typedef" Type Identifier DimensionsNonEmpty ";" { [Decl $ ParamType Localparam $3 (UnpackedType $2 $4)] }
-  | "function" Lifetime FuncRetAndName    TFItems DeclsAndStmts "endfunction" opt(Tag) { [Function $2 (fst $3) (snd $3) (map defaultFuncInput $ (map makeInput $4) ++ fst $5) (snd $5)] }
-  | "function" Lifetime "void" Identifier TFItems DeclsAndStmts "endfunction" opt(Tag) { [Task     $2 $4                (map defaultFuncInput $ $5 ++ fst $6) (snd $6)] }
-  | "task"     Lifetime Identifier        TFItems DeclsAndStmts "endtask"     opt(Tag) { [Task     $2 $3                (map defaultFuncInput $ $4 ++ fst $5) (snd $5)] }
+  | "function" Lifetime FuncRetAndName    TFItems DeclsAndStmts endfunction opt(Tag) { [Function $2 (fst $3) (snd $3) (map defaultFuncInput $ (map makeInput $4) ++ fst $5) (snd $5)] }
+  | "function" Lifetime "void" Identifier TFItems DeclsAndStmts endfunction opt(Tag) { [Task     $2 $4                (map defaultFuncInput $ $5 ++ fst $6) (snd $6)] }
+  | "task"     Lifetime Identifier        TFItems DeclsAndStmts endtask     opt(Tag) { [Task     $2 $3                (map defaultFuncInput $ $4 ++ fst $5) (snd $5)] }
   | "import" PackageImportItems ";" { map (uncurry Import) $2 }
   | "export" PackageImportItems ";" { map (uncurry Export) $2 }
   | "export" "*" "::" "*" ";"       { [Export "" ""] }
@@ -995,10 +995,10 @@ StmtAsgn :: { Stmt }
   | Identifier "::" Identifier          ";" { Subroutine (PSIdent $1 $3) (Args [] []) }
   | Identifier "::" Identifier CallArgs ";" { Subroutine (PSIdent $1 $3) $4 }
 StmtNonAsgn :: { Stmt }
-  : StmtBlock(BlockKWSeq, "end" ) { $1 }
-  | StmtBlock(BlockKWPar, "join") { $1 }
-  |                StmtNonBlock   { $1 }
-  | Identifier ":" StmtNonBlock   { Block Seq $1 [] [$3] }
+  : StmtBlock(BlockKWSeq, end ) { $1 }
+  | StmtBlock(BlockKWPar, join) { $1 }
+  |                StmtNonBlock { $1 }
+  | Identifier ":" StmtNonBlock { Block Seq $1 [] [$3] }
 StmtBlock(begin, end) :: { Stmt }
   :                begin StrTag DeclsAndStmts end StrTag { uncurry (Block $1 $ combineTags $2 $5) $3 }
   | Identifier ":" begin        DeclsAndStmts end StrTag { uncurry (Block $3 $ combineTags $1 $6) $4 }
@@ -1317,7 +1317,7 @@ LoopGenerateConstruct :: { GenItem }
   : "for" "(" GenvarInitialization ";" Expr ";" GenvarIteration ")" GenItem { $3 $5 $7 $9 }
 
 GenBlock :: { (Identifier, [GenItem]) }
-  : "begin" StrTag GenItems "end" StrTag { (combineTags $2 $5, $3) }
+  : "begin" StrTag GenItems end StrTag { (combineTags $2 $5, $3) }
 
 GenCases :: { [GenCase] }
   : GenCase          { [$1] }
@@ -1379,6 +1379,15 @@ Trace :: { String }
 position :: { Position }
   : {- empty -} {% gets fst }
 
+end          : "end"          {} | error {% missingToken "end"          }
+endfunction  : "endfunction"  {} | error {% missingToken "endfunction"  }
+endgenerate  : "endgenerate"  {} | error {% missingToken "endgenerate"  }
+endinterface : "endinterface" {} | error {% missingToken "endinterface" }
+endmodule    : "endmodule"    {} | error {% missingToken "endmodule"    }
+endpackage   : "endpackage"   {} | error {% missingToken "endpackage"   }
+endtask      : "endtask"      {} | error {% missingToken "endtask"      }
+join         : "join"         {} | error {% missingToken "join"         }
+
 {
 
 type ParseState = StateT (Position, [Token]) (ExceptT String IO)
@@ -1399,7 +1408,9 @@ positionKeep cont = do
 
 parseError :: Token -> ParseState a
 parseError a = case a of
-  TokenEOF    -> throwError $ "Parse error: no tokens left to parse."
+  TokenEOF    -> do
+    p <- gets fst
+    throwError $ show p ++ ": Parse error: unexpected end of file."
   Token t s p -> throwError $ show p ++ ": Parse error: unexpected token '"
                   ++ s ++ "' (" ++ show t ++ ")."
 
@@ -1473,5 +1484,10 @@ caseInsideKW tok kw =
 addMIAttr :: Attr -> ModuleItem -> ModuleItem
 addMIAttr _ (item @ (MIPackageItem (Decl CommentDecl{}))) = item
 addMIAttr attr item = MIAttr attr item
+
+missingToken :: String -> ParseState a
+missingToken expected = do
+  p <- gets fst
+  throwError $ show p ++ ": Parse error: missing expected `" ++ expected ++ "`"
 
 }
