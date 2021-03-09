@@ -47,7 +47,27 @@ jobs:
         run: brew install shunit2 icarus-verilog
       - name: Install Dependencies (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get install -y shunit2 iverilog
+        run: sudo apt-get install -y shunit2 flex bison autoconf gperf
+      - name: Cache iverilog (Linux)
+        uses: actions/cache@v2
+        if: runner.os == 'Linux'
+        with:
+          path: ~/.local
+          key: ${{ runner.OS }}-iverilog-11_0
+          restore-keys: ${{ runner.OS }}-iverilog-11_0
+      - name: Install iverilog (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          if [ ! -e "$HOME/.local/bin/iverilog" ]; then
+            curl -L https://github.com/steveicarus/iverilog/archive/v11_0.tar.gz > iverilog.tar.gz
+            tar -xzf iverilog.tar.gz
+            cd iverilog-11_0
+            autoconf
+            ./configure --prefix=$HOME/.local
+            make
+            make install
+            cd ..
+          fi
       - name: Download Artifact
         uses: actions/download-artifact@v1
         with:

@@ -20,11 +20,10 @@ module top;
                 cast_i = inp;
             endfunction
         end
-        // TODO: This is not yet supported by iverilog
-        // localparam P = 2;
-        // for (i = 0; i < P; i = i + 1) begin : g
-        //     wire a = i;
-        // end
-        // initial $display("%b %b", g[0].a, g[1].a);
+        localparam P = 2;
+        for (i = 0; i < P; i = i + 1) begin : g
+            wire a = i;
+        end
+        initial $display("%b %b", g[0].a, g[1].a);
     endgenerate
 endmodule

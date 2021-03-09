@@ -15,11 +15,10 @@ module top;
                 end
             end
         end
-        // TODO: This is not yet supported by iverilog
-        // localparam P = 2;
-        // for (genvar i = 0; i < int'(P); i = i + 1) begin : g
-        //     wire a = i;
-        // end
-        // initial $display("%b %b", g[0].a, g[1].a);
+        localparam P = 2;
+        for (genvar i = 0; i < byte'(P); i = i + 1) begin : g
+            wire a = i;
+        end
+        initial $display("%b %b", g[0].a, g[1].a);
     endgenerate
 endmodule
