@@ -117,9 +117,10 @@ convertStmts stmts = do
     return stmts'
 
 
-pattern SimpleLoopInits :: Type -> Identifier -> Expr
+pattern SimpleLoopInits :: String -> Type -> Identifier -> Expr
     -> Either [Decl] [(LHS, Expr)]
-pattern SimpleLoopInits typ var expr = Left [Variable Local typ var [] expr]
+pattern SimpleLoopInits msg typ var expr =
+    Left [CommentDecl msg, Variable Local typ var [] expr]
 
 pattern SimpleLoopGuard :: BinOp -> Identifier -> Expr -> Expr
 pattern SimpleLoopGuard cmp var bound = BinOp cmp (Ident var) bound
@@ -177,7 +178,7 @@ convertStmt (Case unique kw expr cases) = do
     return $ Case unique kw expr cases'
 
 convertStmt (For
-    (inits @ (SimpleLoopInits _ var1 _))
+    (inits @ (SimpleLoopInits _ _ var1 _))
     (comp @ (SimpleLoopGuard _ var2 _))
     (incr @ (SimpleLoopIncrs var3 _ _))
     stmt) =
