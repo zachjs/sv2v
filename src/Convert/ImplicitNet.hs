@@ -31,11 +31,10 @@ traverseDescription defaultNetType (PackageItem (Directive str)) =
             if isPrefixOf prefix str
                 then parseDefaultNetType $ drop (length prefix) str
                 else defaultNetType
-traverseDescription defaultNetType (part @ Part{}) =
+traverseDescription defaultNetType description =
     (defaultNetType, partScoper traverseDeclM
         (traverseModuleItemM defaultNetType)
-        return return part)
-traverseDescription defaultNetType other = (defaultNetType, other)
+        return return description)
 
 traverseDeclM :: Decl -> Scoper () Decl
 traverseDeclM decl = do

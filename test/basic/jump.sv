@@ -136,4 +136,13 @@ module top;
         $display("Block F-1");
     end
 
+    initial begin
+        int i;
+        for (i = 0; i < 10; ++i)
+            if (i < 5)
+                $display("Loop F:", i);
+            else
+                break;
+    end
+
 endmodule

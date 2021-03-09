@@ -89,7 +89,7 @@ data Lifetime
     = Static
     | Automatic
     | Inherit
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show Lifetime where
     show Static    = "static"

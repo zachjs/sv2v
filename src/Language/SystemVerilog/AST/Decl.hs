@@ -23,7 +23,7 @@ data Decl
     | ParamType ParamScope Identifier Type
     | Variable   Direction Type Identifier [Range] Expr
     | CommentDecl String
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show Decl where
     showList l _ = unlines' $ map show l
@@ -41,7 +41,7 @@ data Direction
     | Output
     | Inout
     | Local
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show Direction where
     show Input  = "input"
@@ -52,7 +52,7 @@ instance Show Direction where
 data ParamScope
     = Parameter
     | Localparam
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show ParamScope where
     show Parameter  = "parameter"

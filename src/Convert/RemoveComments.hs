@@ -22,7 +22,6 @@ isTopLevelComment (PackageItem (Decl CommentDecl{})) = True
 isTopLevelComment _ = False
 
 convertModuleItem :: ModuleItem -> ModuleItem
-convertModuleItem (MIAttr _ (Generate [])) = Generate []
 convertModuleItem (MIPackageItem (Decl CommentDecl{})) = Generate []
 convertModuleItem (MIPackageItem item) =
     MIPackageItem $ convertPackageItem item

@@ -89,15 +89,11 @@ instance Show ([Range] -> Type) where
     show tf = show (tf [])
 instance Eq ([Range] -> Type) where
     (==) tf1 tf2 = (tf1 []) == (tf2 [])
-instance Ord ([Range] -> Type) where
-    compare tf1 tf2 = compare (tf1 []) (tf2 [])
 
 instance Show (Signing -> [Range] -> Type) where
     show tf = show (tf Unspecified)
 instance Eq (Signing -> [Range] -> Type) where
     (==) tf1 tf2 = (tf1 Unspecified) == (tf2 Unspecified)
-instance Ord (Signing -> [Range] -> Type) where
-    compare tf1 tf2 = compare (tf1 Unspecified) (tf2 Unspecified)
 
 typeRanges :: Type -> ([Range] -> Type, [Range])
 typeRanges typ =

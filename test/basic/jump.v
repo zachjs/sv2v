@@ -112,4 +112,10 @@ module top;
         $display("Block F-1");
     end
 
+    initial begin : loop_f
+        integer i;
+        for (i = 0; i < 5; ++i)
+            $display("Loop F:", i);
+    end
+
 endmodule

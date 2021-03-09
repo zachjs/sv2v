@@ -49,10 +49,9 @@ convertStruct' isStruct sg fields =
         zero = RawNum 0
         typeRange :: Type -> Range
         typeRange t =
-            case ranges of
-                [] -> (zero, zero)
-                [range] -> range
-                _ -> error "Struct.hs invariant failure"
+            if null ranges
+                then (zero, zero)
+                else let [range] = ranges in range
             where ranges = snd $ typeRanges t
 
         -- extract info about the fields
@@ -204,8 +203,8 @@ convertExpr t (Mux c e1 e2) =
 convertExpr (struct @ (Struct _ fields [])) (Pattern itemsOrig) =
     if extraNames /= Set.empty then
         error $ "pattern " ++ show (Pattern itemsOrig) ++
-            " has extra named fields: " ++
-            show (Set.toList extraNames) ++ " that are not in " ++ show struct
+            " has extra named fields " ++ show (Set.toList extraNames) ++
+            " that are not in " ++ show struct
     else if structIsntReady struct then
         Pattern items
     else
@@ -223,7 +222,7 @@ convertExpr (struct @ (Struct _ fields [])) (Pattern itemsOrig) =
             -- position-based patterns should cover every field
             else if length itemsOrig /= length fields then
                 error $ "struct pattern " ++ show (Pattern itemsOrig) ++
-                    " doesn't have the same # of items as " ++ show struct
+                    " doesn't have the same number of items as " ++ show struct
             -- if the pattern does not use identifiers, use the
             -- identifiers from the struct type definition in order
             else
@@ -254,9 +253,9 @@ convertExpr (struct @ (Struct _ fields [])) (Pattern itemsOrig) =
             else if Map.member defaultKey specialItemMap then
                 specialItemMap Map.! defaultKey
             else
-                error $ "couldn't find field " ++ fieldName ++
-                    " from struct definition " ++ show struct ++
-                    " in struct pattern " ++ show itemsOrig
+                error $ "couldn't find field '" ++ fieldName ++
+                    "' from struct definition " ++ show struct ++
+                    " in struct pattern " ++ show (Pattern itemsOrig)
             where
                 fieldType = fieldTypeMap Map.! fieldName
                 fieldTypeName =
@@ -328,10 +327,8 @@ convertLHS :: LHS -> Scoper Type (Type, LHS)
 convertLHS l = do
     let e = lhsToExpr l
     (t, e') <- embedScopes convertSubExpr e
-    return $ case exprToLHS e' of
-        Just l' -> (t, l')
-        Nothing -> error $ "struct conversion created non-LHS from "
-                    ++ (show e) ++ " to " ++ (show e')
+    let Just l' = exprToLHS e'
+    return (t, l')
 
 -- try expression conversion by looking at the *innermost* type first
 convertSubExpr :: Scopes Type -> Expr -> (Type, Expr)
@@ -389,10 +386,9 @@ convertSubExpr scopes (Range (Dot e x) mode (baseO, lenO)) =
         baseLeft  = BinOp Sub (fst bounds) $ BinOp Sub (fst dim) baseO'
         baseRight = BinOp Add (snd bounds) $ BinOp Sub (snd dim) baseO'
         baseDec = baseLeft
-        baseInc = case mode of
-            IndexedPlus  -> BinOp Add (BinOp Sub baseRight lenO') one
-            IndexedMinus -> BinOp Sub (BinOp Add baseRight lenO') one
-            NonIndexed   -> error "invariant violated"
+        baseInc = if mode == IndexedPlus
+            then BinOp Add (BinOp Sub baseRight lenO') one
+            else BinOp Sub (BinOp Add baseRight lenO') one
         base = endianCondExpr dim baseDec baseInc
         undotted = Range e' mode (base, lenO')
         one = RawNum 1
@@ -471,7 +467,7 @@ isntStruct = (== Nothing) . getFields
 lookupFieldInfo :: Type -> Identifier -> (Type, Range, [Range])
 lookupFieldInfo struct fieldName =
     if maybeFieldType == Nothing
-        then error $ "field '" ++ fieldName ++ "' not found in: " ++ show struct
+        then error $ "field '" ++ fieldName ++ "' not found in " ++ show struct
         else (fieldType, bounds, dims)
     where
         Just fields = getFields struct
@@ -484,14 +480,11 @@ lookupFieldInfo struct fieldName =
 -- attempts to convert based on the assignment-like contexts of TF arguments
 convertCall :: Scopes Type -> Expr -> Args -> Args
 convertCall scopes fn (Args pnArgs kwArgs) =
-    case exprToLHS fn of
-        Just fnLHS ->
-            Args (map snd pnArgs') kwArgs'
-            where
-                pnArgs' = map (convertArg fnLHS) $ zip idxs pnArgs
-                kwArgs' = map (convertArg fnLHS) kwArgs
-        _ -> Args pnArgs kwArgs
+    Args (map snd pnArgs') kwArgs'
     where
+        Just fnLHS = exprToLHS fn
+        pnArgs' = map (convertArg fnLHS) $ zip idxs pnArgs
+        kwArgs' = map (convertArg fnLHS) kwArgs
         idxs = map show ([0..] :: [Int])
         convertArg :: LHS -> (Identifier, Expr) -> (Identifier, Expr)
         convertArg lhs (x, e) =

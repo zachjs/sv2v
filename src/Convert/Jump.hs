@@ -134,10 +134,9 @@ convertStmt :: Stmt -> State Info Stmt
 convertStmt (Block Par x decls stmts) = do
     -- break, continue, and return disallowed in fork-join
     jumpAllowed <- gets sJumpAllowed
-    returnAllowed <- gets sReturnAllowed
-    modify $ \s -> s { sJumpAllowed = False, sReturnAllowed = False }
+    modify $ \s -> s { sJumpAllowed = False }
     stmts' <- mapM convertStmt stmts
-    modify $ \s -> s { sJumpAllowed = jumpAllowed, sReturnAllowed = returnAllowed }
+    modify $ \s -> s { sJumpAllowed = jumpAllowed }
     return $ Block Par x decls stmts'
 
 convertStmt (Block Seq x decls stmts) =

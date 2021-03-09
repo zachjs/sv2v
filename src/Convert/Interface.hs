@@ -8,7 +8,7 @@
 module Convert.Interface (convert) where
 
 import Data.List (isPrefixOf)
-import Data.Maybe (mapMaybe)
+import Data.Maybe (isNothing, mapMaybe)
 import Control.Monad.Writer.Strict
 import qualified Data.Map.Strict as Map
 
@@ -21,7 +21,7 @@ data PartInfo = PartInfo
     { pKind :: PartKW
     , pPorts :: [Identifier]
     , pItems :: [ModuleItem]
-    } deriving Eq
+    }
 type PartInfos = Map.Map Identifier PartInfo
 
 type ModportInstances = [(Identifier, Identifier)]
@@ -73,7 +73,7 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
         traverseModuleItemM (Modport modportName modportDecls) =
             insertElem modportName modportDecls >> return (Generate [])
         traverseModuleItemM (instanceItem @ Instance{}) =
-            if maybePartInfo == Nothing then
+            if isNothing maybePartInfo then
                 return instanceItem
             else if partKind == Interface then
                 -- inline instantiation of an interface
