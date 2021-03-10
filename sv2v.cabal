@@ -108,7 +108,7 @@ executable sv2v
     -O3
     -threaded
     -rtsopts
-    -with-rtsopts=-N
+    "-with-rtsopts=-N -A32m"
     -funbox-strict-fields
     -Wall
     -j
