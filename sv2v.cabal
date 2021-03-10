@@ -111,7 +111,6 @@ executable sv2v
     "-with-rtsopts=-N -A32m"
     -funbox-strict-fields
     -Wall
-    -j
 
 source-repository head
   type:     git

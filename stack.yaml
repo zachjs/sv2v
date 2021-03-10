@@ -1,4 +1,7 @@
 resolver: lts-16.14
+pvp-bounds: both
+ghc-options:
+    $locals: -j
 
 packages:
     - .
