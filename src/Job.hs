@@ -75,21 +75,6 @@ defaultJob = Job
 
 type DeprecationPhase = [String] -> IO [String]
 
-oneunit :: DeprecationPhase
-oneunit strs = do
-    let strs' = filter (not . isOneunitArg) strs
-    if strs == strs'
-        then return strs
-        else do
-            hPutStr stderr $ "Deprecation warning: --oneunit has been removed, "
-                ++ "and is now on by default\n"
-            return strs'
-    where
-        isOneunitArg :: String -> Bool
-        isOneunitArg "-o" = True
-        isOneunitArg "--oneunit" = True
-        isOneunitArg _ = False
-
 flagRename :: String -> String -> DeprecationPhase
 flagRename before after strs = do
     let strs' = map rename strs
@@ -109,12 +94,10 @@ flagRename before after strs = do
 readJob :: IO Job
 readJob = do
     strs <- getArgs
-    strs' <- oneunit strs
+    strs' <- return strs
         >>= flagRename "-i" "-I"
         >>= flagRename "-d" "-D"
         >>= flagRename "-e" "-E"
-        >>= flagRename "-V" "--version"
-        >>= flagRename "-?" "--help"
     job <- withArgs (strs') $ cmdArgs defaultJob
     return $ if verbose job
         then job { exclude = Succinct : exclude job }
