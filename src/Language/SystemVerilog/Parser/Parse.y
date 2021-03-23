@@ -555,6 +555,7 @@ InterfaceKW :: { PartKW }
 
 PackageDeclaration :: { Description }
   : "package" Lifetime Identifier ";" PackageItems endpackage opt(Tag) { Package $2 $3 $5 }
+  | "class" Lifetime Identifier PIParams ";" PackageItems endclass opt(Tag) { Class $2 $3 $4 $6 }
 
 Tag :: { Identifier }
   : ":" Identifier { $2 }
@@ -571,9 +572,11 @@ PackageImportDeclaration :: { [ModuleItem] }
   : "import" PackageImportItems ";" { map (MIPackageItem . uncurry Import) $2 }
 
 Params :: { [ModuleItem] }
+  : PIParams { map (MIPackageItem . Decl) $1 }
+PIParams :: { [Decl] }
   : {- empty -}          { [] }
   | "#" "(" ")"          { [] }
-  | "#" "(" ParamsFollow { map (MIPackageItem . Decl) $3 }
+  | "#" "(" ParamsFollow { $3 }
 ParamsFollow :: { [Decl] }
   : ParamAsgn ")"              { [$1] }
   | ParamAsgn "," ParamsFollow { $1 : $3 }
@@ -1380,6 +1383,7 @@ position :: { Position }
   : {- empty -} {% gets fst }
 
 end          : "end"          {} | error {% missingToken "end"          }
+endclass     : "endclass"     {} | error {% missingToken "endclass"     }
 endfunction  : "endfunction"  {} | error {% missingToken "endfunction"  }
 endgenerate  : "endgenerate"  {} | error {% missingToken "endgenerate"  }
 endinterface : "endinterface" {} | error {% missingToken "endinterface" }

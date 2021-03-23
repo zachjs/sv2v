@@ -151,11 +151,22 @@ traverseModuleItemsM mapper (PackageItem packageItem) = do
     return $ case item' of
         MIPackageItem packageItem' -> PackageItem packageItem'
         other -> error $ "encountered bad package module item: " ++ show other
-traverseModuleItemsM mapper (Package lifetime name packageItems) = do
-    let items = map MIPackageItem packageItems
-    items' <- mapM (traverseNestedModuleItemsM mapper) items
-    let items'' = concatMap breakGenerate items'
-    return $ Package lifetime name $ map (\(MIPackageItem item) -> item) items''
+traverseModuleItemsM mapper (Package lifetime name items) = do
+    let itemsWrapped = map MIPackageItem items
+    itemsWrapped' <- mapM (traverseNestedModuleItemsM mapper) itemsWrapped
+    let items' = map (\(MIPackageItem item) -> item) $
+                    concatMap breakGenerate itemsWrapped'
+    return $ Package lifetime name items'
+traverseModuleItemsM mapper (Class lifetime name decls items) = do
+    let declsWrapped = map (MIPackageItem . Decl) decls
+    declsWrapped' <- mapM (traverseNestedModuleItemsM mapper) declsWrapped
+    let decls' = map (\(MIPackageItem (Decl decl)) -> decl) $
+                    concatMap breakGenerate declsWrapped'
+    let itemsWrapped = map MIPackageItem items
+    itemsWrapped' <- mapM (traverseNestedModuleItemsM mapper) itemsWrapped
+    let items' = map (\(MIPackageItem item) -> item) $
+                    concatMap breakGenerate itemsWrapped'
+    return $ Class lifetime name decls' items'
 
 traverseModuleItems :: Mapper ModuleItem -> Mapper Description
 traverseModuleItems = unmonad traverseModuleItemsM

@@ -93,6 +93,8 @@ traverseDescriptionM (PackageItem item) = do
         idents -> Decl $ CommentDecl $ "removed " ++ show idents
 traverseDescriptionM (Package _ name _) =
     return $ PackageItem $ Decl $ CommentDecl $ "removed package " ++ show name
+traverseDescriptionM (Class _ name _ _) =
+    return $ PackageItem $ Decl $ CommentDecl $ "removed class " ++ show name
 traverseDescriptionM (Part attrs extern kw liftetime name ports items) = do
     (_, items') <- processItems name "" items
     return $ Part attrs extern kw liftetime name ports items'

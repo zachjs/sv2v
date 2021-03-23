@@ -26,6 +26,7 @@ data Description
     = Part [Attr] Bool PartKW Lifetime Identifier [Identifier] [ModuleItem]
     | PackageItem PackageItem
     | Package Lifetime Identifier [PackageItem]
+    | Class   Lifetime Identifier [Decl] [PackageItem]
     deriving Eq
 
 instance Show Description where
@@ -49,6 +50,12 @@ instance Show Description where
             (showPad lifetime) name bodyStr
         where
             bodyStr = indent $ unlines' $ map show items
+    show (Class lifetime name decls items) =
+        printf "class %s%s;\n%s\nendclass"
+            (showPad lifetime) name bodyStr
+        where
+            bodyStr = indent $ unlines' $ map show items'
+            items' = (map Decl decls) ++ items
     show (PackageItem i) = show i
 
 data PackageItem
