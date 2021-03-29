@@ -60,6 +60,8 @@ rewritePath path = do
         (base, end) = splitAt (length path - length ext) path
 
 writeOutput :: Write -> [FilePath] -> [AST] -> IO ()
+writeOutput _ [] [] =
+    hPutStrLn stderr "Warning: No input files specified (try `sv2v --help`)"
 writeOutput Stdout _ asts =
     hPrint stdout $ concat asts
 writeOutput Adjacent inPaths asts = do
