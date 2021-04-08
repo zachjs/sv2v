@@ -398,6 +398,7 @@ time               { Token Lit_time        _ _ }
 
 
 -- operator precedences, from *lowest* to *highest*
+%nonassoc Asgn
 %nonassoc NoElse
 %nonassoc "else"
 %right  "|->" "|=>" "#-#" "#=#"
@@ -647,8 +648,8 @@ DeclToken :: { DeclToken }
   | "{" StreamOp StreamSize Concat "}" {% posInject \p -> DTStream   p $2 $3           (map toLHS $4) }
   | "{" StreamOp            Concat "}" {% posInject \p -> DTStream   p $2 (RawNum 1) (map toLHS $3) }
   | opt("var") "type" "(" Expr ")"     {% posInject \p -> DTType     p (\Unspecified -> \[] -> TypeOf $4) }
-  | "<=" opt(DelayOrEvent) Expr        {% posInject \p -> DTAsgn     p AsgnOpNonBlocking $2 $3 }
   | IncOrDecOperator                   {% posInject \p -> DTAsgn     p (AsgnOp $1) Nothing (RawNum 1) }
+  | "<=" opt(DelayOrEvent) Expr %prec Asgn {% posInject \p -> DTAsgn p AsgnOpNonBlocking $2 $3 }
   | Identifier               "::" Identifier {% posInject \p -> DTPSIdent p $1    $3 }
   | Identifier ParamBindings "::" Identifier {% posInject \p -> DTCSIdent p $1 $2 $4 }
 DeclTokenAsgn :: { DeclToken }
