@@ -261,7 +261,10 @@ parseDTsAsDeclOrStmt tokens =
             _ -> case takeLHS tokens of
                 Just fullLHS -> Subroutine (lhsToExpr fullLHS) (Args [] [])
                 _ -> error $ "invalid block item decl or stmt: " ++ show tokens
-        Just lhs = takeLHS $ init tokens
+        lhsToks = init tokens
+        lhs = case takeLHS lhsToks of
+            Nothing -> error $ "could not parse as LHS: " ++ show lhsToks
+            Just l -> l
         hasLeadingDecl = tokens /= l4 && tripLookahead l4
         (_, l1) = takeDir      tokens
         (_, l2) = takeLifetime l1
