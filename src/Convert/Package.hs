@@ -304,8 +304,9 @@ processItems topName packageName moduleItems = do
         traverseTypeM (Alias x rs) =
             resolveIdent x >>= \x' -> return $ Alias x' rs
         traverseTypeM (Enum t enumItems rs) = do
+            t' <- traverseTypeM t
             enumItems' <- mapM prefixEnumItem enumItems
-            return $ Enum t enumItems' rs
+            return $ Enum t' enumItems' rs
             where prefixEnumItem (x, e) = prefixIdent x >>= \x' -> return (x', e)
         traverseTypeM other = traverseSinglyNestedTypesM traverseTypeM other
 
