@@ -848,9 +848,9 @@ PackageItem :: { [PackageItem] }
 NonDeclPackageItem :: { [PackageItem] }
   : "typedef" Type Identifier ";" { [Decl $ ParamType Localparam $3 $2] }
   | "typedef" Type Identifier DimensionsNonEmpty ";" { [Decl $ ParamType Localparam $3 (UnpackedType $2 $4)] }
-  | "function" Lifetime FuncRetAndName    TFItems DeclsAndStmts endfunction opt(Tag) { [Function $2 (fst $3) (snd $3) (map defaultFuncInput $ (map makeInput $4) ++ fst $5) (snd $5)] }
-  | "function" Lifetime "void" Identifier TFItems DeclsAndStmts endfunction opt(Tag) { [Task     $2 $4                (map defaultFuncInput $ $5 ++ fst $6) (snd $6)] }
-  | "task"     Lifetime Identifier        TFItems DeclsAndStmts endtask     opt(Tag) { [Task     $2 $3                (map defaultFuncInput $ $4 ++ fst $5) (snd $5)] }
+  | "function" Lifetime FuncRetAndName    TFItems DeclsAndStmts endfunction opt(Tag) { [Function $2 (fst $3) (snd $3) (map makeInput $4 ++ fst $5) (snd $5)] }
+  | "function" Lifetime "void" Identifier TFItems DeclsAndStmts endfunction opt(Tag) { [Task     $2 $4                ($5 ++ fst $6) (snd $6)] }
+  | "task"     Lifetime Identifier        TFItems DeclsAndStmts endtask     opt(Tag) { [Task     $2 $3                ($4 ++ fst $5) (snd $5)] }
   | "import" PackageImportItems ";" { map (uncurry Import) $2 }
   | "export" PackageImportItems ";" { map (uncurry Export) $2 }
   | "export" "*" "::" "*" ";"       { [Export "" ""] }
@@ -1432,15 +1432,6 @@ makeInput (Variable Input t x a e) = Variable Input t x a e
 makeInput (CommentDecl c) = CommentDecl c
 makeInput other =
   error $ "unexpected non-var or non-input decl: " ++ (show other)
-
-defaultFuncInput :: Decl -> Decl
-defaultFuncInput (Variable dir (Implicit sg rs) x a e) =
-  Variable dir t x a e
-  where
-    t = if dir == Input || dir == Inout
-      then IntegerVector TLogic sg rs
-      else Implicit sg rs
-defaultFuncInput other = other
 
 combineTags :: Identifier -> Identifier -> Identifier
 combineTags a "" = a
