@@ -76,7 +76,10 @@ traverseDeclM decl = do
             insertElem x UnknownType >> return decl'
         ParamType Localparam x t -> do
             traverseTypeM t >>= scopeType >>= insertElem x
-            return $ CommentDecl $ "removed localparam type " ++ x
+            return $ case t of
+                Enum{} -> ParamType Localparam tmpX t
+                _ -> CommentDecl $ "removed localparam type " ++ x
+            where tmpX = "_sv2v_keep_enum_for_params"
         ParamType{} -> return decl'
         CommentDecl{} -> return decl'
 
