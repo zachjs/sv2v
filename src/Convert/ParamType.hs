@@ -149,8 +149,10 @@ convert files =
             where
                 Part attrs extern kw ml m p items = part
                 m' = moduleInstanceName m typeMap
-                items' = map (traverseExprs rewriteExpr) $
-                    map (traverseDecls rewriteDecl) items
+                items' = map rewriteModuleItem items
+                rewriteModuleItem = traverseDecls rewriteDecl .
+                    traverseNestedModuleItems
+                        (traverseExprs rewriteExpr . traverseLHSs rewriteLHS)
                 rewriteDecl :: Decl -> Decl
                 rewriteDecl (ParamType Parameter x _) =
                     ParamType Localparam x (fst $ typeMap Map.! x)
@@ -165,6 +167,14 @@ convert files =
                 rewriteExpr other =
                     traverseExprTypes rewriteType $
                     traverseSinglyNestedExprs rewriteExpr other
+                rewriteLHS :: LHS -> LHS
+                rewriteLHS (orig @ (LHSDot (LHSIdent x) y)) =
+                    if x == m
+                        then LHSDot (LHSIdent m') y
+                        else orig
+                rewriteLHS other =
+                    traverseLHSExprs rewriteExpr $
+                    traverseSinglyNestedLHSs rewriteLHS other
                 rewriteType :: Type -> Type
                 rewriteType =
                     traverseNestedTypes $ traverseTypeExprs rewriteExpr

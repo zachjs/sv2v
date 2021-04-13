@@ -1,8 +1,15 @@
-module Module;
-    parameter int S;
-    parameter type T;
-    T x = '1;
-    initial $display("Module %0d: %b, %0d", S, Module.x, $bits(T));
+module Module #(
+    parameter int S,
+    parameter type T
+);
+    T x;
+    if (S) begin : a
+        if (S) begin : b
+            assign Module.x = '1;
+            logic [$bits(Module.x):0] y = 'z;
+        end
+    end
+    initial $display("Module %0d: %b %0d %b %0d", S, Module.x, $bits(T), Module.a.b.y, $bits(Module.a.b.y));
 endmodule
 
 module top;
