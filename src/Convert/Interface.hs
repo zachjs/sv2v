@@ -260,8 +260,8 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                 collectDecl _ = return ()
 
         extractModportInfo :: Type -> Maybe Identifier
-        extractModportInfo (InterfaceT "" Nothing []) = Just ""
-        extractModportInfo (InterfaceT interfaceName (Just modportName) []) =
+        extractModportInfo (InterfaceT "" "" []) = Just ""
+        extractModportInfo (InterfaceT interfaceName modportName []) =
             if isInterface interfaceName
                 then Just modportName
                 else Nothing

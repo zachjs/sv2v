@@ -798,7 +798,7 @@ traverseSinglyNestedTypesM mapper = tm
         tm (IntegerAtom   kw sg   ) = return $ IntegerAtom   kw sg
         tm (NonInteger    kw      ) = return $ NonInteger    kw
         tm (TypeOf        expr    ) = return $ TypeOf        expr
-        tm (InterfaceT x my r) = return $ InterfaceT x my r
+        tm (InterfaceT x y r) = return $ InterfaceT x y r
         tm (Enum t vals r) = do
             t' <- mapper t
             return $ Enum t' vals r

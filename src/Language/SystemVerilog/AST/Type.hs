@@ -49,7 +49,7 @@ data Type
     | Enum     Type         [Item]             [Range]
     | Struct   Packing      [Field]            [Range]
     | Union    Packing      [Field]            [Range]
-    | InterfaceT Identifier (Maybe Identifier) [Range]
+    | InterfaceT Identifier Identifier         [Range]
     | TypeOf Expr
     | UnpackedType Type [Range] -- used internally
     deriving (Eq, Ord)
@@ -63,8 +63,8 @@ instance Show Type where
     show (IntegerVector kw sg rs) = printf "%s%s%s" (show kw) (showPadBefore sg) (showRanges rs)
     show (IntegerAtom   kw sg   ) = printf "%s%s"   (show kw) (showPadBefore sg)
     show (NonInteger    kw      ) = printf "%s"     (show kw)
-    show (InterfaceT x my r) = x ++ yStr ++ (showRanges r)
-        where yStr = maybe "" ("."++) my
+    show (InterfaceT x y r) = x ++ yStr ++ (showRanges r)
+        where yStr = if null y then "" else '.' : y
     show (Enum t vals r) = printf "enum %s{%s}%s" tStr (commas $ map showVal vals) (showRanges r)
         where
             tStr = showPad t
@@ -104,7 +104,7 @@ typeRanges typ =
         Enum            t v rs -> (Enum            t v, rs)
         Struct          p l rs -> (Struct          p l, rs)
         Union           p l rs -> (Union           p l, rs)
-        InterfaceT     x my rs -> (InterfaceT     x my, rs)
+        InterfaceT      x y rs -> (InterfaceT      x y, rs)
         Alias            xx rs -> (Alias            xx, rs)
         PSAlias    ps    xx rs -> (PSAlias    ps    xx, rs)
         CSAlias    ps pm xx rs -> (CSAlias    ps pm xx, rs)

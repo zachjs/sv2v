@@ -434,7 +434,7 @@ takeLifetime (DTLifetime _ l : rest) = (Just  l, rest)
 takeLifetime                   rest  = (Nothing, rest)
 
 takeType :: [DeclToken] -> ([Range] -> Type, [DeclToken])
-takeType (DTIdent _ a  : DTDot _ b      : rest) = (InterfaceT a (Just b), rest)
+takeType (DTIdent _ a  : DTDot _ b      : rest) = (InterfaceT a  b      , rest)
 takeType (DTType  _ tf : DTSigning _ sg : rest) = (tf       sg          , rest)
 takeType (DTType  _ tf                  : rest) = (tf       Unspecified , rest)
 takeType (DTSigning _ sg                : rest) = (Implicit sg          , rest)

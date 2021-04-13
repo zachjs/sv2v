@@ -661,7 +661,7 @@ PortDeclTokens(delim) :: { [DeclToken] }
   | GenericInterfaceDecl                  delim  { $1 }
   | AttributeInstance      PortDeclTokens(delim) {% posInject \p -> DTAttr p $1 : $2 }
 GenericInterfaceDecl :: { [DeclToken] }
-  : "interface" Identifier {% posInject \p -> [DTType p (\Unspecified -> InterfaceT "" Nothing), DTIdent p $2] }
+  : "interface" Identifier {% posInject \p -> [DTType p (\Unspecified -> InterfaceT "" ""), DTIdent p $2] }
 
 VariablePortIdentifiers :: { [(Identifier, Expr)] }
   : VariablePortIdentifier                             { [$1] }
