@@ -35,7 +35,9 @@ import Convert.Traverse
 import Language.SystemVerilog.AST
 
 type Packages = Map.Map Identifier Package
+type Classes = Map.Map Identifier Class
 type Package = (IdentStateMap, [PackageItem])
+type Class = ([Decl], [PackageItem])
 type Idents = Set.Set Identifier
 type PIs = Map.Map Identifier PackageItem
 
@@ -65,12 +67,14 @@ inject packageItems items =
         toPIElem item = map (, item) (piNames item)
 
 -- collect packages and global package items
-collectPackageM :: Description -> Writer (Packages, [PackageItem]) ()
+collectPackageM :: Description -> Writer (Packages, Classes, [PackageItem]) ()
 collectPackageM (PackageItem item) =
     when (not $ null $ piNames item) $
-        tell (Map.empty, [item])
+        tell (Map.empty, Map.empty, [item])
 collectPackageM (Package _ name items) =
-    tell (Map.singleton name (Map.empty, items), [])
+    tell (Map.singleton name (Map.empty, items), Map.empty, [])
+collectPackageM (Class _ name decls items) =
+    tell (Map.empty, Map.singleton name (decls, items), [])
 collectPackageM _ = return ()
 
 -- elaborate all packages and their usages
@@ -78,13 +82,13 @@ convertPackages :: [AST] -> ([AST], Packages)
 convertPackages files =
     (files', packages')
     where
-        (files', ([], packages')) = runState op ([], packages)
+        (files', ([], packages', _)) = runState op ([], packages, classes)
         op = mapM (traverseDescriptionsM traverseDescriptionM) files
         packages = Map.insert "" (Map.empty, globalItems) realPackages
-        (realPackages, globalItems) =
+        (realPackages, classes, globalItems) =
             execWriter $ mapM (collectDescriptionsM collectPackageM) files
 
-type PackagesState = State ([Identifier], Packages)
+type PackagesState = State ([Identifier], Packages, Classes)
 
 traverseDescriptionM :: Description -> PackagesState Description
 traverseDescriptionM (PackageItem item) = do
@@ -298,6 +302,10 @@ processItems topName packageName moduleItems = do
             where declHelp x f = prefixIdent x >>= return . f
 
         traverseTypeM :: Type -> Scope Type
+        traverseTypeM (CSAlias p b x rs) = do
+            scopeKeys <- bindingsScopeKeys b
+            x' <- lift $ resolveCSIdent p b scopeKeys x
+            return $ Alias x' rs
         traverseTypeM (PSAlias p x rs) = do
             x' <- lift $ resolvePSIdent p x
             return $ Alias x' rs
@@ -310,11 +318,18 @@ processItems topName packageName moduleItems = do
             where prefixEnumItem (x, e) = prefixIdent x >>= \x' -> return (x', e)
         traverseTypeM other = traverseSinglyNestedTypesM traverseTypeM other
 
+        traverseExprM :: Expr -> Scope Expr
+        traverseExprM (CSIdent p b x) = do
+            scopeKeys <- bindingsScopeKeys b
+            x' <- lift $ resolveCSIdent p b scopeKeys x
+            return $ Ident x'
         traverseExprM (PSIdent p x) = do
             x' <- lift $ resolvePSIdent p x
             return $ Ident x'
         traverseExprM (Ident x) = resolveIdent x >>= return . Ident
         traverseExprM other = traverseSinglyNestedExprsM traverseExprM other
+
+        traverseLHSM :: LHS -> Scope LHS
         traverseLHSM (LHSIdent x) = resolveIdent x >>= return . LHSIdent
         traverseLHSM other = traverseSinglyNestedLHSsM traverseLHSM other
 
@@ -335,7 +350,7 @@ processItems topName packageName moduleItems = do
 -- locate a package by name, processing its contents if necessary
 findPackage :: Identifier -> PackagesState Package
 findPackage packageName = do
-    (stack, packages) <- get
+    (stack, packages, classes) <- get
     let maybePackage = Map.lookup packageName packages
     assertMsg (maybePackage /= Nothing) $
         "could not find package " ++ show packageName
@@ -349,10 +364,10 @@ findPackage packageName = do
     if Map.null exports
         then do
             -- process and resolve this package
-            put (packageName : stack, packages)
+            put (packageName : stack, packages, classes)
             package' <- processPackage packageName $ snd package
-            packages' <- gets snd
-            put (stack, Map.insert packageName package' packages')
+            (_, packages', _) <- get
+            put (stack, Map.insert packageName package' packages', classes)
             return package'
         else return package
 
@@ -374,8 +389,15 @@ processPackage packageName packageItems = do
 -- resolve a package scoped identifier to its unique global name
 resolvePSIdent :: Identifier -> Identifier -> PackagesState Identifier
 resolvePSIdent packageName itemName = do
-    rootPkg <- resolveRootPackage packageName itemName
-    return $ rootPkg ++ '_' : itemName
+    (_, _, classes) <- get
+    case Map.lookup packageName classes of
+        Nothing -> do
+            rootPkg <- resolveRootPackage packageName itemName
+            return $ rootPkg ++ '_' : itemName
+        Just ([], _) -> resolveCSIdent packageName [] Set.empty itemName
+        Just _ -> error $ "reference to " ++ show itemName
+            ++ " in parameterized class " ++ show packageName
+            ++ " requires explicit #()"
 
 -- determines the root package contained the given package scoped identifier
 resolveRootPackage :: Identifier -> Identifier -> PackagesState Identifier
@@ -386,6 +408,94 @@ resolveRootPackage packageName itemName = do
         "could not find " ++ show itemName ++ " in package " ++ show packageName
     let Just identState = maybeIdentState
     return $ toRootPackage packageName identState
+
+-- collect hashes of accessed resolved scopes in class parameters
+bindingsScopeKeys :: [ParamBinding] -> Scope Idents
+bindingsScopeKeys =
+    execWriterT . mapM (traverseTypeOrExprIdentsM identMapper) . map snd
+    where
+        identMapper :: Identifier -> WriterT Idents Scope Identifier
+        identMapper x = do
+            details <- lift $ lookupElemM x
+            case details of
+                Nothing -> return ()
+                Just (accesses, _, _) ->
+                    tell $ Set.singleton $ shortHash accesses
+            return x
+        traverseTypeOrExprIdentsM mapper (Left  t) =
+            traverseTypeIdentsM mapper t >>= return . Left
+        traverseTypeOrExprIdentsM mapper (Right e) =
+            traverseExprIdentsM mapper e >>= return . Right
+
+-- resolve a class scoped identifier to its unique global name
+resolveCSIdent :: Identifier -> [ParamBinding] -> Idents -> Identifier -> PackagesState Identifier
+resolveCSIdent className paramBindings scopeKeys itemName = do
+    -- find the specified class
+    (_, _, classes) <- get
+    let maybeClass = Map.lookup className classes
+    assertMsg (maybeClass /= Nothing) $
+        "could not find class " ++ show className
+    let Just (classParams, classItems) = maybeClass
+    -- resolve the provided parameters
+    let paramNames = mapMaybe extractParameterName classParams
+    let paramBindings' = resolveBindings paramNames paramBindings
+    -- generate a unique name for this synthetic package
+    let packageName = className ++ '_' : shortHash (scopeKeys, paramBindings')
+    -- process the synthetic package and inject the given parameters
+    (exports, classItems') <- processPackage packageName $
+        map Decl classParams ++ classItems
+    let overrider = overrideParam packageName paramBindings'
+    let classItems'' = map overrider classItems'
+    -- add the synthetic package to the state
+    let package = (exports, classItems'')
+    (stack, packages, _) <- get
+    put (stack, Map.insert packageName package packages, classes)
+    -- ensure the item actually exists
+    let maybeIdentState = Map.lookup itemName exports
+    assertMsg (maybeIdentState /= Nothing) $
+        "could not find " ++ show itemName ++ " in class " ++ show className
+    return $ packageName ++ '_' : itemName
+    where
+        extractParameterName :: Decl -> Maybe Identifier
+        extractParameterName (Param Parameter _ x _) = Just x
+        extractParameterName (ParamType Parameter x _) = Just x
+        extractParameterName _ = Nothing
+
+        -- replace default parameter values with the given overrides
+        overrideParam :: Identifier -> [ParamBinding] -> PackageItem -> PackageItem
+        overrideParam packageName bindings (Decl (Param Parameter t x e)) =
+            Decl $ Param Parameter t x $
+                case lookup x' bindings of
+                    Just (Right e') -> e'
+                    Just (Left (Alias y [])) -> Ident y
+                    Just (Left t') ->
+                        error $ "cannot override parameter " ++ show x'
+                            ++ " in class " ++ show className
+                            ++ " with type " ++ show t'
+                    Nothing ->
+                        if e == Nil
+                            then error $ "required parameter " ++ show x'
+                                    ++ " in class " ++ show className
+                                    ++ " has not been provided"
+                            else e
+            where x' = drop (1 + length packageName) x
+        overrideParam packageName bindings (Decl (ParamType Parameter x t)) =
+            Decl $ ParamType Parameter x $
+                case lookup x' bindings of
+                    Just (Left t') -> t'
+                    Just (Right (Ident t')) -> Alias t' []
+                    Just (Right e') ->
+                        error $ "cannot override type parameter " ++ show x'
+                            ++ " in class " ++ show className
+                            ++ " with expression " ++ show e'
+                    Nothing ->
+                        if t == UnknownType
+                            then error $ "required type parameter " ++ show x'
+                                    ++ " in class " ++ show className
+                                    ++ " has not been provided"
+                            else t
+            where x' = drop (1 + length packageName) x
+        overrideParam _ _ other = other
 
 -- errors with the given message when the check is false
 assertMsg :: Monad m => Bool -> String -> m ()
