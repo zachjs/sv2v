@@ -292,13 +292,13 @@ processItems topName packageName moduleItems = do
 
         traverseDeclM :: Decl -> Scope Decl
         traverseDeclM decl = do
-            decl' <- case decl of
+            decl' <- traverseDeclTypesM traverseTypeM decl
+                    >>= traverseDeclExprsM traverseExprM
+            case decl' of
                 Variable d t x a e -> declHelp x $ \x' -> Variable d t x' a e
                 Param    p t x   e -> declHelp x $ \x' -> Param    p t x'   e
                 ParamType  p x   t -> declHelp x $ \x' -> ParamType  p x'   t
                 CommentDecl c -> return $ CommentDecl c
-            traverseDeclTypesM traverseTypeM decl' >>=
-                traverseDeclExprsM traverseExprM
             where declHelp x f = prefixIdent x >>= return . f
 
         traverseTypeM :: Type -> Scope Type
@@ -307,7 +307,7 @@ processItems topName packageName moduleItems = do
             x' <- lift $ resolveCSIdent p b scopeKeys x
             return $ Alias x' rs
         traverseTypeM (PSAlias p x rs) = do
-            x' <- lift $ resolvePSIdent p x
+            x' <- resolvePSIdent' p x
             return $ Alias x' rs
         traverseTypeM (Alias x rs) =
             resolveIdent x >>= \x' -> return $ Alias x' rs
@@ -324,7 +324,7 @@ processItems topName packageName moduleItems = do
             x' <- lift $ resolveCSIdent p b scopeKeys x
             return $ Ident x'
         traverseExprM (PSIdent p x) = do
-            x' <- lift $ resolvePSIdent p x
+            x' <- resolvePSIdent' p x
             return $ Ident x'
         traverseExprM (Ident x) = resolveIdent x >>= return . Ident
         traverseExprM other = traverseSinglyNestedExprsM traverseExprM other
@@ -346,6 +346,19 @@ processItems topName packageName moduleItems = do
         traverseStmtM =
             traverseStmtExprsM traverseExprM >=>
             traverseStmtLHSsM  traverseLHSM
+
+        -- wrapper allowing explicit reference to local package items
+        resolvePSIdent' :: Identifier -> Identifier -> Scope Identifier
+        resolvePSIdent' p x = do
+            if p /= packageName then
+                lift $ resolvePSIdent p x
+            else do
+                details <- lookupElemM $ Dot (Ident p) x
+                return $ case details of
+                    Just ([_, _], _, Declared) -> p ++ '_' : x
+                    Just ([_, _], _, Imported rootPkg) -> rootPkg ++ '_' : x
+                    _ -> error $ "package " ++ show p ++ " references"
+                            ++ " undeclared local \"" ++ p ++ "::" ++ x ++ "\""
 
 -- locate a package by name, processing its contents if necessary
 findPackage :: Identifier -> PackagesState Package

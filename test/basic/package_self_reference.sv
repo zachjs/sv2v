@@ -1,6 +1,6 @@
-// pattern: package dependency loop: "P" depends on "P"
 package P;
-    localparam Foo = P::Foo;
+    localparam Bar = 1;
+    localparam Foo = P::Bar;
 endpackage
 module top;
     import P::*;
