@@ -27,6 +27,7 @@ module Convert.Traverse
 , traverseExprs
 , collectExprsM
 , traverseNodesM
+, traverseNodes
 , traverseStmtExprsM
 , traverseStmtExprs
 , collectStmtExprsM
@@ -98,6 +99,8 @@ module Convert.Traverse
 , traverseFiles
 , traverseSinglyNestedGenItemsM
 , traverseSinglyNestedStmtsM
+, traverseSinglyNestedStmts
+, collectSinglyNestedStmtsM
 ) where
 
 import Data.Functor.Identity (Identity, runIdentity)
@@ -251,6 +254,11 @@ traverseSinglyNestedStmtsM fullMapper = cs
         cs (Break) = return Break
         cs (Null) = return Null
         cs (CommentStmt c) = return $ CommentStmt c
+
+traverseSinglyNestedStmts :: Mapper Stmt -> Mapper Stmt
+traverseSinglyNestedStmts = unmonad traverseSinglyNestedStmtsM
+collectSinglyNestedStmtsM :: Monad m => CollectorM m Stmt -> CollectorM m Stmt
+collectSinglyNestedStmtsM = collectify traverseSinglyNestedStmtsM
 
 traverseAssertionStmtsM :: Monad m => MapperM m Stmt -> MapperM m Assertion
 traverseAssertionStmtsM mapper = assertionMapper
@@ -623,6 +631,21 @@ traverseNodesM exprMapper declMapper typeMapper lhsMapper stmtMapper =
         e' <- exprMapper e
         return (dir, ident, e')
 
+traverseNodes
+    :: Mapper Expr
+    -> Mapper Decl
+    -> Mapper Type
+    -> Mapper LHS
+    -> Mapper Stmt
+    -> Mapper ModuleItem
+traverseNodes exprMapper declMapper typeMapper lhsMapper stmtMapper =
+    runIdentity . traverseNodesM
+        (return . exprMapper)
+        (return . declMapper)
+        (return . typeMapper)
+        (return . lhsMapper )
+        (return . stmtMapper)
+
 traverseStmtExprsM :: Monad m => MapperM m Expr -> MapperM m Stmt
 traverseStmtExprsM exprMapper = flatStmtMapper
     where
@@ -947,7 +970,12 @@ traverseTypesM' strategy mapper =
     traverseExprsM (traverseNestedExprsM exprMapper)
     where
         exprMapper = traverseExprTypesM mapper
-        declMapper = traverseDeclTypesM mapper
+        declMapper =
+            if strategy == IncludeParamTypes
+                then traverseDeclTypesM mapper
+                else \decl -> case decl of
+                       ParamType{} -> return decl
+                       _ -> traverseDeclTypesM mapper decl
         miMapper (MIPackageItem (Function l t x d s)) =
             mapper t >>= \t' -> return $ MIPackageItem $ Function l t' x d s
         miMapper (MIPackageItem (other @ (Task _ _ _ _))) =

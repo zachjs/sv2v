@@ -150,13 +150,15 @@ convert files =
                 Part attrs extern kw ml m p items = part
                 m' = moduleInstanceName m typeMap
                 items' = map rewriteModuleItem items
-                rewriteModuleItem = traverseDecls rewriteDecl .
-                    traverseNestedModuleItems
-                        (traverseExprs rewriteExpr . traverseLHSs rewriteLHS)
+                rewriteModuleItem = traverseNestedModuleItems $ traverseNodes
+                    rewriteExpr rewriteDecl rewriteType rewriteLHS rewriteStmt
                 rewriteDecl :: Decl -> Decl
                 rewriteDecl (ParamType Parameter x _) =
-                    ParamType Localparam x (fst $ typeMap Map.! x)
-                rewriteDecl other = other
+                    ParamType Localparam x t
+                    where t = rewriteType $ fst $ typeMap Map.! x
+                rewriteDecl other =
+                    traverseDeclTypes rewriteType $
+                    traverseDeclExprs rewriteExpr other
                 additionalParamItems = concatMap makeAddedParams $
                     Map.toList $ Map.map snd typeMap
                 rewriteExpr :: Expr -> Expr
@@ -177,7 +179,13 @@ convert files =
                     traverseSinglyNestedLHSs rewriteLHS other
                 rewriteType :: Type -> Type
                 rewriteType =
-                    traverseNestedTypes $ traverseTypeExprs rewriteExpr
+                    traverseTypeExprs rewriteExpr .
+                    traverseSinglyNestedTypes rewriteType
+                rewriteStmt :: Stmt -> Stmt
+                rewriteStmt =
+                    traverseStmtLHSs rewriteLHS .
+                    traverseStmtExprs rewriteExpr .
+                    traverseSinglyNestedStmts rewriteStmt
 
         makeAddedParams :: (Identifier, IdentSet) -> [ModuleItem]
         makeAddedParams (paramName, identSet) =
@@ -289,6 +297,9 @@ prepareTypeIdents prefix =
         (traverseTypeExprsM $ traverseNestedExprsM prepareExprIdents)
     where
         prepareExprIdents :: Expr -> Writer IdentSet Expr
+        prepareExprIdents (e @ (Ident "$unsigned")) = return e
+        prepareExprIdents (e @ (Ident "$signed"  )) = return e
+        prepareExprIdents (e @ (Ident "$clog2"   )) = return e
         prepareExprIdents (Ident x) = do
             tell $ Set.singleton x
             return $ Ident $ prefix ++ '_' : x

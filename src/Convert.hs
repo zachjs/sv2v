@@ -75,10 +75,10 @@ mainPhases selectExclude =
     , Convert.MultiplePacked.convert
     , Convert.UnbasedUnsized.convert
     , Convert.Cast.convert
+    , Convert.ParamType.convert
     , Convert.HierConst.convert
     , Convert.TypeOf.convert
     , Convert.DimensionQuery.convert
-    , Convert.ParamType.convert
     , Convert.Simplify.convert
     , Convert.Stream.convert
     , Convert.Struct.convert
