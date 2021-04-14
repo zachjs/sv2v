@@ -118,7 +118,7 @@ traverseModuleItem ports scopes =
                     ]
             where
                 t = Net (NetType TWire) Unspecified
-                        [(DimsFn FnBits $ Right expr, RawNum 1)]
+                        [(DimsFn FnBits $ Right $ lhsToExpr lhs, RawNum 1)]
                 x = "sv2v_tmp_" ++ shortHash (lhs, expr)
         -- rewrite port bindings to use temporary nets where necessary
         fixModuleItem (Instance moduleName params instanceName rs bindings) =
