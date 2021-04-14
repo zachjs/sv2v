@@ -122,6 +122,9 @@ pattern SimpleLoopInits :: String -> Type -> Identifier -> Expr
 pattern SimpleLoopInits msg typ var expr =
     Left [CommentDecl msg, Variable Local typ var [] expr]
 
+pattern SimpleLoopInitsAlt :: String -> Expr -> Either [Decl] [(LHS, Expr)]
+pattern SimpleLoopInitsAlt var expr = Right [(LHSIdent var, expr)]
+
 pattern SimpleLoopGuard :: BinOp -> Identifier -> Expr -> Expr
 pattern SimpleLoopGuard cmp var bound = BinOp cmp (Ident var) bound
 
@@ -179,19 +182,32 @@ convertStmt (Case unique kw expr cases) = do
 convertStmt (For
     (inits @ (SimpleLoopInits _ _ var1 _))
     (comp @ (SimpleLoopGuard _ var2 _))
-    (incr @ (SimpleLoopIncrs var3 _ _))
-    stmt) =
-    if var1 /= var2 || var2 /= var3
-        then convertLoop False loop comp stmt
-        else convertLoop True  loop comp stmt
-    where loop c s = For inits c incr s
+    (incr @ (SimpleLoopIncrs var3 _ _)) stmt) =
+    convertLoop localInfo loop comp incr stmt
+    where
+        loop c i s = For inits c i s
+        localInfo = if var1 /= var2 || var2 /= var3
+                        then Nothing
+                        else Just ""
+convertStmt (For
+    (inits @ (SimpleLoopInitsAlt var1 _))
+    (comp @ (SimpleLoopGuard _ var2 _))
+    (incr @ (SimpleLoopIncrs var3 _ _)) stmt) =
+    convertLoop localInfo loop comp incr stmt
+    where
+        loop c i s = For inits c i s
+        localInfo = if var1 /= var2 || var2 /= var3
+                        then Nothing
+                        else Just var1
 convertStmt (For inits comp incr stmt) =
-    convertLoop False loop comp stmt
-    where loop c s = For inits c incr s
+    convertLoop Nothing loop comp incr stmt
+    where loop c i s = For inits c i s
 convertStmt (While comp stmt) =
-    convertLoop False While comp stmt
+    convertLoop Nothing loop comp [] stmt
+    where loop c _ s = While c s
 convertStmt (DoWhile comp stmt) =
-    convertLoop False DoWhile comp stmt
+    convertLoop Nothing loop comp [] stmt
+    where loop c _ s = DoWhile c s
 
 convertStmt (Continue) = do
     loopDepth <- gets sLoopDepth
@@ -255,8 +271,11 @@ convertSubStmt stmt = do
     put origState
     return (stmt', hasJump)
 
-convertLoop :: Bool -> (Expr -> Stmt -> Stmt) -> Expr -> Stmt -> State Info Stmt
-convertLoop local loop comp stmt = do
+type Incr = (LHS, AsgnOp, Expr)
+
+convertLoop :: Maybe Identifier -> (Expr -> [Incr] -> Stmt -> Stmt) -> Expr
+    -> [Incr] -> Stmt -> State Info Stmt
+convertLoop localInfo loop comp incr stmt = do
     -- save the loop state and increment loop depth
     Info { sLoopDepth = origLoopDepth, sHasJump = origHasJump } <- get
     assertMsg (not origHasJump) "has jump invariant failed"
@@ -268,13 +287,26 @@ convertLoop local loop comp stmt = do
     assertMsg (origLoopDepth + 1 == afterLoopDepth) "loop depth invariant failed"
     modify $ \s -> s { sLoopDepth = origLoopDepth }
 
+    let useBreakVar = local && not (null localVar)
+    let breakVarDeclRaw = Variable Local (TypeOf $ Ident localVar) breakVar [] Nil
+    let breakVarDecl = if useBreakVar then breakVarDeclRaw else CommentDecl "no-op"
+    let updateBreakVar = if useBreakVar then asgn breakVar $ Ident localVar else Null
+
     let keepRunning = BinOp Lt (Ident jumpState) jsBreak
+    let pushBreakVar = if useBreakVar
+                        then If NoCheck (UniOp LogNot keepRunning)
+                                (asgn localVar $ Ident breakVar) Null
+                        else Null
     let comp' = if local then comp else BinOp LogAnd comp keepRunning
+    let incr' = if local then incr else map (stubIncr keepRunning) incr
     let body = Block Seq "" [] $
                 [ asgn jumpState jsNone
                 , stmt'
                 ]
-    let body' = if local then If NoCheck keepRunning body Null else body
+    let body' = if local
+                    then If NoCheck keepRunning
+                            (Block Seq "" [] [body, updateBreakVar]) Null
+                    else body
     let jsStackIdent = jumpState ++ "_" ++ show origLoopDepth
     let jsStackDecl = Variable Local jumpStateType jsStackIdent []
                         (Ident jumpState)
@@ -289,18 +321,35 @@ convertLoop local loop comp stmt = do
 
     return $
         if not afterHasJump then
-            loop comp stmt'
+            loop comp incr stmt'
         else if origLoopDepth == 0 then
-            Block Seq "" []
-                [ loop comp' body'
+            Block Seq "" [ breakVarDecl ]
+                [ loop comp' incr' body'
+                , pushBreakVar
                 , jsCheckReturn
                 ]
         else
             Block Seq ""
-                [ jsStackDecl ]
-                [ loop comp' body'
+                [ breakVarDecl, jsStackDecl ]
+                [ loop comp' incr' body'
+                , pushBreakVar
                 , jsStackRestore
                 ]
+
+    where
+        breakVar = "_sv2v_value_on_break"
+        local = localInfo /= Nothing
+        Just localVar = localInfo
+
+stubIncr :: Expr -> Incr -> Incr
+stubIncr keepRunning (lhs, AsgnOpEq, expr) =
+    (lhs, AsgnOpEq, expr')
+    where expr' = Mux keepRunning expr (lhsToExpr lhs)
+stubIncr keepRunning (lhs, op, expr) =
+    stubIncr keepRunning (lhs, AsgnOpEq, expr')
+    where
+        AsgnOp binop = op
+        expr' = BinOp binop (lhsToExpr lhs) expr
 
 jumpStateType :: Type
 jumpStateType = IntegerVector TBit Unspecified [(RawNum 0, RawNum 1)]
