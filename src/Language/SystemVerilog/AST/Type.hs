@@ -51,6 +51,7 @@ data Type
     | Union    Packing      [Field]            [Range]
     | InterfaceT Identifier Identifier         [Range]
     | TypeOf Expr
+    | TypedefRef Expr
     | UnpackedType Type [Range] -- used internally
     deriving (Eq, Ord)
 
@@ -74,6 +75,7 @@ instance Show Type where
     show (Union  p items r) = printf  "union %s{\n%s\n}%s" (showPad p) (showFields items) (showRanges r)
     show (TypeOf expr) = printf "type(%s)" (show expr)
     show (UnpackedType t rs) = printf "UnpackedType(%s, %s)" (show t) (showRanges rs)
+    show (TypedefRef e) = show e
 
 showFields :: [Field] -> String
 showFields items = itemsStr
@@ -112,6 +114,7 @@ typeRanges typ =
         IntegerAtom   kw sg    -> (nullRange $ IntegerAtom kw sg, [])
         NonInteger    kw       -> (nullRange $ NonInteger  kw   , [])
         TypeOf            expr -> (nullRange $ TypeOf       expr, [])
+        TypedefRef        expr -> (nullRange $ TypedefRef   expr, [])
 
 nullRange :: Type -> ([Range] -> Type)
 nullRange t [] = t

@@ -107,8 +107,8 @@ Other:
 ## Supported Features
 
 sv2v supports most synthesizable SystemVerilog features. Current notable
-exceptions include `defparam` on interface instances and references to typedefs
-within interface instances. Assertions are also supported, but are simply
+exceptions include `defparam` on interface instances and certain synthesizable
+usages of parameterized classes. Assertions are also supported, but are simply
 dropped during conversion.
 
 If you find a bug or have a feature request, please create an issue. Preference

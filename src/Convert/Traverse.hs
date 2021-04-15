@@ -821,6 +821,7 @@ traverseSinglyNestedTypesM mapper = tm
         tm (IntegerAtom   kw sg   ) = return $ IntegerAtom   kw sg
         tm (NonInteger    kw      ) = return $ NonInteger    kw
         tm (TypeOf        expr    ) = return $ TypeOf        expr
+        tm (TypedefRef    expr    ) = return $ TypedefRef    expr
         tm (InterfaceT x y r) = return $ InterfaceT x y r
         tm (Enum t vals r) = do
             t' <- mapper t
@@ -879,6 +880,7 @@ traverseTypeExprsM exprMapper =
         typeOrExprMapper (Right e) = exprMapper e >>= return . Right
         typeMapper (TypeOf expr) =
             exprMapper expr >>= return . TypeOf
+        -- TypedefRef is excluded because it isn't really an expression
         typeMapper (CSAlias ps pm xx rs) = do
             vals' <- mapM typeOrExprMapper $ map snd pm
             let pm' = zip (map fst pm) vals'

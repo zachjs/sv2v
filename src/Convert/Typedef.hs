@@ -95,6 +95,11 @@ traverseTypeM (Alias st rs1) = do
         Just (_, _, UnknownType) -> Alias st rs1'
         Just (_, _, typ) -> tf $ rs1' ++ rs2
             where (tf, rs2) = typeRanges typ
+traverseTypeM (TypedefRef expr) = do
+    details <- lookupElemM expr
+    return $ case details of
+        Nothing -> TypedefRef expr
+        Just (_, _, typ) -> typ
 traverseTypeM other =
     traverseSinglyNestedTypesM traverseTypeM other
     >>= traverseTypeExprsM traverseExprM
