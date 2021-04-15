@@ -104,6 +104,7 @@ executable sv2v
     Convert.Wildcard
     -- sv2v CLI modules
     Job
+    Paths_sv2v
   ghc-options:
     -O3
     -threaded

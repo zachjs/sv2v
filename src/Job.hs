@@ -8,7 +8,9 @@
 
 module Job where
 
-import GitHash (giDescribe, tGitInfoCwd)
+import Data.Version (showVersion)
+import GitHash (giDescribe, tGitInfoCwdTry)
+import qualified Paths_sv2v (version)
 import System.IO (stderr, hPutStr)
 import System.Console.CmdArgs
 import System.Environment (getArgs, withArgs)
@@ -40,6 +42,12 @@ data Job = Job
     , write :: Write
     } deriving (Show, Typeable, Data)
 
+version :: String
+version =
+    case $$tGitInfoCwdTry of
+        Left _ -> showVersion Paths_sv2v.version
+        Right info -> giDescribe info
+
 defaultJob :: Job
 defaultJob = Job
     { files = def &= args &= typ "FILES"
@@ -61,7 +69,7 @@ defaultJob = Job
             ++ " create a .v file next to each input")
     }
     &= program "sv2v"
-    &= summary ("sv2v " ++ giDescribe $$tGitInfoCwd)
+    &= summary ("sv2v " ++ version)
     &= details [ "sv2v converts SystemVerilog to Verilog."
                , "More info: https://github.com/zachjs/sv2v"
                , "(C) 2019-2021 Zachary Snow, 2011-2015 Tom Hawkins" ]
