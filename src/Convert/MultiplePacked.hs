@@ -229,7 +229,7 @@ convertExpr scopes =
         rewriteExpr (orig @ (Bit (Bit expr idxInner) idxOuter)) =
             if isJust maybeDims && expr == rewriteExpr expr
                 then Bit expr' idx'
-                else orig
+                else rewriteExprLowPrec orig
             where
                 maybeDims = dims expr
                 Just (dimInner, dimOuter, expr') = maybeDims
@@ -237,22 +237,10 @@ convertExpr scopes =
                 idxOuter' = orientIdx dimOuter idxOuter
                 base = BinOp Mul idxInner' (rangeSize dimOuter)
                 idx' = simplify $ BinOp Add base idxOuter'
-        rewriteExpr (orig @ (Bit expr idx)) =
-            if isJust maybeDims && expr == rewriteExpr expr
-                then Range expr' mode' range'
-                else orig
-            where
-                maybeDims = dims expr
-                Just (dimInner, dimOuter, expr') = maybeDims
-                mode' = IndexedPlus
-                idx' = orientIdx dimInner idx
-                len = rangeSize dimOuter
-                base = BinOp Add (endianCondExpr dimOuter (snd dimOuter) (fst dimOuter)) (BinOp Mul idx' len)
-                range' = (simplify base, simplify len)
         rewriteExpr (orig @ (Range (Bit expr idxInner) NonIndexed rangeOuter)) =
             if isJust maybeDims && expr == rewriteExpr expr
                 then rewriteExpr $ Range exprOuter IndexedMinus range
-                else orig
+                else rewriteExprLowPrec orig
             where
                 maybeDims = dims expr
                 exprOuter = Bit expr idxInner
@@ -264,7 +252,7 @@ convertExpr scopes =
         rewriteExpr (orig @ (Range (Bit expr idxInner) modeOuter rangeOuter)) =
             if isJust maybeDims && expr == rewriteExpr expr
                 then Range expr' modeOuter range'
-                else orig
+                else rewriteExprLowPrec orig
             where
                 maybeDims = dims expr
                 Just (dimInner, dimOuter, expr') = maybeDims
@@ -281,7 +269,23 @@ convertExpr scopes =
                 len = lenOuter
                 range' = (base, len)
                 one = RawNum 1
-        rewriteExpr (orig @ (Range expr NonIndexed range)) =
+        rewriteExpr other =
+            rewriteExprLowPrec other
+
+        rewriteExprLowPrec :: Expr -> Expr
+        rewriteExprLowPrec (orig @ (Bit expr idx)) =
+            if isJust maybeDims && expr == rewriteExpr expr
+                then Range expr' mode' range'
+                else orig
+            where
+                maybeDims = dims expr
+                Just (dimInner, dimOuter, expr') = maybeDims
+                mode' = IndexedPlus
+                idx' = orientIdx dimInner idx
+                len = rangeSize dimOuter
+                base = BinOp Add (endianCondExpr dimOuter (snd dimOuter) (fst dimOuter)) (BinOp Mul idx' len)
+                range' = (simplify base, simplify len)
+        rewriteExprLowPrec (orig @ (Range expr NonIndexed range)) =
             if isJust maybeDims && expr == rewriteExpr expr
                 then rewriteExpr $ Range expr IndexedMinus range'
                 else orig
@@ -292,7 +296,7 @@ convertExpr scopes =
                 base = endianCondExpr range baseDec baseInc
                 len = rangeSize range
                 range' = (base, len)
-        rewriteExpr (orig @ (Range expr mode range)) =
+        rewriteExprLowPrec (orig @ (Range expr mode range)) =
             if isJust maybeDims && expr == rewriteExpr expr
                 then Range expr' mode' range'
                 else orig
@@ -319,4 +323,4 @@ convertExpr scopes =
                 mode' = IndexedPlus
                 len = BinOp Mul sizeOuter lenOrig
                 range' = (base, len)
-        rewriteExpr other = other
+        rewriteExprLowPrec other = other
