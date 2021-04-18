@@ -64,28 +64,44 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
         PackageItem $ Decl $ CommentDecl $
             "removed module with interface ports: " ++ name
     where
-        items' = evalScoper return traverseModuleItemM return return name items
+        items' = evalScoper
+            traverseDeclM traverseModuleItemM return return name items
 
         convertNested =
-            scopeModuleItemT return traverseModuleItemM return return
+            scopeModuleItemT traverseDeclM traverseModuleItemM return return
+
+        traverseDeclM :: Decl -> Scoper [ModportDecl] Decl
+        traverseDeclM decl = do
+            case decl of
+                Variable  _ _ x _ _ -> insertElem x DeclVal
+                Param     _ _ x _   -> insertElem x DeclVal
+                ParamType _   x _   -> insertElem x DeclVal
+                CommentDecl{} -> return ()
+            return decl
+
+        lookupIntfElem :: Scopes [ModportDecl] -> Expr -> LookupResult [ModportDecl]
+        lookupIntfElem modports expr =
+            case lookupElem modports expr of
+                Just (_, _, DeclVal) -> Nothing
+                other -> other
 
         traverseModuleItemM :: ModuleItem -> Scoper [ModportDecl] ModuleItem
         traverseModuleItemM (Modport modportName modportDecls) =
             insertElem modportName modportDecls >> return (Generate [])
-        traverseModuleItemM (instanceItem @ Instance{}) =
+        traverseModuleItemM (instanceItem @ Instance{}) = do
+            modports <- embedScopes (\l () -> l) ()
             if isNothing maybePartInfo then
                 return instanceItem
             else if partKind == Interface then
                 -- inline instantiation of an interface
                 convertNested $ Generate $ map GenModuleItem $
-                    inlineInstance rs []
+                    inlineInstance modports rs []
                     partItems part instanceName paramBindings portBindings
             else if null modportInstances then
                 return instanceItem
             else do
                 -- inline instantiation of a module
-                modportBindings <-
-                    embedScopes (\l () -> getModportBindings l) ()
+                let modportBindings = getModportBindings modports
                 if length modportInstances /= length modportBindings
                     then
                         error $ "instance " ++ instanceName ++ " of " ++ part
@@ -93,7 +109,7 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                             ++ showKeys modportInstances ++ ", but only "
                             ++ showKeys modportBindings ++ " are connected"
                     else convertNested $ Generate $ map GenModuleItem $
-                            inlineInstance rs modportBindings partItems
+                            inlineInstance modports rs modportBindings partItems
                             part instanceName paramBindings portBindings
             where
                 Instance part paramBindings instanceName rs portBindings =
@@ -114,12 +130,12 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
         -- add explicit slices for bindings of entire modport instance arrays
         addImpliedSlice :: Scopes [ModportDecl] -> Expr -> Expr
         addImpliedSlice modports (orig @ (Dot expr modportName)) =
-            case lookupElem modports (InstArrKey expr) of
+            case lookupIntfElem modports (InstArrKey expr) of
                 Just (_, _, InstArrVal l r) ->
                     Dot (Range expr NonIndexed (l, r)) modportName
                 _ -> orig
         addImpliedSlice modports expr =
-            case lookupElem modports (InstArrKey expr) of
+            case lookupIntfElem modports (InstArrKey expr) of
                 Just (_, _, InstArrVal l r) ->
                     Range expr NonIndexed (l, r)
                 _ -> expr
@@ -184,8 +200,8 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
             else
                 Nothing
             where
-                bindingIsModport = lookupElem modports expr /= Nothing
-                bindingIsBundle = lookupElem modports (Dot expr "") /= Nothing
+                bindingIsModport = lookupIntfElem modports expr /= Nothing
+                bindingIsBundle = lookupIntfElem modports (Dot expr "") /= Nothing
                 portIsBundle = null modportName
                 modportName = case lookup portName modportInstances of
                     Just x -> x
@@ -197,7 +213,7 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
 
                 findInstance :: Expr -> Expr
                 findInstance e =
-                    case lookupElem modports (Dot e "") of
+                    case lookupIntfElem modports (Dot e "") of
                         Nothing -> case e of
                             Bit e' _ -> findInstance e'
                             Dot e' _ -> findInstance e'
@@ -205,11 +221,11 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                         Just (accesses, _, _) -> accessesToExpr $ init accesses
                 qualifyModport :: Expr -> Expr
                 qualifyModport e =
-                    case lookupElem modports e of
+                    case lookupIntfElem modports e of
                         Just (accesses, _, _) -> accessesToExpr accesses
                         Nothing -> accessesToExpr $ init accesses
                             where Just (accesses, _, _) =
-                                    lookupElem modports (Dot e "")
+                                    lookupIntfElem modports (Dot e "")
 
         -- expand a modport binding into a series of expression substitutions
         genSubstitutions :: Scopes [ModportDecl] -> Expr -> Expr -> Expr
@@ -218,8 +234,8 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
             (baseE, instanceE) :
             map toPortBinding modportDecls
             where
-                a = lookupElem modports modportE
-                b = lookupElem modports (Dot modportE "")
+                a = lookupIntfElem modports modportE
+                b = lookupIntfElem modports (Dot modportE "")
                 Just (_, replacements, modportDecls) =
                     if a == Nothing then b else a
                 toPortBinding (_, x, e) = (x', e')
@@ -287,9 +303,10 @@ impliedModport =
 
 -- convert an interface-bound module instantiation or an interface instantiation
 -- into a series of equivalent inlined module items
-inlineInstance :: [Range] -> [ModportBinding] -> [ModuleItem] -> Identifier
-    -> Identifier -> [ParamBinding] -> [PortBinding] -> [ModuleItem]
-inlineInstance ranges modportBindings items partName
+inlineInstance :: Scopes [ModportDecl] -> [Range] -> [ModportBinding]
+    -> [ModuleItem] -> Identifier -> Identifier -> [ParamBinding]
+    -> [PortBinding] -> [ModuleItem]
+inlineInstance global ranges modportBindings items partName
     instanceName instanceParams instancePorts =
     comment :
     map (MIPackageItem . Decl) bindingBaseParams ++
@@ -301,7 +318,7 @@ inlineInstance ranges modportBindings items partName
             traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM ""
             $ map (traverseNestedModuleItems rewriteItem) $
             if null modportBindings
-                then dimensionModport : bundleModport : items
+                then items ++ [dimensionModport, bundleModport]
                 else items
 
         key = shortHash (partName, instanceName)
@@ -362,36 +379,37 @@ inlineInstance ranges modportBindings items partName
         exprReplacements = filter ((/= Nil) . snd) modportSubstitutions
         -- LHSs are replaced using simple substitutions
         traverseLHSM :: LHS -> Scoper Expr LHS
-        traverseLHSM lhs = do
-            lhs' <- embedScopes tagLHS lhs
-            return $ replaceLHS lhs'
+        traverseLHSM =
+            embedScopes tagLHS >=>
+            embedScopes replaceLHS
         tagLHS :: Scopes Expr -> LHS -> LHS
         tagLHS scopes lhs =
             if lookupElem scopes lhs /= Nothing
                 then LHSDot lhs "@"
                 else traverseSinglyNestedLHSs (tagLHS scopes) lhs
-        replaceLHS :: LHS -> LHS
-        replaceLHS (LHSDot lhs "@") = lhs
-        replaceLHS (LHSDot (LHSBit lhs elt) field) =
+        replaceLHS :: Scopes Expr -> LHS -> LHS
+        replaceLHS _ (LHSDot lhs "@") = lhs
+        replaceLHS local (LHSDot (LHSBit lhs elt) field) =
             case lookup (LHSDot (LHSBit lhs Tag) field) lhsReplacements of
                 Just resolved -> replaceLHSArrTag elt resolved
-                Nothing -> LHSDot (replaceLHS $ LHSBit lhs elt) field
-        replaceLHS lhs =
+                Nothing -> LHSDot (replaceLHS local $ LHSBit lhs elt) field
+        replaceLHS local lhs =
             case lookup lhs lhsReplacements of
                 Just lhs' -> lhs'
-                Nothing -> traverseSinglyNestedLHSs replaceLHS lhs
+                Nothing -> checkExprResolution local (lhsToExpr lhs) $
+                    traverseSinglyNestedLHSs (replaceLHS local) lhs
         replaceLHSArrTag :: Expr -> LHS -> LHS
         replaceLHSArrTag =
             traverseNestedLHSs . (traverseLHSExprs . replaceArrTag)
         -- top-level expressions may be modports bound to other modports
         traverseExprM :: Expr -> Scoper Expr Expr
-        traverseExprM expr = do
-            expr' <- embedScopes (tagExpr False) expr
-            return $ replaceExpr expr'
+        traverseExprM =
+            embedScopes (tagExpr False) >=>
+            embedScopes replaceExpr
         substituteExprM :: Expr -> Scoper Expr Expr
-        substituteExprM expr = do
-            expr' <- embedScopes (tagExpr True) expr
-            return $ replaceExpr expr'
+        substituteExprM =
+            embedScopes (tagExpr True) >=>
+            embedScopes replaceExpr
         tagExpr :: Bool -> Scopes Expr -> Expr -> Expr
         tagExpr substitute scopes expr =
             case lookupElem scopes expr of
@@ -401,32 +419,44 @@ inlineInstance ranges modportBindings items partName
                         else Dot expr "@"
                 Nothing ->
                     traverseSinglyNestedExprs (tagExpr substitute scopes) expr
-        replaceExpr :: Expr -> Expr
-        replaceExpr (Dot expr "@") = expr
-        replaceExpr (Ident x) =
+        replaceExpr :: Scopes Expr -> Expr -> Expr
+        replaceExpr _ (Dot expr "@") = expr
+        replaceExpr local (Ident x) =
             case lookup x modportBindings of
                 Just (_, m) -> m
-                Nothing -> Ident x
-        replaceExpr expr =
-            replaceExpr' expr
-        replaceExpr' :: Expr -> Expr
-        replaceExpr' (Dot expr "@") = expr
-        replaceExpr' (Dot (Bit expr elt) field) =
+                Nothing -> checkExprResolution local (Ident x) (Ident x)
+        replaceExpr local expr =
+            replaceExpr' local expr
+        replaceExpr' :: Scopes Expr -> Expr -> Expr
+        replaceExpr' _ (Dot expr "@") = expr
+        replaceExpr' local (Dot (Bit expr elt) field) =
             case lookup (Dot (Bit expr Tag) field) exprReplacements of
-                Just resolved -> replaceArrTag (replaceExpr' elt) resolved
-                Nothing -> Dot (replaceExpr' $ Bit expr elt) field
-        replaceExpr' (Bit expr elt) =
+                Just resolved -> replaceArrTag (replaceExpr' local elt) resolved
+                Nothing -> Dot (replaceExpr' local $ Bit expr elt) field
+        replaceExpr' local (Bit expr elt) =
             case lookup (Bit expr Tag) exprReplacements of
-                Just resolved -> replaceArrTag (replaceExpr' elt) resolved
-                Nothing -> Bit (replaceExpr' expr) (replaceExpr' elt)
-        replaceExpr' expr =
+                Just resolved -> replaceArrTag (replaceExpr' local elt) resolved
+                Nothing -> Bit (replaceExpr' local expr) (replaceExpr' local elt)
+        replaceExpr' local expr =
             case lookup expr exprReplacements of
                 Just expr' -> expr'
-                Nothing -> traverseSinglyNestedExprs replaceExpr' expr
+                Nothing -> checkExprResolution local expr $
+                    traverseSinglyNestedExprs (replaceExpr' local) expr
         replaceArrTag :: Expr -> Expr -> Expr
         replaceArrTag replacement Tag = replacement
         replaceArrTag replacement expr =
             traverseSinglyNestedExprs (replaceArrTag replacement) expr
+
+        checkExprResolution :: Scopes Expr -> Expr -> a -> a
+        checkExprResolution local expr =
+            case (lookupElem local expr, lookupElem global expr) of
+                (Nothing, Just (_, _, DeclVal)) ->
+                    error $ "inlining instance \"" ++ instanceName ++ "\" of "
+                        ++ inlineKind ++ " \"" ++ partName
+                        ++ "\" would make expression \"" ++ show expr
+                        ++ "\" used in \"" ++ instanceName
+                        ++ "\" resolvable when it wasn't previously"
+                _ -> id
 
         removeModportInstance :: ModuleItem -> ModuleItem
         removeModportInstance (MIPackageItem (Decl (Variable d t x a e))) =
@@ -578,6 +608,10 @@ pattern InstArrKey :: Expr -> Expr
 pattern InstArrKey expr = Dot (Bit expr (RawNum 0)) InstArrName
 pattern InstArrEncoded :: Expr -> Expr -> ModuleItem
 pattern InstArrEncoded l r = Modport InstArrName (InstArrVal l r)
+
+-- encoding for normal declarations in the current module
+pattern DeclVal :: [ModportDecl]
+pattern DeclVal = [(Local, "~decl~", Nil)]
 
 -- determines the lower bound for the given slice
 sliceLo :: PartSelectMode -> Range -> Expr

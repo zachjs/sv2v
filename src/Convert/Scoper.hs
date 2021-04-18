@@ -54,6 +54,7 @@ module Convert.Scoper
     , lookupLocalIdentM
     , scopeModuleItemT
     , Replacements
+    , LookupResult
     ) where
 
 import Control.Monad.State.Strict
