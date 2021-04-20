@@ -25,7 +25,7 @@ import Language.SystemVerilog.Parser.Tokens
 
 %monad { ParseState }
 %lexer { positionKeep } { TokenEOF }
-%name parse
+%name parseMain
 %tokentype { Token }
 %error { parseError }
 
@@ -1385,7 +1385,7 @@ StmtTrace :: { Stmt }
 Trace :: { String }
   : position { "Trace: " ++ show $1 }
 position :: { Position }
-  : {- empty -} {% gets fst }
+  : {- empty -} {% gets pPosition }
 
 end          : "end"          {} | error {% missingToken "end"          }
 endclass     : "endclass"     {} | error {% missingToken "endclass"     }
@@ -1399,26 +1399,39 @@ join         : "join"         {} | error {% missingToken "join"         }
 
 {
 
-type ParseState = StateT (Position, [Token]) (ExceptT String IO)
+data ParseData = ParseData
+  { pPosition :: Position
+  , pTokens :: [Token]
+  }
+
+type ParseState = StateT ParseData (ExceptT String IO)
+
+parse :: [Token] -> ExceptT String IO AST
+parse [] = return []
+parse tokens =
+  evalStateT parseMain initialState
+  where
+    position = tokenPosition $ head tokens
+    initialState = ParseData position tokens
 
 posInject :: (Position -> a) -> ParseState a
 posInject cont = do
-  pos <- gets fst
+  pos <- gets pPosition
   return $ cont pos
 
 positionKeep :: (Token -> ParseState a) -> ParseState a
 positionKeep cont = do
-  tokens <- gets snd
+  tokens <- gets pTokens
   case tokens of
     [] -> cont TokenEOF
     tok : toks -> do
-      put (tokenPosition tok, toks)
+      put $ ParseData (tokenPosition tok) toks
       cont tok
 
 parseError :: Token -> ParseState a
 parseError a = case a of
   TokenEOF    -> do
-    p <- gets fst
+    p <- gets pPosition
     throwError $ show p ++ ": Parse error: unexpected end of file."
   Token t s p -> throwError $ show p ++ ": Parse error: unexpected token '"
                   ++ s ++ "' (" ++ show t ++ ")."
@@ -1487,7 +1500,7 @@ addMIAttr attr item = MIAttr attr item
 
 missingToken :: String -> ParseState a
 missingToken expected = do
-  p <- gets fst
+  p <- gets pPosition
   throwError $ show p ++ ": Parse error: missing expected `" ++ expected ++ "`"
 
 }
