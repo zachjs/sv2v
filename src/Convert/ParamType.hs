@@ -52,8 +52,7 @@ convert files =
                 isNonDefault = (name /=) . moduleName
                 alreadyExists = (flip Map.member info) . moduleName
                 moduleName :: Description -> Identifier
-                moduleName (Part _ _ _ _ x _ _) = x
-                moduleName _ = error "not possible"
+                moduleName = \(Part _ _ _ _ x _ _) -> x
         explodeDescription other = [other]
 
         -- remove or rewrite source modules that are no longer needed
@@ -109,7 +108,7 @@ convert files =
         replaceDefault _ other = [other]
 
         removeDefaultTypeParams :: Description -> Description
-        removeDefaultTypeParams (part @ Part{}) =
+        removeDefaultTypeParams part =
             Part attrs extern kw ml (moduleDefaultName name) p items
             where
                 Part attrs extern kw ml name p items =
@@ -118,7 +117,6 @@ convert files =
                 rewriteDecl (ParamType Parameter x _) =
                     ParamType Parameter x UnknownType
                 rewriteDecl other = other
-        removeDefaultTypeParams _ = error "not possible"
 
         isUsed :: Identifier -> Bool
         isUsed name =

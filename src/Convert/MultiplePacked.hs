@@ -261,10 +261,9 @@ convertExpr scopes =
                 baseOuter' = orientIdx dimOuter baseOuter
                 start = BinOp Mul idxInner' (rangeSize dimOuter)
                 baseDec = BinOp Add start baseOuter'
-                baseInc = case modeOuter of
-                    IndexedPlus  -> BinOp Add (BinOp Sub baseDec len) one
-                    IndexedMinus -> BinOp Sub (BinOp Add baseDec len) one
-                    NonIndexed   -> error "invariant violated"
+                baseInc = if modeOuter == IndexedPlus
+                    then BinOp Add (BinOp Sub baseDec len) one
+                    else BinOp Sub (BinOp Add baseDec len) one
                 base = endianCondExpr dimOuter baseDec baseInc
                 len = lenOuter
                 range' = (base, len)
@@ -309,16 +308,15 @@ convertExpr scopes =
                 lenOrigMinusOne = BinOp Sub lenOrig (RawNum 1)
                 baseSwapped =
                     orientIdx dimInner $
-                    case mode of
-                        IndexedPlus  ->
+                    if mode == IndexedPlus
+                        then
                             endianCondExpr dimInner
                             baseOrig
                             (BinOp Add baseOrig lenOrigMinusOne)
-                        IndexedMinus ->
+                        else
                             endianCondExpr dimInner
                             (BinOp Sub baseOrig lenOrigMinusOne)
                             baseOrig
-                        NonIndexed   -> error "invariant violated"
                 base = BinOp Add offsetOuter (BinOp Mul sizeOuter baseSwapped)
                 mode' = IndexedPlus
                 len = BinOp Mul sizeOuter lenOrig
