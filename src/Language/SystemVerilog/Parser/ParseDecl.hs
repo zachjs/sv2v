@@ -91,6 +91,14 @@ forbidNonEqAsgn tokens =
 -- Example: `input foo, bar, One inst`
 parseDTsAsPortDecls :: [DeclToken] -> ([Identifier], [ModuleItem])
 parseDTsAsPortDecls pieces =
+    parseDTsAsPortDecls' $
+    case last pieces of
+        DTComma{} -> init pieces
+        _ -> pieces
+
+-- internal parseDTsAsPortDecls after the removal of an optional trailing comma
+parseDTsAsPortDecls' :: [DeclToken] -> ([Identifier], [ModuleItem])
+parseDTsAsPortDecls' pieces =
     forbidNonEqAsgn pieces $
     if isSimpleList
         then (simpleIdents, [])

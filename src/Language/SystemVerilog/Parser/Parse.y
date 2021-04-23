@@ -579,14 +579,17 @@ PIParams :: { [Decl] }
   | "#" "(" ")"          { [] }
   | "#" "(" ParamsFollow { $3 }
 ParamsFollow :: { [Decl] }
-  : ParamAsgn ")"              { [$1] }
+  : ParamAsgn ParamsEnd        { [$1] }
   | ParamAsgn "," ParamsFollow { $1 : $3 }
   |               ParamsDecl   { $1 }
 ParamsDecl :: { [Decl] }
-  : ModuleParameterDecl(")")            { $1 }
+  : ModuleParameterDecl(ParamsEnd)      { $1 }
   | ModuleParameterDecl(",") ParamsDecl { $1 ++ $2 }
 ParamAsgn :: { Decl }
   : Identifier "=" Expr { Param Parameter (Implicit Unspecified []) $1 $3 }
+ParamsEnd
+  :     ")" {}
+  | "," ")" {}
 
 PortDecls :: { ([Identifier], [ModuleItem]) }
   : "(" PortDeclTokens(")") { parseDTsAsPortDecls $2 }
@@ -965,7 +968,7 @@ PortBindings :: { [PortBinding] }
   : "("                    ")" { [] }
   | "(" PortBindingsInside ")" { $2 }
 PortBindingsInside :: { [PortBinding] }
-  : PortBinding                        { [$1] }
+  : PortBinding opt(",")               { [$1] }
   | PortBinding "," PortBindingsInside { $1 : $3}
 PortBinding :: { PortBinding }
   : "." Identifier "(" ExprOrNil ")" { ($2, $4) }
@@ -977,7 +980,7 @@ ParamBindings :: { [ParamBinding] }
   : "#" "("                     ")" { [] }
   | "#" "(" ParamBindingsInside ")" { $3 }
 ParamBindingsInside :: { [ParamBinding] }
-  : ParamBinding                         { [$1] }
+  : ParamBinding opt(",")                { [$1] }
   | ParamBinding "," ParamBindingsInside { $1 : $3}
 ParamBinding :: { ParamBinding }
   : "." Identifier "(" TypeOrExpr ")" { ($2, $4) }
