@@ -289,19 +289,22 @@ typeIsUnresolved =
         collectUnresolvedExprM Dot    {} = tell $ Any True
         collectUnresolvedExprM _ = return ()
 
-prepareTypeIdents :: Identifier -> Type -> (Type, IdentSet)
-prepareTypeIdents prefix =
+prepareTypeExprs :: Identifier -> Identifier -> Type -> (Type, (IdentSet, [Decl]))
+prepareTypeExprs instanceName paramName =
     runWriter . traverseNestedTypesM
-        (traverseTypeExprsM $ traverseNestedExprsM prepareExprIdents)
+        (traverseTypeExprsM $ traverseNestedExprsM prepareExpr)
     where
-        prepareExprIdents :: Expr -> Writer IdentSet Expr
-        prepareExprIdents (e @ (Ident "$unsigned")) = return e
-        prepareExprIdents (e @ (Ident "$signed"  )) = return e
-        prepareExprIdents (e @ (Ident "$clog2"   )) = return e
-        prepareExprIdents (Ident x) = do
-            tell $ Set.singleton x
-            return $ Ident $ prefix ++ '_' : x
-        prepareExprIdents other = return other
+        prepareExpr :: Expr -> Writer (IdentSet, [Decl]) Expr
+        prepareExpr (e @ Call{}) = do
+            tell (Set.empty, [decl])
+            prepareExpr $ Ident x
+            where
+                decl = Param Localparam (TypeOf e) x e
+                x = instanceName ++ "_sv2v_pfunc_" ++ shortHash e
+        prepareExpr (Ident x) = do
+            tell (Set.singleton x, [])
+            return $ Ident $ paramName ++ '_' : x
+        prepareExpr other = return other
 
 addedParamName :: Identifier -> Identifier -> Identifier
 addedParamName paramName var = paramName ++ '_' : var
@@ -328,7 +331,9 @@ convertModuleItemM info (orig @ (Instance m bindings x r p)) =
     else do
         tell $ Set.singleton (m, resolvedTypes)
         let m' = moduleInstanceName m resolvedTypes
-        return $ Instance m' (additionalBindings ++ bindings') x r p
+        return $ Generate $ map GenModuleItem $
+            map (MIPackageItem . Decl) addedDecls ++
+            [Instance m' (additionalBindings ++ bindings') x r p]
     where
         (paramNames, maybeTypeMap) = info Map.! m
         -- attach names to unnamed parameters
@@ -341,20 +346,23 @@ convertModuleItemM info (orig @ (Instance m bindings x r p)) =
             else bindings
         -- determine the types corresponding to each type parameter
         bindingsMap = Map.fromList bindingsNamed
-        resolvedTypes = Map.mapWithKey resolveType maybeTypeMap
-        resolveType :: Identifier -> Maybe Type -> (Type, IdentSet)
+        resolvedTypesWithDecls = Map.mapWithKey resolveType maybeTypeMap
+        resolvedTypes = Map.map (\(a, (b, _)) -> (a, b)) resolvedTypesWithDecls
+        addedDecls = concatMap (snd . snd . snd) $
+            Map.toList resolvedTypesWithDecls
+        resolveType :: Identifier -> Maybe Type -> (Type, (IdentSet, [Decl]))
         resolveType paramName defaultType =
             case (Map.lookup paramName bindingsMap, defaultType) of
-                (Nothing, Just t) -> (t, Set.empty)
+                (Nothing, Just t) -> (t, (Set.empty, []))
                 (Nothing, Nothing) ->
                     error $ "instantiation " ++ show orig ++
                         " is missing a type parameter: " ++ paramName
-                (Just (Left t), _) -> prepareTypeIdents paramName t
+                (Just (Left t), _) -> prepareTypeExprs x paramName t
                 (Just (Right e), _) ->
                     -- Some types are parsed as expressions because of the
                     -- ambiguities of defined type names.
                     case exprToType e of
-                        Just t -> prepareTypeIdents paramName t
+                        Just t -> prepareTypeExprs x paramName t
                         Nothing ->
                             error $ "instantiation " ++ show orig
                                 ++ " has expr " ++ show e
