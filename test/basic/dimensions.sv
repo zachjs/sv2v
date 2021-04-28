@@ -41,6 +41,8 @@ module top;
         $display("args %b", $size(RamPair, 1'h1));
         $display("args %b", $size(RamPair, 1'd1));
         $display("args %b", $size(RamPair, 1'dx));
+        $display("args %b", $size(RamPair, $bits(integer) - 31));
+        $display("args %b", $size(integer, $bits(integer) - 31));
 
         `EXHAUST(Ram);
         `EXHAUST(Ram[0]);
@@ -79,5 +81,10 @@ module top;
         `EXHAUST(type(ints_rev[0:1]));
         `EXHAUST(type(ints[2:1]));
         `EXHAUST(type(ints_rev[1:2]));
+
+        `EXHAUST(int)
+        `EXHAUST(shortint)
+        `EXHAUST(longint)
+        `EXHAUST(time)
     end
 endmodule

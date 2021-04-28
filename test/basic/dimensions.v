@@ -38,6 +38,8 @@ module top;
         $display("args %b", 2);
         $display("args %b", 2);
         $display("args %b", 1'bx);
+        $display("args %b", 2);
+        $display("args %b", 32);
 
         `EXHAUST(Ram,
                 0, 9,
@@ -181,5 +183,22 @@ module top;
                 1, 2,
                 31, 0,
                 2, 1, 64)
+
+        `EXHAUST(int,
+                31, 0,
+                1'bx, 1'bx,
+                1, 0, 32)
+        `EXHAUST(shortint,
+                15, 0,
+                1'bx, 1'bx,
+                1, 0, 16)
+        `EXHAUST(longint,
+                63, 0,
+                1'bx, 1'bx,
+                1, 0, 64)
+        `EXHAUST(time,
+                63, 0,
+                1'bx, 1'bx,
+                1, 0, 64)
     end
 endmodule
