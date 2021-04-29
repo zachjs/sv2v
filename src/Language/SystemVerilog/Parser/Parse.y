@@ -966,7 +966,7 @@ LHSs :: { [LHS] }
 
 PortBindings :: { [PortBinding] }
   : "("                    ")" { [] }
-  | "(" PortBindingsInside ")" { $2 }
+  | "(" PortBindingsInside ")" {% checkPortBindings $2 }
 PortBindingsInside :: { [PortBinding] }
   : PortBinding opt(",")               { [$1] }
   | PortBinding "," PortBindingsInside { $1 : $3}
@@ -978,7 +978,7 @@ PortBinding :: { PortBinding }
 
 ParamBindings :: { [ParamBinding] }
   : "#" "("                     ")" { [] }
-  | "#" "(" ParamBindingsInside ")" { $3 }
+  | "#" "(" ParamBindingsInside ")" {% checkParamBindings $3 }
 ParamBindingsInside :: { [ParamBinding] }
   : ParamBinding opt(",")                { [$1] }
   | ParamBinding "," ParamBindingsInside { $1 : $3}
@@ -1505,5 +1505,20 @@ missingToken :: String -> ParseState a
 missingToken expected = do
   p <- gets pPosition
   throwError $ show p ++ ": Parse error: missing expected `" ++ expected ++ "`"
+
+checkPortBindings :: [PortBinding] -> ParseState [PortBinding]
+checkPortBindings = checkBindings "port connections"
+
+checkParamBindings :: [ParamBinding] -> ParseState [ParamBinding]
+checkParamBindings = checkBindings "parameter overrides"
+
+checkBindings :: String -> [(Identifier, a)] -> ParseState [(Identifier, a)]
+checkBindings kind bindings =
+  if all null bindingNames || all (not . null) bindingNames then
+    return bindings
+  else do
+    p <- gets pPosition
+    error $ show p ++ ": Parse error: illegal mix of ordered and named " ++ kind
+  where bindingNames = map fst bindings
 
 }
