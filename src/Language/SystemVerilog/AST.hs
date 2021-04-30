@@ -88,13 +88,12 @@ shortHash x =
 
 type Binding t = (Identifier, t)
 -- give a set of bindings explicit names
-resolveBindings :: Show t => [Identifier] -> [Binding t] -> [Binding t]
-resolveBindings available bindings =
-    zipWith resolveBinding bindings [0..]
-    where
-        resolveBinding ("", e) idx =
-            if idx < length available
-                then (available !! idx, e)
-                else error $ "binding " ++ show e ++ " is out of range "
-                        ++ show available
-        resolveBinding other _ = other
+resolveBindings :: String -> [Identifier] -> [Binding t] -> [Binding t]
+resolveBindings _ _ [] = []
+resolveBindings location available bindings =
+    if length available < length bindings then
+        error $ "too many bindings specified for " ++ location
+    else if null $ fst $ head bindings then
+        zip available $ map snd bindings
+    else
+        bindings

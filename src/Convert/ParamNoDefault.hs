@@ -74,9 +74,8 @@ traverseModuleItem parts (orig @ (Instance part params name _ _)) =
     where
         maybePartInfo = Map.lookup part parts
         Just partInfo = maybePartInfo
-        paramsResolved = resolveBindings (map fst partInfo) params
         paramsWithNoDefault = map fst $ filter snd partInfo
-        missingParams = filter (needsDefault paramsResolved) paramsWithNoDefault
+        missingParams = filter (needsDefault params) paramsWithNoDefault
 traverseModuleItem _ other = other
 
 -- whether a given parameter is unspecified in the given parameter bindings

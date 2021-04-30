@@ -450,8 +450,9 @@ resolveCSIdent className paramBindings scopeKeys itemName = do
         "could not find class " ++ show className
     let Just (classParams, classItems) = maybeClass
     -- resolve the provided parameters
+    let resolveMsg = "parameters in class specialization of " ++ show className
     let paramNames = mapMaybe extractParameterName classParams
-    let paramBindings' = resolveBindings paramNames paramBindings
+    let paramBindings' = resolveBindings resolveMsg paramNames paramBindings
     -- generate a unique name for this synthetic package
     let packageName = className ++ '_' : shortHash (scopeKeys, paramBindings')
     -- process the synthetic package and inject the given parameters

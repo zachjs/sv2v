@@ -87,9 +87,9 @@ executable sv2v
     Convert.ParamNoDefault
     Convert.ParamType
     Convert.RemoveComments
+    Convert.ResolveBindings
     Convert.Scoper
     Convert.Simplify
-    Convert.StarPort
     Convert.Stream
     Convert.StringParam
     Convert.Struct

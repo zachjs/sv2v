@@ -1109,7 +1109,7 @@ traverseNestedModuleItemsM mapper = fullMapper
                 Nothing -> return $ GenIf (Number n) s1 s2
                 Just 0 -> genItemMapper s2
                 Just _ -> genItemMapper s1
-        genItemMapper (GenBlock "" [item]) = return item
+        genItemMapper (GenBlock "" [item]) = genItemMapper item
         genItemMapper (GenBlock _ []) = return GenNull
         genItemMapper other = return other
 

@@ -37,8 +37,8 @@ import qualified Convert.Package
 import qualified Convert.ParamNoDefault
 import qualified Convert.ParamType
 import qualified Convert.RemoveComments
+import qualified Convert.ResolveBindings
 import qualified Convert.Simplify
-import qualified Convert.StarPort
 import qualified Convert.Stream
 import qualified Convert.StringParam
 import qualified Convert.Struct
@@ -100,11 +100,11 @@ initialPhases selectExclude =
     , Convert.Unique.convert
     , Convert.LogOp.convert
     , Convert.Foreach.convert
-    , Convert.StarPort.convert
     , selectExclude Job.Assert Convert.Assertion.convert
     , selectExclude Job.Always Convert.AlwaysKW.convert
     , Convert.Package.convert
     , Convert.ParamNoDefault.convert
+    , Convert.ResolveBindings.convert
     ]
 
 convert :: [Job.Exclude] -> Phase

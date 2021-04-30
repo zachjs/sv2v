@@ -96,15 +96,11 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                             inlineInstance rs modportBindings partItems
                             part instanceName paramBindings portBindings
             where
-                Instance part rawParamBindings instanceName rs rawPortBindings =
+                Instance part paramBindings instanceName rs portBindings =
                     instanceItem
                 maybePartInfo = Map.lookup part parts
                 Just partInfo = maybePartInfo
-                PartInfo partKind partPorts partItems = partInfo
-
-                partParams = parameterNames partItems
-                paramBindings = resolveBindings partParams rawParamBindings
-                portBindings = resolveBindings partPorts rawPortBindings
+                PartInfo partKind _ partItems = partInfo
 
                 modportInstances = extractModportInstances partInfo
                 getModportBindings modports = mapMaybe
@@ -582,16 +578,6 @@ pattern InstArrKey :: Expr -> Expr
 pattern InstArrKey expr = Dot (Bit expr (RawNum 0)) InstArrName
 pattern InstArrEncoded :: Expr -> Expr -> ModuleItem
 pattern InstArrEncoded l r = Modport InstArrName (InstArrVal l r)
-
--- given a list of module items, produces the parameter names in order
-parameterNames :: [ModuleItem] -> [Identifier]
-parameterNames =
-    execWriter . mapM (collectNestedModuleItemsM $ collectDeclsM collectDeclM)
-    where
-        collectDeclM :: Decl -> Writer [Identifier] ()
-        collectDeclM (Param Parameter   _ x _) = tell [x]
-        collectDeclM (ParamType Parameter x _) = tell [x]
-        collectDeclM _ = return ()
 
 -- determines the lower bound for the given slice
 sliceLo :: PartSelectMode -> Range -> Expr
