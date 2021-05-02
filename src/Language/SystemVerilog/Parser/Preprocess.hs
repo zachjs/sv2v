@@ -16,7 +16,7 @@ module Language.SystemVerilog.Parser.Preprocess
 import Control.Monad.Except
 import Control.Monad.State.Strict
 import Data.Char (ord)
-import Data.List (dropWhileEnd, tails, isPrefixOf, findIndex)
+import Data.List (dropWhileEnd, tails, isPrefixOf, findIndex, intercalate)
 import Data.Maybe (isJust, fromJust)
 import System.Directory (findFile)
 import System.FilePath (dropFileName)
@@ -37,6 +37,7 @@ data PP = PP
     , ppCondStack    :: [Cond] -- if-else cascade state
     , ppIncludePaths :: [FilePath] -- folders to search for includes
     , ppMacroStack   :: [[(String, String)]] -- arguments for in-progress macro expansions
+    , ppIncludeStack :: [(FilePath, Env)] -- in-progress includes for loop detection
     } deriving (Eq, Show)
 
 -- keeps track of the state of an if-else cascade level
@@ -72,7 +73,7 @@ preprocess includePaths env path = do
         if path == "-"
             then getContents
             else loadFile path
-    let initialState = PP contents [] (Position path 1 1) path env [] includePaths []
+    let initialState = PP contents [] (Position path 1 1) path env [] includePaths [] [(path, env)]
     result <- runExceptT $ execStateT preprocessInput initialState
     return $ case result of
         Left msg -> Left msg
@@ -171,6 +172,27 @@ getBuffer = do
     x <- getInput
     p <- getPosition
     return (x, p)
+
+-- mark the start of an include for include loop detection
+pushIncludeStack :: FilePath -> PPS ()
+pushIncludeStack path = do
+    stack <- gets ppIncludeStack
+    env <- gets ppEnv
+    let entry = (path, env)
+    let stack' = entry : stack
+    if elem entry stack then do
+        let first : rest = reverse $ map fst stack'
+        lexicalError $ "include loop: " ++ show first ++ " includes "
+            ++ intercalate ", which includes " (map show rest)
+    else
+        modify $ \s -> s { ppIncludeStack = stack' }
+
+-- mark the end of an include for include loop detection
+popIncludeStack :: PPS ()
+popIncludeStack = do
+    stack <- gets ppIncludeStack
+    let stack' = tail stack
+    modify $ \s -> s { ppIncludeStack = stack' }
 
 -- Push a condition onto the top of the preprocessor condition stack
 pushCondStack :: Cond -> PPS ()
@@ -713,12 +735,14 @@ handleDirective macrosOnly = do
             -- find and load the included file
             let filename = init $ tail quotedFilename
             includePath <- includeSearch filename
+            pushIncludeStack includePath
             includeContent <- liftIO $ loadFile includePath
             -- pre-process the included file
             setFilePath includePath
             setBuffer (includeContent, Position includePath 1 1)
             preprocessInput
             -- resume processing the original file
+            popIncludeStack
             setFilePath fileFollow
             setBuffer bufFollow
 
