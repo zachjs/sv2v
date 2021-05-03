@@ -218,36 +218,39 @@ isIdentChar ch =
 takeIdentifier :: PPS String
 takeIdentifier = do
     str <- getInput
-    let (ident, rest) = span isIdentChar str
-    advancePositions ident
     macroStack <- getMacroStack
-    setInput rest
     if null macroStack
-        then return ident
-        else do
-            identFollow <- takeIdentifierFollow
-            return $ ident ++ identFollow
-takeIdentifierFollow :: PPS String
-takeIdentifierFollow = do
+        then do
+            let (ident, rest) = span isIdentChar str
+            advancePositions ident
+            setInput rest
+            return ident
+        else takeIdentifierFollow True
+takeIdentifierFollow :: Bool -> PPS String
+takeIdentifierFollow firstPass = do
     str <- getInput
     case str of
-        '`' : '`' : '`' : _ ->
+        '`' : '`' : '`' : _ -> do
+            '`' <- takeChar
+            '`' <- takeChar
             process $ handleDirective True
-        '`' : '`' : _ ->
+        '`' : '`' : _ -> do
+            '`' <- takeChar
+            '`' <- takeChar
             process consumeWithSubstitution
-        _ -> return ""
+        _ -> if firstPass
+                then process consumeWithSubstitution
+                else return ""
     where
         process :: (PPS ()) -> PPS String
         process action = do
-            '`' <- takeChar
-            '`' <- takeChar
             outputFollow <- getOutput
             setOutput []
             () <- action
             outputIdent <- getOutput
             setOutput outputFollow
             let ident = reverse $ map fst outputIdent
-            identFollow <- takeIdentifierFollow
+            identFollow <- takeIdentifierFollow False
             return $ ident ++ identFollow
 
 -- read tokens after the name until the first (un-escaped) newline
