@@ -244,11 +244,18 @@ takeIdentifierFollow firstPass = do
     where
         process :: (PPS ()) -> PPS String
         process action = do
-            outputFollow <- getOutput
+            -- save the state
+            outputOrig <- getOutput
+            condStackOrig <- getCondStack
+            -- process this chunk of the identifier
             setOutput []
+            setCondStack []
             () <- action
             outputIdent <- getOutput
-            setOutput outputFollow
+            -- restore the previous state
+            setOutput outputOrig
+            setCondStack condStackOrig
+            -- move on to the next chunk
             let ident = reverse $ map fst outputIdent
             identFollow <- takeIdentifierFollow False
             return $ ident ++ identFollow
@@ -372,11 +379,11 @@ takeMacroDefinition = do
             else if null rest then
                 return (name, Nothing)
             else do
-                let trimmed = dropWhile isWhitespaceChar rest
-                let leadCh = head trimmed
+                let leadCh : after = dropWhile isWhitespaceChar rest
+                let value = dropWhile isWhitespaceChar after
                 if leadCh /= '='
                 then lexicalError $ "bad char after arg name: " ++ (show leadCh)
-                else return (name, Just $ tail trimmed)
+                else return (name, Just value)
 
 -- commas and right parens are forbidden outside matched pairs of: (), [], {},
 -- "", except to delimit arguments or end the list of arguments; see 22.5.1
@@ -811,7 +818,6 @@ handleDirective macrosOnly = do
                     setBuffer (body, pos)
                     preprocessInput
                     "" <- getInput
-                    setMacroStack $ error $ show $ (zip names args) : macroStack
                     -- return to the rest of the input
                     setMacroStack macroStack
                     setBuffer bufFollow
@@ -830,7 +836,7 @@ lineLookahead :: PPS ()
 lineLookahead = do
     line <- takeUntilNewline
     -- save the state
-    outputOrig <- gets ppOutput
+    outputOrig <- getOutput
     condStackOrig <- getCondStack
     inputOrig <- getInput
     -- process the line
@@ -850,7 +856,7 @@ lineLookahead = do
 preprocessString :: String -> PPS String
 preprocessString str = do
     -- save the state
-    outputOrig <- gets ppOutput
+    outputOrig <- getOutput
     condStackOrig <- getCondStack
     bufferOrig <- getBuffer
     -- process the line
