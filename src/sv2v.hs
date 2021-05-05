@@ -9,7 +9,7 @@ import System.IO (hPrint, hPutStrLn, stderr, stdout)
 import System.Exit (exitFailure, exitSuccess)
 
 import Control.Monad (filterM, when, zipWithM_)
-import Data.List (elemIndex, intercalate)
+import Data.List (elemIndex, intercalate, nub)
 
 import Convert (convert)
 import Job (readJob, Job(..), Write(..))
@@ -80,7 +80,7 @@ main = do
     -- parse the input files
     let defines = map splitDefine $ define job
     result <- parseFiles (incdir job) defines (siloed job)
-        (skipPreprocessor job) (files job)
+        (skipPreprocessor job) (nub $ files job)
     case result of
         Left msg -> do
             hPutStrLn stderr msg
