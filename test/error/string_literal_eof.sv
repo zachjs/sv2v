@@ -1,0 +1,2 @@
+// pattern: unterminated string literal
+"

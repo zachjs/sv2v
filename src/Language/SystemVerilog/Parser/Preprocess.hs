@@ -38,14 +38,14 @@ data PP = PP
     , ppIncludePaths :: [FilePath] -- folders to search for includes
     , ppMacroStack   :: [[(String, String)]] -- arguments for in-progress macro expansions
     , ppIncludeStack :: [(FilePath, Env)] -- in-progress includes for loop detection
-    } deriving (Eq, Show)
+    }
 
 -- keeps track of the state of an if-else cascade level
 data Cond
     = CurrentlyTrue -- an active if/elsif/else branch (condition is met)
     | PreviouslyTrue -- an inactive else/elsif block due to an earlier if/elsif
     | NeverTrue -- an inactive if/elsif block; a subsequent else will be met
-    deriving (Eq, Show)
+    deriving Eq
 
 -- update a Cond for an `else block, where this block is active if and only if
 -- no previous block was active
@@ -288,8 +288,7 @@ takeThrough :: Char -> PPS String
 takeThrough goal = do
     str <- getInput
     if null str
-        then lexicalError $
-                "unexpected end of input, looking for " ++ (show goal)
+        then lexicalError $ "unexpected end of input, looking for " ++ show goal
         else do
             ch <- takeChar
             if ch == goal
@@ -366,24 +365,23 @@ takeMacroDefinition = do
             dropSpaces
             body <- takeUntilNewline
             argsWithDefaults <- mapM splitArg args
-            if null args
-                then lexicalError "macros cannot have 0 args"
-                else return (body, argsWithDefaults)
+            return (body, argsWithDefaults)
     where
         splitArg :: String -> PPS (String, Maybe String)
-        splitArg [] = lexicalError "macro defn. empty argument"
-        splitArg str = do
-            let (name, rest) = span isIdentChar str
-            if null name || not (all isIdentChar name) then
-                lexicalError $ "invalid macro arg name: " ++ show name
+        splitArg [] = lexicalError "macro definition missing argument name"
+        splitArg str =
+            if null name then
+                lexicalError $ "invalid macro definition argument: " ++ show str
             else if null rest then
                 return (name, Nothing)
-            else do
-                let leadCh : after = dropWhile isWhitespaceChar rest
-                let value = dropWhile isWhitespaceChar after
-                if leadCh /= '='
-                then lexicalError $ "bad char after arg name: " ++ (show leadCh)
-                else return (name, Just value)
+            else if leadCh /= '=' then
+                lexicalError $ "bad char after argument name: " ++ show leadCh
+            else
+                return (name, Just value)
+            where
+                (name, rest) = span isIdentChar str
+                leadCh : after = dropWhile isWhitespaceChar rest
+                value = dropWhile isWhitespaceChar after
 
 -- commas and right parens are forbidden outside matched pairs of: (), [], {},
 -- "", except to delimit arguments or end the list of arguments; see 22.5.1
@@ -393,7 +391,7 @@ takeMacroArguments = do
     leadCh <- takeChar
     if leadCh == '('
         then argLoop >>= mapM preprocessString
-        else lexicalError $ "expected begining of macro arguments, but found "
+        else lexicalError $ "expected beginning of macro arguments, but found "
                 ++ show leadCh
     where
         argLoop :: PPS [String]
@@ -466,12 +464,10 @@ dropWhitespace = do
     str <- getInput
     case str of
         ch : chs ->
-            if isWhitespaceChar ch
-                then do
-                    advancePosition ch
-                    setInput chs
-                    dropWhitespace
-                else return ()
+            when (isWhitespaceChar ch) $ do
+                advancePosition ch
+                setInput chs
+                dropWhitespace
         [] -> return ()
 
 -- directives that must always be processed even if the current code block is
@@ -617,7 +613,7 @@ handleString = do
                 [] -> lexicalError "unterminated string literal"
 
 -- preprocess a "backtick string", which begins and ends with a backtick
--- followed by a slash (`"), and withing which macros can be invoked as normal;
+-- followed by a slash (`"), and within which macros can be invoked as normal;
 -- otherwise, normal string literal rules apply, except that unescaped quotes
 -- are forbidden, and backticks must be escaped using a backslash to avoid being
 -- interpreted as a macro or marking the end of a string
@@ -733,9 +729,8 @@ handleDirective macrosOnly = do
             setFilePath filename
             let newPos = Position filename lineNumber 0
             setPosition newPos
-            if 0 <= levelNumber && levelNumber <= 2
-                then return ()
-                else lexicalError "line directive invalid level number"
+            when (levelNumber < 0 || 2 < levelNumber) $
+                lexicalError "line directive invalid level number"
 
         "include" -> do
             lineLookahead
@@ -884,9 +879,7 @@ advancePosition _ = do
 
 -- advances position for multiple characters
 advancePositions :: String -> PPS ()
-advancePositions str = do
-    _ <- mapM advancePosition str
-    return ()
+advancePositions = mapM_ advancePosition
 
 -- update the given position based on the movement of the given character
 advance :: Position -> Char -> Position
@@ -897,16 +890,13 @@ advance (Position f l c) _    = Position f l (c + 1)
 pushChar :: Char -> Position -> PPS ()
 pushChar c p = do
     condStack <- getCondStack
-    if any (/= CurrentlyTrue) condStack
-        then return ()
-        else do
-            output <- getOutput
-            setOutput $ (c, p) : output
+    when (all (== CurrentlyTrue) condStack) $ do
+        output <- getOutput
+        setOutput $ (c, p) : output
+
 -- adds a sequence of characters all at the same given position
 pushChars :: String -> Position -> PPS ()
-pushChars s p = do
-    _ <- mapM (flip pushChar p) s
-    return ()
+pushChars s p = mapM_ (flip pushChar p) s
 
 -- search for a pattern in the input and remove remove characters up to and
 -- including the first occurrence of the pattern
