@@ -39,8 +39,13 @@ import Language.SystemVerilog.AST
 type TypeInfo = (Type, [Range])
 
 convert :: [AST] -> [AST]
-convert = map $ traverseDescriptions $ partScoper
-    traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
+convert = map $ traverseDescriptions convertDescription
+
+convertDescription :: Description -> Description
+convertDescription (description @ (Part _ _ Module _ _ _ _)) =
+    partScoper traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
+    description
+convertDescription other = other
 
 -- collects and converts declarations with multiple packed dimensions
 traverseDeclM :: Decl -> Scoper TypeInfo Decl

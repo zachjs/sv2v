@@ -61,7 +61,8 @@ traverseModuleItemM defaultNetType (orig @ (NOutputGate _ _ x lhss expr)) = do
     _ <- mapM (needsLHS defaultNetType) lhss
     needsExpr defaultNetType expr
     return orig
-traverseModuleItemM defaultNetType (orig @ (Instance _ _ _ _ ports)) = do
+traverseModuleItemM defaultNetType (orig @ (Instance _ _ x _ ports)) = do
+    insertElem x ()
     _ <- mapM (needsExpr defaultNetType . snd) ports
     return orig
 traverseModuleItemM _ item = return item
