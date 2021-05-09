@@ -349,7 +349,7 @@ convertSubExpr scopes (Dot e x) =
             else Range e' IndexedMinus (base, len)
 convertSubExpr scopes (Range (Dot e x) NonIndexed rOuter) =
     if isntStruct subExprType then
-        fallbackType scopes orig'
+        (UnknownType, orig')
     else if structIsntReady subExprType then
         (replaceInnerTypeRange NonIndexed rOuter' fieldType, orig')
     else
@@ -371,7 +371,7 @@ convertSubExpr scopes (Range (Dot e x) NonIndexed rOuter) =
             endianCondRange dim rangeLeft rangeRight
 convertSubExpr scopes (Range (Dot e x) mode (baseO, lenO)) =
     if isntStruct subExprType then
-        fallbackType scopes orig'
+        (UnknownType, orig')
     else if structIsntReady subExprType then
         (replaceInnerTypeRange mode (baseO', lenO') fieldType, orig')
     else
@@ -401,7 +401,7 @@ convertSubExpr scopes (Range e mode (left, right)) =
         r' = (left', right')
 convertSubExpr scopes (Bit (Dot e x) i) =
     if isntStruct subExprType then
-        fallbackType scopes orig'
+        (dropInnerTypeRange backupType, orig')
     else if structIsntReady subExprType then
         (dropInnerTypeRange fieldType, orig')
     else
@@ -409,6 +409,7 @@ convertSubExpr scopes (Bit (Dot e x) i) =
     where
         (subExprType, e') = convertSubExpr scopes e
         (_, i') = convertSubExpr scopes i
+        (backupType, _) = fallbackType scopes $ Dot e' x
         orig' = Bit (Dot e' x) i'
         (fieldType, bounds, dims) = lookupFieldInfo subExprType x
         [dim] = dims
@@ -417,7 +418,7 @@ convertSubExpr scopes (Bit (Dot e x) i) =
         iFlat = endianCondExpr dim left right
 convertSubExpr scopes (Bit e i) =
     if t == UnknownType
-        then fallbackType scopes $ Bit e' i'
+        then (UnknownType, Bit e' i')
         else (dropInnerTypeRange t, Bit e' i')
     where
         (t, e') = convertSubExpr scopes e
