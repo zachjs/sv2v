@@ -24,7 +24,7 @@ data PartInfo = PartInfo
     }
 type PartInfos = Map.Map Identifier PartInfo
 
-type ModportInstances = [(Identifier, Identifier)]
+type ModportInstances = [(Identifier, (Identifier, Identifier))]
 type ModportBinding = (Identifier, (Substitutions, Expr))
 type Substitutions = [(Expr, Expr)]
 
@@ -197,19 +197,41 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
             else if bindingIsBundle && not portIsBundle then
                 -- given entire interface, but just bound to a modport
                 foundModport $ Dot expr modportName
+            else if modportInstance /= Nothing then
+                error $ "could not resolve modport binding " ++ show expr
+                    ++ " for port " ++ portName ++ " of type "
+                    ++ showModportType interfaceName modportName
             else
                 Nothing
             where
                 bindingIsModport = lookupIntfElem modports expr /= Nothing
                 bindingIsBundle = lookupIntfElem modports (Dot expr "") /= Nothing
                 portIsBundle = null modportName
-                modportName = case lookup portName modportInstances of
-                    Just x -> x
-                    Nothing -> error $ "can't deduce modport for interface "
-                        ++ show expr ++ " bound to port " ++ portName
+                modportInstance = lookup portName modportInstances
+                (interfaceName, modportName) =
+                    case modportInstance of
+                        Just x -> x
+                        Nothing -> error $ "can't deduce modport for interface "
+                            ++ show expr ++ " bound to port " ++ portName
 
                 foundModport modportE =
-                    Just (findInstance modportE, qualifyModport modportE)
+                    if (null interfaceName || bInterfaceName == interfaceName)
+                        && (null modportName || bModportName == modportName)
+                        then Just (instanceE, qualifyModport modportE)
+                        else error msg
+                    where
+                        bModportName =
+                            case modportE of
+                                Dot _ x -> x
+                                _ -> ""
+                        instanceE = findInstance modportE
+                        Just (_, _, InterfaceTypeVal bInterfaceName) =
+                            lookupIntfElem modports $ InterfaceTypeKey
+                                (findInstance modportE)
+                        msg = "port " ++ portName ++ " has type "
+                            ++ showModportType interfaceName modportName
+                            ++ ", but the binding " ++ show expr ++ " has type "
+                            ++ showModportType bInterfaceName bModportName
 
                 findInstance :: Expr -> Expr
                 findInstance e =
@@ -221,11 +243,19 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                         Just (accesses, _, _) -> accessesToExpr $ init accesses
                 qualifyModport :: Expr -> Expr
                 qualifyModport e =
+                    accessesToExpr $
                     case lookupIntfElem modports e of
-                        Just (accesses, _, _) -> accessesToExpr accesses
-                        Nothing -> accessesToExpr $ init accesses
-                            where Just (accesses, _, _) =
-                                    lookupIntfElem modports (Dot e "")
+                        Just (accesses, _, _) -> accesses
+                        Nothing ->
+                            case lookupIntfElem modports (Dot e "") of
+                                Just (accesses, _, _) -> init accesses
+                                Nothing ->
+                                    error $ "could not find modport " ++ show e
+
+        showModportType :: Identifier -> Identifier -> String
+        showModportType "" "" = "generic interface"
+        showModportType intf "" = intf
+        showModportType intf modp = intf ++ '.' : modp
 
         -- expand a modport binding into a series of expression substitutions
         genSubstitutions :: Scopes [ModportDecl] -> Expr -> Expr -> Expr
@@ -271,15 +301,15 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                         Just info = maybeInfo
                 collectDecl _ = return ()
 
-        extractModportInfo :: Type -> Maybe Identifier
-        extractModportInfo (InterfaceT "" "" []) = Just ""
+        extractModportInfo :: Type -> Maybe (Identifier, Identifier)
+        extractModportInfo (InterfaceT "" "" []) = Just ("", "")
         extractModportInfo (InterfaceT interfaceName modportName []) =
             if isInterface interfaceName
-                then Just modportName
+                then Just (interfaceName, modportName)
                 else Nothing
         extractModportInfo (Alias interfaceName []) =
             if isInterface interfaceName
-                then Just ""
+                then Just (interfaceName, "")
                 else Nothing
         extractModportInfo _ = Nothing
 
@@ -318,7 +348,7 @@ inlineInstance global ranges modportBindings items partName
             traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM ""
             $ map (traverseNestedModuleItems rewriteItem) $
             if null modportBindings
-                then items ++ [dimensionModport, bundleModport]
+                then items ++ [typeModport, dimensionModport, bundleModport]
                 else items
 
         key = shortHash (partName, instanceName)
@@ -328,6 +358,7 @@ inlineInstance global ranges modportBindings items partName
         dimensionModport = if not isArray
             then MIPackageItem $ Decl $ CommentDecl "not an instance array"
             else InstArrEncoded arrayLeft arrayRight
+        typeModport = InterfaceTypeEncoded partName
 
         inlineKind =
             if null modportBindings
@@ -612,6 +643,16 @@ pattern InstArrEncoded l r = Modport InstArrName (InstArrVal l r)
 -- encoding for normal declarations in the current module
 pattern DeclVal :: [ModportDecl]
 pattern DeclVal = [(Local, "~decl~", Nil)]
+
+-- encoding for the interface type of an interface instantiation
+pattern InterfaceTypeName :: Identifier
+pattern InterfaceTypeName = "~interface_type~"
+pattern InterfaceTypeVal :: Identifier -> [ModportDecl]
+pattern InterfaceTypeVal x = [(Local, "~interface~type~", Ident x)]
+pattern InterfaceTypeKey :: Expr -> Expr
+pattern InterfaceTypeKey e = Dot e InterfaceTypeName
+pattern InterfaceTypeEncoded :: Identifier -> ModuleItem
+pattern InterfaceTypeEncoded x = Modport InterfaceTypeName (InterfaceTypeVal x)
 
 -- determines the lower bound for the given slice
 sliceLo :: PartSelectMode -> Range -> Expr
