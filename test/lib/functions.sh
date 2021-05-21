@@ -22,6 +22,7 @@ simulate() {
         -Wall \
         -Wno-select-range \
         -Wno-anachronisms \
+        -Wno-portbind \
         -o $sim_prog \
         -g2005 \
         -DTEST_VCD="\"$sim_vcd\"" \

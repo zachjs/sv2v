@@ -965,11 +965,14 @@ LHSs :: { [LHS] }
   | LHSs "," LHS  { $1 ++ [$3] }
 
 PortBindings :: { [PortBinding] }
-  : "("                    ")" { [] }
-  | "(" PortBindingsInside ")" {% checkPortBindings $2 }
+  : "(" PortBindingsInside ")" {% checkPortBindings $2 }
 PortBindingsInside :: { [PortBinding] }
-  : PortBinding opt(",")               { [$1] }
-  | PortBinding "," PortBindingsInside { $1 : $3}
+  : OptPortBinding                        { [$1] }
+  | OptPortBinding "," PortBindingsInside { $1 : $3}
+OptPortBinding :: { PortBinding }
+  : {- empty -} { ("", Nil) }
+  | PortBinding { $1 }
+
 PortBinding :: { PortBinding }
   : "." Identifier "(" ExprOrNil ")" { ($2, $4) }
   | "." Identifier                   { ($2, Ident $2) }
@@ -1507,7 +1510,12 @@ missingToken expected = do
   throwError $ show p ++ ": Parse error: missing expected `" ++ expected ++ "`"
 
 checkPortBindings :: [PortBinding] -> ParseState [PortBinding]
-checkPortBindings = checkBindings "port connections"
+checkPortBindings [] = return []
+checkPortBindings bindings =
+  checkBindings "port connections" $
+  if last bindings == ("", Nil)
+    then init bindings
+    else bindings
 
 checkParamBindings :: [ParamBinding] -> ParseState [ParamBinding]
 checkParamBindings = checkBindings "parameter overrides"
