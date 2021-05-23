@@ -54,8 +54,6 @@ assertConverts() {
     assertTrue "2nd conversion of $ac_file failed" $?
     diff $ac_tmpa $ac_tmpb > /dev/null
     assertTrue "conversion of $ac_file not stable after the first iteration" $?
-    $SV2V -v $ac_file 2> /dev/null > /dev/null
-    assertTrue "verbose conversion of $ac_file failed" $?
     # using sed to remove quoted strings and integer unsigned
     filtered=`sed -E -e 's/"([^"]|\")+"//g' -e 's/integer unsigned/integer/g' $ac_tmpa`
     # check for various things iverilog accepts which we don't want to output
@@ -104,34 +102,46 @@ simpleTest() {
         assertConverts $tb
     fi
 
-    cv=$SHUNIT_TMPDIR/conv.v
-    convert $cv $sv
+    cs=$SHUNIT_TMPDIR/cs.v
+    convert $cs $sv
 
-    simulateAndCompare $ve $cv $tb
+    cv=$SHUNIT_TMPDIR/cv.v
+    convert $cv $sv -v
+
+    simulateAndCompare $ve $cs $cv $tb
 }
 
 simulateAndCompare() {
-    ve=$1
-    cv=$2
-    tb=$3
+    ve=$1 # reference verilog
+    cs=$2 # converted succinct
+    cv=$3 # converted verbose
+    tb=$4 # testbench
 
     ref_vcd=$SHUNIT_TMPDIR/ref.vcd
-    gen_vcd=$SHUNIT_TMPDIR/gen.vcd
+    cvs_vcd=$SHUNIT_TMPDIR/cvs.vcd
+    cvv_vcd=$SHUNIT_TMPDIR/cvv.vcd
     ref_log=$SHUNIT_TMPDIR/ref.log
-    gen_log=$SHUNIT_TMPDIR/gen.log
+    cvs_log=$SHUNIT_TMPDIR/cvs.log
+    cvv_log=$SHUNIT_TMPDIR/cvv.log
 
-    # simulate and compare the two files
+    # simulate the three files
     simulate $ref_vcd $ref_log top $ve $tb
-    simulate $gen_vcd $gen_log top $cv $tb
-    output=`diff $ref_vcd $gen_vcd`
-    assertTrue "VCDs are different:\n$output" $?
-    output=`diff $ref_log $gen_log`
-    assertTrue "Simulation outputs differ:\n$output" $?
+    simulate $cvs_vcd $cvs_log top $cs $tb
+    simulate $cvv_vcd $cvv_log top $cv $tb
 
-    rm -f $ref_vcd
-    rm -f $gen_vcd
-    rm -f $ref_log
-    rm -f $gen_log
+    # compare reference verilog to converted succinct
+    output=`diff $ref_vcd $cvs_vcd`
+    assertTrue "VE/CS VCDs are different:\n$output" $?
+    output=`diff $ref_log $cvs_log`
+    assertTrue "VE/CS simulation outputs differ:\n$output" $?
+
+    # compare converted verbose to converted succinct
+    output=`diff $cvv_vcd $cvs_vcd`
+    assertTrue "CV/CS VCDs are different:\n$output" $?
+    output=`diff $cvv_log $cvs_log`
+    assertTrue "CV/CS simulation outputs differ:\n$output" $?
+
+    rm -f $ref_vcd $cvs_vcd $cvv_vcd $ref_log $cvs_log $cvv_log
 }
 
 runTest() {

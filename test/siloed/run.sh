@@ -1,9 +1,11 @@
 #!/bin/bash
 
 test_default() {
-    cv="$SHUNIT_TMPDIR/conv.v"
-    convert "$cv" package.svh module.sv
-    simulateAndCompare "reference.v" "$cv" "$SCRIPT_DIR/empty.v"
+    cs=$SHUNIT_TMPDIR/cs.v
+    cv=$SHUNIT_TMPDIR/cv.v
+    convert $cs package.svh module.sv
+    convert $cv package.svh module.sv -v
+    simulateAndCompare reference.v $cs $cv "$SCRIPT_DIR/empty.v"
 }
 
 test_siloed() {

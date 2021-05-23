@@ -128,6 +128,7 @@ showBlockedBranch stmt =
             Forever{} -> True
             Foreach{} -> True
             Timing _ subStmt -> isControl subStmt
+            Block Seq "" [] [CommentStmt{}, subStmt] -> isControl subStmt
             _ -> False
 
 showElseBranch :: Stmt -> String
