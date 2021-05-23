@@ -56,16 +56,22 @@ assertConverts() {
     assertTrue "conversion of $ac_file not stable after the first iteration" $?
     $SV2V -v $ac_file 2> /dev/null > /dev/null
     assertTrue "verbose conversion of $ac_file failed" $?
-    # using sed to remove quoted strings
-    filtered=`sed -E 's/"([^"]|\")+"//g' $ac_tmpa`
+    # using sed to remove quoted strings and integer unsigned
+    filtered=`sed -E -e 's/"([^"]|\")+"//g' -e 's/integer unsigned/integer/g' $ac_tmpa`
     # check for various things iverilog accepts which we don't want to output
-    PATTERNS="\$bits\|\$dimensions\|\$unpacked_dimensions\|\$left\|\$right\|\$low\|\$high\|\$increment\|\$size"
-    echo "$filtered" | grep "$PATTERNS" > /dev/null
-    assertFalse "conversion of $ac_file still contains dimension queries" $?
-    echo "$filtered" | egrep "\s(int\|bit\|logic\|byte\|struct\|enum\|longint\|shortint)\s"
-    assertFalse "conversion of $ac_file still contains SV types" $?
-    echo "$filtered" | grep "[^\$a-zA-Z_]unsigned" | grep -v "integer unsigned" > /dev/null
-    assertFalse "conversion of $ac_file still contains unsigned keyword" $?
+    prefix="conversion of $ac_file still contains"
+    assertNotMatch "$filtered" "$prefix dimension queries" \
+        '\$bits|\$dimensions|\$unpacked_dimensions|\$left|\$right|\$low|\$high|\$increment|\$size'
+    assertNotMatch "$filtered" "$prefix SystemVerilog types" \
+        '[[:space:]](int|bit|logic|byte|struct|enum|longint|shortint)[[:space:]]'
+    assertNotMatch "$filtered" "$prefix unsigned keyword" \
+        '[^\$a-zA-Z_]unsigned'
+}
+
+assertNotMatch() {
+    if [[ "$1" =~ $3 ]]; then
+        fail "$2"
+    fi
 }
 
 # convert SystemVerilog source file(s)
