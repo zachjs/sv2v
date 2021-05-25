@@ -15,7 +15,7 @@ module Language.SystemVerilog.AST.Decl
 import Text.Printf (printf)
 
 import Language.SystemVerilog.AST.ShowHelp (showPad, unlines')
-import Language.SystemVerilog.AST.Type (Type, Identifier, pattern UnknownType)
+import Language.SystemVerilog.AST.Type (Type(UnpackedType), Identifier, pattern UnknownType)
 import Language.SystemVerilog.AST.Expr (Expr, Range, showRanges, showAssignment)
 
 data Decl
@@ -28,6 +28,8 @@ data Decl
 instance Show Decl where
     showList l _ = unlines' $ map show l
     show (Param s t x e) = printf "%s %s%s%s;" (show s) (showPad t) x (showAssignment e)
+    show (ParamType Localparam x (UnpackedType t rs)) =
+        printf "typedef %s %s%s;" (show t) x (showRanges rs)
     show (ParamType s x t) = printf "%s type %s%s;" (show s) x tStr
         where tStr = if t == UnknownType then "" else  " = " ++ show t
     show (Variable d t x a e) = printf "%s%s%s%s%s;" (showPad d) (showPad t) x (showRanges a) (showAssignment e)
