@@ -64,6 +64,7 @@ instance Show Type where
     show (IntegerVector kw sg rs) = printf "%s%s%s" (show kw) (showPadBefore sg) (showRanges rs)
     show (IntegerAtom   kw sg   ) = printf "%s%s"   (show kw) (showPadBefore sg)
     show (NonInteger    kw      ) = printf "%s"     (show kw)
+    show (InterfaceT "" "" r) = "interface" ++ showRanges r
     show (InterfaceT x y r) = x ++ yStr ++ (showRanges r)
         where yStr = if null y then "" else '.' : y
     show (Enum t vals r) = printf "enum %s{%s}%s" tStr (commas $ map showVal vals) (showRanges r)
