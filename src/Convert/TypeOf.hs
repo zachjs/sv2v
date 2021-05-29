@@ -56,8 +56,8 @@ traverseDeclM decl = do
             return $ case t' of
                 UnpackedType t'' a' -> Variable d t'' ident a' e
                 _ ->                   Variable d t'  ident [] e
-        Param _ UnknownType ident String{} ->
-            insertType ident UnknownType >> return decl'
+        Param Parameter UnknownType ident String{} ->
+            insertType ident (TypeOf $ Ident ident) >> return decl'
         Param _ UnknownType ident e ->
             typeof e >>= insertType ident >> return decl'
         Param _ (Implicit sg rs) ident _ ->
