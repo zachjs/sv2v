@@ -304,7 +304,8 @@ processItems topName packageName moduleItems = do
         traverseTypeM :: Type -> Scope Type
         traverseTypeM (CSAlias p b x rs) = do
             scopeKeys <- bindingsScopeKeys b
-            x' <- lift $ resolveCSIdent p b scopeKeys x
+            b' <- mapM traverseParamBindingM b
+            x' <- lift $ resolveCSIdent p b' scopeKeys x
             return $ Alias x' rs
         traverseTypeM (PSAlias p x rs) = do
             x' <- resolvePSIdent' p x
@@ -321,7 +322,8 @@ processItems topName packageName moduleItems = do
         traverseExprM :: Expr -> Scope Expr
         traverseExprM (CSIdent p b x) = do
             scopeKeys <- bindingsScopeKeys b
-            x' <- lift $ resolveCSIdent p b scopeKeys x
+            b' <- mapM traverseParamBindingM b
+            x' <- lift $ resolveCSIdent p b' scopeKeys x
             return $ Ident x'
         traverseExprM (PSIdent p x) = do
             x' <- resolvePSIdent' p x
@@ -346,6 +348,12 @@ processItems topName packageName moduleItems = do
         traverseStmtM =
             traverseStmtExprsM traverseExprM >=>
             traverseStmtLHSsM  traverseLHSM
+
+        traverseParamBindingM :: ParamBinding -> Scope ParamBinding
+        traverseParamBindingM (x, Left t) =
+            traverseTypeM t >>= return . (x, ) . Left
+        traverseParamBindingM (x, Right e) =
+            traverseExprM e >>= return . (x, ) . Right
 
         -- wrapper allowing explicit reference to local package items
         resolvePSIdent' :: Identifier -> Identifier -> Scope Identifier
@@ -481,7 +489,6 @@ resolveCSIdent className paramBindings scopeKeys itemName = do
             Decl $ Param Parameter t x $
                 case lookup x' bindings of
                     Just (Right e') -> e'
-                    Just (Left (Alias y [])) -> Ident y
                     Just (Left t') ->
                         error $ "cannot override parameter " ++ show x'
                             ++ " in class " ++ show className
@@ -497,7 +504,7 @@ resolveCSIdent className paramBindings scopeKeys itemName = do
             Decl $ ParamType Parameter x $
                 case lookup x' bindings of
                     Just (Left t') -> t'
-                    Just (Right (Ident t')) -> Alias t' []
+                    Just (Right (Ident y)) -> Alias y []
                     Just (Right e') ->
                         error $ "cannot override type parameter " ++ show x'
                             ++ " in class " ++ show className
