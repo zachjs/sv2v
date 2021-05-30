@@ -1081,7 +1081,7 @@ IdxVar :: { Identifier }
   | Identifier  { $1 }
 
 DeclsAndStmts :: { ([Decl], [Stmt]) }
-  : StmtTrace DeclOrStmt DeclsAndStmts { combineDeclsAndStmts $2 $3 }
+  : StmtTrace DeclOrStmt DeclsAndStmts {% combineDeclsAndStmts $2 $3 }
   | StmtTrace StmtNonAsgn Stmts        { ([], $1 : $2 : $3) }
   | StmtTrace {- empty -}              { ([], []) }
 DeclOrStmt :: { ([Decl], [Stmt]) }
@@ -1446,8 +1446,15 @@ genItemsToGenItem :: [GenItem] -> GenItem
 genItemsToGenItem [x] = x
 genItemsToGenItem xs = GenBlock "" xs
 
-combineDeclsAndStmts :: ([Decl], [Stmt]) -> ([Decl], [Stmt]) -> ([Decl], [Stmt])
-combineDeclsAndStmts (a1, b1) (a2, b2) = (a1 ++ a2, b1 ++ b2)
+combineDeclsAndStmts :: ([Decl], [Stmt]) -> ([Decl], [Stmt]) ->
+  ParseState ([Decl], [Stmt])
+combineDeclsAndStmts (a1, b1) (a2, b2) =
+  if not (null b1) && not (null a2)
+    then do
+      p <- gets pPosition
+      throwError $ show p
+        ++ ": Parse error: procedural block contains a declaration after a statement"
+    else return (a1 ++ a2, b1 ++ b2)
 
 makeInput :: Decl -> Decl
 makeInput (Variable Local t x a e) = Variable Input t x a e
