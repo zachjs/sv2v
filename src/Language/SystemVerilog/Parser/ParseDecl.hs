@@ -265,10 +265,8 @@ parseDTsAsDeclOrStmt tokens =
         pos = tokPos $ last tokens
         stmt = case last tokens of
             DTAsgn  _ op mt e -> Asgn op mt lhs e
-            DTInstance _ args -> Subroutine (lhsToExpr lhs) (instanceToArgs args)
-            _ -> case takeLHS tokens of
-                Just fullLHS -> Subroutine (lhsToExpr fullLHS) (Args [] [])
-                _ -> error $ "invalid block item decl or stmt: " ++ show tokens
+            DTInstance _ args -> asSubroutine lhsToks (instanceToArgs args)
+            _ -> asSubroutine tokens (Args [] [])
         lhsToks = init tokens
         lhs = case takeLHS lhsToks of
             Nothing -> error $ "could not parse as LHS: " ++ show lhsToks
@@ -281,6 +279,16 @@ parseDTsAsDeclOrStmt tokens =
 
 traceStmt :: Position -> Stmt
 traceStmt pos = CommentStmt $ "Trace: " ++ show pos
+
+-- read the given tokens as the root of a subroutine invocation
+asSubroutine :: [DeclToken] -> Args -> Stmt
+asSubroutine [DTIdent   _     x] = Subroutine $ Ident       x
+asSubroutine [DTPSIdent _ p   x] = Subroutine $ PSIdent p   x
+asSubroutine [DTCSIdent _ c p x] = Subroutine $ CSIdent c p x
+asSubroutine tokens =
+    case takeLHS tokens of
+        Just lhs -> Subroutine $ lhsToExpr lhs
+        Nothing -> error $ "invalid block item decl or stmt: " ++ show tokens
 
 -- converts port bindings to call args
 instanceToArgs :: [PortBinding] -> Args

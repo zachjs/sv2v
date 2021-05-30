@@ -1008,6 +1008,8 @@ StmtAsgn :: { Stmt }
   | LHS CallArgs ";" { Subroutine (lhsToExpr $1) $2 }
   | Identifier "::" Identifier          ";" { Subroutine (PSIdent $1 $3) (Args [] []) }
   | Identifier "::" Identifier CallArgs ";" { Subroutine (PSIdent $1 $3) $4 }
+  | Identifier ParamBindings "::" Identifier          ";" { Subroutine (CSIdent $1 $2 $4) (Args [] []) }
+  | Identifier ParamBindings "::" Identifier CallArgs ";" { Subroutine (CSIdent $1 $2 $4) $5 }
 StmtNonAsgn :: { Stmt }
   : StmtBlock(BlockKWSeq, end ) { $1 }
   | StmtBlock(BlockKWPar, join) { $1 }
