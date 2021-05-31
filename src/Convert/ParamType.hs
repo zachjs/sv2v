@@ -17,7 +17,7 @@ import Convert.Traverse
 import Language.SystemVerilog.AST
 
 type MaybeTypeMap = Map.Map Identifier (Maybe Type)
-type Info = Map.Map Identifier ([Identifier], MaybeTypeMap)
+type Info = Map.Map Identifier MaybeTypeMap
 
 type Instance = Map.Map Identifier (Type, IdentSet)
 type Instances = Set.Set (Identifier, Instance)
@@ -75,7 +75,7 @@ convert files =
         collectModuleItemM (Instance m bindings _ _ _) = do
             case Map.lookup m info of
                 Nothing -> tell (Set.singleton m, Set.empty)
-                Just (_, maybeTypeMap) ->
+                Just maybeTypeMap ->
                     if any (flip Map.member maybeTypeMap) $ map fst bindings
                         then tell (Set.empty, Set.singleton m)
                         else tell (Set.singleton m, Set.empty)
@@ -97,7 +97,7 @@ convert files =
                     then []
                     else [rewriteModule part $ fromJust typeMap]
             where
-                maybeTypeMap = snd $ info Map.! name
+                maybeTypeMap = info Map.! name
                 typeMap = defaultInstance maybeTypeMap
                 existingNames = map moduleName existing
                 alreadyExists = (flip elem existingNames) . moduleName
@@ -203,11 +203,10 @@ convert files =
 -- write down module parameter names and type parameters
 collectDescriptionM :: Description -> Writer Info ()
 collectDescriptionM (part @ (Part _ _ _ _ name _ _)) =
-    tell $ Map.singleton name (paramNames, maybeTypeMap)
+    tell $ Map.singleton name maybeTypeMap
     where
         params = execWriter $
             collectModuleItemsM (collectDeclsM collectDeclM) part
-        paramNames = map fst params
         maybeTypeMap = Map.fromList $
             map (\(x, y) -> (x, fromJust y)) $
             filter (isJust . snd) params
@@ -306,7 +305,7 @@ convertModuleItemM info (orig @ (Instance m bindings x r p)) =
         let defaults = Map.map (Left . fst) resolvedTypes
         let bindingsDefaulted = Map.toList $ Map.union bindingsMap defaults
         if isDefaultName m || bindingsDefaulted == Map.toList bindingsMap
-            then return $ Instance m bindingsNamed x r p
+            then return $ Instance m bindings x r p
             else return $ Instance (moduleDefaultName m) bindingsDefaulted x r p
     else do
         tell $ Set.singleton (m, resolvedTypes)
@@ -315,17 +314,9 @@ convertModuleItemM info (orig @ (Instance m bindings x r p)) =
             map (MIPackageItem . Decl) addedDecls ++
             [Instance m' (additionalBindings ++ bindings') x r p]
     where
-        (paramNames, maybeTypeMap) = info Map.! m
-        -- attach names to unnamed parameters
-        bindingsNamed =
-            if all (== "") (map fst bindings) then
-                zip paramNames (map snd bindings)
-            else if any (== "") (map fst bindings) then
-                error $ "instance has a mix of named and unnamed params: "
-                    ++ show orig
-            else bindings
+        maybeTypeMap = info Map.! m
         -- determine the types corresponding to each type parameter
-        bindingsMap = Map.fromList bindingsNamed
+        bindingsMap = Map.fromList bindings
         resolvedTypesWithDecls = Map.mapWithKey resolveType maybeTypeMap
         resolvedTypes = Map.map (\(a, (b, _)) -> (a, b)) resolvedTypesWithDecls
         addedDecls = concatMap (snd . snd . snd) $
@@ -340,7 +331,7 @@ convertModuleItemM info (orig @ (Instance m bindings x r p)) =
 
         -- leave only the normal expression params behind
         isParamType = flip Map.member maybeTypeMap
-        bindings' = filter (not . isParamType . fst) bindingsNamed
+        bindings' = filter (not . isParamType . fst) bindings
 
         -- create additional parameters needed to specify existing type params
         additionalBindings = concatMap makeAddedParams $
