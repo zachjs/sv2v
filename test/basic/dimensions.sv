@@ -34,6 +34,10 @@ module top;
         $display($size(Ram[0]));
         $display($bits(foo));
 
+        $display("bits %0d", $bits("AB"));
+        $display("bits %0d", $bits("A"));
+        $display("bits %0d", $bits(""));
+
         $display("args %b", $size(RamPair, 1));
         $display("args %b", $size(RamPair, 1'b1));
         $display("args %b", $size(RamPair, '1));

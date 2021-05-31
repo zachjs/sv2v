@@ -225,7 +225,7 @@ typeof (String str) =
     return $ IntegerVector TBit Unspecified [r]
     where
         r = (RawNum $ len - 1, RawNum 0)
-        len = if null str then 1 else 8 * unescapedLength str
+        len = if null str then 8 else 8 * unescapedLength str
 typeof other = lookupTypeOf other
 
 -- length of a string literal in characters

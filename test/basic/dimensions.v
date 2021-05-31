@@ -31,6 +31,10 @@ module top;
         $display(16);
         $display(3);
 
+        $display("bits %0d", $bits("AB"));
+        $display("bits %0d", $bits("A"));
+        $display("bits %0d", $bits(""));
+
         $display("args %b", 2);
         $display("args %b", 2);
         $display("args %b", 2);
