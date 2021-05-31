@@ -13,7 +13,6 @@ import Data.Maybe (isJust, isNothing, fromJust)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
-import Convert.ExprUtils
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
@@ -241,25 +240,6 @@ isDefaultName m =
 defaultTag :: Identifier
 defaultTag = "_sv2v_default"
 
--- attempt to convert an expression to syntactically equivalent type
-exprToType :: Expr -> Maybe Type
-exprToType (Ident       x) = Just $ Alias       x []
-exprToType (PSIdent y   x) = Just $ PSAlias y   x []
-exprToType (CSIdent y p x) = Just $ CSAlias y p x []
-exprToType (Range e NonIndexed r) =
-    case exprToType e of
-        Nothing -> Nothing
-        Just t -> Just $ tf (rs ++ [r])
-            where (tf, rs) = typeRanges t
-exprToType (Bit e i) =
-    case exprToType e of
-        Nothing -> Nothing
-        Just t -> Just $ tf (rs ++ [r])
-            where
-                (tf, rs) = typeRanges t
-                r = (simplify $ BinOp Sub i (RawNum 1), RawNum 0)
-exprToType _ = Nothing
-
 -- checks where a type is sufficiently resolved to be substituted
 isSimpleType :: Type -> Bool
 isSimpleType typ =
@@ -352,21 +332,11 @@ convertModuleItemM info (orig @ (Instance m bindings x r p)) =
             Map.toList resolvedTypesWithDecls
         resolveType :: Identifier -> Maybe Type -> (Type, (IdentSet, [Decl]))
         resolveType paramName defaultType =
-            case (Map.lookup paramName bindingsMap, defaultType) of
-                (Nothing, Just t) -> (t, (Set.empty, []))
-                (Nothing, Nothing) ->
-                    error $ "instantiation " ++ show orig ++
-                        " is missing a type parameter: " ++ paramName
-                (Just (Left t), _) -> prepareTypeExprs x paramName t
-                (Just (Right e), _) ->
-                    -- Some types are parsed as expressions because of the
-                    -- ambiguities of defined type names.
-                    case exprToType e of
-                        Just t -> prepareTypeExprs x paramName t
-                        Nothing ->
-                            error $ "instantiation " ++ show orig
-                                ++ " has expr " ++ show e
-                                ++ " for type param: " ++ paramName
+            case Map.lookup paramName bindingsMap of
+                Nothing -> (t, (Set.empty, []))
+                    where Just t = defaultType
+                Just b -> prepareTypeExprs x paramName t
+                    where Left t = b
 
         -- leave only the normal expression params behind
         isParamType = flip Map.member maybeTypeMap

@@ -29,7 +29,6 @@ module Language.SystemVerilog.AST
     , exprToLHS
     , lhsToExpr
     , shortHash
-    , resolveBindings
     ) where
 
 import Text.Printf (printf)
@@ -85,15 +84,3 @@ shortHash :: (Show a) => a -> String
 shortHash x =
     take 5 $ printf "%05X" val
     where val = hash $ show x
-
-type Binding t = (Identifier, t)
--- give a set of bindings explicit names
-resolveBindings :: String -> [Identifier] -> [Binding t] -> [Binding t]
-resolveBindings _ _ [] = []
-resolveBindings location available bindings =
-    if length available < length bindings then
-        error $ "too many bindings specified for " ++ location
-    else if null $ fst $ head bindings then
-        zip available $ map snd bindings
-    else
-        bindings

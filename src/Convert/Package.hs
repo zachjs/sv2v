@@ -30,6 +30,7 @@ import Data.Maybe (mapMaybe)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
+import Convert.ResolveBindings (exprToType, resolveBindings)
 import Convert.Scoper
 import Convert.Traverse
 import Language.SystemVerilog.AST
@@ -504,11 +505,13 @@ resolveCSIdent className paramBindings scopeKeys itemName = do
             Decl $ ParamType Parameter x $
                 case lookup x' bindings of
                     Just (Left t') -> t'
-                    Just (Right (Ident y)) -> Alias y []
                     Just (Right e') ->
-                        error $ "cannot override type parameter " ++ show x'
-                            ++ " in class " ++ show className
-                            ++ " with expression " ++ show e'
+                        case exprToType e' of
+                            Just t' -> t'
+                            Nothing ->
+                                error $ "cannot override type parameter "
+                                    ++ show x' ++ " in class " ++ show className
+                                    ++ " with expression " ++ show e'
                     Nothing ->
                         if t == UnknownType
                             then error $ "required type parameter " ++ show x'
