@@ -130,18 +130,17 @@ traverseModuleItem ports scopes =
             where
                 comment = MIPackageItem $ Decl $ CommentDecl
                     "rewrote reg-to-output bindings"
-                (bindings', newItemsList) =
-                    unzip $ map (uncurry fixBinding) $ zip bindings [0..]
+                (bindings', newItemsList) = unzip $ map fixBinding bindings
                 newItems = concat newItemsList
-                fixBinding :: PortBinding -> Int -> (PortBinding, [ModuleItem])
-                fixBinding (portName, expr) portIdx =
+                fixBinding :: PortBinding -> (PortBinding, [ModuleItem])
+                fixBinding (portName, expr) =
                     if not outputBound || not usesReg
                         then ((portName, expr), [])
                         else ((portName, tmpExpr), items)
                     where
                         outputBound = portDir == Just Output
                         usesReg = Just True == fmap isReg (exprToLHS expr)
-                        portDir = lookupPortDir portName portIdx
+                        portDir = maybeModulePorts >>= lookup portName
                         tmp = "sv2v_tmp_" ++ instanceName ++ "_" ++ portName
                         tmpExpr = Ident tmp
                         t = Net (NetType TWire) Unspecified
@@ -155,17 +154,7 @@ traverseModuleItem ports scopes =
                                 error $ "bad non-lhs, non-net expr "
                                     ++ show expr ++ " connected to output port "
                                     ++ portName ++ " of " ++ instanceName
-                lookupPortDir :: Identifier -> Int -> Maybe Direction
-                lookupPortDir "" portIdx =
-                    case Map.lookup moduleName ports of
-                        Nothing -> Nothing
-                        Just l -> if portIdx >= length l
-                                    then Nothing
-                                    else Just $ snd $ l !! portIdx
-                lookupPortDir portName _ =
-                    case Map.lookup moduleName ports of
-                        Nothing -> Nothing
-                        Just l -> lookup portName l
+                maybeModulePorts = Map.lookup moduleName ports
         fixModuleItem other = other
 
 traverseDeclM :: Decl -> ST Decl
