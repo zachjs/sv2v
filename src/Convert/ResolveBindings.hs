@@ -17,6 +17,7 @@ module Convert.ResolveBindings
     ) where
 
 import Control.Monad.Writer.Strict
+import Data.List (intercalate, (\\))
 import qualified Data.Map.Strict as Map
 
 import Convert.ExprUtils (simplify)
@@ -121,5 +122,12 @@ resolveBindings location available bindings =
         error $ "too many bindings specified for " ++ location
     else if null $ fst $ head bindings then
         zip available $ map snd bindings
+    else if not $ null unknowns then
+        error $ "unknown binding" ++ unknownsPlural ++ " "
+            ++ unknownsStr ++ " specified for " ++ location
     else
         bindings
+    where
+        unknowns = map fst bindings \\ available
+        unknownsPlural = if length unknowns == 1 then "" else "s"
+        unknownsStr = intercalate ", " $ map show unknowns
