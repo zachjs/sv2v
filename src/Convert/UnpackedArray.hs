@@ -29,25 +29,25 @@ convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription (description @ (Part _ _ Module _ _ _ _)) =
+convertDescription (description @ (Part _ _ Module _ _ ports _)) =
     evalState (operation description) Set.empty
     where
-        operation =
-            partScoperT traverseDeclM traverseModuleItemM noop traverseStmtM >=>
+        operation = partScoperT
+            (traverseDeclM ports) traverseModuleItemM noop traverseStmtM >=>
             partScoperT rewriteDeclM noop noop noop
         noop = return
 convertDescription other = other
 
 -- tracks multi-dimensional unpacked array declarations
-traverseDeclM :: Decl -> ST Decl
-traverseDeclM (decl @ (Variable _ _ _ [] _)) = return decl
-traverseDeclM (decl @ (Variable dir _ x _ e)) = do
+traverseDeclM :: [Identifier] -> Decl -> ST Decl
+traverseDeclM _ (decl @ (Variable _ _ _ [] _)) = return decl
+traverseDeclM ports (decl @ (Variable _ _ x _ e)) = do
     insertElem x decl
-    if dir /= Local || e /= Nil
+    if elem x ports || e /= Nil
         then flatUsageM x
         else return ()
     return decl
-traverseDeclM other = return other
+traverseDeclM _ other = return other
 
 -- pack decls marked for packing
 rewriteDeclM :: Decl -> ST Decl

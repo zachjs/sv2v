@@ -302,12 +302,12 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                 collectDecl _ = return ()
 
         extractModportInfo :: Type -> Maybe (Identifier, Identifier)
-        extractModportInfo (InterfaceT "" "" []) = Just ("", "")
-        extractModportInfo (InterfaceT interfaceName modportName []) =
+        extractModportInfo (InterfaceT "" "" _) = Just ("", "")
+        extractModportInfo (InterfaceT interfaceName modportName _) =
             if isInterface interfaceName
                 then Just (interfaceName, modportName)
                 else Nothing
-        extractModportInfo (Alias interfaceName []) =
+        extractModportInfo (Alias interfaceName _) =
             if isInterface interfaceName
                 then Just (interfaceName, "")
                 else Nothing
@@ -496,15 +496,17 @@ inlineInstance global ranges modportBindings items partName
                 Variable d t x a e
             else if makeBindingBaseExpr modportE == Nothing then
                 CommentDecl $ "removed modport instance " ++ x
-            else if null a then
+            else if null modportDims then
                 localparam (modportBaseName x) bindingBaseExpr
             else
                 localparam (modportBaseName x) $
-                    BinOp Sub bindingBaseExpr (sliceLo NonIndexed $ head a)
+                    BinOp Sub bindingBaseExpr (sliceLo NonIndexed modportDim)
             where
                 maybeModportBinding = lookup x modportBindings
                 Just (_, modportE) = maybeModportBinding
                 bindingBaseExpr = Ident $ bindingBaseName ++ x
+                modportDims = a ++ snd (typeRanges t)
+                [modportDim] = modportDims
 
         removeModportInstance other = other
 
