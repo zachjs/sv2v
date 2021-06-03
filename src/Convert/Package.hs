@@ -656,12 +656,8 @@ traverseTypeIdentsM identMapper = fullMapper
         fullMapper = typeMapper
             >=> traverseTypeExprsM (traverseExprIdentsM identMapper)
             >=> traverseSinglyNestedTypesM fullMapper
-        typeMapper (Alias       x t) = aliasHelper (Alias      ) x t
-        typeMapper (PSAlias p   x t) = aliasHelper (PSAlias p  ) x t
-        typeMapper (CSAlias c p x t) = aliasHelper (CSAlias c p) x t
+        typeMapper (Alias x t) = identMapper x >>= return . flip Alias t
         typeMapper other = return other
-        aliasHelper constructor x t =
-            identMapper x >>= \x' -> return $ constructor x' t
 
 -- visits all identifiers in an LHS
 traverseLHSIdentsM :: Monad m => MapperM m Identifier -> MapperM m LHS
