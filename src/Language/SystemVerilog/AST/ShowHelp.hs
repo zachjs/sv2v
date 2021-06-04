@@ -57,4 +57,4 @@ showEither (Right v) = show v
 showBlock :: (Show a, Show b) => [a] -> [b] -> String
 showBlock a [] = indent $ show a
 showBlock [] b = indent $ show b
-showBlock a b = indent $ show a ++ "\n" ++ show b
+showBlock a b = indent $ show a ++ '\n' : show b

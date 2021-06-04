@@ -126,7 +126,7 @@ data Args
     deriving (Eq, Ord)
 
 instance Show Args where
-    show (Args pnArgs kwArgs) = "(" ++ (commas strs) ++ ")"
+    show (Args pnArgs kwArgs) = '(' : commas strs ++ ")"
         where
             strs = (map show pnArgs) ++ (map showKwArg kwArgs)
             showKwArg (x, e) = printf ".%s(%s)" x (show e)
@@ -177,10 +177,10 @@ showAssignment val = " = " ++ show val
 
 showRanges :: [Range] -> String
 showRanges [] = ""
-showRanges l = " " ++ (concatMap showRange l)
+showRanges l = ' ' : concatMap showRange l
 
 showRange :: Range -> String
-showRange (h, l) = printf "[%s:%s]" (show h) (show l)
+showRange (h, l) = '[' : show h ++ ':' : show l ++ "]"
 
 showUniOpPrec :: Expr -> ShowS
 showUniOpPrec (e @ UniOp{}) = (showParen True . shows) e
@@ -198,6 +198,5 @@ showParams params = indentedParenList $ map showParam params
 
 showParam :: ParamBinding -> String
 showParam ("*", Right Nil) = ".*"
-showParam (i, arg) =
-    printf fmt i (either show show arg)
-    where fmt = if i == "" then "%s%s" else ".%s(%s)"
+showParam ("", arg) = showEither arg
+showParam (i, arg) = printf ".%s(%s)" i (showEither arg)
