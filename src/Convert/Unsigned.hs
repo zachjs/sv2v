@@ -24,4 +24,6 @@ convertType :: Type -> Type
 convertType (Implicit        Unsigned rs) = Implicit        Unspecified rs
 convertType (IntegerVector t Unsigned rs) = IntegerVector t Unspecified rs
 convertType (Net           t Unsigned rs) = Net           t Unspecified rs
+convertType (IntegerAtom TInteger Unsigned) =
+    IntegerVector TReg Unspecified [(RawNum 31, RawNum 0)]
 convertType other = other

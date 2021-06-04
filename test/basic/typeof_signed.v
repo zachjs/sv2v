@@ -1,6 +1,6 @@
 `define MAKE_PRIM(typ, base, size) \
     base [size-1:0] typ``_unspecified = 1; \
-    base unsigned [size-1:0] typ``_unsigned = 1; \
+    base [size-1:0] typ``_unsigned = 1; \
     base signed [size-1:0] typ``_signed = 1;
 
 module top;
@@ -18,8 +18,8 @@ module top;
     `MAKE_PRIM(shortint, reg, 16)
     `MAKE_PRIM(int, reg, 32)
     integer integer_unspecified = 1;
-    integer unsigned integer_unsigned = 1;
-    integer signed integer_signed = 1;
+    reg [31:0] integer_unsigned = 1;
+    integer integer_signed = 1;
     `MAKE_PRIM(longint, reg, 64)
 
     `MAKE_PRIM(bit, wire, 1)

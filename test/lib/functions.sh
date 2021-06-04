@@ -54,8 +54,8 @@ assertConverts() {
     assertTrue "2nd conversion of $ac_file failed" $?
     diff $ac_tmpa $ac_tmpb > /dev/null
     assertTrue "conversion of $ac_file not stable after the first iteration" $?
-    # using sed to remove quoted strings and integer unsigned
-    filtered=`sed -E -e 's/"([^"]|\")+"//g' -e 's/integer unsigned/integer/g' $ac_tmpa`
+    # using sed to remove quoted strings
+    filtered=`sed -E 's/"([^"]|\")+"//g' $ac_tmpa`
     # check for various things iverilog accepts which we don't want to output
     prefix="conversion of $ac_file still contains"
     assertNotMatch "$filtered" "$prefix dimension queries" \
