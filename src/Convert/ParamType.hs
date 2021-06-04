@@ -9,7 +9,7 @@ module Convert.ParamType (convert) where
 
 import Control.Monad.Writer.Strict
 import Data.Either (isLeft)
-import Data.Maybe (isJust, isNothing, fromJust)
+import Data.Maybe (isJust, fromJust)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
@@ -44,18 +44,16 @@ convert files =
             else
                 (:) part $
                 filter (not . alreadyExists) $
-                filter isNonDefault $
                 map (rewriteModule part) theseInstances
             where
                 theseInstances = map snd $ filter ((== name) . fst) instances
-                isNonDefault = (name /=) . moduleName
                 alreadyExists = (flip Map.member info) . moduleName
                 moduleName :: Description -> Identifier
                 moduleName = \(Part _ _ _ _ x _ _) -> x
         explodeDescription other = [other]
 
-        -- remove or rewrite source modules that are no longer needed
-        files''' = map (\a -> concatMap (replaceDefault a) a) files''
+        -- remove source modules that are no longer needed
+        files''' = map (filter keepDescription) files''
         (usageMapRaw, usedTypedModulesRaw) =
             execWriter $ mapM (mapM collectUsageInfoM) files''
         usageMap = Map.unionsWith Set.union $ map (uncurry Map.singleton)
@@ -80,42 +78,13 @@ convert files =
                         then tell (Set.empty, Set.singleton m)
                         else tell (Set.singleton m, Set.empty)
         collectModuleItemM _ = return ()
-        replaceDefault :: [Description] -> Description -> [Description]
-        replaceDefault existing (part @ (Part _ _ _ _ name _ _)) =
-            if Map.notMember name info then
-                [part]
-            else if Map.null maybeTypeMap then
-                [part]
-            else if Map.member name usedTypedModules && isUsed name then
-                [part]
-            else if all isNothing maybeTypeMap then
-                []
-            else
-                filter (not . alreadyExists) $
-                (:) (removeDefaultTypeParams part) $
-                if isNothing typeMap
-                    then []
-                    else [rewriteModule part $ fromJust typeMap]
-            where
-                maybeTypeMap = info Map.! name
-                typeMap = defaultInstance maybeTypeMap
-                existingNames = map moduleName existing
-                alreadyExists = (flip elem existingNames) . moduleName
-                moduleName :: Description -> Identifier
-                moduleName (Part _ _ _ _ x _ _) = x
-                moduleName _ = ""
-        replaceDefault _ other = [other]
-
-        removeDefaultTypeParams :: Description -> Description
-        removeDefaultTypeParams part =
-            Part attrs extern kw ml (moduleDefaultName name) p items
-            where
-                Part attrs extern kw ml name p items =
-                    traverseModuleItems (traverseDecls rewriteDecl) part
-                rewriteDecl :: Decl -> Decl
-                rewriteDecl (ParamType Parameter x _) =
-                    ParamType Parameter x UnknownType
-                rewriteDecl other = other
+        keepDescription :: Description -> Bool
+        keepDescription (Part _ _ _ _ name _ _) =
+            Map.notMember name info ||
+            Map.null maybeTypeMap ||
+            (Map.member name usedTypedModules && isUsed name)
+            where maybeTypeMap = info Map.! name
+        keepDescription _ = True
 
         isUsed :: Identifier -> Bool
         isUsed name =
@@ -150,9 +119,11 @@ convert files =
                 rewriteModuleItem = traverseNestedModuleItems $ traverseNodes
                     rewriteExpr rewriteDecl rewriteType rewriteLHS rewriteStmt
                 rewriteDecl :: Decl -> Decl
-                rewriteDecl (ParamType Parameter x _) =
-                    ParamType Localparam x t
-                    where t = rewriteType $ fst $ typeMap Map.! x
+                rewriteDecl (ParamType Parameter x t) =
+                    ParamType Localparam x $ rewriteType $
+                    case Map.lookup x typeMap of
+                        Nothing -> t
+                        Just (t', _) -> t'
                 rewriteDecl other =
                     traverseDeclTypes rewriteType $
                     traverseDeclExprs rewriteExpr other
@@ -219,25 +190,9 @@ collectDescriptionM (part @ (Part _ _ _ _ name _ _)) =
         collectDeclM _ = return ()
 collectDescriptionM _ = return ()
 
--- produces the default type mapping of a module, if there is one
-defaultInstance :: MaybeTypeMap -> Maybe Instance
-defaultInstance maybeTypeMap =
-    if any isNothing maybeTypeMap
-        then Nothing
-        else Just $ Map.map ((, Set.empty) . fromJust) maybeTypeMap
-
 -- generate a "unique" name for a particular module type instance
 moduleInstanceName :: Identifier -> Instance -> Identifier
 moduleInstanceName m inst = m ++ "_" ++ shortHash (m, inst)
-
--- name for the module without any default type parameters
-moduleDefaultName :: Identifier -> Identifier
-moduleDefaultName m = m ++ defaultTag
-isDefaultName :: Identifier -> Bool
-isDefaultName m =
-    defaultTag == (reverse $ (take $ length defaultTag) $ reverse m)
-defaultTag :: Identifier
-defaultTag = "_sv2v_default"
 
 -- checks where a type is sufficiently resolved to be substituted
 isSimpleType :: Type -> Bool
@@ -301,12 +256,8 @@ convertModuleItemM info (orig @ (Instance m bindings x r p)) =
     else if any (isLeft . snd) bindings' then
         error $ "param type resolution left type params: " ++ show orig
             ++ " converted to: " ++ show bindings'
-    else if any (not . isSimpleType . fst) resolvedTypes then do
-        let defaults = Map.map (Left . fst) resolvedTypes
-        let bindingsDefaulted = Map.toList $ Map.union bindingsMap defaults
-        if isDefaultName m || bindingsDefaulted == Map.toList bindingsMap
-            then return $ Instance m bindings x r p
-            else return $ Instance (moduleDefaultName m) bindingsDefaulted x r p
+    else if any (not . isSimpleType . fst) resolvedTypes then
+        return orig
     else do
         tell $ Set.singleton (m, resolvedTypes)
         let m' = moduleInstanceName m resolvedTypes
@@ -317,17 +268,14 @@ convertModuleItemM info (orig @ (Instance m bindings x r p)) =
         maybeTypeMap = info Map.! m
         -- determine the types corresponding to each type parameter
         bindingsMap = Map.fromList bindings
-        resolvedTypesWithDecls = Map.mapWithKey resolveType maybeTypeMap
+        resolvedTypesWithDecls = Map.mapMaybeWithKey resolveType bindingsMap
         resolvedTypes = Map.map (\(a, (b, _)) -> (a, b)) resolvedTypesWithDecls
         addedDecls = concatMap (snd . snd . snd) $
             Map.toList resolvedTypesWithDecls
-        resolveType :: Identifier -> Maybe Type -> (Type, (IdentSet, [Decl]))
-        resolveType paramName defaultType =
-            case Map.lookup paramName bindingsMap of
-                Nothing -> (t, (Set.empty, []))
-                    where Just t = defaultType
-                Just b -> prepareTypeExprs x paramName t
-                    where Left t = b
+        resolveType :: Identifier -> TypeOrExpr -> Maybe (Type, (IdentSet, [Decl]))
+        resolveType _ Right{} = Nothing
+        resolveType paramName (Left t) =
+            Just $ prepareTypeExprs x paramName t
 
         -- leave only the normal expression params behind
         isParamType = flip Map.member maybeTypeMap
