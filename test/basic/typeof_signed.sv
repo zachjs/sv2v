@@ -14,9 +14,12 @@
 `define ASSERT_UNSIGNED(expr) `ASSERT_SIGNEDNESS(expr, unsigned, 0)
 
 `define MAKE_PRIM(typ) \
-    typ typ``_unspecified = 1; \
-    typ unsigned typ``_unsigned = 1; \
-    typ signed typ``_signed = 1; \
+    typ typ``_unspecified; \
+    typ unsigned typ``_unsigned; \
+    typ signed typ``_signed; \
+    initial typ``_unspecified = 1; \
+    initial typ``_unsigned = 1; \
+    initial typ``_signed = 1; \
     `ASSERT_SIGNED(typ``_signed) \
     `ASSERT_UNSIGNED(typ``_unsigned)
 

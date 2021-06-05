@@ -144,7 +144,7 @@ elaborateIntegerAtom other = other
 -- size; if not unspecified, the first signing overrides the second
 baseIntType :: Signing -> Signing -> Int -> Type
 baseIntType sgOverride sgBase size =
-    IntegerVector TReg sg [(RawNum hi, RawNum 0)]
+    IntegerVector TLogic sg [(RawNum hi, RawNum 0)]
     where
         hi = fromIntegral $ size - 1
         sg = if sgOverride /= Unspecified
