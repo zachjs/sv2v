@@ -8,8 +8,7 @@
 module Convert.ParamType (convert) where
 
 import Control.Monad.Writer.Strict
-import Data.Either (isLeft)
-import Data.Maybe (isJust, fromJust)
+import Data.Either (isRight)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
@@ -176,17 +175,13 @@ collectDescriptionM :: Description -> Writer Info ()
 collectDescriptionM (part @ (Part _ _ _ _ name _ _)) =
     tell $ Map.singleton name maybeTypeMap
     where
-        params = execWriter $
+        maybeTypeMap = Map.fromList $ execWriter $
             collectModuleItemsM (collectDeclsM collectDeclM) part
-        maybeTypeMap = Map.fromList $
-            map (\(x, y) -> (x, fromJust y)) $
-            filter (isJust . snd) params
-        collectDeclM :: Decl -> Writer [(Identifier, Maybe (Maybe Type))] ()
-        collectDeclM (Param   Parameter _ x _) = tell [(x, Nothing)]
+        collectDeclM :: Decl -> Writer [(Identifier, Maybe Type)] ()
         collectDeclM (ParamType Parameter x v) =
             if v == UnknownType
-                then tell [(x, Just Nothing)]
-                else tell [(x, Just $ Just v)]
+                then tell [(x, Nothing)]
+                else tell [(x, Just v)]
         collectDeclM _ = return ()
 collectDescriptionM _ = return ()
 
@@ -216,8 +211,6 @@ typeIsUnresolved =
     (collectNestedExprsM collectUnresolvedExprM)
     where
         collectUnresolvedExprM :: Expr -> Writer Any ()
-        collectUnresolvedExprM PSIdent{} = tell $ Any True
-        collectUnresolvedExprM CSIdent{} = tell $ Any True
         collectUnresolvedExprM DimsFn {} = tell $ Any True
         collectUnresolvedExprM DimFn  {} = tell $ Any True
         collectUnresolvedExprM Dot    {} = tell $ Any True
@@ -249,13 +242,8 @@ addedParamTypeName paramName var = paramName ++ '_' : var ++ "_type"
 -- attempt to rewrite instantiations with type parameters
 convertModuleItemM :: Info -> ModuleItem -> Writer Instances ModuleItem
 convertModuleItemM info (orig @ (Instance m bindings x r p)) =
-    if Map.notMember m info then
+    if Map.notMember m info || Map.null maybeTypeMap then
         return orig
-    else if Map.null maybeTypeMap then
-        return orig
-    else if any (isLeft . snd) bindings' then
-        error $ "param type resolution left type params: " ++ show orig
-            ++ " converted to: " ++ show bindings'
     else if any (not . isSimpleType . fst) resolvedTypes then
         return orig
     else do
@@ -263,7 +251,7 @@ convertModuleItemM info (orig @ (Instance m bindings x r p)) =
         let m' = moduleInstanceName m resolvedTypes
         return $ Generate $ map GenModuleItem $
             map (MIPackageItem . Decl) addedDecls ++
-            [Instance m' (additionalBindings ++ bindings') x r p]
+            [Instance m' (additionalBindings ++ exprBindings) x r p]
     where
         maybeTypeMap = info Map.! m
         -- determine the types corresponding to each type parameter
@@ -278,8 +266,7 @@ convertModuleItemM info (orig @ (Instance m bindings x r p)) =
             Just $ prepareTypeExprs x paramName t
 
         -- leave only the normal expression params behind
-        isParamType = flip Map.member maybeTypeMap
-        bindings' = filter (not . isParamType . fst) bindings
+        exprBindings = filter (isRight . snd) bindings
 
         -- create additional parameters needed to specify existing type params
         additionalBindings = concatMap makeAddedParams $
