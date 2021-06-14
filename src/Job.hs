@@ -26,6 +26,7 @@ data Exclude
 data Write
     = Stdout
     | Adjacent
+    | File
     deriving (Show, Typeable, Data, Eq)
 
 instance Default Write where
@@ -66,7 +67,8 @@ defaultJob = Job
     , verbose = nam "verbose" &= help "Retain certain conversion artifacts"
     , write = nam_ "write" &= name "w" &= typ "MODE"
         &= help ("How to write output; default is 'stdout'; use 'adjacent' to"
-            ++ " create a .v file next to each input")
+            ++ " create a .v file next to each input; use 'file' to create a"
+            ++ " sv2v_output.v file")
     }
     &= program "sv2v"
     &= summary ("sv2v " ++ version)
