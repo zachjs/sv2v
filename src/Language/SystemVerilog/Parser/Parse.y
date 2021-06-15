@@ -542,11 +542,12 @@ Packing :: { Packing }
   | {- empty -}         { Unpacked }
 
 Part(begin, end) :: { Description }
-  : AttributeInstances          begin PartHeader ModuleItems end opt(Tag) { $3 $1 False $2 $4 }
-  | AttributeInstances "extern" begin PartHeader                          { $4 $1 True  $3 [] }
+  : AttributeInstances          begin PartHeader ModuleItems end StrTag {% $3 $1 False $2 $4 $6 }
+  | AttributeInstances "extern" begin PartHeader                        {% $4 $1 True  $3 [] "" }
 
-PartHeader :: { [Attr] -> Bool -> PartKW -> [ModuleItem] -> Description }
-  : Lifetime Identifier PackageImportDeclarations Params PortDecls ";" { \attrs extern kw items -> Part attrs extern kw $1 $2 (fst $5) ($3 ++ $4 ++ (snd $5) ++ items) }
+PartHeader :: { [Attr] -> Bool -> PartKW -> [ModuleItem] -> Identifier -> ParseState Description }
+  : Lifetime Identifier PackageImportDeclarations Params PortDecls ";"
+    { \attrs extern kw items label -> checkTag $2 label $ Part attrs extern kw $1 $2 (fst $5) ($3 ++ $4 ++ (snd $5) ++ items) }
 
 ModuleKW :: { PartKW }
   : "module" { Module }
@@ -555,11 +556,8 @@ InterfaceKW :: { PartKW }
   : "interface" { Interface }
 
 PackageDeclaration :: { Description }
-  : "package" Lifetime Identifier ";" PackageItems endpackage opt(Tag) { Package $2 $3 $5 }
-  | "class" Lifetime Identifier PIParams ";" PackageItems endclass opt(Tag) { Class $2 $3 $4 $6 }
-
-Tag :: { Identifier }
-  : ":" Identifier { $2 }
+  : "package" Lifetime Identifier        ";" PackageItems endpackage StrTag {% checkTag $3 $7 $ Package $2 $3 $5 }
+  | "class" Lifetime Identifier PIParams ";" PackageItems endclass   StrTag {% checkTag $3 $8 $ Class $2 $3 $4 $6 }
 
 StrTag :: { Identifier }
   : {- empty -}    { "" }
@@ -852,9 +850,9 @@ NonDeclPackageItem :: { [PackageItem] }
   : "typedef" Type Identifier ";" { [Decl $ ParamType Localparam $3 $2] }
   | "typedef" Type Identifier DimensionsNonEmpty ";" { [Decl $ ParamType Localparam $3 (UnpackedType $2 $4)] }
   | "typedef" TypedefRef Identifier ";" { [Decl $ ParamType Localparam $3 $2] }
-  | "function" Lifetime FuncRetAndName    TFItems DeclsAndStmts endfunction opt(Tag) { [Function $2 (fst $3) (snd $3) (map makeInput $4 ++ fst $5) (snd $5)] }
-  | "function" Lifetime "void" Identifier TFItems DeclsAndStmts endfunction opt(Tag) { [Task     $2 $4                ($5 ++ fst $6) (snd $6)] }
-  | "task"     Lifetime Identifier        TFItems DeclsAndStmts endtask     opt(Tag) { [Task     $2 $3                ($4 ++ fst $5) (snd $5)] }
+  | "function" Lifetime FuncRetAndName    TFItems DeclsAndStmts endfunction StrTag {% checkTag (snd $3) $7 [Function $2 (fst $3) (snd $3) (map makeInput $4 ++ fst $5) (snd $5)] }
+  | "function" Lifetime "void" Identifier TFItems DeclsAndStmts endfunction StrTag {% checkTag $4       $8 [Task     $2 $4                ($5 ++ fst $6) (snd $6)] }
+  | "task"     Lifetime Identifier        TFItems DeclsAndStmts endtask     StrTag {% checkTag $3       $7 [Task     $2 $3                ($4 ++ fst $5) (snd $5)] }
   | "import" PackageImportItems ";" { map (uncurry Import) $2 }
   | "export" PackageImportItems ";" { map (uncurry Export) $2 }
   | "export" "*" "::" "*" ";"       { [Export "" ""] }
@@ -1016,8 +1014,8 @@ StmtNonAsgn :: { Stmt }
   |                StmtNonBlock { $1 }
   | Identifier ":" StmtNonBlock { Block Seq $1 [] [$3] }
 StmtBlock(begin, end) :: { Stmt }
-  :                begin StrTag DeclsAndStmts end StrTag { uncurry (Block $1 $ combineTags $2 $5) $3 }
-  | Identifier ":" begin        DeclsAndStmts end StrTag { uncurry (Block $3 $ combineTags $1 $6) $4 }
+  :                begin StrTag DeclsAndStmts end StrTag {% checkTag $2 $5 $ uncurry (Block $1 $2) $3 }
+  | Identifier ":" begin        DeclsAndStmts end StrTag {% checkTag $1 $6 $ uncurry (Block $3 $1) $4 }
 StmtNonBlock :: { Stmt }
   : ";" { Null }
   | Unique "if" "(" Expr ")" Stmt "else" Stmt  { If $1 $4 $6 $8   }
@@ -1333,7 +1331,10 @@ LoopGenerateConstruct :: { GenItem }
   : "for" "(" GenvarInitialization ";" Expr ";" GenvarIteration ")" GenItem { $3 $5 $7 $9 }
 
 GenBlock :: { (Identifier, [GenItem]) }
-  : "begin" StrTag GenItems end StrTag { (combineTags $2 $5, $3) }
+  : GenBlockBegin GenItems end StrTag {% checkTag $1 $4 ($1, $2) }
+GenBlockBegin :: { Identifier }
+  : "begin" StrTag         { $2 }
+  | Identifier ":" "begin" { $1 }
 
 GenCases :: { [GenCase] }
   : GenCase          { [$1] }
@@ -1465,13 +1466,18 @@ makeInput (CommentDecl c) = CommentDecl c
 makeInput other =
   error $ "unexpected non-var or non-input decl: " ++ (show other)
 
-combineTags :: Identifier -> Identifier -> Identifier
-combineTags a "" = a
-combineTags "" b = b
-combineTags a b =
+checkTag :: String -> String -> a -> ParseState a
+checkTag _ "" x = return x
+checkTag "" b _ = do
+  p <- gets pPosition
+  error $ show p ++ ": Parse error: block has only end label " ++ show b
+checkTag a b x =
   if a == b
-    then a
-    else error $ "tag mismatch: " ++ show (a, b)
+    then return x
+    else do
+      p <- gets pPosition
+      error $ show p ++ ": Parse error: element " ++ show a
+        ++ " has mismatched end label " ++ show b
 
 toLHS :: Expr -> LHS
 toLHS expr =
