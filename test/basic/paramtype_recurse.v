@@ -48,4 +48,4 @@ module top_2; bar_byte #(3) x(); endmodule
 module top_3; foo_bit #(4) x(); endmodule
 module top_4; bar_bit #(5) x(); endmodule
 
-module top; endmodule
+module top; foo_bit #(0) x(); endmodule

@@ -28,4 +28,4 @@ module top_2; bar #(byte, 3) x(); endmodule
 module top_3; foo #(bit, 4) x(); endmodule
 module top_4; bar #(bit, 5) x(); endmodule
 
-module top; endmodule
+module top; foo x(); endmodule

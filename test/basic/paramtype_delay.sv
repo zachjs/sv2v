@@ -15,7 +15,8 @@ module mod #(
 endmodule
 
 module top;
-    typedef struct packed { byte y; } W;
+    parameter type BASE = byte;
+    typedef struct packed { BASE y; } W;
     W w;
     typedef struct packed { type(w) x, y; } V;
     V v;
