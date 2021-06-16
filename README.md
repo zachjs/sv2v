@@ -74,7 +74,8 @@ running `stack install`, or copy over the executable manually.
 
 sv2v takes in a list of files and prints the converted Verilog to `stdout`.
 Using `--write=adjacent` will create a converted `.v` for every `.sv` input file
-rather than printing to `stdout`.
+rather than printing to `stdout`. `--write`/`-w` can also be used to specify a
+path to a `.v` output file.
 
 Users may specify `include` search paths, define macros during preprocessing,
 and exclude some of the conversions. Specifying `-` as an input file will read
@@ -95,8 +96,9 @@ Conversion:
   -E --exclude=CONV         Exclude a particular conversion (always, assert,
                             interface, or logic)
   -v --verbose              Retain certain conversion artifacts
-  -w --write=MODE           How to write output; default is 'stdout'; use
-                            'adjacent' to create a .v file next to each input
+  -w --write=MODE/FILE      How to write output; default is 'stdout'; use
+                            'adjacent' to create a .v file next to each input;
+                            use a path ending in .v to write to a file
 Other:
      --help                 Display help message
      --version              Print version information

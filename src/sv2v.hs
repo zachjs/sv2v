@@ -64,9 +64,8 @@ writeOutput _ [] [] =
     hPutStrLn stderr "Warning: No input files specified (try `sv2v --help`)"
 writeOutput Stdout _ asts =
     hPrint stdout $ concat asts
-writeOutput File _ asts =
+writeOutput (File f) _ asts =
     writeFile f $ show $ concat asts
-    where f = "sv2v_output.v"
 writeOutput Adjacent inPaths asts = do
     outPaths <- mapM rewritePath inPaths
     badPaths <- filterM doesFileExist outPaths
