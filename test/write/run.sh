@@ -66,6 +66,30 @@ test_adjacent_extension() {
         "$stderr"
 }
 
+test_file() {
+    runAndCapture --write=stdout *.sv
+    expected="$stdout"
+
+    rm -f out.v
+    runAndCapture --write=out.v *.sv
+    assertTrue "file conversion should succeed" $result
+    assertNull "stdout should be empty" "$stdout"
+    assertNull "stderr should be empty" "$stderr"
+
+    actual=`cat out.v`
+    assertEquals "file output should match combined" "$expected" "$actual"
+    clearArtifacts
+}
+
+test_unknown() {
+    runAndCapture --write=unknown *.sv
+    assertFalse "unknown write mode should fail" $result
+    assertNull "stdout should be empty" "$stdout"
+    assertEquals "stderr should list valid write modes" \
+        "invalid --write \"unknown\", expected stdout, adjacent, or a path ending in .v" \
+        "$stderr"
+}
+
 source ../lib/functions.sh
 
 . shunit2
