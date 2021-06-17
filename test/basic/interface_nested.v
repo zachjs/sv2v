@@ -1,16 +1,16 @@
 module top;
     wire x = 1;
     generate
-        begin : f
+        if (1) begin : f
             wire x;
-            begin : a
+            if (1) begin : a
                 wire x;
                 initial begin
                     $display("bar got %b", x);
                 end
             end
             assign a.x = x;
-            begin : b
+            if (1) begin : b
                 wire x;
                 initial begin
                     $display("bar got %b", x);

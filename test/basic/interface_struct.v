@@ -1,6 +1,6 @@
 module top;
     generate
-        begin : i
+        if (1) begin : i
             wire [3:0] x;
             reg [1:0] w;
         end

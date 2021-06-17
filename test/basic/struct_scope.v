@@ -4,7 +4,7 @@ module top;
     wire [17:0] c;
 
     generate
-        begin : foo
+        if (1) begin : foo
             wire [2:0] a;
             wire [14:0] b;
             wire [17:0] c;

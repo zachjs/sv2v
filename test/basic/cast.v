@@ -1,7 +1,7 @@
 module top;
 
     generate
-        begin : A
+        if (1) begin : A
             reg signed [31:0] x;
         end
     endgenerate

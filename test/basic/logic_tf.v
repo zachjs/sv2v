@@ -19,12 +19,12 @@ module top;
     end
 
     generate
-        begin : A
+        if (1) begin : A
             wire x;
-            begin : B
+            if (1) begin : B
                 reg x;
             end
-            begin : C
+            if (1) begin : C
                 wire x;
             end
             assign x = B.x ^ C.x;

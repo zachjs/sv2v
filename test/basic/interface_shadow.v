@@ -1,6 +1,6 @@
 module top;
     generate
-        begin : x
+        if (1) begin : x
             integer x;
             function z;
                 input x;
@@ -10,7 +10,7 @@ module top;
     endgenerate
     initial x.x = 1;
     generate
-        begin : y
+        if (1) begin : y
             function z;
                 input x;
                 z = x;

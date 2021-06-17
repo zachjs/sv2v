@@ -21,7 +21,6 @@ simulate() {
     iv_output=`iverilog \
         -Wall \
         -Wno-select-range \
-        -Wno-anachronisms \
         -Wno-portbind \
         -o $sim_prog \
         -g2005 \

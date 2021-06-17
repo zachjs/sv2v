@@ -11,7 +11,7 @@ module top;
     assign c = x ? d : e;
 
     generate
-        begin : A
+        if (1) begin : A
             wire [1:0] c [0:2];
             wire [5:0] d;
         end

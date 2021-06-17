@@ -3,13 +3,13 @@ module top;
     initial $display("A t %0d", 1);
     initial $display("A top.t %0d", 1);
     generate
-        begin : X
+        if (1) begin : X
             wire [1:0] t;
             initial $display("B t %0d", 2);
             initial $display("B top.t %0d", 1);
             initial $display("B X.t %0d", 2);
             initial $display("B top.X.t %0d", 2);
-            begin : Y
+            if (1) begin : Y
                 wire [2:0] t;
                 initial $display("C t %0d", 3);
                 initial $display("C top.t %0d", 1);
@@ -46,7 +46,7 @@ module top;
 
     wire [11:0] arr;
     generate
-        begin : M
+        if (1) begin : M
             wire [19:0] arr;
             initial $display("M arr[0] = %b", arr[4:0]);
             initial $display("M M.arr[0] = %b", M.arr[4:0]);

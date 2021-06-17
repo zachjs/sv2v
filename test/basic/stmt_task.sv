@@ -3,7 +3,7 @@ module top;
         $display("tick() called");
     endtask
     generate
-        begin : foo
+        if (1) begin : foo
             task tick;
                 $display("foo.tick() called");
             endtask

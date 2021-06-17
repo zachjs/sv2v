@@ -30,27 +30,32 @@ data GenItem
 
 instance Show GenItem where
     showList i _ = unlines' $ map show i
-    show (GenBlock x i)  =
-        printf "begin%s\n%s\nend"
-            (if null x then "" else " : " ++ x)
-            (indent $ show i)
+    show (GenBlock x i) =
+        "if (1) " ++ showBareBlock (GenBlock x i)
     show (GenCase e cs) =
         printf "case (%s)\n%s\nendcase" (show e) bodyStr
         where bodyStr = indent $ unlines' $ map showGenCase cs
-    show (GenIf e a GenNull) = printf "if (%s) %s"          (show e) (show a)
-    show (GenIf e a b      ) = printf "if (%s) %s\nelse %s" (show e) (showBlockedBranch a) (show b)
+    show (GenIf e a GenNull) = printf "if (%s) %s"          (show e) (showBareBlock a)
+    show (GenIf e a b      ) = printf "if (%s) %s\nelse %s" (show e) (showBlockedBranch a) (showBareBlock b)
     show (GenFor (x1, e1) c (x2, o2, e2) s) =
         printf "for (%s = %s; %s; %s %s %s) %s"
             x1 (show e1)
             (show c)
             x2 (show o2) (show e2)
-            (if s == GenNull then "begin end" else show s)
+            (if s == GenNull then "begin end" else showBareBlock s)
     show (GenNull) = ";"
     show (GenModuleItem item) = show item
 
+showBareBlock :: GenItem -> String
+showBareBlock (GenBlock x i) =
+    printf "begin%s\n%s\nend"
+        (if null x then "" else " : " ++ x)
+        (indent $ show i)
+showBareBlock item = show item
+
 showBlockedBranch :: GenItem -> String
 showBlockedBranch genItem =
-    show $
+    showBareBlock $
     if isControl genItem
         then GenBlock "" [genItem]
         else genItem
@@ -65,5 +70,5 @@ showBlockedBranch genItem =
 type GenCase = ([Expr], GenItem)
 
 showGenCase :: GenCase -> String
-showGenCase (a, b) = printf "%s: %s" exprStr (show b)
+showGenCase (a, b) = printf "%s: %s" exprStr (showBareBlock b)
     where exprStr = if null a then "default" else commas $ map show a

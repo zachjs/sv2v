@@ -33,7 +33,7 @@ module top;
 
 
     generate
-        begin : intf
+        if (1) begin : intf
             wire [N-1:0] req;
         end
         genvar j;

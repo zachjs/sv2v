@@ -13,10 +13,10 @@ endmodule
 
 module top;
     generate
-        begin : x
+        if (1) begin : x
             wire [31:0] data = 0;
         end
-        begin : y
+        if (1) begin : y
             wire [9:0] data = 0;
         end
     endgenerate
