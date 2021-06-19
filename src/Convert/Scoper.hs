@@ -48,6 +48,8 @@ module Convert.Scoper
     , embedScopes
     , withinProcedure
     , withinProcedureM
+    , procedureLoc
+    , procedureLocM
     , isLoopVar
     , isLoopVarM
     , lookupLocalIdent
@@ -92,7 +94,7 @@ data Entry a = Entry
 data Scopes a = Scopes
     { sCurrent :: [Tier]
     , sMapping :: Mapping a
-    , sProcedure :: Bool
+    , sProcedureLoc :: [Access]
     , sInjectedItems :: [ModuleItem]
     , sInjectedDecls :: [Decl]
     } deriving Show
@@ -133,10 +135,10 @@ exitScope :: Monad m => ScoperT a m ()
 exitScope = modify' $ \s -> s { sCurrent = init $ sCurrent s }
 
 enterProcedure :: Monad m => ScoperT a m ()
-enterProcedure = modify' $ \s -> s { sProcedure = True }
+enterProcedure = modify' $ \s -> s { sProcedureLoc = map toAccess (sCurrent s) }
 
 exitProcedure :: Monad m => ScoperT a m ()
-exitProcedure = modify' $ \s -> s { sProcedure = False }
+exitProcedure = modify' $ \s -> s { sProcedureLoc = [] }
 
 exprToAccesses :: [Access] -> Expr -> Maybe [Access]
 exprToAccesses accesses (Ident x) =
@@ -302,20 +304,26 @@ lookupLocalIdent :: Scopes a -> Identifier -> LookupResult a
 lookupLocalIdent scopes ident = do
     (replacements, element) <- directResolve (sMapping scopes) accesses
     Just (accesses, replacements, element)
-    where
-        accesses = map toAccess (sCurrent scopes) ++ [Access ident Nil]
-        toAccess :: Tier -> Access
-        toAccess (Tier x "") = Access x Nil
-        toAccess (Tier x y) = Access x (Ident y)
+    where accesses = map toAccess (sCurrent scopes) ++ [Access ident Nil]
+
+toAccess :: Tier -> Access
+toAccess (Tier x "") = Access x Nil
+toAccess (Tier x y) = Access x (Ident y)
 
 lookupLocalIdentM :: Monad m => Identifier -> ScoperT a m (LookupResult a)
 lookupLocalIdentM = embedScopes lookupLocalIdent
 
 withinProcedureM :: Monad m => ScoperT a m Bool
-withinProcedureM = gets sProcedure
+withinProcedureM = gets withinProcedure
 
 withinProcedure :: Scopes a -> Bool
-withinProcedure = sProcedure
+withinProcedure = not . null . sProcedureLoc
+
+procedureLocM :: Monad m => ScoperT a m [Access]
+procedureLocM = gets procedureLoc
+
+procedureLoc :: Scopes a -> [Access]
+procedureLoc = sProcedureLoc
 
 isLoopVar :: Scopes a -> Identifier -> Bool
 isLoopVar scopes x = any matches $ sCurrent scopes
@@ -379,7 +387,7 @@ runScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items =
         operation = do
             enterScope topName ""
             mapM wrappedModuleItemMapper items
-        initialState = Scopes [] Map.empty False [] []
+        initialState = Scopes [] Map.empty [] [] []
 
         wrappedModuleItemMapper = scopeModuleItemT
             declMapper moduleItemMapper genItemMapper stmtMapper

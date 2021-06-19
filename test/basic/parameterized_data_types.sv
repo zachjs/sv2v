@@ -6,7 +6,7 @@ class P #(
 endclass
 
 `define DUMP \
-    initial begin \
+    begin \
         a = '1; \
         b = '1; \
         c = '1; \
@@ -23,16 +23,45 @@ module top;
     P#(X, T)::Unit c;
     P#(.WIDTH(X))::Unit d;
     P#(.BASE(T))::Unit e;
-    `DUMP
-    // TODO: support local overrides
-    // if (1) begin : blk
-    //     localparam X = 3;
-    //     localparam type T = logic [7:0];
-    //     P#()::Unit a;
-    //     P#(X)::Unit b;
-    //     P#(X, T)::Unit c;
-    //     P#(.WIDTH(X))::Unit d;
-    //     P#(.BASE(T))::Unit e;
-    //     `DUMP
-    // end
+    initial `DUMP
+    if (1) begin : blk
+        localparam X = 3;
+        localparam type T = logic [7:0];
+        P#()::Unit a;
+        P#(X)::Unit b;
+        P#(X, T)::Unit c;
+        P#(.WIDTH(X))::Unit d;
+        P#(.BASE(T))::Unit e;
+        initial `DUMP
+    end
+    if (1) begin : route
+        localparam X = 3;
+        localparam type T = logic [7:0];
+        initial begin
+            begin
+                P#()::Unit a;
+                P#(X)::Unit b;
+                P#(X, T)::Unit c;
+                P#(.WIDTH(X))::Unit d;
+                P#(.BASE(T))::Unit e;
+                `DUMP
+            end
+            begin
+                P#()::Unit a;
+                P#(X)::Unit b;
+                P#(X, T)::Unit c;
+                P#(.WIDTH(X))::Unit d;
+                P#(.BASE(T))::Unit e;
+                `DUMP
+            end
+            begin
+                P#()::Unit a;
+                P#(X)::Unit b;
+                P#(X, T)::Unit c;
+                P#(.WIDTH(X))::Unit d;
+                P#(.BASE(T))::Unit e;
+                `DUMP
+            end
+        end
+    end
 endmodule

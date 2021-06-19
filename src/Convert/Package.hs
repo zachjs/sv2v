@@ -53,10 +53,12 @@ convert files =
             Map.elems packages'
         toPackageItems :: PackageItem -> [(Identifier, PackageItem)]
         toPackageItems item = map (, item) (piNames item)
-        makeLocal :: PackageItem -> PackageItem
-        makeLocal (Decl (Param _ t x e)) = Decl $ Param Localparam t x e
-        makeLocal (Decl (ParamType _ x t)) = Decl $ ParamType Localparam x t
-        makeLocal other = other
+
+-- convert a parameter to a localparam
+makeLocal :: PackageItem -> PackageItem
+makeLocal (Decl (Param _ t x e)) = Decl $ Param Localparam t x e
+makeLocal (Decl (ParamType _ x t)) = Decl $ ParamType Localparam x t
+makeLocal other = other
 
 -- utility for inserting package items into a set of module items as needed
 inject :: [PackageItem] -> [ModuleItem] -> [ModuleItem]
@@ -304,9 +306,7 @@ processItems topName packageName moduleItems = do
 
         traverseTypeM :: Type -> Scope Type
         traverseTypeM (CSAlias p b x rs) = do
-            scopeKeys <- bindingsScopeKeys b
-            b' <- mapM traverseParamBindingM b
-            x' <- lift $ resolveCSIdent p b' scopeKeys x
+            x' <- resolveCSIdent' p b x
             return $ Alias x' rs
         traverseTypeM (PSAlias p x rs) = do
             x' <- resolvePSIdent' p x
@@ -322,9 +322,7 @@ processItems topName packageName moduleItems = do
 
         traverseExprM :: Expr -> Scope Expr
         traverseExprM (CSIdent p b x) = do
-            scopeKeys <- bindingsScopeKeys b
-            b' <- mapM traverseParamBindingM b
-            x' <- lift $ resolveCSIdent p b' scopeKeys x
+            x' <- resolveCSIdent' p b x
             return $ Ident x'
         traverseExprM (PSIdent p x) = do
             x' <- resolvePSIdent' p x
@@ -368,6 +366,44 @@ processItems topName packageName moduleItems = do
                     Just ([_, _], _, Imported rootPkg) -> rootPkg ++ '_' : x
                     _ -> error $ "package " ++ show p ++ " references"
                             ++ " undeclared local \"" ++ p ++ "::" ++ x ++ "\""
+
+        -- wrapper resolving parameters and locally injecting the necessary
+        -- class items into modules and interfaces
+        resolveCSIdent'
+            :: Identifier -> [ParamBinding] -> Identifier -> Scope Identifier
+        resolveCSIdent' p b x = do
+            scopeKeys <- bindingsScopeKeys b
+            b' <- mapM traverseParamBindingM b
+            x' <- lift $ resolveCSIdent p b' scopeKeys x
+            let rootPkg = take (length x' - length x - 1) x'
+            when (null packageName) (classScopeInject rootPkg x')
+            return x'
+
+        -- inject the given class item and its dependencies into the local scope
+        classScopeInject :: Identifier -> Identifier -> Scope ()
+        classScopeInject rootPkg fullName = do
+            (_, packages, _) <- lift get
+            let (_, packageItems) = packages Map.! rootPkg
+            let localPIs = Map.fromList $ concatMap toPIElem packageItems
+            mapM_ injectIfMissing $
+                addItems localPIs Set.empty
+                [(Generate [], Set.singleton fullName)]
+            where
+                injectIfMissing :: ModuleItem -> Scope ()
+                injectIfMissing (Generate []) = return ()
+                injectIfMissing moduleItem = do
+                    let MIPackageItem packageItem = moduleItem
+                    let itemName : _ = piNames packageItem
+                    details <- lookupElemM itemName
+                    when (details == Nothing) $ do
+                        accesses <- procedureLocM
+                        let accesses' = accesses ++ [Access itemName Nil]
+                        if null accesses
+                            then insertElem itemName Declared
+                            else insertElem accesses' Declared
+                        injectItem moduleItem
+                toPIElem :: PackageItem -> [(Identifier, PackageItem)]
+                toPIElem item = map (, makeLocal item) (piNames item)
 
 -- locate a package by name, processing its contents if necessary
 findPackage :: Identifier -> PackagesState Package
