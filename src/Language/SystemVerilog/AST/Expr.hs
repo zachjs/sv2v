@@ -57,7 +57,7 @@ data Expr
     | DimsFn  DimsFn TypeOrExpr
     | DimFn   DimFn  TypeOrExpr Expr
     | Dot     Expr Identifier
-    | Pattern [(Identifier, Expr)]
+    | Pattern [(TypeOrExpr, Expr)]
     | Inside  Expr [Expr]
     | MinTypMax Expr Expr Expr
     | Nil
@@ -84,10 +84,11 @@ instance Show Expr where
     show (Pattern l    ) =
         printf "'{\n%s\n}" (indent $ intercalate ",\n" $ map showPatternItem l)
         where
-            showPatternItem :: (Identifier, Expr) -> String
-            showPatternItem (""     , e) = show e
-            showPatternItem (':' : n, e) = showPatternItem (n, e)
-            showPatternItem (n      , e) = printf "%s: %s" n (show e)
+            showPatternItem :: (TypeOrExpr, Expr) -> String
+            showPatternItem (Right Nil, v) = show v
+            showPatternItem (Right e, v) = printf "%s: %s" (show e) (show v)
+            showPatternItem (Left t, v) = printf "%s: %s" tStr (show v)
+                where tStr = if null (show t) then "default" else show t
     show (MinTypMax a b c) = printf "(%s : %s : %s)" (show a) (show b) (show c)
     show (e @ UniOp{}) = showsPrec 0 e ""
     show (e @ BinOp{}) = showsPrec 0 e ""

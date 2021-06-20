@@ -1282,16 +1282,18 @@ ExprOrNil :: { Expr }
   : Expr        { $1 }
   | {- empty -} { Nil }
 
-PatternItems :: { [(Identifier, Expr)] }
+PatternItems :: { [(TypeOrExpr, Expr)] }
   : PatternNamedItems   { $1 }
-  | PatternUnnamedItems { zip (repeat "") $1 }
-PatternNamedItems :: { [(Identifier, Expr)] }
+  | PatternUnnamedItems { zip (repeat $ Right Nil) $1 }
+PatternNamedItems :: { [(TypeOrExpr, Expr)] }
   : PatternNamedItem                       { [$1] }
   | PatternNamedItems "," PatternNamedItem { $1 ++ [$3] }
-PatternNamedItem :: { (Identifier, Expr) }
-  : Identifier  ":" Expr { ($1       , $3) }
-  | PartialType ":" Expr { (':' : show $1  , $3) }
-  | "default"   ":" Expr { (':' : "default", $3) }
+PatternNamedItem :: { (TypeOrExpr, Expr) }
+  : PatternName ":" Expr { ($1, $3) }
+PatternName :: { TypeOrExpr }
+  : Expr        { Right $1 }
+  | PartialType { Left $ $1 Unspecified [] }
+  | "default"   { Left UnknownType }
 PatternUnnamedItems :: { [Expr] }
   :                         PatternUnnamedItem { [$1] }
   | PatternUnnamedItems "," PatternUnnamedItem { $1 ++ [$3] }

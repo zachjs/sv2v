@@ -10,11 +10,12 @@ import Convert.Traverse
 import Language.SystemVerilog.AST
 
 convert :: [AST] -> [AST]
-convert =
-    map $
-    traverseDescriptions $
-    traverseModuleItems $
-    traverseTypes $ traverseNestedTypes convertType
+convert = map $ traverseDescriptions $ traverseModuleItems convertModuleItem
+
+convertModuleItem :: ModuleItem -> ModuleItem
+convertModuleItem =
+    traverseTypes (traverseNestedTypes convertType) .
+    traverseExprs (traverseNestedExprs convertExpr)
 
 convertType :: Type -> Type
 convertType (Struct pk fields rs) =
@@ -34,3 +35,15 @@ convertStructFields fields =
 convertStructFieldType :: Type -> Type
 convertStructFieldType (IntegerAtom TInteger sg) = IntegerAtom TInt sg
 convertStructFieldType t = t
+
+convertExpr :: Expr -> Expr
+convertExpr (Pattern items) =
+    Pattern $ zip names exprs
+    where
+        names = map (convertPatternTypeOrExpr . fst) items
+        exprs = map snd items
+convertExpr other = other
+
+convertPatternTypeOrExpr :: TypeOrExpr -> TypeOrExpr
+convertPatternTypeOrExpr (Left t) = Left $ convertStructFieldType t
+convertPatternTypeOrExpr (Right e) = Right e

@@ -44,6 +44,10 @@ traverseExprM (DimsFn f v) = do
 traverseExprM (DimFn f v e) = do
     v' <- traverseTypeOrExprM v
     traverseExprM' $ DimFn f v' e
+traverseExprM (Pattern items) = do
+    names <- mapM traverseTypeOrExprM $ map fst items
+    let exprs = map snd items
+    traverseExprM' $ Pattern $ zip names exprs
 traverseExprM other = traverseExprM' other
 
 traverseExprM' :: Expr -> Scoper Type Expr

@@ -483,7 +483,7 @@ traverseSinglyNestedExprsM exprMapper = em
         em (Dot e x) =
             exprMapper e >>= \e' -> return $ Dot e' x
         em (Pattern l) = do
-            let names = map fst l
+            names <- mapM typeOrExprMapper $ map fst l
             exprs <- mapM exprMapper $ map snd l
             return $ Pattern $ zip names exprs
         em (Inside e l) = do
@@ -865,6 +865,10 @@ traverseExprTypesM mapper = exprMapper
         exprMapper (DimFn f tore e) = do
             tore' <- typeOrExprMapper tore
             return $ DimFn f tore' e
+        exprMapper (Pattern l) = do
+            names <- mapM typeOrExprMapper $ map fst l
+            let exprs = map snd l
+            return $ Pattern $ zip names exprs
         exprMapper other = return other
 
 traverseExprTypes :: Mapper Type -> Mapper Expr

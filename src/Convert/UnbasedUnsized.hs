@@ -115,7 +115,7 @@ substituteExpr mapping (Dot (Ident x) y) =
     case lookup x mapping of
         Nothing -> Dot (Ident x) y
         Just (Pattern items) ->
-            case lookup y items of
+            case lookup (Right $ Ident y) items of
                 Just item -> substituteExpr mapping item
                 Nothing -> Dot (substituteExpr mapping (Pattern items)) y
         Just expr -> Dot (substituteExpr mapping expr) y
@@ -192,7 +192,7 @@ convertExpr _ (Cast te e) =
     Cast te $ convertExpr SelfDetermined e
 convertExpr _ (Concat exprs) =
     Concat $ map (convertExpr SelfDetermined) exprs
-convertExpr context (Pattern [(":default", e @ UU{})]) =
+convertExpr context (Pattern [(Left UnknownType, e @ UU{})]) =
     convertExpr context e
 convertExpr _ (Pattern items) =
     Pattern $ zip
@@ -202,7 +202,8 @@ convertExpr _ (Call expr (Args pnArgs kwArgs)) =
     Call expr $ Args pnArgs' kwArgs'
     where
         pnArgs' = map (convertExpr SelfDetermined) pnArgs
-        Pattern kwArgs' = convertExpr SelfDetermined $ Pattern kwArgs
+        kwArgs' = zip (map fst kwArgs) $
+            map (convertExpr SelfDetermined) $ map snd kwArgs
 convertExpr _ (Repeat count exprs) =
     Repeat count $ map (convertExpr SelfDetermined) exprs
 convertExpr SelfDetermined (Mux cond (e1 @ UU{}) (e2 @ UU{})) =

@@ -8,7 +8,9 @@
 module Convert.Struct (convert) where
 
 import Control.Monad ((>=>), when)
-import Data.List (partition)
+import Data.Either (isLeft)
+import Data.List (elemIndex, find, partition)
+import Data.Maybe (fromJust)
 import Data.Tuple (swap)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -183,11 +185,6 @@ traverseAsgnM (lhs, expr) = do
     (_, expr') <- embedScopes convertSubExpr $ convertExpr typ expr
     return (lhs', expr')
 
-specialTag :: Char
-specialTag = ':'
-defaultKey :: String
-defaultKey = specialTag : "default"
-
 structIsntReady :: Type -> Bool
 structIsntReady = (Nothing ==) . convertStruct
 
@@ -217,7 +214,7 @@ convertExpr (struct @ (Struct _ fields [])) (Pattern itemsOrig) =
 
         itemsNamed =
             -- patterns either use positions based or name/type/default
-            if all ((/= "") . fst) itemsOrig then
+            if all ((/= Right Nil) . fst) itemsOrig then
                 itemsOrig
             -- position-based patterns should cover every field
             else if length itemsOrig /= length fields then
@@ -226,43 +223,80 @@ convertExpr (struct @ (Struct _ fields [])) (Pattern itemsOrig) =
             -- if the pattern does not use identifiers, use the
             -- identifiers from the struct type definition in order
             else
-                zip fieldNames (map snd itemsOrig)
-        (specialItems, namedItems) =
-            partition ((== specialTag) . head . fst) itemsNamed
+                zip (map (Right . Ident) fieldNames) (map snd itemsOrig)
+        (typedItems, untypedItems) =
+            partition (isLeft . fst) itemsNamed
+        (numberedItems, namedItems) =
+            partition (isNumbered . fst) untypedItems
         namedItemMap = Map.fromList namedItems
-        specialItemMap = Map.fromList specialItems
+        typedItemMap = Map.fromList typedItems
+
+        isNumbered :: TypeOrExpr -> Bool
+        isNumbered (Right (Number n)) =
+            if maybeIndex == Nothing
+                then error msgNonInteger
+                else index < length fieldNames || error msgOutOfBounds
+            where
+                maybeIndex = fmap fromIntegral $ numberToInteger n
+                Just index = maybeIndex
+                msgNonInteger = "pattern index " ++ show (Number n)
+                    ++ " is not an integer"
+                msgOutOfBounds = "pattern index " ++ show index
+                    ++ " is out of bounds for " ++ show struct
+        isNumbered _ = False
 
         extraNames = Set.difference
-            (Set.fromList $ map fst namedItems)
+            (Set.fromList $ map (getName . right . fst) namedItems)
             (Map.keysSet fieldTypeMap)
+        right = \(Right x) -> x
+        getName :: Expr -> Identifier
+        getName (Ident x) = x
+        getName e = error $ "invalid pattern key " ++ show e
+                        ++ " is not a type, field name, or index"
 
-        items = zip fieldNames $ map resolveField fieldNames
+        items = zip
+            (map (Right . Ident) fieldNames)
+            (map resolveField fieldNames)
         resolveField :: Identifier -> Expr
         resolveField fieldName =
             convertExpr fieldType $
             -- look up by name
-            if Map.member fieldName namedItemMap then
-                namedItemMap Map.! fieldName
+            if valueByName /= Nothing then
+                fromJust valueByName
             -- recurse for substructures
             else if isStruct fieldType then
-                Pattern specialItems
+                Pattern typedItems
             -- look up by field type
-            else if Map.member fieldTypeName specialItemMap then
-                specialItemMap Map.! fieldTypeName
+            else if valueByType /= Nothing then
+                fromJust valueByType
             -- fall back on the default value
-            else if Map.member defaultKey specialItemMap then
-                specialItemMap Map.! defaultKey
+            else if valueDefault /= Nothing then
+                fromJust valueDefault
+            else if valueByIndex /= Nothing then
+                fromJust valueByIndex
             else
                 error $ "couldn't find field '" ++ fieldName ++
                     "' from struct definition " ++ show struct ++
                     " in struct pattern " ++ show (Pattern itemsOrig)
             where
+                valueByName = Map.lookup (Right $ Ident fieldName) namedItemMap
+                valueByType = Map.lookup (Left fieldType) typedItemMap
+                valueDefault = Map.lookup (Left UnknownType) typedItemMap
+                valueByIndex = fmap snd $ find (indexCheck . fst) numberedItems
+
                 fieldType = fieldTypeMap Map.! fieldName
-                fieldTypeName =
-                    specialTag : (show $ fst $ typeRanges fieldType)
+                Just fieldIndex = elemIndex fieldName fieldNames
+
                 isStruct :: Type -> Bool
-                isStruct (Struct{}) = True
+                isStruct Struct{} = True
                 isStruct _ = False
+
+                indexCheck :: TypeOrExpr -> Bool
+                indexCheck item =
+                    fromIntegral value == fieldIndex
+                    where
+                        Just value = numberToInteger n
+                        Right (Number n) = item
 
 convertExpr (Implicit _ []) expr = expr
 convertExpr (Implicit sg rs) expr =
@@ -285,7 +319,7 @@ convertExpr (t @ IntegerVector{}) (Concat exprs) =
 
 -- TODO: This is really a conversion for using default patterns to
 -- populate arrays. Maybe this should be somewhere else?
-convertExpr t (orig @ (Pattern [(":default", expr)])) =
+convertExpr t (orig @ (Pattern [(Left UnknownType, expr)])) =
     if null rs
         then orig
         else Repeat count [expr']
@@ -297,7 +331,7 @@ convertExpr t (orig @ (Pattern [(":default", expr)])) =
 
 -- pattern syntax used for simple array literals
 convertExpr t (Pattern items) =
-    if all null names
+    if all (== Right Nil) names
         then convertExpr t $ Concat exprs'
         else Pattern items
     where
@@ -432,7 +466,7 @@ convertSubExpr scopes (Cast (Left t) e) =
     (t, Cast (Left t) e')
     where (_, e') = convertSubExpr scopes e
 convertSubExpr scopes (Pattern items) =
-    if all (== "") $ map fst items'
+    if all (== Right Nil) $ map fst items'
         then (UnknownType, Concat $ map snd items')
         else (UnknownType, Pattern items')
     where
