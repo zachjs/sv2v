@@ -64,7 +64,8 @@ mapInstance parts (Instance m paramBindings x rs portBindings) =
 
         paramBindings' = map checkParam $
             resolveBindings (msg "parameter overrides") paramNames paramBindings
-        portBindings' = resolveBindings (msg "port connections") portNames $
+        portBindings' = filter ((/= Nil) . snd) $
+            resolveBindings (msg "port connections") portNames $
             concatMap expandStar portBindings
 
         expandStar :: PortBinding -> [PortBinding]
