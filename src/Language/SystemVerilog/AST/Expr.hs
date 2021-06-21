@@ -77,7 +77,8 @@ instance Show Expr where
     show (Repeat  e l  ) = printf "{%s {%s}}"  (show e) (commas $ map show l)
     show (Concat  l    ) = printf "{%s}"                (commas $ map show l)
     show (Stream  o e l) = printf "{%s %s%s}"  (show o) (show e) (show $ Concat l)
-    show (Cast tore e  ) = printf "%s'(%s)"    (showEither tore) (show e)
+    show (Cast tore e  ) = printf "%s'(%s)"    toreStr  (show e)
+        where toreStr = either show (flip showBinOpPrec []) tore
     show (DimsFn  f v  ) = printf "%s(%s)"     (show f) (showEither v)
     show (DimFn   f v e) = printf "%s(%s, %s)" (show f) (showEither v) (show e)
     show (Inside  e l  ) = printf "(%s inside { %s })" (show e) (intercalate ", " $ map show l)
