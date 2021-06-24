@@ -468,7 +468,16 @@ inlineInstance global ranges modportBindings items partName
             case lookup (Bit expr Tag) exprReplacements of
                 Just resolved -> replaceArrTag (replaceExpr' local elt) resolved
                 Nothing -> Bit (replaceExpr' local expr) (replaceExpr' local elt)
-        replaceExpr' local expr =
+        replaceExpr' local (expr @ (Dot Ident{} _)) =
+            case lookup expr exprReplacements of
+                Just expr' -> expr'
+                Nothing -> checkExprResolution local expr $
+                    traverseSinglyNestedExprs (replaceExprAny local) expr
+        replaceExpr' local (Ident x) =
+            checkExprResolution local (Ident x) (Ident x)
+        replaceExpr' local expr = replaceExprAny local expr
+        replaceExprAny :: Scopes Expr -> Expr -> Expr
+        replaceExprAny local expr =
             case lookup expr exprReplacements of
                 Just expr' -> expr'
                 Nothing -> checkExprResolution local expr $
