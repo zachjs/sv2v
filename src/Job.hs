@@ -38,6 +38,7 @@ data Job = Job
     , define :: [String]
     , siloed :: Bool
     , skipPreprocessor :: Bool
+    , passThrough :: Bool
     , exclude :: [Exclude]
     , verbose :: Bool
     , write :: Write
@@ -61,6 +62,7 @@ defaultJob = Job
     , siloed = nam_ "siloed" &= help ("Lex input files separately, so"
         ++ " macros from earlier files are not defined in later files")
     , skipPreprocessor = nam_ "skip-preprocessor" &= help "Disable preprocessor"
+    , passThrough = nam_ "pass-through" &= help "Dump input without converting"
     , exclude = nam_ "exclude" &= name "E" &= typ "CONV"
         &= help ("Exclude a particular conversion (always, assert, interface,"
             ++ " or logic)")
