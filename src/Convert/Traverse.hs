@@ -165,11 +165,13 @@ traverseModuleItemsM mapper (Class lifetime name decls items) = do
     declsWrapped' <- mapM (traverseNestedModuleItemsM mapper) declsWrapped
     let decls' = map (\(MIPackageItem (Decl decl)) -> decl) $
                     concatMap breakGenerate declsWrapped'
-    let itemsWrapped = map MIPackageItem items
-    itemsWrapped' <- mapM (traverseNestedModuleItemsM mapper) itemsWrapped
-    let items' = map (\(MIPackageItem item) -> item) $
-                    concatMap breakGenerate itemsWrapped'
+    items' <- fmap concat $ mapM indirect items
     return $ Class lifetime name decls' items'
+    where
+        indirect (qualifier, item) =
+            fmap (map (unwrap qualifier) . breakGenerate) $
+            traverseNestedModuleItemsM mapper (MIPackageItem item)
+        unwrap qualifier = \(MIPackageItem item) -> (qualifier, item)
 
 traverseModuleItems :: Mapper ModuleItem -> Mapper Description
 traverseModuleItems = unmonad traverseModuleItemsM

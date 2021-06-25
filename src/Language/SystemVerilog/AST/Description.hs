@@ -10,6 +10,8 @@ module Language.SystemVerilog.AST.Description
     , PackageItem (..)
     , PartKW      (..)
     , Lifetime    (..)
+    , Qualifier   (..)
+    , ClassItem
     ) where
 
 import Text.Printf (printf)
@@ -26,7 +28,7 @@ data Description
     = Part [Attr] Bool PartKW Lifetime Identifier [Identifier] [ModuleItem]
     | PackageItem PackageItem
     | Package Lifetime Identifier [PackageItem]
-    | Class   Lifetime Identifier [Decl] [PackageItem]
+    | Class   Lifetime Identifier [Decl] [ClassItem]
     deriving Eq
 
 instance Show Description where
@@ -54,8 +56,8 @@ instance Show Description where
         printf "class %s%s;\n%s\nendclass"
             (showPad lifetime) name bodyStr
         where
-            bodyStr = indent $ unlines' $ map show items'
-            items' = (map Decl decls) ++ items
+            bodyStr = indent $ unlines' $ map showClassItem items'
+            items' = (map (\decl -> (QNone, Decl decl)) decls) ++ items
     show (PackageItem i) = show i
 
 data PackageItem
@@ -102,3 +104,21 @@ instance Show Lifetime where
     show Static    = "static"
     show Automatic = "automatic"
     show Inherit   = ""
+
+type ClassItem = (Qualifier, PackageItem)
+
+showClassItem :: ClassItem -> String
+showClassItem (qualifier, item) = showPad qualifier ++ show item
+
+data Qualifier
+    = QNone
+    | QStatic
+    | QLocal
+    | QProtected
+    deriving Eq
+
+instance Show Qualifier where
+    show QNone      = ""
+    show QStatic    = "static"
+    show QLocal     = "local"
+    show QProtected = "protected"

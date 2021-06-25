@@ -13,6 +13,7 @@
  -}
 {
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE TupleSections #-}
 module Language.SystemVerilog.Parser.Parse (parse) where
 
 import Control.Monad.Except
@@ -557,7 +558,7 @@ InterfaceKW :: { PartKW }
 
 PackageDeclaration :: { Description }
   : "package" Lifetime Identifier        ";" PackageItems endpackage StrTag {% checkTag $3 $7 $ Package $2 $3 $5 }
-  | "class" Lifetime Identifier PIParams ";" PackageItems endclass   StrTag {% checkTag $3 $8 $ Class $2 $3 $4 $6 }
+  | "class" Lifetime Identifier PIParams ";" ClassItems   endclass   StrTag {% checkTag $3 $8 $ Class $2 $3 $4 $6 }
 
 StrTag :: { Identifier }
   : {- empty -}    { "" }
@@ -643,7 +644,7 @@ DeclToken :: { DeclToken }
   | "." Identifier                     {% posInject \p -> DTDot      p $2 }
   | PortBindings                       {% posInject \p -> DTInstance p $1 }
   | Signing                            {% posInject \p -> DTSigning  p $1 }
-  | ExplicitLifetime                   {% posInject \p -> DTLifetime p $1 }
+  | "automatic"                        {% posInject \p -> DTLifetime p Automatic }
   | "const" PartialType                {% posInject \p -> DTType     p $2 }
   | "const" PartialTypeAlias           {% posInject \p -> DTType     p $2 }
   | "{" StreamOp StreamSize Concat "}" {% posInject \p -> DTStream   p $2 $3           (map toLHS $4) }
@@ -697,6 +698,7 @@ NonGenerateModuleItem :: { [ModuleItem] }
   | "genvar" Identifiers ";"             { map Genvar $2 }
   | "modport" ModportItems ";"           { map (uncurry Modport) $2 }
   | NonDeclPackageItem                   { map MIPackageItem $1 }
+  | TaskOrFunction                       { [MIPackageItem $1] }
   | NInputGateKW  NInputGates  ";"       { map (\(a, b, c, d) -> NInputGate  $1 a b c d) $2 }
   | NOutputGateKW NOutputGates ";"       { map (\(a, b, c, d) -> NOutputGate $1 a b c d) $2 }
   | AttributeInstance ModuleItem         { map (addMIAttr $1) $2 }
@@ -843,22 +845,45 @@ PackageItems :: { [PackageItem] }
   | ";" PackageItems                 { $2 }
   | PITrace PackageItem PackageItems { $1 : $2 ++ $3 }
 PackageItem :: { [PackageItem] }
+  : PackageOrClassItem { $1}
+  | TaskOrFunction { [$1] }
+
+ClassItems :: { [ClassItem] }
+  : {- empty -}                  { [] }
+  | ";" ClassItems               { $2 }
+  | CITrace ClassItem ClassItems { $1 : $2 ++ $3 }
+ClassItem :: { [ClassItem] }
+  : ClassItemQualifier PackageOrClassItem { map ($1, ) $2 }
+  | ClassItemQualifier TaskOrFunction     { [($1, $2)] }
+ClassItemQualifier :: { Qualifier }
+  : {- empty -} { QNone }
+  | "static"    { QStatic }
+  | "local"     { QLocal }
+  | "protected" { QProtected }
+
+PackageOrClassItem :: { [PackageItem] }
   : DeclTokens(";")    { map Decl $ parseDTsAsDecls $1 }
   | ParameterDecl(";") { map Decl $1 }
   | NonDeclPackageItem { $1 }
 NonDeclPackageItem :: { [PackageItem] }
-  : "typedef" Type Identifier ";" { [Decl $ ParamType Localparam $3 $2] }
-  | "typedef" Type Identifier DimensionsNonEmpty ";" { [Decl $ ParamType Localparam $3 (UnpackedType $2 $4)] }
-  | "typedef" TypedefRef Identifier ";" { [Decl $ ParamType Localparam $3 $2] }
-  | "function" Lifetime FuncRetAndName    TFItems DeclsAndStmts endfunction StrTag {% checkTag (snd $3) $7 [Function $2 (fst $3) (snd $3) (map makeInput $4 ++ fst $5) (snd $5)] }
-  | "function" Lifetime "void" Identifier TFItems DeclsAndStmts endfunction StrTag {% checkTag $4       $8 [Task     $2 $4                ($5 ++ fst $6) (snd $6)] }
-  | "task"     Lifetime Identifier        TFItems DeclsAndStmts endtask     StrTag {% checkTag $3       $7 [Task     $2 $3                ($4 ++ fst $5) (snd $5)] }
-  | "import" PackageImportItems ";" { map (uncurry Import) $2 }
+  : Typedef              { [Decl $1] }
+  | ImportOrExport       { $1 }
+  | ForwardTypedef ";"   { $1 }
+  | TimeunitsDeclaration { $1 }
+  | Directive            { [Directive $1] }
+
+ImportOrExport :: { [PackageItem] }
+  : "import" PackageImportItems ";" { map (uncurry Import) $2 }
   | "export" PackageImportItems ";" { map (uncurry Export) $2 }
   | "export" "*" "::" "*" ";"       { [Export "" ""] }
-  | ForwardTypedef ";"              { $1 }
-  | TimeunitsDeclaration            { $1 }
-  | Directive                       { [Directive $1] }
+TaskOrFunction :: { PackageItem }
+  : "function" Lifetime FuncRetAndName    TFItems DeclsAndStmts endfunction StrTag {% checkTag (snd $3) $7 $ Function $2 (fst $3) (snd $3) (map makeInput $4 ++ fst $5) (snd $5) }
+  | "function" Lifetime "void" Identifier TFItems DeclsAndStmts endfunction StrTag {% checkTag $4       $8 $ Task     $2 $4                ($5 ++ fst $6) (snd $6) }
+  | "task"     Lifetime Identifier        TFItems DeclsAndStmts endtask     StrTag {% checkTag $3       $7 $ Task     $2 $3                ($4 ++ fst $5) (snd $5) }
+Typedef :: { Decl }
+  : "typedef" Type Identifier ";" { ParamType Localparam $3 $2 }
+  | "typedef" Type Identifier DimensionsNonEmpty ";" { ParamType Localparam $3 (UnpackedType $2 $4) }
+  | "typedef" TypedefRef Identifier ";" { ParamType Localparam $3 $2 }
 TypedefRef :: { Type }
   : Identifier              "." Identifier { TypedefRef $ Dot      (Ident $1)     $3 }
   | Identifier "[" Expr "]" "." Identifier { TypedefRef $ Dot (Bit (Ident $1) $3) $6 }
@@ -1391,6 +1416,8 @@ MITrace :: { ModuleItem }
   : PITrace { MIPackageItem $1 }
 PITrace :: { PackageItem }
   : Trace { Decl $ CommentDecl $1 }
+CITrace :: { ClassItem }
+  : PITrace { (QNone, $1) }
 StmtTrace :: { Stmt }
   : Trace { CommentStmt $1 }
 Trace :: { String }

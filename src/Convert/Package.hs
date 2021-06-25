@@ -77,7 +77,22 @@ collectPackageM (PackageItem item) =
 collectPackageM (Package _ name items) =
     tell (Map.singleton name (Map.empty, items), Map.empty, [])
 collectPackageM (Class _ name decls items) =
-    tell (Map.empty, Map.singleton name (decls, items), [])
+    tell (Map.empty, Map.singleton name (decls, map unpackClassItem items), [])
+    where
+        unpackClassItem :: ClassItem -> PackageItem
+        unpackClassItem (item @ (_, Task{})) = checkTF item
+        unpackClassItem (item @ (_, Function{})) = checkTF item
+        unpackClassItem item = checkNonTF item
+        checkTF :: ClassItem -> PackageItem
+        checkTF (QStatic, item) = item
+        checkTF (_, item) =
+            error $ "unsupported declaration of non-static method " ++ itemName
+            where [itemName] = piNames item
+        checkNonTF :: ClassItem -> PackageItem
+        checkNonTF (QNone, item) = item
+        checkNonTF (qualifier, _) =
+            error $ "unexpected qualifier " ++ show qualifier
+                ++ " on a class item which is not a task or a function"
 collectPackageM _ = return ()
 
 -- elaborate all packages and their usages

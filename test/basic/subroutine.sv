@@ -1,8 +1,7 @@
 class C #(
     parameter X = 1
 );
-    // TODO: this should be static
-    task dump;
+    static task dump;
         $display("C#(%0d)::dump()", X);
     endtask
 endclass
