@@ -19,7 +19,7 @@ import Text.Printf (printf)
 import Language.SystemVerilog.AST.ShowHelp
 
 import Language.SystemVerilog.AST.Attr (Attr)
-import Language.SystemVerilog.AST.Decl (Decl)
+import Language.SystemVerilog.AST.Decl (Decl, showDecls)
 import Language.SystemVerilog.AST.Stmt (Stmt)
 import Language.SystemVerilog.AST.Type (Type, Identifier)
 import {-# SOURCE #-} Language.SystemVerilog.AST.ModuleItem (ModuleItem)
@@ -53,12 +53,16 @@ instance Show Description where
         where
             bodyStr = indent $ unlines' $ map show items
     show (Class lifetime name decls items) =
-        printf "class %s%s;\n%s\nendclass"
-            (showPad lifetime) name bodyStr
+        printf "class %s%s%s;\n%s\nendclass"
+            (showPad lifetime) name (showParamDecls decls) bodyStr
         where
-            bodyStr = indent $ unlines' $ map showClassItem items'
-            items' = (map (\decl -> (QNone, Decl decl)) decls) ++ items
+            bodyStr = indent $ unlines' $ map showClassItem items
     show (PackageItem i) = show i
+
+showParamDecls :: [Decl] -> String
+showParamDecls [] = ""
+showParamDecls decls = " #(\n\t" ++ str ++ "\n)"
+    where str = showDecls ',' "\n\t" decls
 
 data PackageItem
     = Function Lifetime Type Identifier [Decl] [Stmt]

@@ -27,7 +27,7 @@ import Text.Printf (printf)
 
 import Language.SystemVerilog.AST.ShowHelp (commas, indent, unlines', showPad, showBlock)
 import Language.SystemVerilog.AST.Attr (Attr)
-import Language.SystemVerilog.AST.Decl (Decl)
+import Language.SystemVerilog.AST.Decl (Decl, showDecls)
 import Language.SystemVerilog.AST.Expr (Expr(Nil), Args(..))
 import Language.SystemVerilog.AST.LHS (LHS)
 import Language.SystemVerilog.AST.Op (AsgnOp(AsgnOpEq))
@@ -78,7 +78,7 @@ instance Show Stmt where
             (indent $ show stmt)
         where
             showInits :: Either [Decl] [(LHS, Expr)] -> String
-            showInits (Left decls) = commas $ map (init . show) decls
+            showInits (Left decls) = showDecls ',' " " decls
             showInits (Right asgns) = commas $ map showInit asgns
                 where showInit (l, e) = showAssign (l, AsgnOpEq, e)
             showAssign :: (LHS, AsgnOp, Expr) -> String

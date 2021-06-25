@@ -662,6 +662,10 @@ PortDeclTokens(delim) :: { [DeclToken] }
   | GenericInterfaceDecl   PortDeclTokens(delim) { $1 ++ $2}
   | GenericInterfaceDecl                  delim  { $1 }
   | AttributeInstance      PortDeclTokens(delim) {% posInject \p -> DTAttr p $1 : $2 }
+ModuleDeclTokens(delim) :: { [DeclToken] }
+  : DeclTokensBase(ModuleDeclTokens(delim), delim) { $1 }
+  | GenericInterfaceDecl   ModuleDeclTokens(delim) { $1 ++ $2}
+  | GenericInterfaceDecl                    delim  { $1 }
 GenericInterfaceDecl :: { [DeclToken] }
   : "interface" Identifier {% posInject \p -> [DTType p (\Unspecified -> InterfaceT "" ""), DTIdent p $2] }
 
@@ -688,7 +692,7 @@ ModuleItem :: { [ModuleItem] }
   | "generate" GenItems endgenerate { [Generate $2] }
 NonGenerateModuleItem :: { [ModuleItem] }
   -- This item covers module instantiations and all declarations
-  : DeclTokens(";")                      { parseDTsAsModuleItems $1 }
+  : ModuleDeclTokens(";")                { parseDTsAsModuleItems $1 }
   | ParameterDecl(";")                   { map (MIPackageItem . Decl) $1 }
   | "defparam" LHSAsgns ";"              { map (uncurry Defparam) $2 }
   | "assign" AssignOption LHSAsgns ";"   { map (uncurry $ Assign $2) $3 }

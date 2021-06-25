@@ -10,12 +10,14 @@ module Language.SystemVerilog.AST.Decl
     ( Decl       (..)
     , Direction  (..)
     , ParamScope (..)
+    , showDecls
     ) where
 
+import Data.List (intercalate)
 import Text.Printf (printf)
 
 import Language.SystemVerilog.AST.ShowHelp (showPad, unlines')
-import Language.SystemVerilog.AST.Type (Type(UnpackedType), Identifier, pattern UnknownType)
+import Language.SystemVerilog.AST.Type (Type(TypedefRef, UnpackedType), Identifier, pattern UnknownType)
 import Language.SystemVerilog.AST.Expr (Expr, Range, showRanges, showAssignment)
 
 data Decl
@@ -28,6 +30,8 @@ data Decl
 instance Show Decl where
     showList l _ = unlines' $ map show l
     show (Param s t x e) = printf "%s %s%s%s;" (show s) (showPad t) x (showAssignment e)
+    show (ParamType Localparam x (TypedefRef e)) =
+        printf "typedef %s %s;" (show e) x
     show (ParamType Localparam x (UnpackedType t rs)) =
         printf "typedef %s %s%s;" (show t) x (showRanges rs)
     show (ParamType s x t) = printf "%s type %s%s;" (show s) x tStr
@@ -37,6 +41,20 @@ instance Show Decl where
         if elem '\n' c
             then "// " ++ show c
             else "// " ++ c
+
+showDecls :: Char -> String -> [Decl] -> String
+showDecls delim whitespace =
+    dropDelim . intercalate whitespace . map showDecl
+    where
+        dropDelim :: String -> String
+        dropDelim [] = []
+        dropDelim [x] = if x == delim then [] else [x]
+        dropDelim (x : xs) = x : dropDelim xs
+        showDecl (CommentDecl c) =
+            if whitespace == " "
+                then "/* " ++ c ++ " */"
+                else show $ CommentDecl c
+        showDecl decl = (init $ show decl) ++ [delim]
 
 data Direction
     = Input

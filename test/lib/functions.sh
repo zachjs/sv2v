@@ -45,14 +45,26 @@ simulate() {
 
 assertConverts() {
     ac_file=$1
+
     ac_tmpa=$SHUNIT_TMPDIR/ac-conv-tmpa.v
     $SV2V $ac_file 2> /dev/null > $ac_tmpa
     assertTrue "1st conversion of $ac_file failed" $?
+
     ac_tmpb=$SHUNIT_TMPDIR/ac-conv-tmpb.v
     $SV2V $ac_tmpa 2> /dev/null > $ac_tmpb
     assertTrue "2nd conversion of $ac_file failed" $?
     diff $ac_tmpa $ac_tmpb > /dev/null
     assertTrue "conversion of $ac_file not stable after the first iteration" $?
+
+    ac_tmpc=$SHUNIT_TMPDIR/ac-conv-tmpc.v
+    $SV2V --pass-through $ac_file 2> /dev/null > $ac_tmpc
+    assertTrue "pass through of $ac_file failed" $?
+    ac_tmpd=$SHUNIT_TMPDIR/ac-conv-tmpd.v
+    $SV2V $ac_tmpc 2> /dev/null > $ac_tmpd
+    assertTrue "conversion of pass through of $ac_file failed" $?
+    diff $ac_tmpa $ac_tmpd > /dev/null
+    assertTrue "pass through then conversion differs for $ac_file" $?
+
     # using sed to remove quoted strings
     filtered=`sed -E 's/"([^"]|\")+"//g' $ac_tmpa`
     # check for various things iverilog accepts which we don't want to output
