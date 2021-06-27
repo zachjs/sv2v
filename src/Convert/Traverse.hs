@@ -129,7 +129,7 @@ traverseDescriptionsM = mapM
 traverseDescriptions :: Mapper Description -> Mapper AST
 traverseDescriptions = map
 collectDescriptionsM :: Monad m => CollectorM m Description -> CollectorM m AST
-collectDescriptionsM = collectify traverseDescriptionsM
+collectDescriptionsM = mapM_
 
 breakGenerate :: ModuleItem -> [ModuleItem]
 breakGenerate (Generate genItems) =
