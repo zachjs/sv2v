@@ -85,11 +85,12 @@ addJumpStateDeclTF decls stmts =
     else
         (decls, map (traverseNestedStmts removeJumpState) stmts)
     where
-        dummyModuleItem = Initial $ Block Seq "" decls stmts
-        declares = elem jumpState $ execWriter $
-            collectDeclsM collectVarM dummyModuleItem
-        uses = elem jumpState $ execWriter $
-            collectExprsM (collectNestedExprsM collectExprIdentM) dummyModuleItem
+        dummyStmt = Block Seq "" decls stmts
+        writesJumpState f = elem jumpState $ execWriter $
+            collectNestedStmtsM f dummyStmt
+        declares = writesJumpState $ collectStmtDeclsM collectVarM
+        uses = writesJumpState $
+            collectStmtExprsM $ collectNestedExprsM collectExprIdentM
         collectVarM :: Decl -> Writer [String] ()
         collectVarM (Variable Local _ ident _ _) = tell [ident]
         collectVarM _ = return ()

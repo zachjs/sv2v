@@ -8,7 +8,6 @@ module Convert.Traverse
 ( MapperM
 , Mapper
 , CollectorM
-, TypeStrategy (..)
 , unmonad
 , collectify
 , traverseDescriptionsM
@@ -37,6 +36,9 @@ module Convert.Traverse
 , traverseDeclsM
 , traverseDecls
 , collectDeclsM
+, traverseStmtDeclsM
+, traverseStmtDecls
+, collectStmtDeclsM
 , traverseSinglyNestedTypesM
 , traverseSinglyNestedTypes
 , collectSinglyNestedTypesM
@@ -58,9 +60,6 @@ module Convert.Traverse
 , traverseDeclTypesM
 , traverseDeclTypes
 , collectDeclTypesM
-, traverseTypesM'
-, traverseTypes'
-, collectTypesM'
 , traverseTypesM
 , traverseTypes
 , collectTypesM
@@ -78,6 +77,7 @@ module Convert.Traverse
 , traverseNestedModuleItemsM
 , traverseNestedModuleItems
 , collectNestedModuleItemsM
+, traverseNestedStmtsM
 , traverseNestedStmts
 , collectNestedStmtsM
 , traverseNestedExprsM
@@ -110,11 +110,6 @@ import Language.SystemVerilog.AST
 type MapperM m t = t -> m t
 type Mapper t = t -> t
 type CollectorM m t = t -> m ()
-
-data TypeStrategy
-    = IncludeParamTypes
-    | ExcludeParamTypes
-    deriving Eq
 
 unmonad :: (MapperM Identity a -> MapperM Identity b) -> Mapper a -> Mapper b
 unmonad traverser mapper = runIdentity . traverser (return . mapper)
@@ -201,14 +196,15 @@ traverseStmts = unmonad traverseStmtsM
 collectStmtsM :: Monad m => CollectorM m Stmt -> CollectorM m ModuleItem
 collectStmtsM = collectify traverseStmtsM
 
--- private utility for turning a thing which maps over a single lever of
--- statements into one that maps over the nested statements first, then the
--- higher levels up
 traverseNestedStmtsM :: Monad m => MapperM m Stmt -> MapperM m Stmt
 traverseNestedStmtsM mapper = fullMapper
     where fullMapper = mapper >=> traverseSinglyNestedStmtsM fullMapper
 
--- variant of the above which only traverses one level down
+traverseNestedStmts :: Mapper Stmt -> Mapper Stmt
+traverseNestedStmts = unmonad traverseNestedStmtsM
+collectNestedStmtsM :: Monad m => CollectorM m Stmt -> CollectorM m Stmt
+collectNestedStmtsM = collectify traverseNestedStmtsM
+
 traverseSinglyNestedStmtsM :: Monad m => MapperM m Stmt -> MapperM m Stmt
 traverseSinglyNestedStmtsM fullMapper = cs
     where
@@ -783,28 +779,29 @@ collectSinglyNestedLHSsM :: Monad m => CollectorM m LHS -> CollectorM m LHS
 collectSinglyNestedLHSsM = collectify traverseSinglyNestedLHSsM
 
 traverseDeclsM :: Monad m => MapperM m Decl -> MapperM m ModuleItem
-traverseDeclsM mapper item = do
-    item' <- miMapper item
-    traverseStmtsM stmtMapper item'
+traverseDeclsM mapper = miMapper
     where
         miMapper (MIPackageItem (Decl decl)) =
             mapper decl >>= return . MIPackageItem . Decl
-        miMapper (MIPackageItem (Function l t x decls stmts)) = do
-            decls' <- mapM mapper decls
-            return $ MIPackageItem $ Function l t x decls' stmts
-        miMapper (MIPackageItem (Task l x decls stmts)) = do
-            decls' <- mapM mapper decls
-            return $ MIPackageItem $ Task l x decls' stmts
         miMapper other = return other
-        stmtMapper (Block kw name decls stmts) = do
-            decls' <- mapM mapper decls
-            return $ Block kw name decls' stmts
-        stmtMapper other = return other
 
 traverseDecls :: Mapper Decl -> Mapper ModuleItem
 traverseDecls = unmonad traverseDeclsM
 collectDeclsM :: Monad m => CollectorM m Decl -> CollectorM m ModuleItem
 collectDeclsM = collectify traverseDeclsM
+
+traverseStmtDeclsM :: Monad m => MapperM m Decl -> MapperM m Stmt
+traverseStmtDeclsM mapper = stmtMapper
+    where
+        stmtMapper (Block kw name decls stmts) = do
+            decls' <- mapM mapper decls
+            return $ Block kw name decls' stmts
+        stmtMapper other = return other
+
+traverseStmtDecls :: Mapper Decl -> Mapper Stmt
+traverseStmtDecls = unmonad traverseStmtDeclsM
+collectStmtDeclsM :: Monad m => CollectorM m Decl -> CollectorM m Stmt
+collectStmtDeclsM = collectify traverseStmtDeclsM
 
 traverseSinglyNestedTypesM :: Monad m => MapperM m Type -> MapperM m Type
 traverseSinglyNestedTypesM mapper = tm
@@ -971,45 +968,21 @@ traverseDeclTypes = unmonad traverseDeclTypesM
 collectDeclTypesM :: Monad m => CollectorM m Type -> CollectorM m Decl
 collectDeclTypesM = collectify traverseDeclTypesM
 
-traverseTypesM' :: Monad m => TypeStrategy -> MapperM m Type -> MapperM m ModuleItem
-traverseTypesM' strategy mapper =
-    miMapper >=>
-    traverseDeclsM declMapper >=>
-    traverseExprsM (traverseNestedExprsM exprMapper)
-    where
-        exprMapper = traverseExprTypesM mapper
-        declMapper =
-            if strategy == IncludeParamTypes
-                then traverseDeclTypesM mapper
-                else \decl -> case decl of
-                       ParamType{} -> return decl
-                       _ -> traverseDeclTypesM mapper decl
-        miMapper (MIPackageItem (Function l t x d s)) =
-            mapper t >>= \t' -> return $ MIPackageItem $ Function l t' x d s
-        miMapper (MIPackageItem (other @ (Task _ _ _ _))) =
-            return $ MIPackageItem other
-        miMapper (Instance m params x rs p) = do
-            params' <- mapM mapParam params
-            return $ Instance m params' x rs p
-            where
-                mapParam (i, Left t) =
-                    if strategy == IncludeParamTypes
-                        then mapper t >>= \t' -> return (i, Left t')
-                        else return (i, Left t)
-                mapParam (i, Right e) = return $ (i, Right e)
-        miMapper other = return other
-
-traverseTypes' :: TypeStrategy -> Mapper Type -> Mapper ModuleItem
-traverseTypes' strategy = unmonad $ traverseTypesM' strategy
-collectTypesM' :: Monad m => TypeStrategy -> CollectorM m Type -> CollectorM m ModuleItem
-collectTypesM' strategy = collectify $ traverseTypesM' strategy
-
 traverseTypesM :: Monad m => MapperM m Type -> MapperM m ModuleItem
-traverseTypesM = traverseTypesM' IncludeParamTypes
+traverseTypesM typeMapper =
+    traverseNodesM exprMapper declMapper typeMapper lhsMapper stmtMapper
+    where
+        exprMapper = traverseNestedExprsM (traverseExprTypesM typeMapper)
+        lhsMapper = traverseNestedLHSsM (traverseLHSExprsM exprMapper)
+        stmtMapper = traverseNestedStmtsM $
+            traverseStmtDeclsM declMapper >=> traverseStmtExprsM exprMapper
+        declMapper =
+            traverseDeclExprsM exprMapper >=> traverseDeclTypesM typeMapper
+
 traverseTypes :: Mapper Type -> Mapper ModuleItem
-traverseTypes = traverseTypes' IncludeParamTypes
+traverseTypes = unmonad traverseTypesM
 collectTypesM :: Monad m => CollectorM m Type -> CollectorM m ModuleItem
-collectTypesM = collectTypesM' IncludeParamTypes
+collectTypesM = collectify traverseTypesM
 
 traverseGenItemsM :: Monad m => MapperM m GenItem -> MapperM m ModuleItem
 traverseGenItemsM mapper = moduleItemMapper
@@ -1123,11 +1096,6 @@ traverseNestedModuleItems :: Mapper ModuleItem -> Mapper ModuleItem
 traverseNestedModuleItems = unmonad traverseNestedModuleItemsM
 collectNestedModuleItemsM :: Monad m => CollectorM m ModuleItem -> CollectorM m ModuleItem
 collectNestedModuleItemsM = collectify traverseNestedModuleItemsM
-
-traverseNestedStmts :: Mapper Stmt -> Mapper Stmt
-traverseNestedStmts = unmonad traverseNestedStmtsM
-collectNestedStmtsM :: Monad m => CollectorM m Stmt -> CollectorM m Stmt
-collectNestedStmtsM = collectify traverseNestedStmtsM
 
 -- In many conversions, we want to resolve items locally first, and then fall
 -- back to looking at other source files, if necessary. This helper captures

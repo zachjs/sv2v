@@ -27,8 +27,6 @@ convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription (description @ (Part _ _ Module _ _ _ _)) =
-    traverseModuleItems
-    (traverseTypes' ExcludeParamTypes $ traverseNestedTypes convertType) $
     partScoper traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
     description
 convertDescription other = other
@@ -100,7 +98,7 @@ convertStruct' isStruct sg fields =
 convertType :: Type -> Type
 convertType t1 =
     case convertStruct t1 of
-        Nothing -> t1
+        Nothing -> traverseSinglyNestedTypes convertType t1
         Just (t2, _) -> tf2 (rs1 ++ rs2)
             where (tf2, rs2) = typeRanges t2
     where (_, rs1) = typeRanges t1
@@ -114,11 +112,13 @@ traverseDeclM decl = do
             when (isRangeable t) $
                 scopeType (tf $ a ++ rs) >>= insertElem x
             let e' = convertExpr t e
-            return $ Variable d t x a e'
+            let t' = convertType t
+            return $ Variable d t' x a e'
         Param s t x e -> do
             scopeType t >>= insertElem x
             let e' = convertExpr t e
-            return $ Param s t x e'
+            let t' = convertType t
+            return $ Param s t' x e'
         ParamType{} -> return decl
         CommentDecl{} -> return decl
     traverseDeclExprsM traverseExprM decl'
@@ -153,7 +153,9 @@ traverseStmtM' =
     traverseStmtAsgnsM traverseAsgnM
 
 traverseExprM :: Expr -> Scoper Type Expr
-traverseExprM = embedScopes convertSubExpr >=> return . snd
+traverseExprM =
+    (embedScopes convertSubExpr >=> return . snd) .
+    (traverseNestedExprs $ traverseExprTypes convertType)
 
 traverseLHSM :: LHS -> Scoper Type LHS
 traverseLHSM = convertLHS >=> return . snd
