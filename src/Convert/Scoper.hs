@@ -512,8 +512,6 @@ scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
             fullModuleItemMapper item >>= return . MIAttr attr
         fullModuleItemMapper item = moduleItemMapper item
 
-        -- TODO: This doesn't yet support implicit naming of generate blocks as
-        -- blocks as described in Section 27.6.
         fullGenItemMapper :: GenItem -> ScoperT a m GenItem
         fullGenItemMapper genItem = do
             genItem' <- genItemMapper genItem
@@ -524,7 +522,7 @@ scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
                     injected' <- mapM fullModuleItemMapper injected
                     genItem'' <- scopeGenItemMapper genItem'
                     let genItems = map GenModuleItem injected' ++ [genItem'']
-                    return $ GenBlock "" genItems
+                    return $ GenBlock "" genItems -- flattened during traversal
         scopeGenItemMapper :: GenItem -> ScoperT a m GenItem
         scopeGenItemMapper (GenFor (index, a) b c genItem) = do
             genItem' <- scopeGenItemBranchMapper index genItem

@@ -1352,6 +1352,7 @@ GenItems :: { [GenItem] }
 GenItem :: { GenItem }
   : GenBlock              { uncurry GenBlock $1 }
   | NonGenerateModuleItem { genItemsToGenItem $ map GenModuleItem $1 }
+  | "generate" GenItems "endgenerate" { genItemsToGenItem $2 }
   | ConditionalGenerateConstruct { $1 }
   | LoopGenerateConstruct        { $1 }
 ConditionalGenerateConstruct :: { GenItem }
@@ -1375,7 +1376,7 @@ GenCase :: { GenCase }
   | "default" opt(":") GenItemOrNull { ([], $3) }
 
 GenvarInitialization :: { Expr -> (Identifier, AsgnOp, Expr) -> GenItem -> GenItem }
-  : "genvar" Identifier "=" Expr { \a b c -> GenBlock "" [GenModuleItem (Genvar $2), GenFor ($2, $4) a b c] }
+  : "genvar" Identifier "=" Expr { \a b c -> genItemsToGenItem [GenModuleItem (Genvar $2), GenFor ($2, $4) a b c] }
   |          Identifier "=" Expr { GenFor ($1, $3) }
 
 GenvarIteration :: { (Identifier, AsgnOp, Expr) }
@@ -1480,7 +1481,7 @@ parseError a = case a of
 
 genItemsToGenItem :: [GenItem] -> GenItem
 genItemsToGenItem [x] = x
-genItemsToGenItem xs = GenBlock "" xs
+genItemsToGenItem xs = GenModuleItem $ Generate xs
 
 combineDeclsAndStmts :: ([Decl], [Stmt]) -> ([Decl], [Stmt]) ->
   ParseState ([Decl], [Stmt])

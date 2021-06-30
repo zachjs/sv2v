@@ -99,6 +99,7 @@ executable sv2v
     Convert.TypeOf
     Convert.UnbasedUnsized
     Convert.Unique
+    Convert.UnnamedGenBlock
     Convert.UnpackedArray
     Convert.Unsigned
     Convert.Wildcard

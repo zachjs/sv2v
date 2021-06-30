@@ -47,6 +47,7 @@ import qualified Convert.Typedef
 import qualified Convert.TypeOf
 import qualified Convert.UnbasedUnsized
 import qualified Convert.Unique
+import qualified Convert.UnnamedGenBlock
 import qualified Convert.UnpackedArray
 import qualified Convert.Unsigned
 import qualified Convert.Wildcard
@@ -105,6 +106,7 @@ initialPhases selectExclude =
     , Convert.Package.convert
     , Convert.ParamNoDefault.convert
     , Convert.ResolveBindings.convert
+    , Convert.UnnamedGenBlock.convert
     ]
 
 convert :: [Job.Exclude] -> Phase

@@ -341,7 +341,7 @@ inlineInstance global ranges modportBindings items partName
     comment :
     map (MIPackageItem . Decl) bindingBaseParams ++
     map (MIPackageItem . Decl) parameterBinds ++
-    (wrapInstance $ GenBlock instanceName $ map GenModuleItem items')
+    wrapInstance instanceName items'
     : portBindings
     where
         items' = evalScoper
@@ -367,11 +367,20 @@ inlineInstance global ranges modportBindings items partName
 
         comment = MIPackageItem $ Decl $ CommentDecl $
             "expanded " ++ inlineKind ++ " instance: " ++ instanceName
-        portBindings = mapMaybe portBindingItem $
+        portBindings =
+            wrapPortBindings $
+            map portBindingItem $
+            filter ((/= Nil) . snd) $
             filter notSubstituted instancePorts
         notSubstituted :: PortBinding -> Bool
         notSubstituted (portName, _) =
             lookup portName modportBindings == Nothing
+        wrapPortBindings :: [ModuleItem] -> [ModuleItem]
+        wrapPortBindings =
+            if isArray
+                then (\x -> [x]) . wrapInstance blockName
+                else id
+            where blockName = instanceName ++ "_port_bindings"
 
         rewriteItem :: ModuleItem -> ModuleItem
         rewriteItem =
@@ -573,10 +582,8 @@ inlineInstance global ranges modportBindings items partName
                         ++ " expected type, found expr: " ++ show e'
         overrideParam other = other
 
-        portBindingItem :: PortBinding -> Maybe ModuleItem
-        portBindingItem (_, Nil) = Nothing
+        portBindingItem :: PortBinding -> ModuleItem
         portBindingItem (ident, expr) =
-            Just $ wrapInstance $ GenModuleItem $
             if findDeclDir ident == Input
                 then bind (LHSDot (inj LHSBit LHSIdent) ident) expr
                 else bind (toLHS expr) (Dot (inj Bit Ident) ident)
@@ -614,8 +621,8 @@ inlineInstance global ranges modportBindings items partName
         [arrayRange @ (arrayLeft, arrayRight)] = ranges
 
         -- wrap the given item in a generate loop if necessary
-        wrapInstance :: GenItem -> ModuleItem
-        wrapInstance item =
+        wrapInstance :: Identifier -> [ModuleItem] -> ModuleItem
+        wrapInstance blockName moduleItems =
             Generate $
             if not isArray then
                 [item]
@@ -624,6 +631,7 @@ inlineInstance global ranges modportBindings items partName
                 , GenFor inits cond incr item
                 ]
             where
+                item = GenBlock blockName $ map GenModuleItem moduleItems
                 inits = (loopVar, arrayLeft)
                 cond = endianCondExpr arrayRange
                     (BinOp Ge (Ident loopVar) arrayRight)
