@@ -61,6 +61,12 @@ traverseDeclM decl = do
                 else do
                     insertElem x Nil
                     return $ Variable d t x a e'
+        Net d n s t x a e -> do
+            enterStmt
+            e' <- traverseExprM e
+            exitStmt
+            insertElem x Nil
+            return $ Net d n s t x a e'
         Param _ _ x _ ->
             insertElem x Nil >> return decl
         ParamType    _ _ _ -> return decl

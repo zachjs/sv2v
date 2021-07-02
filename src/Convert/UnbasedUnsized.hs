@@ -105,6 +105,9 @@ determinePortSize portName instanceParams moduleItems =
                 then substituteExpr (reverse mapping) size
                 else step mapping rest
             where size = BinOp Mul (dimensionsSize a) (DimsFn FnBits $ Left t)
+        step mapping (MIPackageItem (Decl (Net d _ _ t x a e)) : rest) =
+            step mapping $ item : rest
+            where item = MIPackageItem $ Decl $ Variable d t x a e
         step mapping (_ : rest) = step mapping rest
         step _ [] = error $ "could not find size of port " ++ portName
 

@@ -74,6 +74,7 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
         traverseDeclM decl = do
             case decl of
                 Variable  _ _ x _ _ -> insertElem x DeclVal
+                Net   _ _ _ _ x _ _ -> insertElem x DeclVal
                 Param     _ _ x _   -> insertElem x DeclVal
                 ParamType _   x _   -> insertElem x DeclVal
                 CommentDecl{} -> return ()
@@ -324,10 +325,13 @@ convertDescription _ other = other
 -- produce the implicit modport decls for an interface bundle
 impliedModport :: [ModuleItem] -> [ModportDecl]
 impliedModport =
-    execWriter . mapM (collectNestedModuleItemsM collectModportDecls)
+    execWriter . mapM
+        (collectNestedModuleItemsM $ collectDeclsM collectModportDecls)
     where
-        collectModportDecls :: ModuleItem -> Writer [ModportDecl] ()
-        collectModportDecls (MIPackageItem (Decl (Variable _ _ x _ _))) =
+        collectModportDecls :: Decl -> Writer [ModportDecl] ()
+        collectModportDecls (Variable _ _ x _ _) =
+            tell [(Inout, x, Ident x)]
+        collectModportDecls (Net  _ _ _ _ x _ _) =
             tell [(Inout, x, Ident x)]
         collectModportDecls _ = return ()
 
@@ -384,15 +388,17 @@ inlineInstance global ranges modportBindings items partName
 
         rewriteItem :: ModuleItem -> ModuleItem
         rewriteItem =
+            traverseDecls $
             removeModportInstance .
             removeDeclDir .
-            traverseDecls overrideParam
+            overrideParam
 
         traverseDeclM :: Decl -> Scoper Expr Decl
         traverseDeclM decl = do
             decl' <- traverseDeclExprsM substituteExprM decl
             case decl' of
                 Variable  _ _ x _ _ -> insertElem x Nil
+                Net   _ _ _ _ x _ _ -> insertElem x Nil
                 Param     _ _ x e   -> insertElem x e
                 ParamType _   x _   -> insertElem x Nil
                 CommentDecl{} -> return ()
@@ -507,9 +513,8 @@ inlineInstance global ranges modportBindings items partName
                         ++ "\" resolvable when it wasn't previously"
                 _ -> id
 
-        removeModportInstance :: ModuleItem -> ModuleItem
-        removeModportInstance (MIPackageItem (Decl (Variable d t x a e))) =
-            MIPackageItem $ Decl $
+        removeModportInstance :: Decl -> Decl
+        removeModportInstance (Variable d t x a e) =
             if maybeModportBinding == Nothing then
                 Variable d t x a e
             else if makeBindingBaseExpr modportE == Nothing then
@@ -525,16 +530,17 @@ inlineInstance global ranges modportBindings items partName
                 bindingBaseExpr = Ident $ bindingBaseName ++ x
                 modportDims = a ++ snd (typeRanges t)
                 [modportDim] = modportDims
-
         removeModportInstance other = other
 
-        removeDeclDir :: ModuleItem -> ModuleItem
-        removeDeclDir (MIPackageItem (Decl (Variable _ t x a e))) =
-            MIPackageItem $ Decl $ Variable Local t' x a e
+        removeDeclDir :: Decl -> Decl
+        removeDeclDir (Variable _ t x a e) =
+            Variable Local t' x a e
             where t' = case t of
                     Implicit Unspecified rs ->
                         IntegerVector TLogic Unspecified rs
                     _ -> t
+        removeDeclDir decl @ Net{} =
+            traverseNetAsVar removeDeclDir decl
         removeDeclDir other = other
 
         -- capture the lower bound for each modport array binding
@@ -599,6 +605,8 @@ inlineInstance global ranges modportBindings items partName
         collectDeclDir (Variable dir _ ident _ _) =
             when (dir /= Local) $
                 tell $ Map.singleton ident dir
+        collectDeclDir net @ Net{} =
+            collectNetAsVarM collectDeclDir net
         collectDeclDir _ = return ()
         findDeclDir :: Identifier -> Direction
         findDeclDir ident =

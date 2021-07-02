@@ -36,6 +36,7 @@ traverseDeclM (Variable d t x [] (expr @ (Stream StreamL chunk exprs))) = do
         fnName = streamerFuncName x
         func = streamerFunc fnName chunk (TypeOf $ Concat exprs) t
         expr' = Call (Ident fnName) (Args [Concat exprs] [])
+traverseDeclM decl @ Net{} = traverseNetAsVarM traverseDeclM decl
 traverseDeclM decl = return decl
 
 traverseModuleItemM :: ModuleItem -> Scoper () ModuleItem

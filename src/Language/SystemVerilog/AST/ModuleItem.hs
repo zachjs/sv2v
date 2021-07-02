@@ -28,7 +28,7 @@ import Language.SystemVerilog.AST.Expr (Expr(Nil), pattern Ident, Range, showRan
 import Language.SystemVerilog.AST.GenItem (GenItem)
 import Language.SystemVerilog.AST.LHS (LHS)
 import Language.SystemVerilog.AST.Stmt (Stmt, AssertionItem, Timing(Delay))
-import Language.SystemVerilog.AST.Type (Identifier, DriveStrength)
+import Language.SystemVerilog.AST.Type (Identifier, Strength0, Strength1)
 
 data ModuleItem
     = MIAttr     Attr ModuleItem
@@ -140,11 +140,11 @@ instance Show NOutputGateKW where
 
 data AssignOption
     = AssignOptionNone
-    | AssignOptionDelay  Expr
-    | AssignOptionDrive  DriveStrength
+    | AssignOptionDelay Expr
+    | AssignOptionDrive Strength0 Strength1
     deriving Eq
 
 instance Show AssignOption where
     show AssignOptionNone = ""
     show (AssignOptionDelay de) = printf "#(%s)" (show de)
-    show (AssignOptionDrive ds) = show ds
+    show (AssignOptionDrive s0 s1) = printf "(%s, %s)" (show s0) (show s1)

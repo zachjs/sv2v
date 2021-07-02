@@ -41,6 +41,8 @@ type ST = Scoper Type
 
 -- insert the given declaration into the scope, and convert an TypeOfs within
 traverseDeclM :: Decl -> ST Decl
+traverseDeclM decl @ Net{} =
+    traverseNetAsVarM traverseDeclM decl
 traverseDeclM decl = do
     decl' <- traverseDeclExprsM traverseExprM decl
         >>= traverseDeclTypesM traverseTypeM
@@ -65,8 +67,7 @@ traverseDeclM decl = do
             where t' = IntegerVector TLogic sg rs
         Param _ t ident _ ->
             insertType ident t >> return decl'
-        ParamType{} -> return decl'
-        CommentDecl{} -> return decl'
+        _ -> return decl'
 
 -- rewrite and store a non-genvar data declaration's type information
 insertType :: Identifier -> Type -> ST ()
@@ -155,13 +156,8 @@ lookupTypeOf expr = do
                     then IntegerAtom TInteger Unspecified
                     else TypeOf expr
             _ -> return $ TypeOf expr
-        Just (_, replacements, typ) -> do
-            let typ' = toVarType typ
-            return $ replaceInType replacements typ'
-    where
-        toVarType :: Type -> Type
-        toVarType (Net _ sg rs) = IntegerVector TLogic sg rs
-        toVarType other = other
+        Just (_, replacements, typ) ->
+            return $ replaceInType replacements typ
 
 -- determines the type of an expression based on the available scope information
 -- according the semantics defined in IEEE 1800-2017, especially Section 11.6
@@ -248,7 +244,6 @@ typeSignednessOverride fallback sg t =
     case t of
         IntegerVector base _ rs -> IntegerVector base sg rs
         IntegerAtom   base _    -> IntegerAtom   base sg
-        Net           base _ rs -> Net           base sg rs
         _ -> fallback
 
 -- type of a unary operator expression
@@ -319,7 +314,6 @@ binopSignedness Signed Signed = Signed
 
 -- returns the signedness of the given type, if possible
 typeSignedness :: Type -> Signing
-typeSignedness (Net           _ sg _) = signednessFallback Unsigned sg
 typeSignedness (IntegerVector _ sg _) = signednessFallback Unsigned sg
 typeSignedness (IntegerAtom   t sg  ) = signednessFallback fallback sg
     where fallback = if t == TTime then Unsigned else Signed
@@ -389,7 +383,6 @@ typeCastUnneeded t1 t2 =
         sz1 = typeSize t1
         sz2 = typeSize t2
         typeSize :: Type -> Maybe Expr
-        typeSize (Net           _ _ rs) = Just $ dimensionsSize rs
         typeSize (IntegerVector _ _ rs) = Just $ dimensionsSize rs
         typeSize (t @ IntegerAtom{}) =
             typeSize $ tf [(RawNum 1, RawNum 1)]

@@ -101,6 +101,9 @@ module Convert.Traverse
 , traverseSinglyNestedStmtsM
 , traverseSinglyNestedStmts
 , collectSinglyNestedStmtsM
+, traverseNetAsVarM
+, traverseNetAsVar
+, collectNetAsVarM
 ) where
 
 import Data.Functor.Identity (Identity, runIdentity)
@@ -576,7 +579,7 @@ traverseNodesM exprMapper declMapper typeMapper lhsMapper stmtMapper =
     moduleItemMapper (Assign opt lhs expr) = do
         opt' <- case opt of
             AssignOptionNone -> return $ AssignOptionNone
-            AssignOptionDrive ds -> return $ AssignOptionDrive ds
+            AssignOptionDrive s0 s1 -> return $ AssignOptionDrive s0 s1
             AssignOptionDelay delay ->
                 exprMapper delay >>= return . AssignOptionDelay
         lhs' <- lhsMapper lhs
@@ -814,7 +817,6 @@ traverseSinglyNestedTypesM mapper = tm
             vals' <- mapM typeOrExprMapper $ map snd pm
             let pm' = zip (map fst pm) vals'
             return $ CSAlias ps pm' xx rs
-        tm (Net           kw sg rs) = return $ Net           kw sg rs
         tm (Implicit         sg rs) = return $ Implicit         sg rs
         tm (IntegerVector kw sg rs) = return $ IntegerVector kw sg rs
         tm (IntegerAtom   kw sg   ) = return $ IntegerAtom   kw sg
@@ -946,6 +948,11 @@ traverseDeclExprsM exprMapper =
             a' <- mapM (mapBothM exprMapper) a
             e' <- exprMapper e
             return $ Variable d t' x a' e'
+        declMapper (Net d n s t x a e) = do
+            t' <- typeMapper t
+            a' <- mapM (mapBothM exprMapper) a
+            e' <- exprMapper e
+            return $ Net d n s t' x a' e'
         declMapper (CommentDecl c) =
             return $ CommentDecl c
 
@@ -961,6 +968,8 @@ traverseDeclTypesM mapper (ParamType s x t) =
     mapper t >>= \t' -> return $ ParamType s x t'
 traverseDeclTypesM mapper (Variable d t x a e) =
     mapper t >>= \t' -> return $ Variable d t' x a e
+traverseDeclTypesM mapper (Net d n s t x a e) =
+    mapper t >>= \t' -> return $ Net d n s t' x a e
 traverseDeclTypesM _ (CommentDecl c) = return $ CommentDecl c
 
 traverseDeclTypes :: Mapper Type -> Mapper Decl
@@ -1128,3 +1137,17 @@ traverseFiles
 traverseFiles fileCollectorM fileMapper files =
     runIdentity (traverseFilesM fileCollectorM fileMapperM  files)
     where fileMapperM = (\w -> return . fileMapper w)
+
+traverseNetAsVarM :: Monad m => MapperM m Decl -> MapperM m Decl
+traverseNetAsVarM func net = do
+    let Net d n s t x a e = net
+    let var = Variable d t x a e
+    var' <- func var
+    let Variable d' t' x' a' e' = var'
+    let net' = Net d' n s t' x' a' e'
+    return net'
+
+traverseNetAsVar :: Mapper Decl -> Mapper Decl
+traverseNetAsVar = unmonad traverseNetAsVarM
+collectNetAsVarM :: Monad m => CollectorM m Decl -> CollectorM m Decl
+collectNetAsVarM = collectify traverseNetAsVarM

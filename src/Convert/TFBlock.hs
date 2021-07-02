@@ -66,6 +66,7 @@ declNames = filter (not . null) . map declName
 
 declName :: Decl -> Identifier
 declName (Variable _ _ x _ _) = x
+declName (Net  _ _ _ _ x _ _) = x
 declName (Param _ _ x _) = x
 declName (ParamType _ x _) = x
 declName CommentDecl{} = ""

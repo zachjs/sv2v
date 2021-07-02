@@ -17,8 +17,7 @@ module Language.SystemVerilog.AST.Type
     , IntegerVectorType  (..)
     , IntegerAtomType    (..)
     , NonIntegerType     (..)
-    , NetTypeAndStrength (..)
-    , DriveStrength      (..)
+    , Strength           (..)
     , Strength0          (..)
     , Strength1          (..)
     , ChargeStrength     (..)
@@ -41,7 +40,6 @@ data Type
     = IntegerVector IntegerVectorType  Signing [Range]
     | IntegerAtom   IntegerAtomType    Signing
     | NonInteger    NonIntegerType
-    | Net           NetTypeAndStrength Signing [Range]
     | Implicit                         Signing [Range]
     | Alias               Identifier           [Range]
     | PSAlias  Identifier Identifier           [Range]
@@ -59,7 +57,6 @@ instance Show Type where
     show (Alias         xx    rs) = printf "%s%s" xx (showRanges rs)
     show (PSAlias ps    xx    rs) = printf "%s::%s%s" ps xx (showRanges rs)
     show (CSAlias ps pm xx    rs) = printf "%s#%s::%s%s" ps (showParams pm) xx (showRanges rs)
-    show (Net           kw sg rs) = printf "%s%s%s" (show kw) (showPadBefore sg) (showRanges rs)
     show (Implicit         sg rs) = printf "%s%s"             (showPad       sg) (dropWhile (== ' ') $ showRanges rs)
     show (IntegerVector kw sg rs) = printf "%s%s%s" (show kw) (showPadBefore sg) (showRanges rs)
     show (IntegerAtom   kw sg   ) = printf "%s%s"   (show kw) (showPadBefore sg)
@@ -101,7 +98,6 @@ instance Eq (Signing -> [Range] -> Type) where
 typeRanges :: Type -> ([Range] -> Type, [Range])
 typeRanges typ =
     case typ of
-        Net           kw sg rs -> (Net           kw sg, rs)
         Implicit         sg rs -> (Implicit         sg, rs)
         IntegerVector kw sg rs -> (IntegerVector kw sg, rs)
         Enum            t v rs -> (Enum            t v, rs)
@@ -237,22 +233,15 @@ instance Show Packing where
     show (Unpacked) = ""
     show (Packed s) = "packed" ++ (showPadBefore s)
 
-data NetTypeAndStrength
-    = NetType       NetType
-    | NetTypeDrive  NetType DriveStrength
-    | NetTypeCharge NetType ChargeStrength
+data Strength
+    = DefaultStrength
+    | DriveStrength Strength0 Strength1
+    | ChargeStrength ChargeStrength
     deriving (Eq, Ord)
 
-instance Show NetTypeAndStrength where
-    show (NetType       nt   ) = show nt
-    show (NetTypeDrive  nt ds) = printf "%s %s" (show nt) (show ds)
-    show (NetTypeCharge nt cs) = printf "%s %s" (show nt) (show cs)
-
-data DriveStrength
-    = DriveStrength Strength0 Strength1
-    deriving (Eq, Ord)
-
-instance Show DriveStrength where
+instance Show Strength where
+    show DefaultStrength = ""
+    show (ChargeStrength cs) = printf "(%s)" (show cs)
     show (DriveStrength s0 s1) = printf "(%s, %s)" (show s0) (show s1)
 
 data Strength0
@@ -292,6 +281,6 @@ data ChargeStrength
     deriving (Eq, Ord)
 
 instance Show ChargeStrength where
-    show Small  = "(small)"
-    show Medium = "(medium)"
-    show Large  = "(large)"
+    show Small  = "small"
+    show Medium = "medium"
+    show Large  = "large"

@@ -44,6 +44,8 @@ traverseDeclM ports (decl @ (Variable _ _ x _ e)) = do
         then flatUsageM x
         else return ()
     return decl
+traverseDeclM ports decl @ Net{} =
+    traverseNetAsVarM (traverseDeclM ports) decl
 traverseDeclM _ other = return other
 
 -- pack decls marked for packing
@@ -62,6 +64,7 @@ rewriteDeclM (decl @ (Variable d t x a e)) = do
             let t' = tf $ shifted ++ rs
             return $ Variable d t' x rest e
         Nothing -> return decl
+rewriteDeclM decl @ Net{} = traverseNetAsVarM rewriteDeclM decl
 rewriteDeclM other = return other
 
 traverseModuleItemM :: ModuleItem -> ST ModuleItem

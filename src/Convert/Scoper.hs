@@ -451,6 +451,7 @@ scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
                     if d == Local
                         then Nothing
                         else Just $ \i -> Variable d t (show i) a e
+                argIdxDecl Net{} = Nothing
                 argIdxDecl Param{} = Nothing
                 argIdxDecl ParamType{} = Nothing
                 argIdxDecl CommentDecl{} = Nothing

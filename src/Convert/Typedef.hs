@@ -76,6 +76,7 @@ traverseDeclM decl = do
         >>= traverseDeclTypesM traverseTypeM
     case decl' of
         Variable{} -> return decl'
+        Net{} -> return decl'
         Param _ _ x _ ->
             insertElem x UnknownType >> return decl'
         ParamType Localparam x t -> do

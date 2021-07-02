@@ -16,14 +16,15 @@ module Language.SystemVerilog.AST.Decl
 import Data.List (intercalate)
 import Text.Printf (printf)
 
-import Language.SystemVerilog.AST.ShowHelp (showPad, unlines')
-import Language.SystemVerilog.AST.Type (Type(TypedefRef, UnpackedType), Identifier, pattern UnknownType)
+import Language.SystemVerilog.AST.ShowHelp (showPad, showPadBefore, unlines')
+import Language.SystemVerilog.AST.Type (Type(TypedefRef, UnpackedType), Identifier, pattern UnknownType, NetType, Strength)
 import Language.SystemVerilog.AST.Expr (Expr, Range, showRanges, showAssignment)
 
 data Decl
     = Param     ParamScope Type Identifier Expr
     | ParamType ParamScope Identifier Type
     | Variable   Direction Type Identifier [Range] Expr
+    | Net Direction NetType Strength Type Identifier [Range] Expr
     | CommentDecl String
     deriving Eq
 
@@ -37,6 +38,7 @@ instance Show Decl where
     show (ParamType s x t) = printf "%s type %s%s;" (show s) x tStr
         where tStr = if t == UnknownType then "" else  " = " ++ show t
     show (Variable d t x a e) = printf "%s%s%s%s%s;" (showPad d) (showPad t) x (showRanges a) (showAssignment e)
+    show (Net  d n s t x a e) = printf "%s%s%s %s%s%s%s;" (showPad d) (show n) (showPadBefore s) (showPad t) x (showRanges a) (showAssignment e)
     show (CommentDecl c) =
         if elem '\n' c
             then "// " ++ show c

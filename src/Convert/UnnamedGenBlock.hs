@@ -48,6 +48,7 @@ traverseDeclM :: Decl -> S Decl
 traverseDeclM decl =
     case decl of
         Variable  _ _ x _ _ -> declaration x decl
+        Net   _ _ _ _ x _ _ -> declaration x decl
         Param     _ _ x _   -> declaration x decl
         ParamType _   x _   -> declaration x decl
         CommentDecl{} -> return decl

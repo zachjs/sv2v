@@ -63,6 +63,8 @@ convert =
                 (_, InterfaceT{}) -> tell [(ident, Local)]
                 (Local, _) -> return ()
                 _ -> tell [(ident, dir)]
+        collectDeclDirsM (MIPackageItem (Decl net @ Net{})) =
+            collectNetAsVarM (collectDeclDirsM . MIPackageItem . Decl) net
         collectDeclDirsM _ = return ()
 
 convertDescription :: Ports -> Description -> Description
@@ -112,13 +114,14 @@ traverseModuleItem ports scopes =
                 then Assign AssignOptionNone lhs expr
                 else
                     Generate $ map GenModuleItem
-                    [ MIPackageItem (Decl (Variable Local t x [] Nil))
+                    [ MIPackageItem $ Decl decl
                     , Assign AssignOptionNone (LHSIdent x) expr
                     , always_comb $ Asgn AsgnOpEq Nothing lhs (Ident x)
                     ]
             where
-                t = Net (NetType TWire) Unspecified
-                        [(DimsFn FnBits $ Right $ lhsToExpr lhs, RawNum 1)]
+                decl = Net Local TWire DefaultStrength t x [] Nil
+                t = Implicit Unspecified [r]
+                r = (DimsFn FnBits $ Right $ lhsToExpr lhs, RawNum 1)
                 x = "sv2v_tmp_" ++ shortHash (lhs, expr)
         -- rewrite port bindings to use temporary nets where necessary
         fixModuleItem (Instance moduleName params instanceName rs bindings) =
@@ -143,10 +146,11 @@ traverseModuleItem ports scopes =
                         portDir = maybeModulePorts >>= lookup portName
                         tmp = "sv2v_tmp_" ++ instanceName ++ "_" ++ portName
                         tmpExpr = Ident tmp
-                        t = Net (NetType TWire) Unspecified
-                                [(DimsFn FnBits $ Right expr, RawNum 1)]
+                        decl = Net Local TWire DefaultStrength t tmp [] Nil
+                        t = Implicit Unspecified [r]
+                        r = (DimsFn FnBits $ Right expr, RawNum 1)
                         items =
-                            [ MIPackageItem $ Decl $ Variable Local t tmp [] Nil
+                            [ MIPackageItem $ Decl decl
                             , always_comb $ Asgn AsgnOpEq Nothing lhs tmpExpr]
                         lhs = case exprToLHS expr of
                             Just l -> l
@@ -160,26 +164,35 @@ traverseModuleItem ports scopes =
 traverseDeclM :: Decl -> ST Decl
 traverseDeclM (decl @ (Variable _ t x _ _)) =
     insertElem x t >> return decl
+traverseDeclM (decl @ (Net _ _ _ t x _ _)) =
+    insertElem x t >> return decl
 traverseDeclM decl = return decl
 
 rewriteDeclM :: Decl -> ST Decl
-rewriteDeclM (Variable d t x a e) = do
-    (d', t') <- case t of
-        IntegerVector TLogic sg rs -> do
-            insertElem x t
-            details <- lookupElemM x
-            let Just (accesses, _, _) = details
-            let location = map accessName accesses
-            usedAsReg <- lift $ gets $ Set.member location
-            blockLogic <- withinProcedureM
-            if usedAsReg || blockLogic || e /= Nil
-                then do
-                    let dir = if d == Inout then Output else d
-                    return (dir, IntegerVector TReg sg rs)
-                else return (d, Net (NetType TWire) sg rs)
-        _ -> return (d, t)
-    insertElem x t'
-    return $ Variable d' t' x a e
+rewriteDeclM (Variable d (t @ (IntegerVector TLogic sg rs)) x a e) = do
+    insertElem x t
+    details <- lookupElemM x
+    let Just (accesses, _, _) = details
+    let location = map accessName accesses
+    usedAsReg <- lift $ gets $ Set.member location
+    blockLogic <- withinProcedureM
+    if usedAsReg || blockLogic || e /= Nil
+        then do
+            let d' = if d == Inout then Output else d
+            let t' = IntegerVector TReg sg rs
+            insertElem x t'
+            return $ Variable d' t' x a e
+        else do
+            let t' = Implicit sg rs
+            insertElem x t'
+            return $ Net d TWire DefaultStrength t' x a e
+rewriteDeclM (decl @ (Variable _ t x _ _)) =
+    insertElem x t >> return decl
+rewriteDeclM (Net d n s (IntegerVector _ sg rs) x a e) =
+    insertElem x t >> return (Net d n s t x a e)
+    where t = Implicit sg rs
+rewriteDeclM (decl @ (Net _ _ _ t x _ _)) =
+    insertElem x t >> return decl
 rewriteDeclM (Param s (IntegerVector _ sg []) x e) =
     return $ Param s (Implicit sg [(zero, zero)]) x e
     where zero = RawNum 0

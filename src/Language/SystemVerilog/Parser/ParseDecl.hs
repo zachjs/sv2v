@@ -54,6 +54,8 @@ import Language.SystemVerilog.Parser.Tokens (Position(..))
 data DeclToken
     = DTComma    Position
     | DTAutoDim  Position
+    | DTConst    Position
+    | DTVar      Position
     | DTAsgn     Position AsgnOp (Maybe Timing) Expr
     | DTRange    Position (PartSelectMode, Range)
     | DTIdent    Position Identifier
@@ -61,6 +63,7 @@ data DeclToken
     | DTCSIdent  Position Identifier [ParamBinding] Identifier
     | DTDir      Position Direction
     | DTType     Position (Signing -> [Range] -> Type)
+    | DTNet      Position NetType Strength
     | DTParams   Position [ParamBinding]
     | DTInstance Position [PortBinding]
     | DTBit      Position Expr
@@ -130,6 +133,11 @@ parseDTsAsPortDecls' pieces =
             where
                 decl = Variable dir t x a e
                 dir = if currDir == Local then lastDir else currDir
+        propagateDirections lastDir (Net currDir n s t x a e : decls) =
+            decl : propagateDirections dir decls
+            where
+                decl = Net dir n s t x a e
+                dir = if currDir == Local then lastDir else currDir
         propagateDirections dir (decl : decls) =
             decl : propagateDirections dir decls
         propagateDirections _ [] = []
@@ -138,6 +146,7 @@ parseDTsAsPortDecls' pieces =
         portNames = filter (not . null) . map portName
         portName :: Decl -> Identifier
         portName (Variable _ _ ident _ _) = ident
+        portName (Net  _ _ _ _ ident _ _) = ident
         portName CommentDecl{} = ""
         portName decl =
             error $ "unexpected non-variable port declaration: " ++ (show decl)
@@ -271,11 +280,12 @@ parseDTsAsDeclOrStmt tokens =
         lhs = case takeLHS lhsToks of
             Nothing -> error $ "could not parse as LHS: " ++ show lhsToks
             Just l -> l
-        hasLeadingDecl = tokens /= l4 && tripLookahead l4
+        hasLeadingDecl = tokens /= l5 && tripLookahead l5
         (_, l1) = takeDir      tokens
         (_, l2) = takeLifetime l1
-        (_, l3) = takeType     l2
-        (_, l4) = takeRanges   l3
+        (_, l3) = takeVarOrNet l2
+        (_, l4) = takeType     l3
+        (_, l5) = takeRanges   l4
 
 traceStmt :: Position -> Stmt
 traceStmt pos = CommentStmt $ "Trace: " ++ show pos
@@ -366,12 +376,13 @@ takeLHSStep _ _ = Nothing
 
 
 -- batches together separate declaration lists
+type DeclBase = Direction -> Identifier -> [Range] -> Expr -> Decl
 type Triplet = (Identifier, [Range], Expr)
-type Component = (Direction, Type, [Triplet])
+type Component = (Direction, DeclBase, [Triplet])
 finalize :: (Position, Component) -> [Decl]
-finalize (pos, (dir, typ, trips)) =
+finalize (pos, (dir, base, trips)) =
     CommentDecl ("Trace: " ++ show pos) :
-    map (\(x, a, e) -> Variable dir typ x a e) trips
+    map (\(x, a, e) -> base dir x a e) trips
 
 
 -- internal; entrypoint of the critical portion of our parser
@@ -387,18 +398,19 @@ parseDTsAsComponent [] = error "parseDTsAsComponent unexpected end of tokens"
 parseDTsAsComponent l0 =
     if l /= Nothing && l /= Just Automatic then
         error $ "unexpected non-automatic lifetime: " ++ show l0
-    else if dir == Local && tf rs == Implicit Unspecified [] then
+    else if dir == Local && length l2 == length l5 then
         error $ "declaration(s) missing type information: "
             ++ show (position, tps)
     else
-        (position, component, l5)
+        (position, component, l6)
     where
         (dir, l1) = takeDir      l0
         (l  , l2) = takeLifetime l1
-        (tf , l3) = takeType     l2
-        (rs , l4) = takeRanges   l3
-        (tps, l5) = takeTrips    l4 True
-        component = (dir, tf rs, tps)
+        (von, l3) = takeVarOrNet l2
+        (tf , l4) = takeType     l3
+        (rs , l5) = takeRanges   l4
+        (tps, l6) = takeTrips    l5 True
+        component = (dir, von $ tf rs, tps)
         position = tokPos $ head l0
 
 takeTrips :: [DeclToken] -> Bool -> ([Triplet], [DeclToken])
@@ -449,6 +461,13 @@ takeLifetime :: [DeclToken] -> (Maybe Lifetime, [DeclToken])
 takeLifetime (DTLifetime _ l : rest) = (Just  l, rest)
 takeLifetime                   rest  = (Nothing, rest)
 
+takeVarOrNet :: [DeclToken] -> (Type -> DeclBase, [DeclToken])
+takeVarOrNet (DTConst _ : DTConst pos : _) =
+    error $ "unexpected const after const at " ++ show pos
+takeVarOrNet (DTConst _ : tokens) = takeVarOrNet tokens
+takeVarOrNet (DTNet _ n s : tokens) = (\t d -> Net d n s t, tokens)
+takeVarOrNet tokens = (flip Variable, tokens)
+
 takeType :: [DeclToken] -> ([Range] -> Type, [DeclToken])
 takeType (DTIdent _ a  : DTDot _ b      : rest) = (InterfaceT a  b      , rest)
 takeType (DTType  _ tf : DTSigning _ sg : rest) = (tf       sg          , rest)
@@ -469,6 +488,13 @@ takeType (DTIdent pos tn                : rest) =
                 (_, Nothing) -> True
                 -- if comma is first, then this ident is a declaration
                 (Just a, Just b) -> a < b
+takeType (DTVar _ : DTVar pos : _) =
+    error $ "unexpected var after var at " ++ show pos
+takeType (DTVar _ : rest) =
+    case tf [] of
+        Implicit sg [] -> (IntegerVector TLogic sg, rest')
+        _ -> (tf, rest')
+    where (tf, rest') = takeType rest
 takeType rest = (Implicit Unspecified, rest)
 
 takeRanges :: [DeclToken] -> ([Range], [DeclToken])
@@ -526,6 +552,8 @@ isComma _ = False
 tokPos :: DeclToken -> Position
 tokPos (DTComma    p) = p
 tokPos (DTAutoDim  p) = p
+tokPos (DTConst    p) = p
+tokPos (DTVar      p) = p
 tokPos (DTAsgn     p _ _ _) = p
 tokPos (DTRange    p _) = p
 tokPos (DTIdent    p _) = p
@@ -533,6 +561,7 @@ tokPos (DTPSIdent  p _ _) = p
 tokPos (DTCSIdent  p _ _ _) = p
 tokPos (DTDir      p _) = p
 tokPos (DTType     p _) = p
+tokPos (DTNet      p _ _) = p
 tokPos (DTParams   p _) = p
 tokPos (DTInstance p _) = p
 tokPos (DTBit      p _) = p

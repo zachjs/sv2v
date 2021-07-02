@@ -52,6 +52,8 @@ traverseDeclM :: Decl -> Scoper TypeInfo Decl
 traverseDeclM (Variable dir t ident a e) = do
     t' <- traverseTypeM t a ident
     traverseDeclExprsM traverseExprM $ Variable dir t' ident a e
+traverseDeclM net @ Net{} =
+    traverseNetAsVarM traverseDeclM net
 traverseDeclM (Param s t ident e) = do
     t' <- traverseTypeM t [] ident
     traverseDeclExprsM traverseExprM $ Param s t' ident e

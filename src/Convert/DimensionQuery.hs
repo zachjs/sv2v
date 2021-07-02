@@ -113,7 +113,6 @@ convertBits (Left t) =
     case elaborateType t of
         IntegerVector _ _ rs -> dimensionsSize rs
         Implicit        _ rs -> dimensionsSize rs
-        Net           _ _ rs -> dimensionsSize rs
         Struct   _ fields rs ->
             BinOp Mul
                 (dimensionsSize rs)

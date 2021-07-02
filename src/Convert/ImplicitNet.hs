@@ -40,6 +40,7 @@ traverseDeclM :: Decl -> Scoper () Decl
 traverseDeclM decl = do
     case decl of
         Variable _ _ x _ _ -> insertElem x ()
+        Net  _ _ _ _ x _ _ -> insertElem x ()
         Param _ _ x _ -> insertElem x ()
         ParamType{} -> return ()
         CommentDecl{} -> return ()
@@ -81,15 +82,14 @@ needsIdent defaultNetType x = do
     when (details == Nothing) $ do
         insertElem x ()
         injectItem decl
-    where
-        t = impliedNetType x defaultNetType Unspecified []
-        decl = MIPackageItem $ Decl $ Variable Local t x [] Nil
+    where decl = MIPackageItem $ Decl $ impliedNet x defaultNetType
 
-impliedNetType :: String -> DefaultNetType -> Signing -> [Range] -> Type
-impliedNetType var Nothing =
+impliedNet :: Identifier -> DefaultNetType -> Decl
+impliedNet var Nothing =
     error $ "implicit declaration of " ++
         show var ++ " but default_nettype is none"
-impliedNetType _ (Just netType) = Net (NetType netType)
+impliedNet var (Just netType) =
+    Net Local netType DefaultStrength UnknownType var [] Nil
 
 parseDefaultNetType :: String -> DefaultNetType
 parseDefaultNetType "tri"    = Just TTri

@@ -314,6 +314,7 @@ processItems topName packageName moduleItems = do
                     >>= traverseDeclExprsM traverseExprM
             case decl' of
                 Variable d t x a e -> declHelp x $ \x' -> Variable d t x' a e
+                Net  d n s t x a e -> declHelp x $ \x' -> Net  d n s t x' a e
                 Param    p t x   e -> declHelp x $ \x' -> Param    p t x'   e
                 ParamType  p x   t -> declHelp x $ \x' -> ParamType  p x'   t
                 CommentDecl c -> return $ CommentDecl c
@@ -660,6 +661,7 @@ writeDeclIdents :: Decl -> IdentWriter Decl
 writeDeclIdents decl = do
     case decl of
         Variable _ _ x _ _ -> insertElem x ()
+        Net  _ _ _ _ x _ _ -> insertElem x ()
         Param    _ _ x   _ -> insertElem x ()
         ParamType  _ x   _ -> insertElem x ()
         CommentDecl{} -> return ()
@@ -744,6 +746,7 @@ piNames (Decl (ParamType _ ident (Enum _ enumItems _))) =
 piNames (Function _ _ ident _ _) = [ident]
 piNames (Task     _   ident _ _) = [ident]
 piNames (Decl (Variable _ _ ident _ _)) = [ident]
+piNames (Decl (Net  _ _ _ _ ident _ _)) = [ident]
 piNames (Decl (Param    _ _ ident   _)) = [ident]
 piNames (Decl (ParamType  _ ident   _)) = [ident]
 piNames (Decl (CommentDecl          _)) = []

@@ -399,6 +399,8 @@ time               { Token Lit_time        _ _ }
 
 
 -- operator precedences, from *lowest* to *highest*
+%nonassoc DefaultStrength
+%nonassoc DriveStrength ChargeStrength
 %nonassoc Asgn
 %nonassoc NoElse
 %nonassoc "else"
@@ -456,16 +458,11 @@ TypeAlias :: { Type }
   :                               Identifier Dimensions { Alias   $1       $2 }
   | Identifier               "::" Identifier Dimensions { PSAlias $1    $3 $4 }
   | Identifier ParamBindings "::" Identifier Dimensions { CSAlias $1 $2 $4 $5 }
-PartialTypeAlias :: { Signing -> [Range] -> Type }
-  :                               Identifier { \Unspecified -> Alias   $1       }
-  | Identifier               "::" Identifier { \Unspecified -> PSAlias $1    $3 }
-  | Identifier ParamBindings "::" Identifier { \Unspecified -> CSAlias $1 $2 $4 }
 TypeNonIdent :: { Type }
   : PartialType OptSigning Dimensions { $1 $2 $3 }
   | "type" "(" Expr ")" { TypeOf $3 }
 PartialType :: { Signing -> [Range] -> Type }
-  : NetTypeAndStrength                      {                        Net           $1    }
-  | IntegerVectorType                       {                        IntegerVector $1    }
+  : IntegerVectorType                       {                        IntegerVector $1    }
   | IntegerAtomType                         { \sg          -> \[] -> IntegerAtom   $1 sg }
   | NonIntegerType                          { \Unspecified -> \[] -> NonInteger    $1    }
   | "enum" EnumBaseType "{" EnumItems   "}" { \Unspecified -> Enum   $2 $4 }
@@ -479,11 +476,6 @@ CastingType :: { Type }
 EnumBaseType :: { Type }
   : Type       { $1 }
   | Dimensions { Implicit Unspecified $1 }
-
-NetTypeAndStrength :: { NetTypeAndStrength }
-  : NetType                %prec "+" { NetType       $1    }
-  | NetType DriveStrength  %prec "*" { NetTypeDrive  $1 $2 }
-  | NetType ChargeStrength %prec "*" { NetTypeCharge $1 $2 }
 
 Signing :: { Signing }
   : "signed"   { Signed   }
@@ -623,6 +615,11 @@ Identifiers :: { [Identifier] }
   :                 Identifier { [$1] }
   | Identifiers "," Identifier { $1 ++ [$3] }
 
+Strength :: { Strength }
+  : {- empty -}    %prec DefaultStrength { DefaultStrength }
+  | DriveStrength  %prec DriveStrength   { uncurry DriveStrength $1 }
+  | ChargeStrength %prec ChargeStrength  { ChargeStrength $1 }
+
 -- uses delimiter propagation hack to avoid conflicts
 DeclTokens(delim) :: { [DeclToken] }
   : DeclTokensBase(DeclTokens(delim), delim) { $1 }
@@ -635,21 +632,22 @@ DeclTokensBase(repeat, delim) :: { [DeclToken] }
 DeclToken :: { DeclToken }
   : ","                                {% posInject \p -> DTComma    p }
   | "[" "]"                            {% posInject \p -> DTAutoDim  p }
+  | "const"                            {% posInject \p -> DTConst    p }
+  | "var"                              {% posInject \p -> DTVar      p }
   | PartSelect                         {% posInject \p -> DTRange    p $1 }
   | Identifier                         {% posInject \p -> DTIdent    p $1 }
   | Direction                          {% posInject \p -> DTDir      p $1 }
   | "[" Expr "]"                       {% posInject \p -> DTBit      p $2 }
   | LHSConcat                          {% posInject \p -> DTConcat   p $1 }
   | PartialType                        {% posInject \p -> DTType     p $1 }
+  | NetType Strength                   {% posInject \p -> DTNet      p $1 $2 }
   | "." Identifier                     {% posInject \p -> DTDot      p $2 }
   | PortBindings                       {% posInject \p -> DTInstance p $1 }
   | Signing                            {% posInject \p -> DTSigning  p $1 }
   | "automatic"                        {% posInject \p -> DTLifetime p Automatic }
-  | "const" PartialType                {% posInject \p -> DTType     p $2 }
-  | "const" PartialTypeAlias           {% posInject \p -> DTType     p $2 }
   | "{" StreamOp StreamSize Concat "}" {% posInject \p -> DTStream   p $2 $3           (map toLHS $4) }
   | "{" StreamOp            Concat "}" {% posInject \p -> DTStream   p $2 (RawNum 1) (map toLHS $3) }
-  | opt("var") "type" "(" Expr ")"     {% posInject \p -> DTType     p (\Unspecified -> \[] -> TypeOf $4) }
+  | "type" "(" Expr ")"                {% posInject \p -> DTType     p (\Unspecified -> \[] -> TypeOf $3) }
   | IncOrDecOperator                   {% posInject \p -> DTAsgn     p (AsgnOp $1) Nothing (RawNum 1) }
   | "<=" opt(DelayOrEvent) Expr %prec Asgn {% posInject \p -> DTAsgn p AsgnOpNonBlocking $2 $3 }
   | Identifier               "::" Identifier {% posInject \p -> DTPSIdent p $1    $3 }
@@ -711,7 +709,7 @@ NonGenerateModuleItem :: { [ModuleItem] }
 AssignOption :: { AssignOption }
   : {- empty -}   { AssignOptionNone }
   | DelayControl  { AssignOptionDelay $1 }
-  | DriveStrength { AssignOptionDrive $1 }
+  | DriveStrength { uncurry AssignOptionDrive $1 }
 
 -- for ModuleItem, for now
 AssertionItem :: { AssertionItem }
@@ -816,13 +814,13 @@ NOutputGateKW :: { NOutputGateKW }
   : "buf"  { GateBuf  }
   | "not"  { GateNot  }
 
-DriveStrength :: { DriveStrength }
-  : "(" Strength0 "," Strength1 ")" { DriveStrength $2     $4     }
-  | "(" Strength1 "," Strength0 ")" { DriveStrength $4     $2     }
-  | "(" Strength0 "," "highz1"  ")" { DriveStrength $2     Highz1 }
-  | "(" Strength1 "," "highz0"  ")" { DriveStrength Highz0 $2     }
-  | "(" "highz0"  "," Strength1 ")" { DriveStrength Highz0 $4     }
-  | "(" "highz1"  "," Strength0 ")" { DriveStrength $4     Highz1 }
+DriveStrength :: { (Strength0, Strength1) }
+  : "(" Strength0 "," Strength1 ")" { ($2    , $4    ) }
+  | "(" Strength1 "," Strength0 ")" { ($4    , $2    ) }
+  | "(" Strength0 "," "highz1"  ")" { ($2    , Highz1) }
+  | "(" Strength1 "," "highz0"  ")" { (Highz0, $2    ) }
+  | "(" "highz0"  "," Strength1 ")" { (Highz0, $4    ) }
+  | "(" "highz1"  "," Strength0 ")" { ($4    , Highz1) }
 Strength0 :: { Strength0 }
   : "supply0" { Supply0 }
   | "strong0" { Strong0 }

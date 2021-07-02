@@ -105,6 +105,8 @@ convertType t1 =
 
 -- write down the types of declarations
 traverseDeclM :: Decl -> Scoper Type Decl
+traverseDeclM decl @ Net{} =
+    traverseNetAsVarM traverseDeclM decl
 traverseDeclM decl = do
     decl' <- case decl of
         Variable d t x a e -> do
@@ -119,8 +121,7 @@ traverseDeclM decl = do
             let e' = convertExpr t e
             let t' = convertType t
             return $ Param s t' x e'
-        ParamType{} -> return decl
-        CommentDecl{} -> return decl
+        _ -> return decl
     traverseDeclExprsM traverseExprM decl'
     where
         isRangeable :: Type -> Bool
