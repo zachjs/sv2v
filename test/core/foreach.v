@@ -1,5 +1,5 @@
 module top;
-    wire [7:0] foo = {2'b10,2'b01,2'b11,2'b00};
+    reg [7:0] foo = {2'b10,2'b01,2'b11,2'b00};
     initial begin : f
         integer x;
         for (x = 0; x <= 3; x = x + 1)

@@ -1,5 +1,5 @@
 `define TEST(value) \
-    wire [63:0] val_``value = {64{1'b``value}}; \
+    reg [63:0] val_``value = {64{1'b``value}}; \
     initial $display(`"'value -> %b (%0d) %b (%0d)`", \
         val_``value, $bits(val_``value), \
         1'b``value, $bits(1'b``value) \

@@ -1,5 +1,5 @@
 module top;
-    wire x = 1;
+    reg x = 1;
     generate
         if (1) begin : f
             wire x;

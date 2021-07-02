@@ -172,7 +172,7 @@ rewriteDeclM (Variable d t x a e) = do
             let location = map accessName accesses
             usedAsReg <- lift $ gets $ Set.member location
             blockLogic <- withinProcedureM
-            if usedAsReg || blockLogic
+            if usedAsReg || blockLogic || e /= Nil
                 then do
                     let dir = if d == Inout then Output else d
                     return (dir, IntegerVector TReg sg rs)

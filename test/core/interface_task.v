@@ -3,8 +3,8 @@ module top;
         input reg [31:0] i;
         $display("I x(%0d)", i);
     endtask
-    wire [31:0] w = 31;
-    wire [31:0] y = 42;
+    reg [31:0] w = 31;
+    reg [31:0] y = 42;
     task x;
         input reg [31:0] a, b;
         $display("x('{%0d, %0d})", a, b);

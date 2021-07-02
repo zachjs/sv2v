@@ -49,8 +49,7 @@ module top;
         $display("test1: %b %b", 3'b0z1, test1(3'b0z1));
     end
 
-    wire [0:2][31:0] arr;
-    assign arr = { 32'd60, 32'd61, 32'd63 };
+    reg [0:2][31:0] arr = { 32'd60, 32'd61, 32'd63 };
     function test2;
         input integer inp;
         integer i;
