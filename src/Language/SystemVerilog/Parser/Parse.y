@@ -28,7 +28,7 @@ import Language.SystemVerilog.Parser.Tokens
 %lexer { positionKeep } { TokenEOF }
 %name parseMain
 %tokentype { Token }
-%error { parseError }
+%error { parseErrorTok }
 
 %expect 0
 
@@ -462,58 +462,62 @@ TypeNonIdent :: { Type }
   : PartialType OptSigning Dimensions { $1 $2 $3 }
   | "type" "(" Expr ")" { TypeOf $3 }
 PartialType :: { Signing -> [Range] -> Type }
-  : IntegerVectorType                       {                        IntegerVector $1    }
-  | IntegerAtomType                         { \sg          -> \[] -> IntegerAtom   $1 sg }
-  | NonIntegerType                          { \Unspecified -> \[] -> NonInteger    $1    }
-  | "enum" EnumBaseType "{" EnumItems   "}" { \Unspecified -> Enum   $2 $4 }
-  | "struct" Packing    "{" StructItems "}" { \Unspecified -> Struct $2 $4 }
-  | "union"  Packing    "{" StructItems "}" { \Unspecified -> Union  $2 $4 }
+  : PartialTypeP { snd $1 }
+PartialTypeP :: { (Position, Signing -> [Range] -> Type) }
+  : IntegerVectorTypeP { (fst $1, makeIntegerVector $1) }
+  | IntegerAtomTypeP   { (fst $1, makeIntegerAtom   $1) }
+  | NonIntegerTypeP    { (fst $1, makeNonInteger    $1) }
+  | "enum" EnumBaseType "{" EnumItems   "}" { makeComplex $1 $ Enum   $2 $4 }
+  | "struct" Packing    "{" StructItems "}" { makeComplex $1 $ Struct $2 $4 }
+  | "union"  Packing    "{" StructItems "}" { makeComplex $1 $ Union  $2 $4 }
 CastingType :: { Type }
-  : IntegerVectorType { IntegerVector $1 Unspecified [] }
-  | IntegerAtomType   { IntegerAtom   $1 Unspecified    }
-  | NonIntegerType    { NonInteger    $1                }
-  | Signing           { Implicit      $1             [] }
+  : IntegerVectorTypeP { IntegerVector (snd $1) Unspecified [] }
+  | IntegerAtomTypeP   { IntegerAtom   (snd $1) Unspecified    }
+  | NonIntegerTypeP    { NonInteger    (snd $1)                }
+  | SigningP           { Implicit      (snd $1)             [] }
 EnumBaseType :: { Type }
   : Type       { $1 }
   | Dimensions { Implicit Unspecified $1 }
 
 Signing :: { Signing }
-  : "signed"   { Signed   }
-  | "unsigned" { Unsigned }
+  : SigningP { snd $1 }
+SigningP :: { (Position, Signing) }
+  : "signed"   { withPos $1 Signed   }
+  | "unsigned" { withPos $1 Unsigned }
 OptSigning :: { Signing }
   : Signing { $1 }
   | {- empty -} { Unspecified }
 
-NetType :: { NetType }
-  : "supply0"   { TSupply0   }
-  | "supply1"   { TSupply1   }
-  | "tri"       { TTri       }
-  | "triand"    { TTriand    }
-  | "trior"     { TTrior     }
-  | "trireg"    { TTrireg    }
-  | "tri0"      { TTri0      }
-  | "tri1"      { TTri1      }
-  | "uwire"     { TUwire     }
-  | "wire"      { TWire      }
-  | "wand"      { TWand      }
-  | "wor"       { TWor       }
-IntegerVectorType :: { IntegerVectorType }
-  : "bit"       { TBit       }
-  | "logic"     { TLogic     }
-  | "reg"       { TReg       }
-IntegerAtomType :: { IntegerAtomType }
-  : "byte"      { TByte      }
-  | "shortint"  { TShortint  }
-  | "int"       { TInt       }
-  | "longint"   { TLongint   }
-  | "integer"   { TInteger   }
-  | "time"      { TTime      }
-NonIntegerType :: { NonIntegerType }
-  : "shortreal" { TShortreal }
-  | "real"      { TReal      }
-  | "realtime"  { TRealtime  }
-  | "string"    { TString    }
-  | "event"     { TEvent     }
+NetTypeP :: { (Position, NetType) }
+  : "supply0"   { withPos $1 TSupply0   }
+  | "supply1"   { withPos $1 TSupply1   }
+  | "tri"       { withPos $1 TTri       }
+  | "triand"    { withPos $1 TTriand    }
+  | "trior"     { withPos $1 TTrior     }
+  | "trireg"    { withPos $1 TTrireg    }
+  | "tri0"      { withPos $1 TTri0      }
+  | "tri1"      { withPos $1 TTri1      }
+  | "uwire"     { withPos $1 TUwire     }
+  | "wire"      { withPos $1 TWire      }
+  | "wand"      { withPos $1 TWand      }
+  | "wor"       { withPos $1 TWor       }
+IntegerVectorTypeP :: { (Position, IntegerVectorType) }
+  : "bit"       { withPos $1 TBit       }
+  | "logic"     { withPos $1 TLogic     }
+  | "reg"       { withPos $1 TReg       }
+IntegerAtomTypeP :: { (Position, IntegerAtomType) }
+  : "byte"      { withPos $1 TByte      }
+  | "shortint"  { withPos $1 TShortint  }
+  | "int"       { withPos $1 TInt       }
+  | "longint"   { withPos $1 TLongint   }
+  | "integer"   { withPos $1 TInteger   }
+  | "time"      { withPos $1 TTime      }
+NonIntegerTypeP :: { (Position, NonIntegerType) }
+  : "shortreal" { withPos $1 TShortreal }
+  | "real"      { withPos $1 TReal      }
+  | "realtime"  { withPos $1 TRealtime  }
+  | "string"    { withPos $1 TString    }
+  | "event"     { withPos $1 TEvent     }
 
 EnumItems :: { [(Identifier, Expr)] }
   : VariablePortIdentifiers { $1 }
@@ -607,9 +611,11 @@ ModportSimplePort :: { (Identifier, Expr) }
   | Identifier                       { ($1, Ident $1) }
 
 Identifier :: { Identifier }
-  : simpleIdentifier  { tokenString $1 }
-  | escapedIdentifier { tokenString $1 }
-  | systemIdentifier  { tokenString $1 }
+  : IdentifierP { snd $1 }
+IdentifierP :: { (Position, Identifier) }
+  : simpleIdentifier  { withPos $1 $ tokenString $1 }
+  | escapedIdentifier { withPos $1 $ tokenString $1 }
+  | systemIdentifier  { withPos $1 $ tokenString $1 }
 
 Identifiers :: { [Identifier] }
   :                 Identifier { [$1] }
@@ -624,48 +630,48 @@ Strength :: { Strength }
 DeclTokens(delim) :: { [DeclToken] }
   : DeclTokensBase(DeclTokens(delim), delim) { $1 }
 DeclTokensBase(repeat, delim) :: { [DeclToken] }
-  : DeclToken                delim  { [$1] }
-  | DeclToken                repeat { [$1] ++ $2 }
-  | Identifier ParamBindings repeat {% posInject \p -> [DTIdent p $1, DTParams p $2] ++ $3 }
-  | DeclTokenAsgn ","        repeat {% posInject \p -> [$1, DTComma p] ++ $3 }
-  | DeclTokenAsgn            delim  {% posInject \p -> [$1] }
+  : DeclToken                 delim  { [$1] }
+  | DeclToken                 repeat { [$1] ++ $2 }
+  | IdentifierP ParamBindings repeat { [uncurry DTIdent $1, DTParams (fst $1) $2] ++ $3 }
+  | DeclTokenAsgn ","         repeat { [$1, DTComma (tokenPosition $2)] ++ $3 }
+  | DeclTokenAsgn             delim  { [$1] }
 DeclToken :: { DeclToken }
-  : ","                                {% posInject \p -> DTComma    p }
-  | "[" "]"                            {% posInject \p -> DTAutoDim  p }
-  | "const"                            {% posInject \p -> DTConst    p }
-  | "var"                              {% posInject \p -> DTVar      p }
-  | PartSelect                         {% posInject \p -> DTRange    p $1 }
-  | Identifier                         {% posInject \p -> DTIdent    p $1 }
-  | Direction                          {% posInject \p -> DTDir      p $1 }
-  | "[" Expr "]"                       {% posInject \p -> DTBit      p $2 }
-  | LHSConcat                          {% posInject \p -> DTConcat   p $1 }
-  | PartialType                        {% posInject \p -> DTType     p $1 }
-  | NetType Strength                   {% posInject \p -> DTNet      p $1 $2 }
-  | "." Identifier                     {% posInject \p -> DTDot      p $2 }
-  | PortBindings                       {% posInject \p -> DTInstance p $1 }
-  | Signing                            {% posInject \p -> DTSigning  p $1 }
-  | "automatic"                        {% posInject \p -> DTLifetime p Automatic }
-  | "{" StreamOp StreamSize Concat "}" {% posInject \p -> DTStream   p $2 $3           (map toLHS $4) }
-  | "{" StreamOp            Concat "}" {% posInject \p -> DTStream   p $2 (RawNum 1) (map toLHS $3) }
-  | "type" "(" Expr ")"                {% posInject \p -> DTType     p (\Unspecified -> \[] -> TypeOf $3) }
-  | IncOrDecOperator                   {% posInject \p -> DTAsgn     p (AsgnOp $1) Nothing (RawNum 1) }
-  | "<=" opt(DelayOrEvent) Expr %prec Asgn {% posInject \p -> DTAsgn p AsgnOpNonBlocking $2 $3 }
-  | Identifier               "::" Identifier {% posInject \p -> DTPSIdent p $1    $3 }
-  | Identifier ParamBindings "::" Identifier {% posInject \p -> DTCSIdent p $1 $2 $4 }
+  : ","                                { DTComma   $ tokenPosition $1 }
+  | "[" "]"                            { DTAutoDim $ tokenPosition $1 }
+  | "const"                            { DTConst   $ tokenPosition $1 }
+  | "var"                              { DTVar     $ tokenPosition $1 }
+  | PartSelectP                        { uncurry DTRange $1 }
+  | IdentifierP                        { uncurry DTIdent $1 }
+  | DirectionP                         { uncurry DTDir $1 }
+  | LHSConcatP                         { uncurry DTConcat $1 }
+  | PartialTypeP                       { uncurry DTType $1 }
+  | NetTypeP Strength                  { uncurry DTNet $1 $2 }
+  | PortBindingsP                      { uncurry DTPorts $1 }
+  | SigningP                           { uncurry DTSigning $1 }
+  | "[" Expr "]"                       { DTBit      (tokenPosition $1) $2 }
+  | "." Identifier                     { DTDot      (tokenPosition $1) $2 }
+  | "automatic"                        { DTLifetime (tokenPosition $1) Automatic }
+  | "{" StreamOp StreamSize Concat "}" { DTStream   (tokenPosition $1) $2 $3           (map toLHS $4) }
+  | "{" StreamOp            Concat "}" { DTStream   (tokenPosition $1) $2 (RawNum 1) (map toLHS $3) }
+  | "type" "(" Expr ")"                { uncurry DTType $ makeTypeOf $1 $3 }
+  | IncOrDecOperatorP                  { DTAsgn     (fst $1) (AsgnOp $ snd $1) Nothing (RawNum 1) }
+  | "<=" opt(DelayOrEvent) Expr %prec Asgn { DTAsgn (tokenPosition $1) AsgnOpNonBlocking $2 $3 }
+  | IdentifierP               "::" Identifier { uncurry DTPSIdent $1    $3 }
+  | IdentifierP ParamBindings "::" Identifier { uncurry DTCSIdent $1 $2 $4 }
 DeclTokenAsgn :: { DeclToken }
-  : "=" opt(DelayOrEvent) Expr {% posInject \p -> DTAsgn p AsgnOpEq $2 $3 }
-  | AsgnBinOp Expr             {% posInject \p -> DTAsgn p $1 Nothing $2 }
+  : "=" opt(DelayOrEvent) Expr { DTAsgn (tokenPosition $1) AsgnOpEq $2 $3 }
+  | AsgnBinOpP Expr            { uncurry DTAsgn $1 Nothing $2 }
 PortDeclTokens(delim) :: { [DeclToken] }
   : DeclTokensBase(PortDeclTokens(delim), delim) { $1 }
   | GenericInterfaceDecl   PortDeclTokens(delim) { $1 ++ $2}
   | GenericInterfaceDecl                  delim  { $1 }
-  | AttributeInstance      PortDeclTokens(delim) {% posInject \p -> DTAttr p $1 : $2 }
+  | AttributeInstanceP     PortDeclTokens(delim) { uncurry DTAttr $1 : $2 }
 ModuleDeclTokens(delim) :: { [DeclToken] }
   : DeclTokensBase(ModuleDeclTokens(delim), delim) { $1 }
   | GenericInterfaceDecl   ModuleDeclTokens(delim) { $1 ++ $2}
   | GenericInterfaceDecl                    delim  { $1 }
 GenericInterfaceDecl :: { [DeclToken] }
-  : "interface" Identifier {% posInject \p -> [DTType p (\Unspecified -> InterfaceT "" ""), DTIdent p $2] }
+  : "interface" IdentifierP { [DTType (tokenPosition $1) (\Unspecified -> InterfaceT "" ""), uncurry DTIdent $2] }
 
 VariablePortIdentifiers :: { [(Identifier, Expr)] }
   : VariablePortIdentifier                             { [$1] }
@@ -674,9 +680,11 @@ VariablePortIdentifier :: { (Identifier, Expr) }
   : Identifier OptAsgn { ($1,$2) }
 
 Direction :: { Direction }
-  : "inout"  { Inout  }
-  | "input"  { Input  }
-  | "output" { Output }
+  : DirectionP { snd $1 }
+DirectionP :: { (Position, Direction) }
+  : "inout"  { (tokenPosition $1, Inout ) }
+  | "input"  { (tokenPosition $1, Input ) }
+  | "output" { (tokenPosition $1, Output) }
 
 ModuleItems :: { [ModuleItem] }
   : {- empty -}                    { [] }
@@ -778,7 +786,9 @@ AttributeInstances :: { [Attr] }
   : {- empty -}                          { [] }
   | AttributeInstance AttributeInstances { $1 : $2 }
 AttributeInstance :: { Attr }
-  : "(*" AttrSpecs "*)" { Attr $2 }
+  : AttributeInstanceP { snd $1 }
+AttributeInstanceP :: { (Position, Attr) }
+  : "(*" AttrSpecs "*)" { withPos $1 $ Attr $2 }
 AttrSpecs :: { [AttrSpec] }
   : AttrSpec               { [$1] }
   | AttrSpecs "," AttrSpec { $1 ++ [$3] }
@@ -910,7 +920,7 @@ Drive :: { String }
   : "pull0" { tokenString $1 }
   | "pull1" { tokenString $1 }
 DefaultNetType :: { String }
-  : NetType { show $1 }
+  : NetTypeP { show $ snd $1 }
   | Identifier { $1 }
 
 PackageImportItems :: { [(Identifier, Identifier)] }
@@ -969,28 +979,28 @@ DeclAsgn :: { (Identifier, Expr, [Range]) }
 Range :: { Range }
   : "[" Expr ":"  Expr "]" { ($2, $4) }
 
-PartSelect :: { (PartSelectMode, Range) }
-  : "[" Expr ":"  Expr "]" { (NonIndexed  , ($2, $4)) }
-  | "[" Expr "+:" Expr "]" { (IndexedPlus , ($2, $4)) }
-  | "[" Expr "-:" Expr "]" { (IndexedMinus, ($2, $4)) }
+PartSelectP :: { (Position, (PartSelectMode, Range)) }
+  : "[" Expr ":"  Expr "]" { (tokenPosition $1, (NonIndexed  , ($2, $4))) }
+  | "[" Expr "+:" Expr "]" { (tokenPosition $1, (IndexedPlus , ($2, $4))) }
+  | "[" Expr "-:" Expr "]" { (tokenPosition $1, (IndexedMinus, ($2, $4))) }
 
 LHS :: { LHS }
   : Identifier         { LHSIdent  $1    }
-  | LHS PartSelect     { LHSRange  $1 (fst $2) (snd $2) }
+  | LHS PartSelectP    { uncurry (LHSRange $1) (snd $2) }
   | LHS "[" Expr "]"   { LHSBit    $1 $3 }
   | LHS "." Identifier { LHSDot    $1 $3 }
-  | LHSConcat          { LHSConcat $1    }
+  | LHSConcatP         { LHSConcat $ snd $1 }
   | "{" StreamOp StreamSize Concat "}" { LHSStream $2 $3         (map toLHS $4) }
   | "{" StreamOp            Concat "}" { LHSStream $2 (RawNum 1) (map toLHS $3) }
 
-LHSConcat :: { [LHS] }
-  : "{" LHSs "}" { $2 }
+LHSConcatP :: { (Position, [LHS]) }
+  : "{" LHSs "}" { withPos $1 $2 }
 LHSs :: { [LHS] }
   : LHS           { [$1] }
   | LHSs "," LHS  { $1 ++ [$3] }
 
-PortBindings :: { [PortBinding] }
-  : "(" PortBindingsInside ")" {% checkPortBindings $2 }
+PortBindingsP:: { (Position, [PortBinding]) }
+  : "(" PortBindingsInside ")" {% checkPortBindings $2 >>= return . withPos $1 }
 PortBindingsInside :: { [PortBinding] }
   : OptPortBinding                        { [$1] }
   | OptPortBinding "," PortBindingsInside { $1 : $3}
@@ -1246,7 +1256,7 @@ Expr :: { Expr }
   | DimsFn "(" TypeOrExpr ")"   { DimsFn $1 $3 }
   | DimFn  "(" TypeOrExpr ")"   { DimFn  $1 $3 (RawNum 1) }
   | DimFn  "(" TypeOrExpr "," Expr ")" { DimFn $1 $3 $5 }
-  | Expr PartSelect             { Range $1 (fst $2) (snd $2) }
+  | Expr PartSelectP            { uncurry (Range $1) (snd $2) }
   | Expr "[" Expr "]"           { Bit   $1 $3 }
   | "{" Expr Concat "}"         { Repeat $2 $3 }
   | Concat                      { Concat $1 }
@@ -1386,22 +1396,26 @@ AsgnOp :: { AsgnOp }
   : "=" { AsgnOpEq }
   | AsgnBinOp { $1 }
 AsgnBinOp :: { AsgnOp }
-  : "+="   { AsgnOp Add }
-  | "-="   { AsgnOp Sub }
-  | "*="   { AsgnOp Mul }
-  | "/="   { AsgnOp Div }
-  | "%="   { AsgnOp Mod }
-  | "&="   { AsgnOp BitAnd }
-  | "|="   { AsgnOp BitOr  }
-  | "^="   { AsgnOp BitXor }
-  | "<<="  { AsgnOp ShiftL }
-  | ">>="  { AsgnOp ShiftR }
-  | "<<<=" { AsgnOp ShiftAL }
-  | ">>>=" { AsgnOp ShiftAR }
+  : AsgnBinOpP { snd $1 }
+AsgnBinOpP :: { (Position, AsgnOp) }
+  : "+="   { withPos $1 $ AsgnOp Add }
+  | "-="   { withPos $1 $ AsgnOp Sub }
+  | "*="   { withPos $1 $ AsgnOp Mul }
+  | "/="   { withPos $1 $ AsgnOp Div }
+  | "%="   { withPos $1 $ AsgnOp Mod }
+  | "&="   { withPos $1 $ AsgnOp BitAnd }
+  | "|="   { withPos $1 $ AsgnOp BitOr  }
+  | "^="   { withPos $1 $ AsgnOp BitXor }
+  | "<<="  { withPos $1 $ AsgnOp ShiftL }
+  | ">>="  { withPos $1 $ AsgnOp ShiftR }
+  | "<<<=" { withPos $1 $ AsgnOp ShiftAL }
+  | ">>>=" { withPos $1 $ AsgnOp ShiftAR }
 
 IncOrDecOperator :: { BinOp }
-  : "++" { Add }
-  | "--" { Sub }
+  : IncOrDecOperatorP { snd $1 }
+IncOrDecOperatorP :: { (Position, BinOp) }
+  : "++" { withPos $1 Add }
+  | "--" { withPos $1 Sub }
 
 DimsFn :: { DimsFn }
   : "$bits"                { FnBits               }
@@ -1455,11 +1469,6 @@ parse tokens =
     position = tokenPosition $ head tokens
     initialState = ParseData position tokens
 
-posInject :: (Position -> a) -> ParseState a
-posInject cont = do
-  pos <- gets pPosition
-  return $ cont pos
-
 positionKeep :: (Token -> ParseState a) -> ParseState a
 positionKeep cont = do
   tokens <- gets pTokens
@@ -1469,13 +1478,19 @@ positionKeep cont = do
       put $ ParseData (tokenPosition tok) toks
       cont tok
 
-parseError :: Token -> ParseState a
-parseError a = case a of
+parseErrorTok :: Token -> ParseState a
+parseErrorTok a = case a of
   TokenEOF    -> do
     p <- gets pPosition
-    throwError $ show p ++ ": Parse error: unexpected end of file."
-  Token t s p -> throwError $ show p ++ ": Parse error: unexpected token '"
-                  ++ s ++ "' (" ++ show t ++ ")."
+    parseErrorM p "unexpected end of file"
+  Token t s p ->
+    parseErrorM p $ "unexpected token '" ++ s ++ "' (" ++ show t ++ ")"
+
+parseErrorM :: Position -> String -> ParseState a
+parseErrorM pos msg = throwError $ show pos ++ ": Parse error: " ++ msg
+
+parseError :: Position -> String -> a
+parseError pos msg = error $ show pos ++ ": Parse error: " ++ msg
 
 genItemsToGenItem :: [GenItem] -> GenItem
 genItemsToGenItem [x] = x
@@ -1487,8 +1502,8 @@ combineDeclsAndStmts (a1, b1) (a2, b2) =
   if not (null b1) && not (null a2)
     then do
       p <- gets pPosition
-      throwError $ show p
-        ++ ": Parse error: procedural block contains a declaration after a statement"
+      parseErrorM p
+        "procedural block contains a declaration after a statement"
     else return (a1 ++ a2, b1 ++ b2)
 
 makeInput :: Decl -> Decl
@@ -1502,13 +1517,13 @@ checkTag :: String -> String -> a -> ParseState a
 checkTag _ "" x = return x
 checkTag "" b _ = do
   p <- gets pPosition
-  error $ show p ++ ": Parse error: block has only end label " ++ show b
+  parseErrorM p $ "block has only end label " ++ show b
 checkTag a b x =
   if a == b
     then return x
     else do
       p <- gets pPosition
-      error $ show p ++ ": Parse error: element " ++ show a
+      parseErrorM p $ "element " ++ show a
         ++ " has mismatched end label " ++ show b
 
 toLHS :: Expr -> LHS
@@ -1538,14 +1553,12 @@ validateCases :: Token -> [([Expr], a)] -> [([Expr], a)]
 validateCases tok items =
   if length (filter (null . fst) items) <= 1
     then items
-    else error $ show (tokenPosition tok)
-          ++ ": Parse error: case has multiple defaults"
+    else parseError (tokenPosition tok) "case has multiple defaults"
 
 caseInsideKW :: Token -> CaseKW -> CaseKW
 caseInsideKW _ CaseN = CaseInside
 caseInsideKW tok kw =
-  error $ show (tokenPosition tok)
-    ++ ": Parse error: cannot use inside with " ++ show kw
+  parseError (tokenPosition tok) $ "cannot use inside with " ++ show kw
 
 addMIAttr :: Attr -> ModuleItem -> ModuleItem
 addMIAttr _ (item @ (MIPackageItem (Decl CommentDecl{}))) = item
@@ -1554,7 +1567,7 @@ addMIAttr attr item = MIAttr attr item
 missingToken :: String -> ParseState a
 missingToken expected = do
   p <- gets pPosition
-  throwError $ show p ++ ": Parse error: missing expected `" ++ expected ++ "`"
+  parseErrorM p $ "missing expected `" ++ expected ++ "`"
 
 checkPortBindings :: [PortBinding] -> ParseState [PortBinding]
 checkPortBindings [] = return []
@@ -1573,7 +1586,46 @@ checkBindings kind bindings =
     return bindings
   else do
     p <- gets pPosition
-    error $ show p ++ ": Parse error: illegal mix of ordered and named " ++ kind
+    parseErrorM p $ "illegal mix of ordered and named " ++ kind
   where bindingNames = map fst bindings
+
+withPos :: Token -> a -> (Position, a)
+withPos tok = (tokenPosition tok, )
+
+type PartialType = Signing -> [Range] -> Type
+
+unexpectedPackedRanges :: Position -> String -> a
+unexpectedPackedRanges pos typ =
+  parseError pos $ "unexpected packed range(s) applied to " ++ typ
+
+unexpectedSigning :: Position -> Signing -> String -> a
+unexpectedSigning pos sg typ =
+  parseError pos $ "unexpected " ++ show sg ++ " applied to " ++ typ
+
+makeIntegerVector :: (Position, IntegerVectorType) -> PartialType
+makeIntegerVector (_, typ) = IntegerVector typ
+
+makeIntegerAtom :: (Position, IntegerAtomType) -> PartialType
+makeIntegerAtom (_, typ) sg [] = IntegerAtom typ sg
+makeIntegerAtom (pos, typ) _ _ = unexpectedPackedRanges pos (show typ)
+
+makeNonInteger :: (Position, NonIntegerType) -> PartialType
+makeNonInteger (_, typ) Unspecified [] = NonInteger typ
+makeNonInteger (pos, typ) sg [] = unexpectedSigning pos sg (show typ)
+makeNonInteger (pos, typ) Unspecified _ = unexpectedPackedRanges pos (show typ)
+
+makeComplex :: Token -> ([Range] -> Type) -> (Position, PartialType)
+makeComplex (Token _ str pos) tf = (pos, check)
+  where
+    check Unspecified = tf
+    check sg = unexpectedSigning pos sg str
+
+makeTypeOf :: Token -> Expr -> (Position, PartialType)
+makeTypeOf (Token _ _ pos) expr = (pos, check)
+  where
+    typ = TypeOf expr
+    check Unspecified [] = typ
+    check Unspecified _  = unexpectedPackedRanges pos (show typ)
+    check sg [] = unexpectedSigning pos sg (show typ)
 
 }
