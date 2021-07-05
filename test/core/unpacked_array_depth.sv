@@ -1,18 +1,22 @@
 module example(
-    input wire [7:0] inp,
-    output wire [7:0] out
+    input wire inp [7:0],
+    output wire out [7:0]
 );
-    assign out = ~inp;
+    for (genvar i = 0; i < 8; ++i)
+        assign out[i] = ~inp[i];
 endmodule
 
 module top;
-    reg arr1 [7:0][1:0];
-    reg arr2 [7:0][1:0][1:0];
-    wire [7:0] out1, out2;
+    reg arr1 [1:0][7:0];
+    reg arr2 [1:0][1:0][7:0];
+    wire out1 [7:0];
+    wire out2 [7:0];
     example e1(arr1[0], out1);
     example e2(arr2[0][0], out2);
     initial begin
-        #1 arr1[0] = 8'hAD;
-        #1 arr2[0][0] = 8'h42;
+        for (integer i = 0; i < 8; ++i) begin
+            #1 arr1[0][i] = (8'hAD >> i) & 1'b1;
+            #1 arr2[0][0][i] = (8'h42 >> i) & 1'b1;
+        end
     end
 endmodule

@@ -60,9 +60,9 @@ rewriteDeclM (decl @ (Variable d t x a e)) = do
     case usedAsPacked of
         Just depth -> do
             let (tf, rs) = typeRanges t
-            let (shifted, rest) = splitAt (length a - depth) a
-            let t' = tf $ shifted ++ rs
-            return $ Variable d t' x rest e
+            let (unpacked, packed) = splitAt depth a
+            let t' = tf $ packed ++ rs
+            return $ Variable d t' x unpacked e
         Nothing -> return decl
 rewriteDeclM decl @ Net{} = traverseNetAsVarM rewriteDeclM decl
 rewriteDeclM other = return other
