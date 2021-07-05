@@ -625,6 +625,11 @@ traverseNodesM exprMapper declMapper typeMapper lhsMapper stmtMapper =
         a' <- traverseAssertionStmtsM stmtMapper a
         a'' <- traverseAssertionExprsM exprMapper a'
         return $ AssertionItem (mx, a'')
+    moduleItemMapper (ElabTask severity (Args pnArgs kwArgs)) = do
+        pnArgs' <- mapM exprMapper pnArgs
+        kwArgs' <- fmap (zip kwNames) $ mapM exprMapper kwExprs
+        return $ ElabTask severity $ Args pnArgs' kwArgs'
+        where (kwNames, kwExprs) = unzip kwArgs
 
     genItemMapper = traverseGenItemExprsM exprMapper
 

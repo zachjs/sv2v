@@ -45,7 +45,7 @@ module Language.SystemVerilog.Parser.ParseDecl
 , parseDTsAsDeclsOrAsgns
 ) where
 
-import Data.List (findIndex, findIndices, partition, uncons)
+import Data.List (findIndex, partition, uncons)
 
 import Language.SystemVerilog.AST
 import Language.SystemVerilog.Parser.Tokens (Position(..))
@@ -57,7 +57,7 @@ data DeclToken
     | DTConst    Position
     | DTVar      Position
     | DTAsgn     Position AsgnOp (Maybe Timing) Expr
-    | DTRange    Position (PartSelectMode, Range)
+    | DTRange    Position PartSelectMode Range
     | DTIdent    Position Identifier
     | DTPSIdent  Position Identifier Identifier
     | DTCSIdent  Position Identifier [ParamBinding] Identifier
@@ -73,59 +73,34 @@ data DeclToken
     | DTSigning  Position Signing
     | DTLifetime Position Lifetime
     | DTAttr     Position Attr
-    deriving (Show, Eq)
-
--- entrypoints besides `parseDTsAsDeclOrStmt` use this to disallow `DTAsgn` with
--- a non-blocking operator, binary assignment operator, or a timing control
--- because we don't expect to see those assignment operators in declarations
-forbidNonEqAsgn :: [DeclToken] -> a -> a
-forbidNonEqAsgn [] = id
-forbidNonEqAsgn (tok @ (DTAsgn _ op mt _) : toks) =
-    if op /= AsgnOpEq then
-        parseError tok $ "unexpected " ++ opKind
-            ++ " assignment operator in declaration"
-    else if mt /= Nothing then
-        parseError tok "unexpected timing modifier in declaration"
-    else
-        forbidNonEqAsgn toks
-    where opKind = if op == AsgnOpNonBlocking then "non-blocking" else "binary"
-forbidNonEqAsgn (_ : toks) = forbidNonEqAsgn toks
+    | DTEnd      Position Char
+    deriving Eq
 
 
 -- [PUBLIC]: parser for module port declarations, including interface ports
 -- Example: `input foo, bar, One inst`
 parseDTsAsPortDecls :: [DeclToken] -> ([Identifier], [ModuleItem])
-parseDTsAsPortDecls pieces =
-    parseDTsAsPortDecls' $
-    case last pieces of
-        DTComma{} -> init pieces
-        _ -> pieces
+parseDTsAsPortDecls = parseDTsAsPortDecls' . dropTrailingComma
+    where
+        dropTrailingComma :: [DeclToken] -> [DeclToken]
+        dropTrailingComma [] = []
+        dropTrailingComma [DTComma{}, end @ DTEnd{}] = [end]
+        dropTrailingComma (tok : toks) = tok : dropTrailingComma toks
 
 -- internal parseDTsAsPortDecls after the removal of an optional trailing comma
 parseDTsAsPortDecls' :: [DeclToken] -> ([Identifier], [ModuleItem])
 parseDTsAsPortDecls' pieces =
-    forbidNonEqAsgn pieces `seq`
     if isSimpleList
         then (simpleIdents, [])
         else (portNames declarations, applyAttrs [] pieces declarations)
     where
-        commaIdxs = findIndices isComma pieces
-        identIdxs = findIndices isIdent pieces
-        isSimpleList =
-            all even identIdxs &&
-            all odd commaIdxs &&
-            odd (length pieces) &&
-            length pieces == length commaIdxs + length identIdxs
+        maybeSimpleIdents = parseDTsAsIdents pieces
+        Just simpleIdents = maybeSimpleIdents
+        isSimpleList = maybeSimpleIdents /= Nothing
 
-        simpleIdents = map extractIdent $ filter isIdent pieces
         declarations = propagateDirections Input $ parseDTsAsDecls pieces'
 
-        extractIdent = \(DTIdent _ x) -> x
-
-        pieces' = filter (not . isDTAttr) pieces
-        isDTAttr :: DeclToken -> Bool
-        isDTAttr DTAttr{} = True
-        isDTAttr _ = False
+        pieces' = filter (not . isAttr) pieces
 
         propagateDirections :: Direction -> [Decl] -> [Decl]
         propagateDirections dir (decl @ (Variable _ InterfaceT{} _ _ _) : decls) =
@@ -149,12 +124,9 @@ parseDTsAsPortDecls' pieces =
         portName :: Decl -> Identifier
         portName (Variable _ _ ident _ _) = ident
         portName (Net  _ _ _ _ ident _ _) = ident
-        portName CommentDecl{} = ""
-        portName decl =
-            error $ "unexpected non-variable port declaration: " ++ (show decl)
+        portName _ = ""
 
         applyAttrs :: [Attr] -> [DeclToken] -> [Decl] -> [ModuleItem]
-        applyAttrs _ [] [] = []
         applyAttrs _ tokens (CommentDecl c : decls) =
             MIPackageItem (Decl $ CommentDecl c) : applyAttrs [] tokens decls
         applyAttrs attrs (DTAttr _ attr : tokens) decls =
@@ -165,41 +137,53 @@ parseDTsAsPortDecls' pieces =
             wrapDecl attrs decl : applyAttrs attrs tokens decls
         applyAttrs attrs (_ : tokens) decls =
             applyAttrs attrs tokens decls
-        applyAttrs _ [] _ = error "applyAttrs internal invariant failed"
+        applyAttrs _ [] _ = undefined
 
         wrapDecl :: [Attr] -> Decl -> ModuleItem
         wrapDecl attrs decl = foldr MIAttr (MIPackageItem $ Decl decl) attrs
+
+-- internal utility for a simple list of port identifiers
+parseDTsAsIdents :: [DeclToken] -> Maybe [Identifier]
+parseDTsAsIdents [DTIdent _ x, DTEnd _ _] = Just [x]
+parseDTsAsIdents [_, _] = Nothing
+parseDTsAsIdents (DTIdent _ x : DTComma _ : rest) =
+    fmap (x :) (parseDTsAsIdents rest)
+parseDTsAsIdents _ = Nothing
 
 
 -- [PUBLIC]: parser for single (semicolon-terminated) declarations (including
 -- parameters) and module instantiations
 parseDTsAsModuleItems :: [DeclToken] -> [ModuleItem]
 parseDTsAsModuleItems tokens =
-    forbidNonEqAsgn tokens `seq`
-    if isElabTask $ head tokens then
-        asElabTask tokens
+    if maybeElabTask /= Nothing then
+        [elabTask]
     else if any isPorts tokens then
         parseDTsAsIntantiations tokens
     else
         map (MIPackageItem . Decl) $ parseDTsAsDecl tokens
     where
-        isElabTask :: DeclToken -> Bool
-        isElabTask (DTIdent _ x) = elem x elabTasks
-            where elabTasks = ["$fatal", "$error", "$warning", "$info"]
-        isElabTask _ = False
+        Just elabTask = maybeElabTask
+        maybeElabTask = asElabTask tokens
 
--- internal; approximates the behavior of the elaboration system tasks
-asElabTask :: [DeclToken] -> [ModuleItem]
-asElabTask [DTIdent _ name, DTPorts _ args] =
-    if name == "$info"
-        then [] -- just drop them for simplicity
-        else [Instance "ThisModuleDoesNotExist" [] name' [] args]
-    where name' = "__sv2v_elab_" ++ tail name
-asElabTask [DTIdent pos name] =
-    asElabTask [DTIdent pos name, DTPorts pos []]
-asElabTask tokens =
-    error $ "could not parse elaboration system task: " ++ show tokens
+-- internal; attempt to parse an elaboration system task
+asElabTask :: [DeclToken] -> Maybe ModuleItem
+asElabTask tokens = do
+    DTIdent _ x @ ('$' : _) <- return $ head tokens
+    severity <- lookup x elabTasks
+    Just $ ElabTask severity args
+    where
+        args =
+            case tail tokens of
+                [DTEnd{}] -> Args [] []
+                [DTPorts _ ports, DTEnd{}] -> portsToArgs ports
+                DTPorts{} : tok : _ -> parseError tok msg
+                toks -> parseError (head toks) msg
+        msg = "unexpected token after elaboration system task"
 
+-- lookup table for elaboration system task severities
+elabTasks :: [(String, Severity)]
+elabTasks = map (\x -> (show x, x))
+    [SeverityInfo, SeverityWarning, SeverityError, SeverityFatal]
 
 -- internal; parser for module instantiations
 parseDTsAsIntantiations :: [DeclToken] -> [ModuleItem]
@@ -207,18 +191,12 @@ parseDTsAsIntantiations (DTIdent _ name : DTParams _ params : tokens) =
     step tokens
     where
         step :: [DeclToken] -> [ModuleItem]
-        step [] = parseError endTok "unexpected end of instantiation list"
-        step toks = inst : rest
+        step [] = []
+        step toks = inst : step restToks
             where
-                (delimTok, rest) =
-                    if null restToks
-                        then (endTok, [])
-                        else (head restToks, step $ tail restToks)
                 inst = Instance name params x rs p
                 (x, rs, p) = parseDTsAsIntantiation instToks delimTok
-                (instToks, restToks) = break isComma toks
-        -- TODO: all public interfaces should take the ending token
-        endTok = last tokens
+                (instToks, delimTok : restToks) = break isCommaOrEnd toks
 parseDTsAsIntantiations (DTIdent pos name : tokens) =
     parseDTsAsIntantiations $ DTIdent pos name : DTParams pos [] : tokens
 parseDTsAsIntantiations tokens =
@@ -230,16 +208,20 @@ parseDTsAsIntantiation :: [DeclToken] -> DeclToken
     -> (Identifier, [Range], [PortBinding])
 parseDTsAsIntantiation l0 delimTok =
     if null l0 then
-        parseError delimTok "expected instantiation before delimiter"
+        parseError delimTok $ "expected instantiation before " ++ delimStr
     else if not (isIdent nameTok) then
         parseError nameTok "expected instantiation name"
     else if null l1 then
-        parseError delimTok "expected port connections before delimiter"
+        parseError delimTok $ "expected port connections before " ++ delimStr
     else if seq ranges not (isPorts portsTok) then
         parseError portsTok "expected port connections"
     else
         (name, ranges, ports)
     where
+        delimChar = case delimTok of
+                        DTEnd _ char -> char
+                        _ -> ','
+        delimStr = ['\'', delimChar, '\'']
         Just (nameTok, l1) = uncons l0
         rangeToks = init l1
         portsTok = last l1
@@ -247,7 +229,7 @@ parseDTsAsIntantiation l0 delimTok =
         DTPorts _ ports = portsTok
         ranges = map asRange rangeToks
         asRange :: DeclToken -> Range
-        asRange (DTRange _ (NonIndexed, s)) = s
+        asRange (DTRange _ NonIndexed s) = s
         asRange (DTBit _ s) = (RawNum 0, BinOp Sub s (RawNum 1))
         asRange tok = parseError tok "expected instantiation dimensions"
 
@@ -255,61 +237,61 @@ parseDTsAsIntantiation l0 delimTok =
 -- [PUBLIC]: parser for generic, comma-separated declarations
 parseDTsAsDecls :: [DeclToken] -> [Decl]
 parseDTsAsDecls tokens =
-    forbidNonEqAsgn tokens `seq`
-    concat $ map finalize $ parseDTsAsComponents tokens
+    concatMap finalize $ parseDTsAsComponents tokens
 
 
 -- internal; used for "single" declarations, i.e., declarations appearing
 -- outside of a port list
 parseDTsAsDecl :: [DeclToken] -> [Decl]
 parseDTsAsDecl tokens =
-    if length components /= 1
-        then parseError tok $ "unexpected comma-separated declarations"
-        else finalize $ head components
-    where
-        components = parseDTsAsComponents tokens
-        _ : (pos, _, _) : _ = components
-        tok = DTComma pos
+    if null rest
+        then finalize component
+        else parseError (head rest) "unexpected token in declaration"
+    where (component, rest) = parseDTsAsComponent tokens
 
 
 -- [PUBLIC]: parser for single block item declarations or assign or arg-less
 -- subroutine call statements
 parseDTsAsDeclOrStmt :: [DeclToken] -> ([Decl], [Stmt])
-parseDTsAsDeclOrStmt (DTAsgn pos (AsgnOp op) mt e : tok : toks) =
-    parseDTsAsDeclOrStmt $ (tok : toks) ++ [DTAsgn pos (AsgnOp op) mt e]
 parseDTsAsDeclOrStmt tokens =
-    if not hasLeadingDecl
-        then ([], [traceStmt pos, stmt])
-        else (parseDTsAsDecl tokens, [])
+    if declLookahead tokens
+        then (parseDTsAsDecl tokens, [])
+        else ([], parseDTsAsStmt $ shiftIncOrDec tokens)
+
+-- check if the necessary tokens for a complete declaration exist at the
+-- beginning of the given token list
+declLookahead :: [DeclToken] -> Bool
+declLookahead l0 =
+    l0 /= l5 && tripLookahead l5
     where
-        pos = tokPos $ last tokens
-        stmt = case last tokens of
-            DTAsgn  _ op mt e -> Asgn op mt lhs e
-            DTPorts _ ports -> asSubroutine lhsToks (portsToArgs ports)
-            _ -> asSubroutine tokens (Args [] [])
-        lhsToks = init tokens
-        lhs = case takeLHS lhsToks of
-            Nothing -> error $ "could not parse as LHS: " ++ show lhsToks
-            Just l -> l
-        hasLeadingDecl = tokens /= l5 && tripLookahead l5
-        (_, l1) = takeDir      tokens
+        (_, l1) = takeDir      l0
         (_, l2) = takeLifetime l1
         (_, l3) = takeVarOrNet l2
         (_, l4) = takeType     l3
         (_, l5) = takeRanges   l4
 
-traceStmt :: Position -> Stmt
-traceStmt pos = CommentStmt $ "Trace: " ++ show pos
+-- internal; parser for leading statements in a procedural block
+parseDTsAsStmt :: [DeclToken] -> [Stmt]
+parseDTsAsStmt l0 =
+    [traceStmt $ head l0, stmt]
+    where
+        (lhs, _) = takeLHS l0
+        (expr, l1) = takeExpr l0
+        stmt = case init l1 of
+            [DTAsgn _ op mt e] -> Asgn op mt lhs e
+            [DTPorts _ ports] -> Subroutine expr (portsToArgs ports)
+            [] -> Subroutine expr (Args [] [])
+            tok : _ -> parseError tok "unexpected statement token"
+
+traceStmt :: DeclToken -> Stmt
+traceStmt tok = CommentStmt $ "Trace: " ++ show (tokPos tok)
 
 -- read the given tokens as the root of a subroutine invocation
-asSubroutine :: [DeclToken] -> Args -> Stmt
-asSubroutine [DTIdent   _     x] = Subroutine $ Ident       x
-asSubroutine [DTPSIdent _ p   x] = Subroutine $ PSIdent p   x
-asSubroutine [DTCSIdent _ c p x] = Subroutine $ CSIdent c p x
-asSubroutine tokens =
-    case takeLHS tokens of
-        Just lhs -> Subroutine $ lhsToExpr lhs
-        Nothing -> error $ "invalid block item decl or stmt: " ++ show tokens
+takeExpr :: [DeclToken] -> (Expr, [DeclToken])
+takeExpr (DTPSIdent _ p   x : toks) = (PSIdent p   x, toks)
+takeExpr (DTCSIdent _ c p x : toks) = (CSIdent c p x, toks)
+takeExpr toks = (lhsToExpr lhs, rest)
+    where (lhs, rest) = takeLHS toks
 
 -- converts port bindings to call args
 portsToArgs :: [PortBinding] -> Args
@@ -324,66 +306,68 @@ portsToArgs bindings =
 -- is only used for `for` loop initialization lists
 parseDTsAsDeclsOrAsgns :: [DeclToken] -> Either [Decl] [(LHS, Expr)]
 parseDTsAsDeclsOrAsgns tokens =
-    forbidNonEqAsgn tokens `seq`
-    if hasLeadingAsgn || tripLookahead tokens
-        then Right $ parseDTsAsAsgns tokens
-        else Left $ map checkDecl $ parseDTsAsDecls tokens
+    if declLookahead tokens
+        then Left decls
+        else Right asgns
     where
-        hasLeadingAsgn =
-            -- if there is an asgn token before the next comma
-            case (findIndex isComma tokens, findIndex isAsgnToken tokens) of
-                (Just a, Just b) -> a > b
-                (Nothing, Just _) -> True
-                _ -> False
-        checkDecl :: Decl -> Decl
-        checkDecl (decl @ (Variable _ _ _ _ Nil)) =
-            error $ "for loop declaration missing initialization: "
-                ++ init (show decl)
-        checkDecl decl = decl
+        decls = concatMap finalize components
+        components = map checkComponent $ parseDTsAsComponents tokens
+        asgns = parseDTsAsAsgns $ shiftIncOrDec tokens
+        checkComponent :: Component -> Component
+        checkComponent (pos, base, trips) =
+            (pos, base, map (checkTriplet pos) trips)
+        checkTriplet :: Position -> Triplet -> Triplet
+        checkTriplet pos (x, _, Nil) =
+            parseError pos $ "for loop declaration of " ++ show x
+                ++ " is missing initialization"
+        checkTriplet _ trip = trip
 
 -- internal parser for basic assignment lists
 parseDTsAsAsgns :: [DeclToken] -> [(LHS, Expr)]
 parseDTsAsAsgns tokens =
-    case l1 of
-        [] -> [asgn]
-        DTComma{} : remaining -> asgn : parseDTsAsAsgns remaining
-        _ -> error $ "bad assignment tokens: " ++ show tokens
+    if not (isAsgn asgnTok) then
+        parseError asgnTok "expected assignment operator"
+    else if mt /= Nothing then
+        unexpected "timing modifier"
+    else (lhs, expr) : case head remaining of
+        DTEnd{} -> []
+        DTComma{} -> parseDTsAsAsgns $ tail remaining
+        tok -> parseError tok "expected ',' or ';'"
     where
-        (lhsToks, l0) = break isDTAsgn tokens
-        lhs = case takeLHS lhsToks of
-            Nothing -> error $ "could not parse as LHS: " ++ show lhsToks
-            Just l -> l
-        DTAsgn _ AsgnOpEq Nothing expr : l1 = l0
-        asgn = (lhs, expr)
+        (lhs, asgnTok : remaining) = takeLHS tokens
+        DTAsgn _ op mt rhs = asgnTok
+        expr = case op of
+            AsgnOpEq -> rhs
+            AsgnOpNonBlocking -> unexpected "non-blocking assignment"
+            AsgnOp binop -> BinOp binop (lhsToExpr lhs) rhs
 
-        isDTAsgn :: DeclToken -> Bool
-        isDTAsgn (DTAsgn _ _ Nothing _) = True
-        isDTAsgn _ = False
+        unexpected surprise = parseError asgnTok $
+            "unexpected " ++ surprise ++ " in for loop initialization"
 
-isAsgnToken :: DeclToken -> Bool
-isAsgnToken (DTBit{}   ) = True
-isAsgnToken (DTConcat{}) = True
-isAsgnToken (DTStream{}) = True
-isAsgnToken (DTDot{}   ) = True
-isAsgnToken (DTAsgn _ op _ _) = op /= AsgnOpEq
-isAsgnToken _ = False
+shiftIncOrDec :: [DeclToken] -> [DeclToken]
+shiftIncOrDec (tok @ (DTAsgn _ AsgnOp{} _ _) : toks) =
+    before ++ tok : delim : shiftIncOrDec after
+    where (before, delim : after) = break isCommaOrEnd toks
+shiftIncOrDec [] = []
+shiftIncOrDec toks =
+    before ++ delim : shiftIncOrDec after
+    where (before, delim : after) = break isCommaOrEnd toks
 
-takeLHS :: [DeclToken] -> Maybe LHS
-takeLHS [] = Nothing
-takeLHS (t : ts) =
-    foldl takeLHSStep (takeLHSStart t) ts
+takeLHS :: [DeclToken] -> (LHS, [DeclToken])
+takeLHS tokens = takeLHSStep (takeLHSStart tok) toks
+    where tok : toks = tokens
 
-takeLHSStart :: DeclToken -> Maybe LHS
-takeLHSStart (DTConcat _     lhss) = Just $ LHSConcat lhss
-takeLHSStart (DTStream _ o e lhss) = Just $ LHSStream o e lhss
-takeLHSStart (DTIdent  _ x       ) = Just $ LHSIdent x
-takeLHSStart _ = Nothing
+takeLHSStart :: DeclToken -> LHS
+takeLHSStart (DTConcat _     lhss) = LHSConcat lhss
+takeLHSStart (DTStream _ o e lhss) = LHSStream o e lhss
+takeLHSStart (DTIdent  _ x       ) = LHSIdent x
+takeLHSStart tok = parseError tok "expected primary token or type"
 
-takeLHSStep :: Maybe LHS -> DeclToken -> Maybe LHS
-takeLHSStep (Just curr) (DTBit   _  e   ) = Just $ LHSBit   curr e
-takeLHSStep (Just curr) (DTRange _ (m,r)) = Just $ LHSRange curr m r
-takeLHSStep (Just curr) (DTDot   _  x   ) = Just $ LHSDot curr x
-takeLHSStep _ _ = Nothing
+takeLHSStep :: LHS -> [DeclToken] -> (LHS, [DeclToken])
+takeLHSStep curr (DTBit   _ e   : toks) = takeLHSStep (LHSBit   curr e  ) toks
+takeLHSStep curr (DTRange _ m r : toks) = takeLHSStep (LHSRange curr m r) toks
+takeLHSStep curr (DTDot   _ x   : toks) = takeLHSStep (LHSDot   curr x  ) toks
+takeLHSStep lhs toks = (lhs, toks)
 
 
 -- batches together separate declaration lists
@@ -404,13 +388,11 @@ parseDTsAsComponents tokens =
     where (component, tokens') = parseDTsAsComponent tokens
 
 parseDTsAsComponent :: [DeclToken] -> (Component, [DeclToken])
-parseDTsAsComponent [] = error "parseDTsAsComponent unexpected end of tokens"
 parseDTsAsComponent l0 =
     if l /= Nothing && l /= Just Automatic then
-        error $ "unexpected non-automatic lifetime: " ++ show l0
+        parseError (head l1) "unexpected non-automatic lifetime"
     else if dir == Local && length l2 == length l5 then
-        error $ "declaration(s) missing type information: "
-            ++ show (position, tps)
+        parseError (head l0) "declaration missing type information"
     else
         (component, l6)
     where
@@ -419,50 +401,37 @@ parseDTsAsComponent l0 =
         (von, l3) = takeVarOrNet l2
         (tf , l4) = takeType     l3
         (rs , l5) = takeRanges   l4
-        (tps, l6) = takeTrips    l5 True
+        (tps, l6) = takeTrips    l5
         position = tokPos $ head l0
         base = von dir $ tf rs
         component = (position, base, tps)
 
-takeTrips :: [DeclToken] -> Bool -> ([Triplet], [DeclToken])
-takeTrips [] True = error "incomplete declaration"
-takeTrips [] False = ([], [])
-takeTrips l0 force =
-    if not force && not (tripLookahead l0)
-        then ([], l0)
-        else (trip : trips, l5)
+takeTrips :: [DeclToken] -> ([Triplet], [DeclToken])
+takeTrips l0 =
+    (trip : trips, l5)
     where
         (x, l1) = takeIdent  l0
         (a, l2) = takeRanges l1
         (e, l3) = takeAsgn   l2
-        (_, l4) = takeComma  l3
+        l4 = takeCommaOrEnd  l3
         trip = (x, a, e)
-        (trips, l5) = takeTrips l4 False
+        (trips, l5) =
+            if tripLookahead l4
+                then takeTrips l4
+                else ([], l4)
 
 tripLookahead :: [DeclToken] -> Bool
-tripLookahead [] = False
 tripLookahead l0 =
+    not (null l0) &&
     -- every triplet *must* begin with an identifier
-    if not (isIdent $ head l0) then
-        False
-    -- if the identifier is the last token, or if it assigned a value, then we
-    -- know we must have a valid triplet ahead
-    else if null l1 || asgn /= Nil then
-        True
-    -- if there is an ident followed by some number of ranges, and that's it,
-    -- then there is a trailing declaration of an array ahead
-    else if (not $ null l1) && (null l2) then
-        True
-    -- if there is a comma after the identifier (and optional ranges and
-    -- assignment) that we're looking at, then we know this identifier is not a
-    -- type name, as type names must be followed by a first identifier before a
-    -- comma or the end of the list
-    else
-        (not $ null l3) && (isComma $ head l3)
+    isIdent (head l0) &&
+    -- expecting to see a comma or the ending token after the identifier and
+    -- optional ranges and/or assignment
+    isCommaOrEnd (head l3)
     where
-        (_   , l1) = takeIdent  l0
-        (_   , l2) = takeRanges l1
-        (asgn, l3) = takeAsgn   l2
+        (_, l1) = takeIdent  l0
+        (_, l2) = takeRanges l1
+        (_, l3) = takeAsgn   l2
 
 takeDir :: [DeclToken] -> (Direction, [DeclToken])
 takeDir (DTDir _ dir : rest) = (dir  , rest)
@@ -473,8 +442,8 @@ takeLifetime (DTLifetime _ l : rest) = (Just  l, rest)
 takeLifetime                   rest  = (Nothing, rest)
 
 takeVarOrNet :: [DeclToken] -> (Direction -> Type -> DeclBase, [DeclToken])
-takeVarOrNet (DTConst{} : tok @ DTConst{} : _) =
-    parseError tok "duplicate const modifier"
+takeVarOrNet (DTConst{} : DTConst pos : _) =
+    parseError pos "duplicate const modifier"
 takeVarOrNet (DTConst _ : tokens) = takeVarOrNet tokens
 takeVarOrNet (DTNet _ n s : tokens) = (\d -> Net d n s, tokens)
 takeVarOrNet tokens = (Variable, tokens)
@@ -499,8 +468,8 @@ takeType (DTIdent pos tn                : rest) =
                 (_, Nothing) -> True
                 -- if comma is first, then this ident is a declaration
                 (Just a, Just b) -> a < b
-takeType (DTVar{} : tok @ DTVar{} : _) =
-    parseError tok "duplicate var modifier"
+takeType (DTVar{} : DTVar pos : _) =
+    parseError pos "duplicate var modifier"
 takeType (DTVar _ : rest) =
     case tf [] of
         Implicit sg [] -> (IntegerVector TLogic sg, rest')
@@ -509,19 +478,18 @@ takeType (DTVar _ : rest) =
 takeType rest = (Implicit Unspecified, rest)
 
 takeRanges :: [DeclToken] -> ([Range], [DeclToken])
-takeRanges [] = ([], [])
-takeRanges (token : tokens) =
-    case token of
-        DTRange _ (NonIndexed, r) -> (r         : rs, rest          )
-        DTBit   _ s               -> (asRange s : rs, rest          )
-        DTAutoDim _               ->
-            case rest of
-                (DTAsgn _ AsgnOpEq Nothing (Pattern l) : _) -> autoDim l
-                (DTAsgn _ AsgnOpEq Nothing (Concat  l) : _) -> autoDim l
-                _ ->                 ([]            , token : tokens)
-        _                         -> ([]            , token : tokens)
+takeRanges tokens =
+    case head tokens of
+        DTRange _ NonIndexed r -> (r         : rs, rest)
+        DTBit   _ s            -> (asRange s : rs, rest)
+        DTAutoDim _            ->
+            case head $ tail tokens of
+                DTAsgn _ AsgnOpEq Nothing (Pattern l) -> autoDim l
+                DTAsgn _ AsgnOpEq Nothing (Concat  l) -> autoDim l
+                _ -> ([], tokens)
+        _ -> ([], tokens)
     where
-        (rs, rest) = takeRanges tokens
+        (rs, rest) = takeRanges $ tail tokens
         asRange s = (RawNum 0, BinOp Sub s (RawNum 1))
         autoDim :: [a] -> ([Range], [DeclToken])
         autoDim l =
@@ -531,34 +499,52 @@ takeRanges (token : tokens) =
                 lo = RawNum 0
                 hi = RawNum $ fromIntegral $ n - 1
 
--- Matching `AsgnOpEq` and `AsgnOpNonBlocking` here allows tripLookahead to work
--- both for standard declarations and in `parseDTsAsDeclOrStmt`, where we're
--- checking for an assignment statement. The other entry points disallow
--- `AsgnOpNonBlocking`, so this doesn't liberalize the parser.
 takeAsgn :: [DeclToken] -> (Expr, [DeclToken])
-takeAsgn (DTAsgn _ op Nothing e : rest) =
-    if op == AsgnOpEq || op == AsgnOpNonBlocking
-        then (e  , rest)
-        else (Nil, rest)
+takeAsgn (tok @ (DTAsgn _ op mt e) : rest) =
+    if op == AsgnOpNonBlocking then
+        unexpected "non-blocking assignment operator"
+    else if op /= AsgnOpEq then
+        unexpected "binary assignment operator"
+    else if mt /= Nothing then
+        unexpected "timing modifier"
+    else
+        (e, rest)
+    where
+        unexpected surprise =
+            parseError tok $ "unexpected " ++ surprise ++ " in declaration"
 takeAsgn rest = (Nil, rest)
 
-takeComma :: [DeclToken] -> (Bool, [DeclToken])
-takeComma [] = (False, [])
-takeComma (DTComma{} : rest) = (True, rest)
-takeComma toks = error $ "expected comma or end of decl, got: " ++ show toks
+takeCommaOrEnd :: [DeclToken] -> [DeclToken]
+takeCommaOrEnd tokens =
+    if isCommaOrEnd tok
+        then toks
+        else parseError tok "expected comma or end of declarations"
+    where tok : toks = tokens
 
 takeIdent :: [DeclToken] -> (Identifier, [DeclToken])
 takeIdent (DTIdent _ x : rest) = (x, rest)
-takeIdent tokens = error $ "takeIdent didn't find identifier: " ++ show tokens
+takeIdent tokens = parseError (head tokens) "expected identifier"
 
+
+isAttr :: DeclToken -> Bool
+isAttr DTAttr{} = True
+isAttr _ = False
+
+isAsgn :: DeclToken -> Bool
+isAsgn DTAsgn{} = True
+isAsgn _ = False
 
 isIdent :: DeclToken -> Bool
-isIdent (DTIdent{}) = True
+isIdent DTIdent{} = True
 isIdent _ = False
 
 isComma :: DeclToken -> Bool
-isComma (DTComma{}) = True
+isComma DTComma{} = True
 isComma _ = False
+
+isCommaOrEnd :: DeclToken -> Bool
+isCommaOrEnd DTEnd{} = True
+isCommaOrEnd tok = isComma tok
 
 isPorts :: DeclToken -> Bool
 isPorts DTPorts{} = True
@@ -570,7 +556,7 @@ tokPos (DTAutoDim  p) = p
 tokPos (DTConst    p) = p
 tokPos (DTVar      p) = p
 tokPos (DTAsgn     p _ _ _) = p
-tokPos (DTRange    p _) = p
+tokPos (DTRange    p _ _) = p
 tokPos (DTIdent    p _) = p
 tokPos (DTPSIdent  p _ _) = p
 tokPos (DTCSIdent  p _ _ _) = p
@@ -586,7 +572,13 @@ tokPos (DTDot      p _) = p
 tokPos (DTSigning  p _) = p
 tokPos (DTLifetime p _) = p
 tokPos (DTAttr     p _) = p
+tokPos (DTEnd      p _) = p
 
-parseError :: DeclToken -> String -> a
-parseError tok msg = error $ show pos ++ ": Parse error: " ++ msg
-    where pos = tokPos tok
+class Loc t where
+    parseError :: t -> String -> a
+
+instance Loc Position where
+    parseError pos msg = error $ show pos ++ ": Parse error: " ++ msg
+
+instance Loc DeclToken where
+    parseError = parseError . tokPos

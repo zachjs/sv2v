@@ -14,6 +14,7 @@ module Language.SystemVerilog.AST.ModuleItem
     , NInputGateKW  (..)
     , NOutputGateKW (..)
     , AssignOption  (..)
+    , Severity      (..)
     ) where
 
 import Data.List (intercalate)
@@ -24,7 +25,7 @@ import Language.SystemVerilog.AST.ShowHelp
 import Language.SystemVerilog.AST.Attr (Attr)
 import Language.SystemVerilog.AST.Decl (Direction)
 import Language.SystemVerilog.AST.Description (PackageItem)
-import Language.SystemVerilog.AST.Expr (Expr(Nil), pattern Ident, Range, showRanges, ParamBinding, showParams)
+import Language.SystemVerilog.AST.Expr (Expr(Nil), pattern Ident, Range, showRanges, ParamBinding, showParams, Args)
 import Language.SystemVerilog.AST.GenItem (GenItem)
 import Language.SystemVerilog.AST.LHS (LHS)
 import Language.SystemVerilog.AST.Stmt (Stmt, AssertionItem, Timing(Delay))
@@ -41,6 +42,7 @@ data ModuleItem
     | Modport    Identifier [ModportDecl]
     | Initial    Stmt
     | Final      Stmt
+    | ElabTask   Severity Args
     | MIPackageItem PackageItem
     | NInputGate  NInputGateKW  Expr Identifier  LHS [Expr]
     | NOutputGate NOutputGateKW Expr Identifier [LHS] Expr
@@ -58,6 +60,7 @@ instance Show ModuleItem where
     show (Modport     x l) = printf "modport %s(\n%s\n);" x (indent $ intercalate ",\n" $ map showModportDecl l)
     show (Initial     s  ) = printf "initial %s" (show s)
     show (Final       s  ) = printf   "final %s" (show s)
+    show (ElabTask    s a) = printf "%s%s;" (show s) (show a)
     show (NInputGate  kw d x lhs exprs) =
         showGate kw d x $ show lhs : map show exprs
     show (NOutputGate kw d x lhss expr) =
@@ -148,3 +151,16 @@ instance Show AssignOption where
     show AssignOptionNone = ""
     show (AssignOptionDelay de) = printf "#(%s)" (show de)
     show (AssignOptionDrive s0 s1) = printf "(%s, %s)" (show s0) (show s1)
+
+data Severity
+    = SeverityInfo
+    | SeverityWarning
+    | SeverityError
+    | SeverityFatal
+    deriving Eq
+
+instance Show Severity where
+    show SeverityInfo    = "$info"
+    show SeverityWarning = "$warning"
+    show SeverityError   = "$error"
+    show SeverityFatal   = "$fatal"

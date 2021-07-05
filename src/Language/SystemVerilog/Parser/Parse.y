@@ -401,7 +401,6 @@ time               { Token Lit_time        _ _ }
 -- operator precedences, from *lowest* to *highest*
 %nonassoc DefaultStrength
 %nonassoc DriveStrength ChargeStrength
-%nonassoc Asgn
 %nonassoc NoElse
 %nonassoc "else"
 %right  "|->" "|=>" "#-#" "#=#"
@@ -630,17 +629,17 @@ Strength :: { Strength }
 DeclTokens(delim) :: { [DeclToken] }
   : DeclTokensBase(DeclTokens(delim), delim) { $1 }
 DeclTokensBase(repeat, delim) :: { [DeclToken] }
-  : DeclToken                 delim  { [$1] }
+  : DeclToken         DTDelim(delim) { [$1, $2] }
   | DeclToken                 repeat { [$1] ++ $2 }
   | IdentifierP ParamBindings repeat { [uncurry DTIdent $1, DTParams (fst $1) $2] ++ $3 }
   | DeclTokenAsgn ","         repeat { [$1, DTComma (tokenPosition $2)] ++ $3 }
-  | DeclTokenAsgn             delim  { [$1] }
+  | DeclTokenAsgn     DTDelim(delim) { [$1, $2] }
 DeclToken :: { DeclToken }
   : ","                                { DTComma   $ tokenPosition $1 }
   | "[" "]"                            { DTAutoDim $ tokenPosition $1 }
   | "const"                            { DTConst   $ tokenPosition $1 }
   | "var"                              { DTVar     $ tokenPosition $1 }
-  | PartSelectP                        { uncurry DTRange $1 }
+  | PartSelectP                        { uncurry (DTRange $ fst $1) (snd $1) }
   | IdentifierP                        { uncurry DTIdent $1 }
   | DirectionP                         { uncurry DTDir $1 }
   | LHSConcatP                         { uncurry DTConcat $1 }
@@ -655,21 +654,23 @@ DeclToken :: { DeclToken }
   | "{" StreamOp            Concat "}" { DTStream   (tokenPosition $1) $2 (RawNum 1) (map toLHS $3) }
   | "type" "(" Expr ")"                { uncurry DTType $ makeTypeOf $1 $3 }
   | IncOrDecOperatorP                  { DTAsgn     (fst $1) (AsgnOp $ snd $1) Nothing (RawNum 1) }
-  | "<=" opt(DelayOrEvent) Expr %prec Asgn { DTAsgn (tokenPosition $1) AsgnOpNonBlocking $2 $3 }
   | IdentifierP               "::" Identifier { uncurry DTPSIdent $1    $3 }
   | IdentifierP ParamBindings "::" Identifier { uncurry DTCSIdent $1 $2 $4 }
+DTDelim(delim) :: { DeclToken }
+  : delim { DTEnd (tokenPosition $1) (head $ tokenString $1) }
 DeclTokenAsgn :: { DeclToken }
   : "=" opt(DelayOrEvent) Expr { DTAsgn (tokenPosition $1) AsgnOpEq $2 $3 }
   | AsgnBinOpP Expr            { uncurry DTAsgn $1 Nothing $2 }
+  | "<=" opt(DelayOrEvent) Expr { DTAsgn (tokenPosition $1) AsgnOpNonBlocking $2 $3 }
 PortDeclTokens(delim) :: { [DeclToken] }
   : DeclTokensBase(PortDeclTokens(delim), delim) { $1 }
   | GenericInterfaceDecl   PortDeclTokens(delim) { $1 ++ $2}
-  | GenericInterfaceDecl                  delim  { $1 }
+  | GenericInterfaceDecl          DTDelim(delim) { $1 ++ [$2] }
   | AttributeInstanceP     PortDeclTokens(delim) { uncurry DTAttr $1 : $2 }
 ModuleDeclTokens(delim) :: { [DeclToken] }
   : DeclTokensBase(ModuleDeclTokens(delim), delim) { $1 }
   | GenericInterfaceDecl   ModuleDeclTokens(delim) { $1 ++ $2}
-  | GenericInterfaceDecl                    delim  { $1 }
+  | GenericInterfaceDecl            DTDelim(delim) { $1 ++ [$2] }
 GenericInterfaceDecl :: { [DeclToken] }
   : "interface" IdentifierP { [DTType (tokenPosition $1) (\Unspecified -> InterfaceT "" ""), uncurry DTIdent $2] }
 
