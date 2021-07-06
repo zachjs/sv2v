@@ -159,8 +159,3 @@ no prior experience, and has also helped with test cases.
 Since sv2v's public release, several people have taken the time to file detailed
 bug reports and feature requests. I greatly appreciate their help in furthering
 the project.
-
-
-## License
-
-See the [LICENSE file](LICENSE) for copyright and licensing information.
