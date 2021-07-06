@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
@@ -74,7 +73,6 @@ data DeclToken
     | DTLifetime Position Lifetime
     | DTAttr     Position Attr
     | DTEnd      Position Char
-    deriving Eq
 
 
 -- [PUBLIC]: parser for module port declarations, including interface ports
@@ -262,13 +260,14 @@ parseDTsAsDeclOrStmt tokens =
 -- beginning of the given token list
 declLookahead :: [DeclToken] -> Bool
 declLookahead l0 =
-    l0 /= l5 && tripLookahead l5
+    length l0 /= length l6 && tripLookahead l6
     where
         (_, l1) = takeDir      l0
         (_, l2) = takeLifetime l1
-        (_, l3) = takeVarOrNet l2
-        (_, l4) = takeType     l3
-        (_, l5) = takeRanges   l4
+        (_, l3) = takeConst    l2
+        (_, l4) = takeVarOrNet l3
+        (_, l5) = takeType     l4
+        (_, l6) = takeRanges   l5
 
 -- internal; parser for leading statements in a procedural block
 parseDTsAsStmt :: [DeclToken] -> [Stmt]
@@ -391,20 +390,26 @@ parseDTsAsComponent :: [DeclToken] -> (Component, [DeclToken])
 parseDTsAsComponent l0 =
     if l /= Nothing && l /= Just Automatic then
         parseError (head l1) "unexpected non-automatic lifetime"
-    else if dir == Local && length l2 == length l5 then
+    else if dir == Local && isImplicit t && not (isNet $ head l3) then
         parseError (head l0) "declaration missing type information"
     else
-        (component, l6)
+        (component, l7)
     where
         (dir, l1) = takeDir      l0
         (l  , l2) = takeLifetime l1
-        (von, l3) = takeVarOrNet l2
-        (tf , l4) = takeType     l3
-        (rs , l5) = takeRanges   l4
-        (tps, l6) = takeTrips    l5
+        (_ct, l3) = takeConst    l2
+        (von, l4) = takeVarOrNet l3
+        (tf , l5) = takeType     l4
+        (rs , l6) = takeRanges   l5
+        (tps, l7) = takeTrips    l6
         position = tokPos $ head l0
-        base = von dir $ tf rs
+        base = von dir t
+        t = tf rs
         component = (position, base, tps)
+
+isImplicit :: Type -> Bool
+isImplicit Implicit{} = True
+isImplicit _ = False
 
 takeTrips :: [DeclToken] -> ([Triplet], [DeclToken])
 takeTrips l0 =
@@ -441,10 +446,15 @@ takeLifetime :: [DeclToken] -> (Maybe Lifetime, [DeclToken])
 takeLifetime (DTLifetime _ l : rest) = (Just  l, rest)
 takeLifetime                   rest  = (Nothing, rest)
 
-takeVarOrNet :: [DeclToken] -> (Direction -> Type -> DeclBase, [DeclToken])
-takeVarOrNet (DTConst{} : DTConst pos : _) =
+takeConst :: [DeclToken] -> (Bool, [DeclToken])
+takeConst (DTConst{} : DTConst pos : _) =
     parseError pos "duplicate const modifier"
-takeVarOrNet (DTConst _ : tokens) = takeVarOrNet tokens
+takeConst (DTConst{} : tokens) = (True, tokens)
+takeConst tokens = (False, tokens)
+
+takeVarOrNet :: [DeclToken] -> (Direction -> Type -> DeclBase, [DeclToken])
+takeVarOrNet (DTNet{} : DTVar pos : _) =
+    parseError pos "unexpected var after net type"
 takeVarOrNet (DTNet _ n s : tokens) = (\d -> Net d n s, tokens)
 takeVarOrNet tokens = (Variable, tokens)
 
@@ -549,6 +559,10 @@ isCommaOrEnd tok = isComma tok
 isPorts :: DeclToken -> Bool
 isPorts DTPorts{} = True
 isPorts _ = False
+
+isNet :: DeclToken -> Bool
+isNet DTNet{} = True
+isNet _ = False
 
 tokPos :: DeclToken -> Position
 tokPos (DTComma    p) = p

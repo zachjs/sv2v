@@ -61,9 +61,8 @@ instance Show Type where
     show (IntegerVector kw sg rs) = printf "%s%s%s" (show kw) (showPadBefore sg) (showRanges rs)
     show (IntegerAtom   kw sg   ) = printf "%s%s"   (show kw) (showPadBefore sg)
     show (NonInteger    kw      ) = printf "%s"     (show kw)
-    show (InterfaceT "" "" r) = "interface" ++ showRanges r
-    show (InterfaceT x y r) = x ++ yStr ++ (showRanges r)
-        where yStr = if null y then "" else '.' : y
+    show (InterfaceT    "" "" rs) = printf "interface%s" ( showRanges rs)
+    show (InterfaceT    xx yy rs) = printf "%s.%s%s" xx yy (showRanges rs)
     show (Enum t vals r) = printf "enum %s{%s}%s" tStr (commas $ map showVal vals) (showRanges r)
         where
             tStr = showPad t
@@ -84,16 +83,6 @@ showFields items = itemsStr
 -- internal representation of a fully implicit or unknown type
 pattern UnknownType :: Type
 pattern UnknownType = Implicit Unspecified []
-
-instance Show ([Range] -> Type) where
-    show tf = show (tf [])
-instance Eq ([Range] -> Type) where
-    (==) tf1 tf2 = (tf1 []) == (tf2 [])
-
-instance Show (Signing -> [Range] -> Type) where
-    show tf = show (tf Unspecified)
-instance Eq (Signing -> [Range] -> Type) where
-    (==) tf1 tf2 = (tf1 Unspecified) == (tf2 Unspecified)
 
 typeRanges :: Type -> ([Range] -> Type, [Range])
 typeRanges typ =
