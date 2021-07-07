@@ -642,7 +642,8 @@ DeclToken :: { DeclToken }
   | PartSelectP                        { uncurry (DTRange $ fst $1) (snd $1) }
   | IdentifierP                        { uncurry DTIdent $1 }
   | DirectionP                         { uncurry DTDir $1 }
-  | LHSConcatP                         { uncurry DTConcat $1 }
+  | LHSConcatP                         { uncurry DTLHSBase $1 }
+  | LHSStreamP                         { uncurry DTLHSBase $1 }
   | PartialTypeP                       { uncurry DTType $1 }
   | NetTypeP Strength                  { uncurry DTNet $1 $2 }
   | PortBindingsP                      { uncurry DTPorts $1 }
@@ -650,8 +651,6 @@ DeclToken :: { DeclToken }
   | "[" Expr "]"                       { DTBit      (tokenPosition $1) $2 }
   | "." Identifier                     { DTDot      (tokenPosition $1) $2 }
   | "automatic"                        { DTLifetime (tokenPosition $1) Automatic }
-  | "{" StreamOp StreamSize Concat "}" { DTStream   (tokenPosition $1) $2 $3           (map toLHS $4) }
-  | "{" StreamOp            Concat "}" { DTStream   (tokenPosition $1) $2 (RawNum 1) (map toLHS $3) }
   | "type" "(" Expr ")"                { uncurry DTType $ makeTypeOf $1 $3 }
   | IncOrDecOperatorP                  { DTAsgn     (fst $1) (AsgnOp $ snd $1) Nothing (RawNum 1) }
   | IdentifierP               "::" Identifier { uncurry DTPSIdent $1    $3 }
@@ -990,12 +989,15 @@ LHS :: { LHS }
   | LHS PartSelectP    { uncurry (LHSRange $1) (snd $2) }
   | LHS "[" Expr "]"   { LHSBit    $1 $3 }
   | LHS "." Identifier { LHSDot    $1 $3 }
-  | LHSConcatP         { LHSConcat $ snd $1 }
-  | "{" StreamOp StreamSize Concat "}" { LHSStream $2 $3         (map toLHS $4) }
-  | "{" StreamOp            Concat "}" { LHSStream $2 (RawNum 1) (map toLHS $3) }
+  | LHSConcatP         { snd $1 }
+  | LHSStreamP         { snd $1 }
 
-LHSConcatP :: { (Position, [LHS]) }
-  : "{" LHSs "}" { withPos $1 $2 }
+LHSStreamP :: { (Position, LHS) }
+  : "{" StreamOp StreamSize Concat "}" { withPos $1 $ LHSStream $2 $3         (map toLHS $4) }
+  | "{" StreamOp            Concat "}" { withPos $1 $ LHSStream $2 (RawNum 1) (map toLHS $3) }
+
+LHSConcatP :: { (Position, LHS) }
+  : "{" LHSs "}" { withPos $1 $ LHSConcat $2 }
 LHSs :: { [LHS] }
   : LHS           { [$1] }
   | LHSs "," LHS  { $1 ++ [$3] }

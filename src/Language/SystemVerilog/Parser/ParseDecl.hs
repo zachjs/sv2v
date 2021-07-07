@@ -66,8 +66,7 @@ data DeclToken
     | DTParams   Position [ParamBinding]
     | DTPorts    Position [PortBinding]
     | DTBit      Position Expr
-    | DTConcat   Position [LHS]
-    | DTStream   Position StreamOp Expr [LHS]
+    | DTLHSBase  Position LHS
     | DTDot      Position Identifier
     | DTSigning  Position Signing
     | DTLifetime Position Lifetime
@@ -357,9 +356,8 @@ takeLHS tokens = takeLHSStep (takeLHSStart tok) toks
     where tok : toks = tokens
 
 takeLHSStart :: DeclToken -> LHS
-takeLHSStart (DTConcat _     lhss) = LHSConcat lhss
-takeLHSStart (DTStream _ o e lhss) = LHSStream o e lhss
-takeLHSStart (DTIdent  _ x       ) = LHSIdent x
+takeLHSStart (DTLHSBase _ lhs) = lhs
+takeLHSStart (DTIdent _ x) = LHSIdent x
 takeLHSStart tok = parseError tok "expected primary token or type"
 
 takeLHSStep :: LHS -> [DeclToken] -> (LHS, [DeclToken])
@@ -580,8 +578,7 @@ tokPos (DTNet      p _ _) = p
 tokPos (DTParams   p _) = p
 tokPos (DTPorts    p _) = p
 tokPos (DTBit      p _) = p
-tokPos (DTConcat   p _) = p
-tokPos (DTStream   p _ _ _) = p
+tokPos (DTLHSBase  p _) = p
 tokPos (DTDot      p _) = p
 tokPos (DTSigning  p _) = p
 tokPos (DTLifetime p _) = p
