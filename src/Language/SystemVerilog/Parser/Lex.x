@@ -498,6 +498,11 @@ postProcess stack (Token Dir_end_keywords _ pos : ts) =
     case stack of
         (_ : stack') -> postProcess stack' ts
         [] -> throwError $ show pos ++ ": unmatched end_keywords"
+postProcess stack (Token Id_escaped str pos : ts) =
+    postProcess stack ts >>= return . (t' :)
+    where
+        t' = Token Id_escaped str' pos
+        str' = (++ " ") $ init str
 postProcess [] (t : ts) = do
     ts' <- postProcess [] ts
     return $ t : ts'
