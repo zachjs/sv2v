@@ -32,6 +32,7 @@ module Language.SystemVerilog.AST
     ) where
 
 import Text.Printf (printf)
+import Data.Bits ((.&.))
 import Data.Hashable (hash)
 
 import Language.SystemVerilog.AST.Attr as Attr
@@ -82,5 +83,5 @@ lhsToExpr (LHSStream o e ls) = Stream o e $ map lhsToExpr ls
 
 shortHash :: (Show a) => a -> String
 shortHash x =
-    take 5 $ printf "%05X" val
+    printf "%05X" $ val .&. 0xFFFFF
     where val = hash $ show x

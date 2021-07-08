@@ -185,6 +185,7 @@ rangeSize (s, e) =
 
 -- returns the size of a range known to be ordered
 rangeSizeHiLo :: Range -> Expr
+rangeSizeHiLo (SizedRange size) = size
 rangeSizeHiLo (hi, lo) =
     simplify $ BinOp Add (BinOp Sub hi lo) (RawNum 1)
 
@@ -206,9 +207,10 @@ endianCondRange r r1 r2 =
 
 -- returns the total size of a set of dimensions
 dimensionsSize :: [Range] -> Expr
+dimensionsSize [] = RawNum 1
 dimensionsSize ranges =
     simplify $
-    foldl (BinOp Mul) (RawNum 1) $
+    foldl1 (BinOp Mul) $
     map rangeSize $
     ranges
 
