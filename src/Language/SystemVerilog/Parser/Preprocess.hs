@@ -16,7 +16,7 @@ module Language.SystemVerilog.Parser.Preprocess
 import Control.Monad.Except
 import Control.Monad.State.Strict
 import Data.Char (ord)
-import Data.List (dropWhileEnd, tails, isPrefixOf, findIndex, intercalate)
+import Data.List (tails, isPrefixOf, findIndex, intercalate)
 import Data.Maybe (isJust, fromJust)
 import System.Directory (findFile)
 import System.FilePath (dropFileName)
@@ -397,34 +397,59 @@ takeMacroArguments = do
         argLoop :: PPS [String]
         argLoop = do
             dropWhitespace
-            (arg, isEnd) <- loop "" []
-            let arg' = dropWhileEnd isWhitespaceChar arg
+            (argRev, isEnd) <- loop "" []
+            let arg = trimAndRev argRev
             if isEnd
-                then return [arg']
+                then return [arg]
                 else do
                     rest <- argLoop
-                    return $ arg' : rest
+                    return $ arg : rest
         loop :: String -> [Char] -> PPS (String, Bool)
         loop curr stack = do
             ch <- takeChar
             case (stack, ch) of
-                (      s,'\\') -> do
-                    ch2 <- takeChar
-                    loop (curr ++ [ch, ch2]) s
                 ([     ], ',') -> return (curr, False)
                 ([     ], ')') -> return (curr, True)
 
-                ('"' : s, '"') -> loop (curr ++ [ch]) s
-                (      s, '"') -> loop (curr ++ [ch]) ('"' : s)
-                ('[' : s, ']') -> loop (curr ++ [ch]) s
-                (      s, '[') -> loop (curr ++ [ch]) ('[' : s)
-                ('(' : s, ')') -> loop (curr ++ [ch]) s
-                (      s, '(') -> loop (curr ++ [ch]) ('(' : s)
-                ('{' : s, '}') -> loop (curr ++ [ch]) s
-                (      s, '{') -> loop (curr ++ [ch]) ('{' : s)
+                -- simple quoted strings, allowing escaped quotes
+                ('\\': s, _  ) -> loop (ch : curr) s
+                ('"' : s, '"') -> loop (ch : curr) s
+                ('"' : _,'\\') -> loop (ch : curr) ('\\': stack)
+                ('"' : _, _  ) -> loop (ch : curr) stack
+                (      _, '"') -> loop (ch : curr) ('"' : stack)
 
-                (      s,'\n') -> loop (curr ++ [' ']) s
-                (      s, _  ) -> loop (curr ++ [ch ]) s
+                ('[' : s, ']') -> loop (ch : curr) s
+                (      s, '[') -> loop (ch : curr) ('[' : s)
+                ('(' : s, ')') -> loop (ch : curr) s
+                (      s, '(') -> loop (ch : curr) ('(' : s)
+                ('{' : s, '}') -> loop (ch : curr) s
+                (      s, '{') -> loop (ch : curr) ('{' : s)
+
+                (      s, '/') -> do
+                    next <- peekChar
+                    case next of
+                        '/' -> takeChar >> dropLineComment >> loop curr s
+                        '*' -> takeChar >> dropBlockComment >> loop curr s
+                        _ -> loop ('/' : curr) s
+
+                (      s,'\n') -> loop (' ' : curr) s
+                (      s, _  ) -> loop (ch  : curr) s
+
+        trimAndRev = -- drop surrounding whitespace and reverse string
+            dropWhile isWhitespaceChar . reverse . dropWhile isWhitespaceChar
+
+        dropLineComment :: PPS ()
+        dropLineComment = do
+            ch <- takeChar
+            when (ch /= '\n') dropLineComment
+
+        dropBlockComment :: PPS ()
+        dropBlockComment = do
+            ch1 <- takeChar
+            ch2 <- peekChar
+            if ch1 == '*' && ch2 == '/'
+                then takeChar >> return ()
+                else dropBlockComment
 
 defaultMacroArgs :: [Maybe String] -> [String] -> PPS [String]
 defaultMacroArgs [] [] = return []
