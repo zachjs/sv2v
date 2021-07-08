@@ -32,14 +32,12 @@ pattern TokenEOF = Token Unknown "" (Position "" 0 0)
 
 data Position
     = Position String Int Int
-    deriving Eq
 
 instance Show Position where
     show (Position f l c) = printf "%s:%d:%d" f l c
 
 data Token
     = Token TokenName String Position
-    deriving (Show, Eq)
 
 data TokenName
     = KW_dollar_bits

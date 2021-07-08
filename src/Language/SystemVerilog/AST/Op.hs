@@ -102,7 +102,7 @@ data AsgnOp
     = AsgnOpEq
     | AsgnOpNonBlocking
     | AsgnOp BinOp
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show AsgnOp where
     show AsgnOpEq = "="

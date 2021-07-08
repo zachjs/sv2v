@@ -226,7 +226,7 @@ data Strength
     = DefaultStrength
     | DriveStrength Strength0 Strength1
     | ChargeStrength ChargeStrength
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show Strength where
     show DefaultStrength = ""
@@ -239,7 +239,7 @@ data Strength0
     | Pull0
     | Weak0
     | Highz0
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show Strength0 where
     show Supply0 = "supply0"
@@ -254,7 +254,7 @@ data Strength1
     | Pull1
     | Weak1
     | Highz1
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show Strength1 where
     show Supply1 = "supply1"
@@ -267,7 +267,7 @@ data ChargeStrength
     = Small
     | Medium
     | Large
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show ChargeStrength where
     show Small  = "small"

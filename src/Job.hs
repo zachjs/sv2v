@@ -24,13 +24,13 @@ data Exclude
     | Interface
     | Logic
     | Succinct
-    deriving (Show, Typeable, Data, Eq)
+    deriving (Typeable, Data, Eq)
 
 data Write
     = Stdout
     | Adjacent
     | File FilePath
-    deriving (Show, Typeable, Data, Eq)
+    deriving (Typeable, Data)
 
 data Job = Job
     { files :: [FilePath]
@@ -43,7 +43,7 @@ data Job = Job
     , verbose :: Bool
     , write :: Write
     , writeRaw :: String
-    } deriving (Show, Typeable, Data)
+    } deriving (Typeable, Data)
 
 version :: String
 version =
