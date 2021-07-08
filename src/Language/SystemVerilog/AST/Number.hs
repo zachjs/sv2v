@@ -23,7 +23,7 @@ import Text.Read (readMaybe)
 -- visual niceties like spaces and underscores
 parseNumber :: String -> Number
 parseNumber = parseNumber' . map toLower . filter (not . isPad)
-    where isPad ch = ch == '_' || ch == ' '
+    where isPad = flip elem "_ \n\t"
 
 parseNumber' :: String -> Number
 parseNumber' ['\'', ch] = UnbasedUnsized ch

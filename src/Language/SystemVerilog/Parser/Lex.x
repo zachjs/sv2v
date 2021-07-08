@@ -53,19 +53,19 @@ import Language.SystemVerilog.Parser.Tokens
     = @fixedPointNumber
     | @unsignedNumber ("." @unsignedNumber)? @exp @sign? @unsignedNumber
 
-@size = @nonZeroUnsignedNumber " "?
+@size = @nonZeroUnsignedNumber $white*
 
-@binaryNumber = @size? @binaryBase " "? @binaryValue
-@octalNumber  = @size? @octalBase  " "? @octalValue
-@hexNumber    = @size? @hexBase    " "? @hexValue
+@binaryNumber = @size? @binaryBase $white* @binaryValue
+@octalNumber  = @size? @octalBase  $white* @octalValue
+@hexNumber    = @size? @hexBase    $white* @hexValue
 
 @unbasedUnsizedLiteral = "'" ( 0 | 1 | x | X | z | Z )
 
 @decimalNumber
     = @unsignedNumber
-    | @size? @decimalBase " "? @unsignedNumber
-    | @size? @decimalBase " "? @xDigit "_"*
-    | @size? @decimalBase " "? @zDigit "_"*
+    | @size? @decimalBase $white* @unsignedNumber
+    | @size? @decimalBase $white* @xDigit "_"*
+    | @size? @decimalBase $white* @zDigit "_"*
 @integralNumber
     = @decimalNumber
     | @octalNumber
