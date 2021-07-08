@@ -10,22 +10,10 @@ module Language.SystemVerilog.Parser.Tokens
     ( Token     (..)
     , TokenName (..)
     , Position  (..)
-    , tokenString
-    , tokenName
-    , tokenPosition
     , pattern TokenEOF
     ) where
 
 import Text.Printf
-
-tokenString :: Token -> String
-tokenString (Token _ s _) = s
-
-tokenName :: Token -> TokenName
-tokenName (Token kw _ _) = kw
-
-tokenPosition :: Token -> Position
-tokenPosition (Token _ _ pos) = pos
 
 pattern TokenEOF :: Token
 pattern TokenEOF = Token Unknown "" (Position "" 0 0)
@@ -36,8 +24,11 @@ data Position
 instance Show Position where
     show (Position f l c) = printf "%s:%d:%d" f l c
 
-data Token
-    = Token TokenName String Position
+data Token = Token
+    { tokenName :: TokenName
+    , tokenString :: String
+    , tokenPosition :: Position
+    }
 
 data TokenName
     = KW_dollar_bits
