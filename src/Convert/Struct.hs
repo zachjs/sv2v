@@ -9,18 +9,16 @@ module Convert.Struct (convert) where
 
 import Control.Monad ((>=>), when)
 import Data.Either (isLeft)
-import Data.List (elemIndex, find, partition)
+import Data.List (elemIndex, find, partition, (\\))
 import Data.Maybe (fromJust)
 import Data.Tuple (swap)
-import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
 
 import Convert.ExprUtils
 import Convert.Scoper
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type StructInfo = (Type, Map.Map Identifier Range)
+type StructInfo = (Type, [(Identifier, Range)])
 
 convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
@@ -74,7 +72,7 @@ convertStruct' isStruct sg fields =
         -- create the mapping structure for the unstructured fields
         keys = map snd fields
         unstructRanges = zip fieldHis fieldLos
-        unstructFields = Map.fromList $ zip keys unstructRanges
+        unstructFields = zip keys unstructRanges
 
         -- create the unstructured type; result type takes on the signing of the
         -- struct itself to preserve behavior of operations on the whole struct
@@ -201,19 +199,16 @@ convertExpr t (Mux c e1 e2) =
         e2' = convertExpr t e2
 
 convertExpr (struct @ (Struct _ fields [])) (Pattern itemsOrig) =
-    if extraNames /= Set.empty then
+    if not (null extraNames) then
         error $ "pattern " ++ show (Pattern itemsOrig) ++
-            " has extra named fields " ++ show (Set.toList extraNames) ++
+            " has extra named fields " ++ show extraNames ++
             " that are not in " ++ show struct
     else if structIsntReady struct then
         Pattern items
     else
-        Concat
-            $ map (uncurry $ Cast . Left)
-            $ zip (map fst fields) (map snd items)
+        Concat $ zipWith (Cast . Left) fieldTypes (map snd items)
     where
-        fieldNames = map snd fields
-        fieldTypeMap = Map.fromList $ map swap fields
+        (fieldTypes, fieldNames) = unzip fields
 
         itemsNamed =
             -- patterns either use positions based or name/type/default
@@ -228,11 +223,9 @@ convertExpr (struct @ (Struct _ fields [])) (Pattern itemsOrig) =
             else
                 zip (map (Right . Ident) fieldNames) (map snd itemsOrig)
         (typedItems, untypedItems) =
-            partition (isLeft . fst) itemsNamed
+            partition (isLeft . fst) $ reverse itemsNamed
         (numberedItems, namedItems) =
             partition (isNumbered . fst) untypedItems
-        namedItemMap = Map.fromList namedItems
-        typedItemMap = Map.fromList typedItems
 
         isNumbered :: TypeOrExpr -> Bool
         isNumbered (Right (Number n)) =
@@ -248,9 +241,7 @@ convertExpr (struct @ (Struct _ fields [])) (Pattern itemsOrig) =
                     ++ " is out of bounds for " ++ show struct
         isNumbered _ = False
 
-        extraNames = Set.difference
-            (Set.fromList $ map (getName . right . fst) namedItems)
-            (Map.keysSet fieldTypeMap)
+        extraNames = map (getName . right . fst) namedItems \\ fieldNames
         right = \(Right x) -> x
         getName :: Expr -> Identifier
         getName (Ident x) = x
@@ -282,12 +273,12 @@ convertExpr (struct @ (Struct _ fields [])) (Pattern itemsOrig) =
                     "' from struct definition " ++ show struct ++
                     " in struct pattern " ++ show (Pattern itemsOrig)
             where
-                valueByName = Map.lookup (Right $ Ident fieldName) namedItemMap
-                valueByType = Map.lookup (Left fieldType) typedItemMap
-                valueDefault = Map.lookup (Left UnknownType) typedItemMap
+                valueByName = lookup (Right $ Ident fieldName) namedItems
+                valueByType = lookup (Left fieldType) typedItems
+                valueDefault = lookup (Left UnknownType) typedItems
                 valueByIndex = fmap snd $ find (indexCheck . fst) numberedItems
 
-                fieldType = fieldTypeMap Map.! fieldName
+                fieldType = fst $ fields !! fieldIndex
                 Just fieldIndex = elemIndex fieldName fieldNames
 
                 isStruct :: Type -> Bool
@@ -513,7 +504,7 @@ lookupFieldInfo struct fieldName =
         Just fieldType = maybeFieldType
         dims = snd $ typeRanges fieldType
         Just (_, unstructRanges) = convertStruct struct
-        Just bounds = Map.lookup fieldName unstructRanges
+        Just bounds = lookup fieldName unstructRanges
 
 -- attempts to convert based on the assignment-like contexts of TF arguments
 convertCall :: Scopes Type -> Expr -> Args -> Args
