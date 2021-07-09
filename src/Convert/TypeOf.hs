@@ -96,9 +96,9 @@ traverseExprM (Cast (Left (Implicit sg [])) expr) =
     -- and `$unsigned` system functions present in Verilog-2005
     traverseExprM $ Call (Ident fn) $ Args [expr] []
     where fn = if sg == Signed then "$signed" else "$unsigned"
-traverseExprM (Cast (Left t) (Number (UnbasedUnsized ch))) =
+traverseExprM (Cast (Left t) (Number (UnbasedUnsized bit))) =
     -- defer until this expression becomes explicit
-    return $ Cast (Left t) (Number (UnbasedUnsized ch))
+    return $ Cast (Left t) (Number (UnbasedUnsized bit))
 traverseExprM (Cast (Left (t @ (IntegerAtom TInteger _))) expr) =
     -- convert to cast to an integer vector type
     traverseExprM $ Cast (Left t') expr

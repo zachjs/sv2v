@@ -68,11 +68,11 @@ convertModuleItem parts (Instance moduleName params instanceName [] bindings) =
             convertExpr (ContextDetermined tag) expr
         replaceBindingExpr :: Identifier -> Int -> Expr -> Expr
         replaceBindingExpr portName idx (orig @ (Repeat _ [ConvertedUU a b])) =
-            if orig == sizedLiteralFor tag ch
+            if orig == sizedLiteralFor tag bit
                 then Repeat portSize [ConvertedUU a b]
                 else orig
             where
-                ch = charForBit a b
+                bit = bitForBased a b
                 portName' =
                     if null portName
                         then lookupBindingName portNames idx
@@ -159,28 +159,21 @@ convertModuleItem' =
     traverseTypes (traverseNestedTypes convertType) .
     traverseAsgns convertAsgn
 
-literalFor :: Char -> Expr
-literalFor 'Z' = literalFor 'z'
-literalFor 'X' = literalFor 'x'
-literalFor '0' = Number $ Based 1 True Binary 0 0
-literalFor '1' = Number $ Based 1 True Binary 1 0
-literalFor 'x' = Number $ Based 1 True Binary 0 1
-literalFor 'z' = Number $ Based 1 True Binary 1 1
-literalFor ch = error $ "unexpected unbased-unsized digit: " ++ [ch]
+literalFor :: Bit -> Expr
+literalFor = Number . (uncurry $ Based 1 True Binary) . bitToVK
 
 pattern ConvertedUU :: Integer -> Integer -> Expr
 pattern ConvertedUU a b = Number (Based 1 True Binary a b)
 
-charForBit :: Integer -> Integer -> Char
-charForBit 0 0 = '0'
-charForBit 1 0 = '1'
-charForBit 0 1 = 'x'
-charForBit 1 1 = 'z'
-charForBit _ _ = error "charForBit invariant violated"
+bitForBased :: Integer -> Integer -> Bit
+bitForBased 0 0 = Bit0
+bitForBased 1 0 = Bit1
+bitForBased 0 1 = BitX
+bitForBased _ _ = BitZ
 
-sizedLiteralFor :: Expr -> Char -> Expr
-sizedLiteralFor expr ch =
-    Repeat size [literalFor ch]
+sizedLiteralFor :: Expr -> Bit -> Expr
+sizedLiteralFor expr bit =
+    Repeat size [literalFor bit]
     where size = DimsFn FnBits $ Right expr
 
 convertAsgn :: (LHS, Expr) -> (LHS, Expr)
@@ -251,14 +244,14 @@ convertExpr context (UniOp op expr) =
     if isSizedUniOp op
         then UniOp op (convertExpr context expr)
         else UniOp op (convertExpr SelfDetermined expr)
-convertExpr SelfDetermined (UU ch) =
-    literalFor ch
-convertExpr (ContextDetermined expr) (UU ch) =
-    sizedLiteralFor expr ch
+convertExpr SelfDetermined (UU bit) =
+    literalFor bit
+convertExpr (ContextDetermined expr) (UU bit) =
+    sizedLiteralFor expr bit
 convertExpr _ other = other
 
-pattern UU :: Char -> Expr
-pattern UU ch = Number (UnbasedUnsized ch)
+pattern UU :: Bit -> Expr
+pattern UU bit = Number (UnbasedUnsized bit)
 
 convertType :: Type -> Type
 convertType (TypeOf e) = TypeOf $ convertExpr SelfDetermined e

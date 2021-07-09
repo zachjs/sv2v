@@ -7,11 +7,13 @@
 module Language.SystemVerilog.AST.Number
     ( Number (..)
     , Base (..)
+    , Bit (..)
     , parseNumber
     , numberBitLength
     , numberIsSigned
     , numberIsSized
     , numberToInteger
+    , bitToVK
     ) where
 
 import Data.Bits (shiftL)
@@ -26,7 +28,10 @@ parseNumber = parseNumber' . map toLower . filter (not . isPad)
     where isPad = flip elem "_ \n\t"
 
 parseNumber' :: String -> Number
-parseNumber' ['\'', ch] = UnbasedUnsized ch
+parseNumber' "'0" = UnbasedUnsized Bit0
+parseNumber' "'1" = UnbasedUnsized Bit1
+parseNumber' "'x" = UnbasedUnsized BitX
+parseNumber' "'z" = UnbasedUnsized BitZ
 parseNumber' str =
     -- simple decimal number
     if maybeIdx == Nothing then
@@ -145,6 +150,26 @@ zDigits = ['z', '?']
 xzDigits :: [Char]
 xzDigits = xDigits ++ zDigits
 
+data Bit
+    = Bit0
+    | Bit1
+    | BitX
+    | BitZ
+    deriving (Eq, Ord)
+
+instance Show Bit where
+    show Bit0 = "0"
+    show Bit1 = "1"
+    show BitX = "x"
+    show BitZ = "z"
+
+-- convet an unbased unsized bit to its (values, kinds) pair
+bitToVK :: Bit -> (Integer, Integer)
+bitToVK Bit0 = (0, 0)
+bitToVK Bit1 = (1, 0)
+bitToVK BitX = (0, 1)
+bitToVK BitZ = (1, 1)
+
 data Base
     = Binary
     | Octal
@@ -157,7 +182,7 @@ instance Show Base where
     show Hex    = "h"
 
 data Number
-    = UnbasedUnsized Char
+    = UnbasedUnsized Bit
     | Decimal Int Bool Integer
     | Based   Int Bool Base Integer Integer
     deriving (Eq, Ord)
@@ -191,8 +216,8 @@ numberIsSigned (Based _ signed _ _ _) = signed
 
 -- get the integer value of a number, provided it has not X or Z bits
 numberToInteger :: Number -> Maybe Integer
-numberToInteger (UnbasedUnsized '1') = Just 1
-numberToInteger (UnbasedUnsized '0') = Just 0
+numberToInteger (UnbasedUnsized Bit1) = Just 1
+numberToInteger (UnbasedUnsized Bit0) = Just 0
 numberToInteger UnbasedUnsized{} = Nothing
 numberToInteger (Decimal _ _ num) = Just num
 numberToInteger (Based _ _ _ num 0) = Just num
@@ -205,10 +230,8 @@ bits n = 1 + bits (quot n 2)
 
 -- number to string conversion
 instance Show Number where
-    show (UnbasedUnsized ch) =
-        if elem ch "01xzXZ"
-            then ['\'', ch]
-            else error $ "illegal unbased-unsized char: " ++ show ch
+    show (UnbasedUnsized bit) =
+        '\'' : show bit
     show (Decimal (-32) True value) =
         if value < 0
             then error $ "illegal decimal: " ++ show value
@@ -326,11 +349,5 @@ instance Semigroup Number where
             toBased (n @ Based{}) = n
             toBased (Decimal size signed num) =
                 Based size signed Hex num 0
-            toBased (UnbasedUnsized ch) =
-                case ch of
-                    '0' -> based 0 0
-                    '1' -> based 1 0
-                    'x' -> based 0 1
-                    'z' -> based 1 1
-                    _ -> error $ "invalid unbased unsized char: " ++ show ch
-                where based = Based 1 False Binary
+            toBased (UnbasedUnsized bit) =
+                uncurry (Based 1 False Binary) (bitToVK bit)

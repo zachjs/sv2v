@@ -116,16 +116,15 @@ convertCastM (RawNum size) (Number (Based 1 True Binary a b)) signed =
     return $ Number $ Based (fromIntegral size) signed Binary
         (val * a) (val * b)
     where val = (2 ^ size) - 1
-convertCastM (RawNum size) (Number (UnbasedUnsized ch)) signed =
+convertCastM (RawNum size) (Number (UnbasedUnsized bit)) signed =
     convertCastM (RawNum size) (Number num) signed
     where
         num = Based 1 True Binary a b
-        (a, b) = case ch of
-            '0' -> (0, 0)
-            '1' -> (1, 0)
-            'x' -> (0, 1)
-            'z' -> (1, 1)
-            _ -> error $ "unexpected unbased-unsized digit: " ++ [ch]
+        (a, b) = case bit of
+            Bit0 -> (0, 0)
+            Bit1 -> (1, 0)
+            BitX -> (0, 1)
+            BitZ -> (1, 1)
 convertCastM size value signed = do
     value' <- traverseExprM value
     useFn <- embedScopes canUseCastFn size

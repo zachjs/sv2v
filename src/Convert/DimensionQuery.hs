@@ -79,7 +79,7 @@ convertExpr (DimFn f (Left t) (Number n)) =
     if isUnresolved t then
         DimFn f (Left t) (Number n)
     else if d <= 0 || d > length rs then
-        Number $ UnbasedUnsized 'x'
+        Number $ UnbasedUnsized BitX
     else case f of
         FnLeft -> fst r
         FnRight -> snd r
