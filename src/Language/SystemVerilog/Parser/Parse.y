@@ -874,7 +874,7 @@ ClassItemQualifier :: { Qualifier }
   | "protected" { QProtected }
 
 PackageOrClassItem :: { [PackageItem] }
-  : DeclTokens(";")    { map Decl $ parseDTsAsDecls $1 }
+  : DeclTokens(";")    { map Decl $ parseDTsAsDecl $1 }
   | ParameterDecl(";") { map Decl $1 }
   | NonDeclPackageItem { $1 }
 NonDeclPackageItem :: { [PackageItem] }
@@ -951,7 +951,7 @@ ExplicitLifetime :: { Lifetime }
   | "automatic" { Automatic }
 
 TFItems :: { [Decl] }
-  : "(" DeclTokens(")") ";" { parseDTsAsDecls $2 }
+  : "(" DeclTokens(")") ";" { parseDTsAsTFDecls $2 }
   | "("            ")"  ";" { [] }
   |                     ";" { [] }
 
