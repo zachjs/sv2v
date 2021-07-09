@@ -18,20 +18,19 @@
 module Convert.UnbasedUnsized (convert) where
 
 import Control.Monad.Writer.Strict
-import Data.Maybe (catMaybes)
+import Data.Maybe (mapMaybe)
 import qualified Data.Map.Strict as Map
 
 import Convert.ExprUtils
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type Part = ([Identifier], [ModuleItem])
+type Part = [ModuleItem]
 type Parts = Map.Map Identifier Part
 
 data ExprContext
     = SelfDetermined
     | ContextDetermined Expr
-    deriving (Eq, Show)
 
 convert :: [AST] -> [AST]
 convert files =
@@ -41,8 +40,8 @@ convert files =
         convertDescription = traverseModuleItems $ convertModuleItem parts
 
 collectPartsM :: Description -> Writer Parts ()
-collectPartsM (Part _ _ _ _ name ports items) =
-    tell $ Map.singleton name (ports, items)
+collectPartsM (Part _ _ _ _ name _ items) =
+    tell $ Map.singleton name items
 collectPartsM _ = return ()
 
 convertModuleItem :: Parts -> ModuleItem -> ModuleItem
@@ -52,8 +51,8 @@ convertModuleItem parts (Instance moduleName params instanceName [] bindings) =
                 Instance moduleName params instanceName [] bindings'
         else Instance moduleName params instanceName [] bindings
     where
-        bindings' = zipWith convertBinding bindings [0..]
-        (portNames, moduleItems) =
+        bindings' = map convertBinding bindings
+        moduleItems =
             case Map.lookup moduleName parts of
                 Nothing -> error $ "could not find module: " ++ moduleName
                 Just partInfo -> partInfo
@@ -61,40 +60,30 @@ convertModuleItem parts (Instance moduleName params instanceName [] bindings) =
         isTypeParam (MIPackageItem (Decl ParamType{})) = True
         isTypeParam _ = False
         tag = Ident "~~uub~~"
-        convertBinding :: PortBinding -> Int -> PortBinding
-        convertBinding (portName, expr) idx =
+        convertBinding :: PortBinding -> PortBinding
+        convertBinding (portName, expr) =
             (portName, ) $
-            traverseNestedExprs (replaceBindingExpr portName idx) $
+            traverseNestedExprs (replaceBindingExpr portName) $
             convertExpr (ContextDetermined tag) expr
-        replaceBindingExpr :: Identifier -> Int -> Expr -> Expr
-        replaceBindingExpr portName idx (orig @ (Repeat _ [ConvertedUU a b])) =
+        replaceBindingExpr :: Identifier -> Expr -> Expr
+        replaceBindingExpr portName (orig @ (Repeat _ [ConvertedUU a b])) =
             if orig == sizedLiteralFor tag bit
                 then Repeat portSize [ConvertedUU a b]
                 else orig
             where
                 bit = bitForBased a b
-                portName' =
-                    if null portName
-                        then lookupBindingName portNames idx
-                        else portName
-                portSize = determinePortSize portName' params moduleItems
-        replaceBindingExpr _ _ other = other
+                portSize = determinePortSize portName params moduleItems
+        replaceBindingExpr _ other = other
 convertModuleItem _ other = convertModuleItem' other
 
 determinePortSize :: Identifier -> [ParamBinding] -> [ModuleItem] -> Expr
 determinePortSize portName instanceParams moduleItems =
     step (reverse initialMapping) moduleItems
     where
-        moduleParams = parameterNames moduleItems
-        initialMapping = catMaybes $
-            zipWith createParamReplacement instanceParams [0..]
-        createParamReplacement
-            :: ParamBinding -> Int -> Maybe (Identifier, Expr)
-        createParamReplacement ("", b) idx =
-            createParamReplacement (paramName, b) idx
-            where paramName = lookupBindingName moduleParams idx
-        createParamReplacement (_, Left _) _ = Nothing
-        createParamReplacement (paramName, Right expr) _ =
+        initialMapping = mapMaybe createParamReplacement instanceParams
+        createParamReplacement :: ParamBinding -> Maybe (Identifier, Expr)
+        createParamReplacement (_, Left _) = Nothing
+        createParamReplacement (paramName, Right expr) =
             Just (paramName, tagExpr expr)
 
         step :: [(Identifier, Expr)] -> [ModuleItem] -> Expr
@@ -136,22 +125,6 @@ substituteExpr mapping expr =
 tagExpr :: Expr -> Expr
 tagExpr (Ident x) = Ident (':' : x)
 tagExpr expr = traverseSinglyNestedExprs tagExpr expr
-
--- given a list of module items, produces the parameter names in order
-parameterNames :: [ModuleItem] -> [Identifier]
-parameterNames =
-    execWriter . mapM (collectNestedModuleItemsM $ collectDeclsM collectDeclM)
-    where
-        collectDeclM :: Decl -> Writer [Identifier] ()
-        collectDeclM (Param Parameter   _ x _) = tell [x]
-        collectDeclM (ParamType Parameter x _) = tell [x]
-        collectDeclM _ = return ()
-
-lookupBindingName :: [Identifier] -> Int -> Identifier
-lookupBindingName names idx =
-    if idx < length names
-        then names !! idx
-        else error $ "out of bounds binding " ++ show (names, idx)
 
 convertModuleItem' :: ModuleItem -> ModuleItem
 convertModuleItem' =
@@ -251,7 +224,7 @@ convertExpr (ContextDetermined expr) (UU bit) =
 convertExpr _ other = other
 
 pattern UU :: Bit -> Expr
-pattern UU bit = Number (UnbasedUnsized bit)
+pattern UU bit <- Number (UnbasedUnsized bit)
 
 convertType :: Type -> Type
 convertType (TypeOf e) = TypeOf $ convertExpr SelfDetermined e
