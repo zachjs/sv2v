@@ -45,6 +45,8 @@ module top;
         $display("args %b", $size(RamPair, 1'h1));
         $display("args %b", $size(RamPair, 1'd1));
         $display("args %b", $size(RamPair, 1'dx));
+        $display("args %b", $size(RamPair, '0));
+        $display("args %b", $size(RamPair, 'x));
         $display("args %b", $size(RamPair, $bits(integer) - 31));
         $display("args %b", $size(integer, $bits(integer) - 31));
 
