@@ -181,7 +181,8 @@ castFnName size signed =
             Number n ->
                 case numberToInteger n of
                     Just v -> show v
-                    _ -> shortHash size
+                    _ -> error $ "size cast width " ++ show n
+                            ++ " is not an integer"
             _ -> shortHash size
         suffix = if signed then "_signed" else ""
 
