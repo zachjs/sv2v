@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
@@ -44,7 +45,15 @@ traverseDeclM decl = do
         _ -> return ()
     return decl'
 
+pattern SimpleVector :: Signing -> Integer -> Integer -> Type
+pattern SimpleVector sg l r <- IntegerVector _ sg [(RawNum l, RawNum r)]
+
 insertExpr :: Identifier -> Expr -> Scoper Expr ()
+insertExpr ident (Cast (Left (SimpleVector sg l r)) (Number n)) =
+    insertExpr ident $ Number $ numberCast signed size n
+    where
+        signed = sg == Signed
+        size = fromIntegral $ abs $ l - r + 1
 insertExpr ident expr = do
     expr' <- substituteExprM expr
     when (isSimpleExpr expr') $ insertElem ident expr'
