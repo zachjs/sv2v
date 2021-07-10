@@ -36,8 +36,6 @@ traverseDeclM decl = do
     case decl' of
         Param Localparam UnknownType x e ->
             insertExpr x e
-        Param Localparam (Implicit _ [(RawNum 31, RawNum 0)]) x e ->
-            insertExpr x e
         Param Localparam (Implicit sg rs) x e ->
             insertExpr x $ Cast (Left t) e
             where t = IntegerVector TLogic sg rs

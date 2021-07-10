@@ -570,7 +570,7 @@ inlineInstance global ranges modportBindings items partName
         makeParameterBind (x, Left t) =
             ParamType Localparam (paramTmp ++ x) t
         makeParameterBind (x, Right e) =
-            Param Localparam (TypeOf e) (paramTmp ++ x) e
+            Param Localparam UnknownType (paramTmp ++ x) e
 
         overrideParam :: Decl -> Decl
         overrideParam (Param Parameter t x e) =
