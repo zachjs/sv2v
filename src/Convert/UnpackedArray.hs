@@ -37,13 +37,14 @@ convertDescription other = other
 
 -- tracks multi-dimensional unpacked array declarations
 traverseDeclM :: [Identifier] -> Decl -> ST Decl
-traverseDeclM _ (decl @ (Variable _ _ _ [] _)) = return decl
-traverseDeclM ports (decl @ (Variable _ _ x _ e)) = do
+traverseDeclM _ (decl @ (Variable _ _ _ [] e)) =
+    traverseExprArgsM e >> return decl
+traverseDeclM ports (decl @ (Variable dir _ x _ e)) = do
     insertElem x decl
-    if elem x ports || e /= Nil
+    if dir /= Local || elem x ports || e /= Nil
         then flatUsageM x
         else return ()
-    return decl
+    traverseExprArgsM e >> return decl
 traverseDeclM ports decl @ Net{} =
     traverseNetAsVarM (traverseDeclM ports) decl
 traverseDeclM _ other = return other
@@ -89,12 +90,24 @@ traverseStmtM :: Stmt -> ST Stmt
 traverseStmtM =
     traverseStmtLHSsM  traverseLHSM  >=>
     traverseStmtExprsM traverseExprM >=>
-    traverseStmtAsgnsM traverseAsgnM
+    traverseStmtAsgnsM traverseAsgnM >=>
+    traverseStmtArgsM
+
+traverseStmtArgsM :: Stmt -> ST Stmt
+traverseStmtArgsM stmt @ (Subroutine _ (Args args [])) =
+    mapM_ flatUsageM args >> return stmt
+traverseStmtArgsM stmt = return stmt
 
 traverseExprM :: Expr -> ST Expr
 traverseExprM (Range x mode i) =
     flatUsageM x >> return (Range x mode i)
-traverseExprM other = return other
+traverseExprM expr = traverseExprArgsM expr
+
+traverseExprArgsM :: Expr -> ST Expr
+traverseExprArgsM expr @ (Call _ (Args args [])) =
+    mapM_ (traverseExprArgsM >> flatUsageM) args >> return expr
+traverseExprArgsM expr =
+    traverseSinglyNestedExprsM traverseExprArgsM expr
 
 traverseLHSM :: LHS -> ST LHS
 traverseLHSM x = flatUsageM x >> return x
