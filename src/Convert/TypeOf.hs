@@ -391,10 +391,8 @@ typeCastUnneeded t1 t2 =
 
 -- explicitly sizes top level numbers used in arithmetic expressions
 makeExplicit :: Expr -> Expr
-makeExplicit (Number (Decimal size signed values)) =
-    Number $ Decimal (abs size) signed values
-makeExplicit (Number (Based size base signed values kinds)) =
-    Number $ Based (abs size) base signed values kinds
+makeExplicit (Number n) =
+    Number $ numberCast (numberIsSigned n) (fromIntegral $ numberBitLength n) n
 makeExplicit (BinOp op e1 e2) =
     BinOp op (makeExplicit e1) (makeExplicit e2)
 makeExplicit (UniOp op e) =

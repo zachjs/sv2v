@@ -13,6 +13,7 @@ module Language.SystemVerilog.AST.Number
     , numberIsSigned
     , numberIsSized
     , numberToInteger
+    , numberCast
     , bitToVK
     ) where
 
@@ -332,10 +333,7 @@ instance Semigroup Number where
         where
             size = size1 + size2
             signed = False
-            base =
-                if kinds1 == 0 && kinds2 == 0
-                    then min base1 base2
-                    else Binary
+            base = selectBase (min base1 base2) values kinds
             trim = flip mod . (2 ^)
             values = trim size2 values2 + shiftL (trim size1 values1) size2
             kinds = trim size2 kinds2 + shiftL (trim size1 kinds1) size2
@@ -351,3 +349,67 @@ instance Semigroup Number where
                 Based size signed Hex num 0
             toBased (UnbasedUnsized bit) =
                 uncurry (Based 1 False Binary) (bitToVK bit)
+
+-- size cast raw bits with optional sign extension
+rawCast :: Bool -> Int -> Int -> Integer -> Integer
+rawCast signed inSize outSize val =
+    if outSize <= inSize then
+        val `mod` (2 ^ outSize)
+    else if signed && val >= 2 ^ (inSize - 1) then
+        valTrim + 2 ^ outSize - 2 ^ inSize
+    else
+        valTrim
+    where valTrim = val `mod` (2 ^ inSize)
+
+-- check if the based number is valid under the given base
+checkBase :: Integer -> Integer -> Integer -> Bool
+checkBase _ _ 0 = True
+checkBase base v k =
+    -- kind bits in this chunk must all be the same
+    (rK == 0 || rK == base - 1) &&
+    -- if the X/Z, it must be all X or all Z
+    (rK == 0 || rV == 0 || rV == base - 1) &&
+    -- check the next chunk
+    checkBase base qV qK
+    where
+        (qV, rV) = v `divMod` base
+        (qK, rK) = k `divMod` base
+
+-- select the maximal valid base
+selectBase :: Base -> Integer -> Integer -> Base
+selectBase Binary _ _ = Binary
+selectBase Octal v k =
+    if checkBase 8 v k
+        then Octal
+        else Binary
+selectBase Hex v k =
+    if checkBase 16 v k
+        then Hex
+        else selectBase Octal v k
+
+-- utility for size and/or sign casting a number
+numberCast :: Bool -> Int -> Number -> Number
+numberCast outSigned outSize (Decimal inSizeRaw inSigned inVal) =
+    Decimal outSize outSigned outVal
+    where
+        inSize = abs inSizeRaw
+        outVal = rawCast inSigned inSize outSize inVal
+numberCast outSigned outSize (Based inSizeRaw inSigned inBase inVal inKnd) =
+    Based outSize outSigned outBase outVal outKnd
+    where
+        inSize = abs inSizeRaw
+        -- sign extend signed inputs, or unsized literals with a leading X/Z
+        doExtend = inSigned || inKnd >= 2 ^ (inSize - 1) && inSizeRaw < 0
+        outVal = rawCast doExtend inSize outSize inVal
+        outKnd = rawCast doExtend inSize outSize inKnd
+        -- note that we could try patching the upper bits of the result to allow
+        -- the use of a higher base as in 5'(6'ozx), but this should be rare
+        outBase = selectBase inBase outVal outKnd
+numberCast signed size (UnbasedUnsized bit) =
+    numberCast signed size $
+    uncurry (Based 1 True Binary) $
+        case bit of
+            Bit0 -> (0, 0)
+            Bit1 -> (1, 0)
+            BitX -> (0, 1)
+            BitZ -> (1, 1)

@@ -109,22 +109,12 @@ traverseExprM other =
     traverseSinglyNestedExprsM traverseExprM other
 
 convertCastM :: Expr -> Expr -> Bool -> ST Expr
-convertCastM (RawNum size) (RawNum val) signed =
-    return $ Number $ Decimal (fromIntegral size) signed val'
-    where val' = val `mod` (2 ^ size)
-convertCastM (RawNum size) (Number (Based 1 True Binary a b)) signed =
-    return $ Number $ Based (fromIntegral size) signed Binary
-        (val * a) (val * b)
-    where val = (2 ^ size) - 1
-convertCastM (RawNum size) (Number (UnbasedUnsized bit)) signed =
-    convertCastM (RawNum size) (Number num) signed
-    where
-        num = Based 1 True Binary a b
-        (a, b) = case bit of
-            Bit0 -> (0, 0)
-            Bit1 -> (1, 0)
-            BitX -> (0, 1)
-            BitZ -> (1, 1)
+convertCastM (Number size) (Number value) signed =
+    return $ Number $
+    case numberToInteger size of
+        Just size' -> numberCast signed (fromIntegral size') value
+        Nothing -> error $ "size cast width " ++ show size
+                        ++ " is not an integer"
 convertCastM size value signed = do
     value' <- traverseExprM value
     useFn <- embedScopes canUseCastFn size
