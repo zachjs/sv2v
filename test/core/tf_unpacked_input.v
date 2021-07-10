@@ -19,4 +19,7 @@ module top;
         #1 arr2[2] = 9; dump(arr2);
         #1 arr2[3] = 7; dump(arr2);
     end
+    reg [7:0] arr3 [0:3];
+    wire [31:0] arr3_flat = {arr3[0], arr3[1], arr3[2], arr3[3]};
+    initial $readmemh("tf_unpacked_input.mem", arr3);
 endmodule

@@ -94,6 +94,8 @@ traverseStmtM =
     traverseStmtArgsM
 
 traverseStmtArgsM :: Stmt -> ST Stmt
+traverseStmtArgsM stmt @ (Subroutine (Ident ('$' : _)) _) =
+    return stmt
 traverseStmtArgsM stmt @ (Subroutine _ (Args args [])) =
     mapM_ flatUsageM args >> return stmt
 traverseStmtArgsM stmt = return stmt

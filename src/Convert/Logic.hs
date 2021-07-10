@@ -206,7 +206,7 @@ traverseStmtM (Timing timing stmt) =
     return $ Timing timing stmt
 traverseStmtM (Subroutine (Ident f) args) = do
     case args of
-        Args [_, Ident x, _] [] ->
+        Args (_ : Ident x : _) [] ->
             if f == "$readmemh" || f == "$readmemb"
                 then collectLHSM $ LHSIdent x
                 else return ()
