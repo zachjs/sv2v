@@ -13,9 +13,26 @@ convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions $ traverseModuleItems convertModuleItem
 
 convertModuleItem :: ModuleItem -> ModuleItem
-convertModuleItem =
-    traverseTypes (traverseNestedTypes convertType) .
-    traverseExprs (traverseNestedExprs convertExpr)
+convertModuleItem = traverseNodes
+    traverseExpr traverseDecl traverseType traverseLHS traverseStmt
+    where
+        traverseDecl = traverseDeclNodes traverseType traverseExpr
+        traverseLHS = traverseNestedLHSs $ traverseLHSExprs traverseExpr
+        traverseStmt = traverseNestedStmts $
+            traverseStmtDecls (traverseDeclNodes traverseType id) .
+            traverseStmtExprs traverseExpr
+
+traverseType :: Type -> Type
+traverseType =
+    traverseSinglyNestedTypes traverseType .
+    traverseTypeExprs traverseExpr .
+    convertType
+
+traverseExpr :: Expr -> Expr
+traverseExpr =
+    traverseSinglyNestedExprs traverseExpr .
+    traverseExprTypes traverseType .
+    convertExpr
 
 convertType :: Type -> Type
 convertType (Struct pk fields rs) =

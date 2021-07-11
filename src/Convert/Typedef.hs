@@ -72,8 +72,7 @@ traverseGenItemM = traverseGenItemExprsM traverseExprM
 
 traverseDeclM :: Decl -> Scoper Type Decl
 traverseDeclM decl = do
-    decl' <- traverseDeclExprsM traverseExprM decl
-        >>= traverseDeclTypesM traverseTypeM
+    decl' <- traverseDeclNodesM traverseTypeM traverseExprM decl
     case decl' of
         Variable{} -> return decl'
         Net{} -> return decl'
@@ -110,7 +109,4 @@ traverseTypeM other =
     >>= traverseTypeExprsM traverseExprM
 
 traverseRangeM :: Range -> Scoper Type Range
-traverseRangeM (a, b) = do
-    a' <- traverseExprM a
-    b' <- traverseExprM b
-    return (a', b')
+traverseRangeM = mapBothM traverseExprM

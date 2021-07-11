@@ -142,8 +142,7 @@ convert files =
                                     then Parameter
                                     else Localparam
                 rewriteDecl other =
-                    traverseDeclTypes rewriteType $
-                    traverseDeclExprs rewriteExpr other
+                    traverseDeclNodes rewriteType rewriteExpr other
                 additionalParamItems = concatMap makeAddedParams $
                     Map.toList $ Map.map snd inst
                 rewriteExpr :: Expr -> Expr

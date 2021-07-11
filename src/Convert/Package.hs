@@ -310,8 +310,7 @@ processItems topName packageName moduleItems = do
 
         traverseDeclM :: Decl -> Scope Decl
         traverseDeclM decl = do
-            decl' <- traverseDeclTypesM traverseTypeM decl
-                    >>= traverseDeclExprsM traverseExprM
+            decl' <- traverseDeclNodesM traverseTypeM traverseExprM decl
             case decl' of
                 Variable d t x a e -> declHelp x $ \x' -> Variable d t x' a e
                 Net  d n s t x a e -> declHelp x $ \x' -> Net  d n s t x' a e
@@ -320,21 +319,36 @@ processItems topName packageName moduleItems = do
                 CommentDecl c -> return $ CommentDecl c
             where declHelp x f = prefixIdent x >>= return . f
 
+        traverseRangeM :: Range -> Scope Range
+        traverseRangeM = mapBothM traverseExprM
+
+        traverseEnumItemM :: (Identifier, Expr) -> Scope (Identifier, Expr)
+        traverseEnumItemM (x, e) = do
+            x' <- prefixIdent x
+            e' <- traverseExprM e
+            return (x', e')
+
         traverseTypeM :: Type -> Scope Type
         traverseTypeM (CSAlias p b x rs) = do
             x' <- resolveCSIdent' p b x
-            return $ Alias x' rs
+            rs' <- mapM traverseRangeM rs
+            return $ Alias x' rs'
         traverseTypeM (PSAlias p x rs) = do
             x' <- resolvePSIdent' p x
-            return $ Alias x' rs
-        traverseTypeM (Alias x rs) =
-            resolveIdent x >>= \x' -> return $ Alias x' rs
+            rs' <- mapM traverseRangeM rs
+            return $ Alias x' rs'
+        traverseTypeM (Alias x rs) = do
+            rs' <- mapM traverseRangeM rs
+            x' <- resolveIdent x
+            return $ Alias x' rs'
         traverseTypeM (Enum t enumItems rs) = do
             t' <- traverseTypeM t
-            enumItems' <- mapM prefixEnumItem enumItems
-            return $ Enum t' enumItems' rs
-            where prefixEnumItem (x, e) = prefixIdent x >>= \x' -> return (x', e)
-        traverseTypeM other = traverseSinglyNestedTypesM traverseTypeM other
+            enumItems' <- mapM traverseEnumItemM enumItems
+            rs' <- mapM traverseRangeM rs
+            return $ Enum t' enumItems' rs'
+        traverseTypeM other =
+            traverseSinglyNestedTypesM traverseTypeM other
+            >>= traverseTypeExprsM traverseExprM
 
         traverseExprM :: Expr -> Scope Expr
         traverseExprM (CSIdent p b x) = do
@@ -344,7 +358,9 @@ processItems topName packageName moduleItems = do
             x' <- resolvePSIdent' p x
             return $ Ident x'
         traverseExprM (Ident x) = resolveIdent x >>= return . Ident
-        traverseExprM other = traverseSinglyNestedExprsM traverseExprM other
+        traverseExprM other =
+            traverseSinglyNestedExprsM traverseExprM other
+            >>= traverseExprTypesM traverseTypeM
 
         traverseLHSM :: LHS -> Scope LHS
         traverseLHSM (LHSIdent x) = resolveIdent x >>= return . LHSIdent
@@ -735,9 +751,9 @@ traverseStmtIdentsM identMapper = fullMapper
 
 -- visits all identifiers in a declaration
 traverseDeclIdentsM :: Monad m => MapperM m Identifier -> MapperM m Decl
-traverseDeclIdentsM identMapper =
-    traverseDeclExprsM (traverseExprIdentsM identMapper) >=>
-    traverseDeclTypesM (traverseTypeIdentsM identMapper)
+traverseDeclIdentsM identMapper = traverseDeclNodesM
+    (traverseTypeIdentsM identMapper)
+    (traverseExprIdentsM identMapper)
 
 -- returns any names defined by a package item
 piNames :: PackageItem -> [Identifier]

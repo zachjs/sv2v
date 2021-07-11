@@ -44,8 +44,7 @@ traverseDeclM :: Decl -> ST Decl
 traverseDeclM decl @ Net{} =
     traverseNetAsVarM traverseDeclM decl
 traverseDeclM decl = do
-    decl' <- traverseDeclExprsM traverseExprM decl
-        >>= traverseDeclTypesM traverseTypeM
+    decl' <- traverseDeclNodesM traverseTypeM traverseExprM decl
     case decl' of
         Variable _ (Implicit sg rs) ident a _ ->
             -- implicit types, which are commonly found in function return

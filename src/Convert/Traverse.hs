@@ -10,6 +10,7 @@ module Convert.Traverse
 , CollectorM
 , unmonad
 , collectify
+, mapBothM
 , traverseDescriptionsM
 , traverseDescriptions
 , collectDescriptionsM
@@ -54,6 +55,8 @@ module Convert.Traverse
 , traverseGenItemExprsM
 , traverseGenItemExprs
 , collectGenItemExprsM
+, traverseDeclNodesM
+, traverseDeclNodes
 , traverseDeclExprsM
 , traverseDeclExprs
 , collectDeclExprsM
@@ -531,7 +534,7 @@ traverseExprsM :: Monad m => MapperM m Expr -> MapperM m ModuleItem
 traverseExprsM exprMapper =
     traverseNodesM exprMapper declMapper typeMapper lhsMapper stmtMapper
     where
-    declMapper = traverseDeclExprsM exprMapper
+    declMapper = traverseDeclNodesM typeMapper exprMapper
     typeMapper = traverseNestedTypesM (traverseTypeExprsM exprMapper)
     lhsMapper = traverseNestedLHSsM (traverseLHSExprsM exprMapper)
     stmtMapper = traverseNestedStmtsM (traverseStmtExprsM exprMapper)
@@ -935,12 +938,11 @@ traverseGenItemExprs = unmonad traverseGenItemExprsM
 collectGenItemExprsM :: Monad m => CollectorM m Expr -> CollectorM m GenItem
 collectGenItemExprsM = collectify traverseGenItemExprsM
 
-traverseDeclExprsM :: Monad m => MapperM m Expr -> MapperM m Decl
-traverseDeclExprsM exprMapper =
+traverseDeclNodesM
+    :: Monad m => MapperM m Type -> MapperM m Expr -> MapperM m Decl
+traverseDeclNodesM typeMapper exprMapper =
     declMapper
     where
-        typeMapper = traverseNestedTypesM (traverseTypeExprsM exprMapper)
-
         declMapper (Param s t x e) = do
             t' <- typeMapper t
             e' <- exprMapper e
@@ -961,21 +963,24 @@ traverseDeclExprsM exprMapper =
         declMapper (CommentDecl c) =
             return $ CommentDecl c
 
+traverseDeclNodes :: Mapper Type -> Mapper Expr -> Mapper Decl
+traverseDeclNodes typeMapper exprMapper =
+    runIdentity . traverseDeclNodesM
+        (return . typeMapper)
+        (return . exprMapper)
+
+traverseDeclExprsM :: Monad m => MapperM m Expr -> MapperM m Decl
+traverseDeclExprsM exprMapper = traverseDeclNodesM typeMapper exprMapper
+    where typeMapper = traverseNestedTypesM (traverseTypeExprsM exprMapper)
+
 traverseDeclExprs :: Mapper Expr -> Mapper Decl
 traverseDeclExprs = unmonad traverseDeclExprsM
 collectDeclExprsM :: Monad m => CollectorM m Expr -> CollectorM m Decl
 collectDeclExprsM = collectify traverseDeclExprsM
 
 traverseDeclTypesM :: Monad m => MapperM m Type -> MapperM m Decl
-traverseDeclTypesM mapper (Param s t x e) =
-    mapper t >>= \t' -> return $ Param s t' x e
-traverseDeclTypesM mapper (ParamType s x t) =
-    mapper t >>= \t' -> return $ ParamType s x t'
-traverseDeclTypesM mapper (Variable d t x a e) =
-    mapper t >>= \t' -> return $ Variable d t' x a e
-traverseDeclTypesM mapper (Net d n s t x a e) =
-    mapper t >>= \t' -> return $ Net d n s t' x a e
-traverseDeclTypesM _ (CommentDecl c) = return $ CommentDecl c
+traverseDeclTypesM typeMapper = traverseDeclNodesM typeMapper exprMapper
+    where exprMapper = traverseNestedExprsM (traverseExprTypesM typeMapper)
 
 traverseDeclTypes :: Mapper Type -> Mapper Decl
 traverseDeclTypes = unmonad traverseDeclTypesM
@@ -990,8 +995,7 @@ traverseTypesM typeMapper =
         lhsMapper = traverseNestedLHSsM (traverseLHSExprsM exprMapper)
         stmtMapper = traverseNestedStmtsM $
             traverseStmtDeclsM declMapper >=> traverseStmtExprsM exprMapper
-        declMapper =
-            traverseDeclExprsM exprMapper >=> traverseDeclTypesM typeMapper
+        declMapper = traverseDeclNodesM typeMapper exprMapper
 
 traverseTypes :: Mapper Type -> Mapper ModuleItem
 traverseTypes = unmonad traverseTypesM
