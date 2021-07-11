@@ -131,9 +131,21 @@ traverseExprM other =
 elaborateSizeCast :: Expr -> Expr -> ST Expr
 elaborateSizeCast size value = do
     t <- typeof value
-    case typeSignedness t of
-        Unspecified -> return $ Cast (Right size) value
-        sg -> traverseExprM $ Cast (Left $ typeOfSize sg size) value
+    force <- isStringParam value
+    case (typeSignedness t, force) of
+        (Unspecified, False)-> return $ Cast (Right size) value
+        (sg, _) -> traverseExprM $ Cast (Left $ typeOfSize sg size) value
+
+-- string params use a self-referential type to enable the string param
+-- conversion to add a synthetic parameter if necessary; this check enables size
+-- casts to assume a string parameter is unsigned regardless of its length
+isStringParam :: Expr -> ST Bool
+isStringParam (Ident x) = do
+    details <- lookupElemM x
+    return $ case details of
+        Nothing -> False
+        Just (_, _, typ) -> typ == TypeOf (Ident x)
+isStringParam _ = return False
 
 -- convert TypeOf in a Type
 traverseTypeM :: Type -> ST Type

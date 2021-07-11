@@ -199,4 +199,11 @@ module top;
     `ASSERT_UNSIGNED(integer_signed[1])
     `ASSERT_UNSIGNED(integer_unsigned[0])
     `ASSERT_UNSIGNED(integer_unsigned[1])
+
+    parameter STR_P = "foo";
+    localparam STR_L = "foo";
+    `ASSERT_UNSIGNED(STR_P)
+    `ASSERT_UNSIGNED(STR_L)
+    `ASSERT_UNSIGNED(64'(STR_P))
+    `ASSERT_UNSIGNED(64'(STR_L))
 endmodule
