@@ -610,7 +610,8 @@ convertDescription pis (orig @ Part{}) =
         else Part attrs extern kw lifetime name ports items'
     where
         Part attrs extern kw lifetime name ports items = orig
-        items' = addItems pis Set.empty (map addUsedPIs items)
+        items' = addItems pis Set.empty $ map addUsedPIs $
+            foldr breakGenerate [] items -- ensure decls are visible
 convertDescription _ other = other
 
 -- attempt to fix simple declaration order issues

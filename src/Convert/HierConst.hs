@@ -19,6 +19,7 @@
 
 module Convert.HierConst (convert) where
 
+import Control.Monad (when)
 import Data.Either (fromLeft)
 import qualified Data.Map.Strict as Map
 
@@ -86,7 +87,9 @@ traverseExprM (expr @ (Dot _ x)) = do
         (Just ([_, _], _, Left{}), Just ([_, _], _, Left{})) ->
             return $ Ident x
         (Just (accesses @ [Access _ Nil, _], _, Left False), _) -> do
-            insertElem accesses (Left True)
+            details <- lookupElemM $ prefix x
+            when (details == Nothing) $
+                insertElem accesses (Left True)
             return $ Ident $ prefix x
         (Just ([Access _ Nil, _], _, Left True), _) ->
             return $ Ident $ prefix x

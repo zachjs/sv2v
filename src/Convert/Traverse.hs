@@ -11,6 +11,7 @@ module Convert.Traverse
 , unmonad
 , collectify
 , mapBothM
+, breakGenerate
 , traverseDescriptionsM
 , traverseDescriptions
 , collectDescriptionsM
@@ -132,21 +133,21 @@ traverseDescriptions = map
 collectDescriptionsM :: Monad m => CollectorM m Description -> CollectorM m AST
 collectDescriptionsM = mapM_
 
-breakGenerate :: ModuleItem -> [ModuleItem]
-breakGenerate (Generate genItems) =
-    if all isGenModuleItem genItems
-        then map (\(GenModuleItem item) -> item) genItems
-        else [Generate genItems]
-    where
-        isGenModuleItem :: GenItem -> Bool
-        isGenModuleItem (GenModuleItem _) = True
-        isGenModuleItem _ = False
-breakGenerate other = [other]
+breakGenerate :: ModuleItem -> [ModuleItem] -> [ModuleItem]
+breakGenerate (Generate genItems) items =
+    foldr breakGenerateStep items genItems
+breakGenerate item items = item : items
+
+breakGenerateStep :: GenItem -> [ModuleItem] -> [ModuleItem]
+breakGenerateStep (GenModuleItem item) items = item : items
+breakGenerateStep genItem (Generate genItems : items) =
+    Generate (genItem : genItems) : items
+breakGenerateStep genItem items = Generate [genItem] : items
 
 traverseModuleItemsM :: Monad m => MapperM m ModuleItem -> MapperM m Description
 traverseModuleItemsM mapper (Part attrs extern kw lifetime name ports items) = do
     items' <- mapM (traverseNestedModuleItemsM mapper) items
-    let items'' = concatMap breakGenerate items'
+    let items'' = foldr breakGenerate [] items'
     return $ Part attrs extern kw lifetime name ports items''
     where
 traverseModuleItemsM mapper (PackageItem packageItem) = do
@@ -159,18 +160,18 @@ traverseModuleItemsM mapper (Package lifetime name items) = do
     let itemsWrapped = map MIPackageItem items
     itemsWrapped' <- mapM (traverseNestedModuleItemsM mapper) itemsWrapped
     let items' = map (\(MIPackageItem item) -> item) $
-                    concatMap breakGenerate itemsWrapped'
+                    foldr breakGenerate [] itemsWrapped'
     return $ Package lifetime name items'
 traverseModuleItemsM mapper (Class lifetime name decls items) = do
     let declsWrapped = map (MIPackageItem . Decl) decls
     declsWrapped' <- mapM (traverseNestedModuleItemsM mapper) declsWrapped
     let decls' = map (\(MIPackageItem (Decl decl)) -> decl) $
-                    concatMap breakGenerate declsWrapped'
+                    foldr breakGenerate [] declsWrapped'
     items' <- fmap concat $ mapM indirect items
     return $ Class lifetime name decls' items'
     where
         indirect (qualifier, item) =
-            fmap (map (unwrap qualifier) . breakGenerate) $
+            fmap (map (unwrap qualifier) . flip breakGenerate []) $
             traverseNestedModuleItemsM mapper (MIPackageItem item)
         unwrap qualifier = \(MIPackageItem item) -> (qualifier, item)
 

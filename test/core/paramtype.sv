@@ -126,3 +126,4 @@ module p_6; parameter W = 2; p #(logic [$signed(W):0], logic [$signed(W):0]) x()
 module p_7; parameter W = 2; p #(logic [square(W):0], logic [square(W):0]) x(); endmodule
 module p_8; p #(OtherT) x(); endmodule
 module p_9; p #(SomeT, OtherT) x(); endmodule
+module p_A; if (1) begin : blk p #(SomeT, OtherT) x(); end endmodule

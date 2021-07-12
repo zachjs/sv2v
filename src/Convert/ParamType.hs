@@ -23,6 +23,7 @@ type Instance = Map.Map Identifier (Type, IdentSet)
 type Instances = Set.Set (Identifier, Instance)
 
 type IdentSet = Set.Set Identifier
+type DeclMap = Map.Map Identifier Decl
 type UsageMap = [(Identifier, Set.Set Identifier)]
 
 convert :: [AST] -> [AST]
@@ -241,20 +242,20 @@ typeIsUnresolved =
         collectUnresolvedExprM Dot    {} = tell $ Any True
         collectUnresolvedExprM _ = return ()
 
-prepareTypeExprs :: Identifier -> Identifier -> Type -> (Type, (IdentSet, [Decl]))
+prepareTypeExprs :: Identifier -> Identifier -> Type -> (Type, (IdentSet, DeclMap))
 prepareTypeExprs instanceName paramName =
     runWriter . traverseNestedTypesM
         (traverseTypeExprsM $ traverseNestedExprsM prepareExpr)
     where
-        prepareExpr :: Expr -> Writer (IdentSet, [Decl]) Expr
+        prepareExpr :: Expr -> Writer (IdentSet, DeclMap) Expr
         prepareExpr (e @ Call{}) = do
-            tell (Set.empty, [decl])
+            tell (Set.empty, Map.singleton x decl)
             prepareExpr $ Ident x
             where
                 decl = Param Localparam (TypeOf e) x e
                 x = instanceName ++ "_sv2v_pfunc_" ++ shortHash e
         prepareExpr (Ident x) = do
-            tell (Set.singleton x, [])
+            tell (Set.singleton x, Map.empty)
             return $ Ident $ paramName ++ '_' : x
         prepareExpr other = return other
 
@@ -301,9 +302,9 @@ convertModuleItemM (orig @ (Instance m bindings x r p)) =
         bindingsMap = Map.fromList bindings
         resolvedTypesWithDecls = Map.mapMaybeWithKey resolveType bindingsMap
         resolvedTypes = Map.map (\(a, (b, _)) -> (a, b)) resolvedTypesWithDecls
-        addedDecls = concatMap (snd . snd . snd) $
-            Map.toList resolvedTypesWithDecls
-        resolveType :: Identifier -> TypeOrExpr -> Maybe (Type, (IdentSet, [Decl]))
+        addedDecls = Map.elems $ Map.unions $ map (snd . snd) $
+            Map.elems resolvedTypesWithDecls
+        resolveType :: Identifier -> TypeOrExpr -> Maybe (Type, (IdentSet, DeclMap))
         resolveType _ Right{} = Nothing
         resolveType paramName (Left t) =
             Just $ prepareTypeExprs x paramName t

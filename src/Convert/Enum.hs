@@ -39,7 +39,10 @@ convertDescription :: Description -> [Description]
 convertDescription (description @ Part{}) =
     [Part attrs extern kw lifetime name ports items']
     where
-        items' = inject enumItems items -- only keep what's used
+        items' = -- only keep what's used
+            if null enumItems
+                then items
+                else inject enumItems items
         Part attrs extern kw lifetime name ports items = description'
         (description', enumItems) = convertDescription' description
 convertDescription other = [other]
