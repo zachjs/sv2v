@@ -5,6 +5,12 @@ module top;
         $display("packet data = %b", {2'b00, 2'b11});
     end
 
+    task printer;
+        input [23:0] inpA;
+        input [23:0] inpB;
+        $display("printer(%h, %h)", inpA, inpB);
+    endtask
+
     function automatic [23:0] pack_r_8_24;
         input [23:0] in;
         integer i;
@@ -43,12 +49,10 @@ module top;
     function automatic [23:0] pack_l_7_24;
         input [23:0] in;
         integer i;
-        integer e;
         begin
-        for (i = 0; i < 24; i = i + 7) begin
+        for (i = 0; i + 7 < 24; i = i + 7) begin
             pack_l_7_24[23-i-:7] = in[i+:7];
         end
-        i = i - 7;
         pack_l_7_24[0+:24%7] = in[i+:24%7];
         end
     endfunction
@@ -67,6 +71,33 @@ module top;
 
         $display("%h", pack_r_7_24(24'h070800));
         $display("%h", pack_l_7_24(24'h000708));
+
+        $display("%h", pack_r_7_24(24'h070800));
+        $display("%h", pack_l_7_24(24'h000708));
+
+        printer(pack_r_7_24(24'h070800), pack_l_7_24(24'h000708));
+    end
+
+    reg [23:0] init_simple_stream_var = pack_l_7_24(24'h000718);
+    wire [23:0] init_simple_stream_net = pack_l_7_24(24'h000728);
+    reg [23:0] init_indirect_stream_var = pack_l_7_24(24'h000738);
+    wire [23:0] init_indirect_stream_net = pack_l_7_24(24'h000748);
+
+    reg [23:0] asgn_simple_stream_var = pack_l_7_24(24'h000758);
+    wire [23:0] asgn_simple_stream_net = pack_l_7_24(24'h000768);
+    reg [23:0] asgn_indirect_stream_var = pack_l_7_24(24'h000778);
+    wire [23:0] asgn_indirect_stream_net = pack_l_7_24(24'h000788);
+
+    initial begin
+        #1;
+        $display("%b", init_simple_stream_var);
+        $display("%b", init_simple_stream_net);
+        $display("%b", init_indirect_stream_var);
+        $display("%b", init_indirect_stream_net);
+        $display("%b", asgn_simple_stream_var);
+        $display("%b", asgn_simple_stream_net);
+        $display("%b", asgn_indirect_stream_var);
+        $display("%b", asgn_indirect_stream_net);
     end
 
     task test_unpack;
@@ -95,6 +126,19 @@ module top;
         test_unpack(24'h060708);
         test_unpack(24'hC02375);
         test_unpack(24'h12E3B8);
+    end
+
+    wire [0:0] i;
+    wire [1:0] j;
+    wire [2:0] k;
+    wire [5:0] l;
+    wire [11:0] m;
+    reg [23:0] in;
+    assign {i, j, k, l, m} = pack_l_7_24(in);
+    initial begin
+        #1 in = 24'h060708;
+        #1 in = 24'hC02375;
+        #1 in = 24'h12E3B8;
     end
 
 endmodule

@@ -6,6 +6,8 @@
 
 module Convert.Stream (convert) where
 
+import Control.Monad (zipWithM)
+
 import Convert.Scoper
 import Convert.Traverse
 import Language.SystemVerilog.AST
@@ -36,6 +38,8 @@ traverseDeclM (Variable d t x [] (expr @ (Stream StreamL chunk exprs))) = do
         fnName = streamerFuncName x
         func = streamerFunc fnName chunk (TypeOf $ Concat exprs) t
         expr' = Call (Ident fnName) (Args [Concat exprs] [])
+traverseDeclM (Variable d t x a expr) =
+    traverseExprM expr >>= return . Variable d t x a
 traverseDeclM decl @ Net{} = traverseNetAsVarM traverseDeclM decl
 traverseDeclM decl = return decl
 
@@ -53,15 +57,45 @@ traverseModuleItemM (Assign opt (LHSStream StreamL chunk lhss) expr) =
         Assign opt (LHSConcat lhss)
         (Stream StreamL chunk [expr])
 traverseModuleItemM (Assign opt lhs expr) =
-    return $ Assign opt lhs' expr'
+    traverseExprM expr' >>= return . Assign opt lhs'
     where Asgn AsgnOpEq Nothing lhs' expr' =
             traverseAsgn (lhs, expr) (Asgn AsgnOpEq Nothing)
 traverseModuleItemM item = return item
 
 traverseStmtM :: Stmt -> Scoper () Stmt
-traverseStmtM (Asgn op mt lhs expr) =
-    return $ traverseAsgn (lhs, expr) (Asgn op mt)
-traverseStmtM other = return other
+traverseStmtM (Subroutine fn (Args args [])) = do
+    args' <- traverseCall fn args
+    return $ Subroutine fn $ Args args' []
+traverseStmtM (Asgn op mt lhs expr) = do
+    expr' <- traverseExprM expr
+    return $ traverseAsgn (lhs, expr') (Asgn op mt)
+traverseStmtM stmt = traverseStmtExprsM traverseExprM stmt
+
+-- replace streaming concatenations in function arguments
+traverseExprM :: Expr -> Scoper () Expr
+traverseExprM (Call fn (Args args [])) = do
+    args' <- traverseCall fn args
+    return $ Call fn $ Args args' []
+traverseExprM expr = traverseSinglyNestedExprsM traverseExprM expr
+
+traverseCall :: Expr -> [Expr] -> Scoper () [Expr]
+traverseCall fn = zipWithM wrapper ([0..] :: [Int])
+    where wrapper = traverseCallArg . TypeOf . Dot fn . show
+
+-- task and function arguments are "assignment-like contexts"
+traverseCallArg :: Type -> Expr -> Scoper () Expr
+traverseCallArg t expr@(Stream op _ _) = do
+    inProcedure <- withinProcedureM
+    if inProcedure && op == StreamL
+        then injectDecl decl >> return (Ident tmp)
+        else do
+            decl' <- traverseDeclM decl
+            let Variable _ _ _ _ expr' = decl'
+            return expr'
+    where
+        tmp = "_arg_tmp_" ++ shortHash (t, expr)
+        decl = Variable Local t tmp [] expr
+traverseCallArg _ arg = traverseExprM arg
 
 -- produces a function used to capture an inline streaming concatenation
 streamerFunc :: Identifier -> Expr -> Type -> Type -> PackageItem
