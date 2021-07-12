@@ -31,6 +31,8 @@ convertPackageItem (Task     ml   f decls stmts) =
 convertPackageItem other = other
 
 convertTFBlock :: [Decl] -> [Stmt] -> ([Decl], [Stmt])
+convertTFBlock decls [CommentStmt c, stmt] =
+    convertTFBlock (decls ++ [CommentDecl c]) [stmt]
 convertTFBlock decls stmts =
     (decls', [stmtsToStmt stmts'])
     where (decls', stmts') = flattenOuterBlocks $ Block Seq "" decls stmts

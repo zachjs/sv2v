@@ -360,7 +360,7 @@ inlineInstance global ranges modportBindings items partName
         -- synthetic modports to be collected and removed after inlining
         bundleModport = Modport "" (impliedModport items)
         dimensionModport = if not isArray
-            then MIPackageItem $ Decl $ CommentDecl "not an instance array"
+            then Generate []
             else InstArrEncoded arrayLeft arrayRight
         typeModport = InterfaceTypeEncoded partName
 
@@ -544,12 +544,11 @@ inlineInstance global ranges modportBindings items partName
         removeDeclDir other = other
 
         -- capture the lower bound for each modport array binding
-        bindingBaseParams = map makeBindingBaseParam modportBindings
-        makeBindingBaseParam :: ModportBinding -> Decl
+        bindingBaseParams = mapMaybe makeBindingBaseParam modportBindings
+        makeBindingBaseParam :: ModportBinding -> Maybe Decl
         makeBindingBaseParam (portName, (_, modportE)) =
-            case makeBindingBaseExpr modportE of
-                Just expr -> localparam (bindingBaseName ++ portName) expr
-                Nothing -> CommentDecl "no-op"
+            fmap (localparam $ bindingBaseName ++ portName) $
+                makeBindingBaseExpr modportE
         bindingBaseName = "_bbase_" ++ key ++ "_"
         makeBindingBaseExpr :: Expr -> Maybe Expr
         makeBindingBaseExpr modportE =

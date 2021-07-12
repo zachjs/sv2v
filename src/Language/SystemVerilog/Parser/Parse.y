@@ -444,7 +444,7 @@ Description :: { [Description] }
   : Part(ModuleKW   , endmodule   ) { [$1] }
   | Part(InterfaceKW, endinterface) { [$1] }
   | PackageDeclaration              { [$1] }
-  | PackageItem { map PackageItem $1 }
+  | PITrace PackageItem { map PackageItem $ addPITrace $1 $2 }
 
 OptAsgn :: { Expr }
   : {- empty -} { Nil }
@@ -573,14 +573,14 @@ PIParams :: { [Decl] }
   | "#" "(" ")"          { [] }
   | "#" "(" ParamsFollow { $3 }
 ParamsFollow :: { [Decl] }
-  : ParamAsgn ParamsEnd        { [$1] }
-  | ParamAsgn "," ParamsFollow { $1 : $3 }
+  : ParamAsgn ParamsEnd        { $1 }
+  | ParamAsgn "," ParamsFollow { $1 ++ $3 }
   |               ParamsDecl   { $1 }
 ParamsDecl :: { [Decl] }
   : ModuleParameterDecl(ParamsEnd)      { $1 }
   | ModuleParameterDecl(",") ParamsDecl { $1 ++ $2 }
-ParamAsgn :: { Decl }
-  : Identifier "=" Expr { Param Parameter (Implicit Unspecified []) $1 $3 }
+ParamAsgn :: { [Decl] }
+  : DeclTrace Identifier "=" Expr { [$1, Param Parameter (Implicit Unspecified []) $2 $4] }
 ParamsEnd
   :     ")" {}
   | "," ")" {}
@@ -689,7 +689,7 @@ DirectionP :: { (Position, Direction) }
 ModuleItems :: { [ModuleItem] }
   : {- empty -}                    { [] }
   | ";" ModuleItems                { $2 }
-  | MITrace ModuleItem ModuleItems { $1 : $2 ++ $3 }
+  | MITrace ModuleItem ModuleItems { addMITrace $1 ($2 ++ $3) }
 
 ModuleItem :: { [ModuleItem] }
   : NonGenerateModuleItem { $1 }
@@ -855,7 +855,7 @@ LHSAsgn :: { (LHS, Expr) }
 PackageItems :: { [PackageItem] }
   : {- empty -}                      { [] }
   | ";" PackageItems                 { $2 }
-  | PITrace PackageItem PackageItems { $1 : $2 ++ $3 }
+  | PITrace PackageItem PackageItems { addPITrace $1 ($2 ++ $3) }
 PackageItem :: { [PackageItem] }
   : PackageOrClassItem { $1}
   | TaskOrFunction { [$1] }
@@ -863,7 +863,7 @@ PackageItem :: { [PackageItem] }
 ClassItems :: { [ClassItem] }
   : {- empty -}                  { [] }
   | ";" ClassItems               { $2 }
-  | CITrace ClassItem ClassItems { $1 : $2 ++ $3 }
+  | CITrace ClassItem ClassItems { addCITrace $1 ($2 ++ $3) }
 ClassItem :: { [ClassItem] }
   : ClassItemQualifier PackageOrClassItem { map ($1, ) $2 }
   | ClassItemQualifier TaskOrFunction     { [($1, $2)] }
@@ -1129,16 +1129,16 @@ DeclOrStmt :: { ([Decl], [Stmt]) }
   | ParameterDecl(";") { ($1, []) }
 
 ModuleParameterDecl(delim) :: { [Decl] }
-  :    ParameterDecl(delim) { $1 }
-  | "type" TypeAsgns delim  { map (uncurry $ ParamType Parameter) $2 }
+  : ParameterDecl(delim) { $1 }
+  | DeclTrace "type" TypeAsgns delim { $1 : map (uncurry $ ParamType Parameter) $3 }
 ParameterDecl(delim) :: { [Decl] }
   : ParameterDeclKW           DeclAsgns delim { makeParamDecls $1 (Implicit Unspecified []) $2 }
   | ParameterDeclKW ParamType DeclAsgns delim { makeParamDecls $1 $2 $3 }
   | ParameterDeclKW TypeAlias DeclAsgns delim { makeParamDecls $1 $2 $3 }
-  | ParameterDeclKW "type"    TypeAsgns delim { map (uncurry $ ParamType $1) $3 }
-ParameterDeclKW :: { ParamScope }
-  : "parameter"  { Parameter  }
-  | "localparam" { Localparam }
+  | ParameterDeclKW "type"    TypeAsgns delim { makeParamTypeDecls $1 $3 }
+ParameterDeclKW :: { (Position, ParamScope) }
+  : "parameter"  { withPos $1 Parameter  }
+  | "localparam" { withPos $1 Localparam }
 
 TypeAsgns :: { [(Identifier, Type)] }
   : TypeAsgn               { [$1] }
@@ -1361,11 +1361,11 @@ GenItems :: { [GenItem] }
   | GenItems GenItem { $1 ++ [$2] }
 
 GenItem :: { GenItem }
-  : GenBlock              { uncurry GenBlock $1 }
-  | NonGenerateModuleItem { genItemsToGenItem $ map GenModuleItem $1 }
-  | "generate" GenItems "endgenerate" { genItemsToGenItem $2 }
-  | ConditionalGenerateConstruct { $1 }
-  | LoopGenerateConstruct        { $1 }
+  : MITrace GenBlock              { uncurry GenBlock $2 }
+  | MITrace NonGenerateModuleItem { genItemsToGenItem $ map GenModuleItem $ addMITrace $1 $2 }
+  | MITrace "generate" GenItems "endgenerate" { genItemsToGenItem $3 }
+  | MITrace ConditionalGenerateConstruct { $2 }
+  | MITrace LoopGenerateConstruct        { $2 }
 ConditionalGenerateConstruct :: { GenItem }
   : "if" "(" Expr ")" GenItemOrNull "else" GenItemOrNull { GenIf $3 $5 $7      }
   | "if" "(" Expr ")" GenItemOrNull %prec NoElse         { GenIf $3 $5 GenNull }
@@ -1435,9 +1435,11 @@ DimFn :: { DimFn }
 MITrace :: { ModuleItem }
   : PITrace { MIPackageItem $1 }
 PITrace :: { PackageItem }
-  : Trace { Decl $ CommentDecl $1 }
+  : DeclTrace { Decl $1 }
 CITrace :: { ClassItem }
   : PITrace { (QNone, $1) }
+DeclTrace :: { Decl }
+  : Trace { CommentDecl $1 }
 StmtTrace :: { Stmt }
   : Trace { CommentStmt $1 }
 Trace :: { String }
@@ -1536,16 +1538,25 @@ toLHS expr =
     Nothing -> error $ "Parse error: cannot convert expression to LHS: "
                 ++ show expr
 
+traceCommentDecl :: Position -> Decl
+traceCommentDecl = CommentDecl . ("Trace: " ++) . show
+
 makeParamDecls
-  :: ParamScope
+  :: (Position, ParamScope)
   -> Type
   -> [(Identifier, Expr, [Range])]
   -> [Decl]
-makeParamDecls s t items =
+makeParamDecls (p, s) t items =
+  traceCommentDecl p :
   map mapper items
   where
     (tf, rs) = typeRanges t
     mapper (x, e, a) = Param s (tf $ a ++ rs) x e
+
+makeParamTypeDecls :: (Position, ParamScope) -> [(Identifier, Type)] -> [Decl]
+makeParamTypeDecls (p, s) items =
+  traceCommentDecl p :
+  map (uncurry $ ParamType s) items
 
 fieldDecl :: Type -> (Identifier, [Range]) -> (Type, Identifier)
 fieldDecl t (x, rs2) =
@@ -1630,5 +1641,17 @@ makeTypeOf (Token _ _ pos) expr = (pos, check)
     check Unspecified [] = typ
     check Unspecified _  = unexpectedPackedRanges pos (show typ)
     check sg [] = unexpectedSigning pos sg (show typ)
+
+addMITrace :: ModuleItem -> [ModuleItem] -> [ModuleItem]
+addMITrace _ items @ (MIPackageItem (Decl CommentDecl{}) : _) = items
+addMITrace trace items = trace : items
+
+addPITrace :: PackageItem -> [PackageItem] -> [PackageItem]
+addPITrace _ items @ (Decl CommentDecl{} : _) = items
+addPITrace trace items = trace : items
+
+addCITrace :: ClassItem -> [ClassItem] -> [ClassItem]
+addCITrace _ items @ ((_, Decl CommentDecl{}) : _) = items
+addCITrace trace items = trace : items
 
 }

@@ -407,7 +407,7 @@ scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
         fullStmtMapper (Block kw name decls stmts) = do
             enterScope name ""
             decls' <- fmap concat $ mapM declMapper' decls
-            stmts' <- mapM fullStmtMapper stmts
+            stmts' <- mapM fullStmtMapper $ filter (/= Null) stmts
             exitScope
             return $ Block kw name decls' stmts'
         -- TODO: Do we need to support the various procedural loops?
