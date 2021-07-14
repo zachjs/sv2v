@@ -25,7 +25,6 @@
 
 module Convert.Logic (convert) where
 
-import Control.Monad.State.Strict
 import Control.Monad.Writer.Strict
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -37,7 +36,7 @@ import Language.SystemVerilog.AST
 type Ports = Map.Map Identifier [(Identifier, Direction)]
 type Location = [Identifier]
 type Locations = Set.Set Location
-type ST = ScoperT Type (State Locations)
+type ST = ScoperT Type (Writer Locations)
 
 convert :: [AST] -> [AST]
 convert =
@@ -46,7 +45,7 @@ convert =
         (traverseDescriptions . convertDescription)
     where
         collectPortsM :: Description -> Writer Ports ()
-        collectPortsM (orig @ (Part _ _ _ _ name portNames _)) =
+        collectPortsM orig@(Part _ _ _ _ name portNames _) =
             tell $ Map.singleton name ports
             where
                 ports = zip portNames (map lookupDir portNames)
@@ -58,34 +57,24 @@ convert =
                         Nothing -> Inout
         collectPortsM _ = return ()
         collectDeclDirsM :: ModuleItem -> Writer [(Identifier, Direction)] ()
-        collectDeclDirsM (MIPackageItem (Decl (Variable dir t ident _ _))) =
-            case (dir, t) of
-                (_, InterfaceT{}) -> tell [(ident, Local)]
-                (Local, _) -> return ()
-                _ -> tell [(ident, dir)]
-        collectDeclDirsM (MIPackageItem (Decl net @ Net{})) =
-            collectNetAsVarM (collectDeclDirsM . MIPackageItem . Decl) net
+        collectDeclDirsM (MIPackageItem (Decl (Variable dir _ ident _ _))) =
+            when (dir /= Local) $ tell [(ident, dir)]
+        collectDeclDirsM (MIPackageItem (Decl (Net dir _ _ _ ident _ _))) =
+            when (dir /= Local) $ tell [(ident, dir)]
         collectDeclDirsM _ = return ()
 
 convertDescription :: Ports -> Description -> Description
-convertDescription ports (description @ (Part _ _ Module _ _ _ _)) =
-    evalState (operation description) Set.empty
+convertDescription ports description@(Part _ _ Module _ _ _ _) =
+    -- rewrite reg continuous assignments and output port connections
+    partScoper (rewriteDeclM locations) (traverseModuleItemM ports)
+        return return description
     where
-        operation =
-            -- log then rewrite
-            partScoperT td tm tg ts >=>
-            partScoperT rd tm tg ts
-        td = traverseDeclM
-        rd = rewriteDeclM
-        tm = traverseModuleItemM ports
-        tg = traverseGenItemM
-        ts = traverseStmtM
+        -- write down which vars are procedurally assigned
+        locations = execWriter $ partScoperT
+            traverseDeclM return return traverseStmtM description
 convertDescription _ other = other
 
-traverseGenItemM :: GenItem -> ST GenItem
-traverseGenItemM = return
-
-traverseModuleItemM :: Ports -> ModuleItem -> ST ModuleItem
+traverseModuleItemM :: Ports -> ModuleItem -> Scoper Type ModuleItem
 traverseModuleItemM ports = embedScopes $ traverseModuleItem ports
 
 traverseModuleItem :: Ports -> Scopes Type -> ModuleItem -> ModuleItem
@@ -162,65 +151,58 @@ traverseModuleItem ports scopes =
         fixModuleItem other = other
 
 traverseDeclM :: Decl -> ST Decl
-traverseDeclM (decl @ (Variable _ t x _ _)) =
+traverseDeclM decl@(Variable _ t x _ _) =
     insertElem x t >> return decl
-traverseDeclM (decl @ (Net _ _ _ t x _ _)) =
+traverseDeclM decl@(Net _ _ _ t x _ _) =
     insertElem x t >> return decl
 traverseDeclM decl = return decl
 
-rewriteDeclM :: Decl -> ST Decl
-rewriteDeclM (Variable d (t @ (IntegerVector TLogic sg rs)) x a e) = do
-    insertElem x t
-    details <- lookupElemM x
-    let Just (accesses, _, _) = details
+rewriteDeclM :: Locations -> Decl -> Scoper Type Decl
+rewriteDeclM locations (Variable d (IntegerVector TLogic sg rs) x a e) = do
+    accesses <- localAccessesM x
     let location = map accessName accesses
-    usedAsReg <- lift $ gets $ Set.member location
+    let usedAsReg = Set.member location locations
     blockLogic <- withinProcedureM
-    if usedAsReg || blockLogic || e /= Nil
+    if blockLogic || usedAsReg || e /= Nil
         then do
             let d' = if d == Inout then Output else d
             let t' = IntegerVector TReg sg rs
-            insertElem x t'
+            insertElem accesses t'
             return $ Variable d' t' x a e
         else do
             let t' = Implicit sg rs
-            insertElem x t'
+            insertElem accesses t'
             return $ Net d TWire DefaultStrength t' x a e
-rewriteDeclM (decl @ (Variable _ t x _ _)) =
+rewriteDeclM _ decl@(Variable _ t x _ _) =
     insertElem x t >> return decl
-rewriteDeclM (Net d n s (IntegerVector _ sg rs) x a e) =
+rewriteDeclM _ (Net d n s (IntegerVector _ sg rs) x a e) =
     insertElem x t >> return (Net d n s t x a e)
     where t = Implicit sg rs
-rewriteDeclM (decl @ (Net _ _ _ t x _ _)) =
+rewriteDeclM _ decl@(Net _ _ _ t x _ _) =
     insertElem x t >> return decl
-rewriteDeclM (Param s (IntegerVector _ sg []) x e) =
+rewriteDeclM _ (Param s (IntegerVector _ sg []) x e) =
     return $ Param s (Implicit sg [(zero, zero)]) x e
     where zero = RawNum 0
-rewriteDeclM (Param s (IntegerVector _ sg rs) x e) =
+rewriteDeclM _ (Param s (IntegerVector _ sg rs) x e) =
     return $ Param s (Implicit sg rs) x e
-rewriteDeclM decl = return decl
+rewriteDeclM _ decl = return decl
 
 traverseStmtM :: Stmt -> ST Stmt
-traverseStmtM (Timing timing stmt) =
+traverseStmtM stmt@Timing{} =
     -- ignore the timing LHSs
-    return $ Timing timing stmt
-traverseStmtM (Subroutine (Ident f) args) = do
-    case args of
-        Args (_ : Ident x : _) [] ->
-            if f == "$readmemh" || f == "$readmemb"
-                then collectLHSM $ LHSIdent x
-                else return ()
-        _ -> return ()
-    return $ Subroutine (Ident f) args
-traverseStmtM stmt = do
-    collectStmtLHSsM (collectNestedLHSsM collectLHSM) stmt
     return stmt
+traverseStmtM stmt@(Subroutine (Ident f) (Args (_ : Ident x : _) [])) =
+    when (f == "$readmemh" || f == "$readmemb") (collectLHSM $ LHSIdent x)
+        >> return stmt
+traverseStmtM stmt =
+    collectStmtLHSsM (collectNestedLHSsM collectLHSM) stmt
+        >> return stmt
 
 collectLHSM :: LHS -> ST ()
 collectLHSM lhs = do
     details <- lookupElemM lhs
     case details of
-        Just (accesses, _, _) -> do
-            let location = map accessName accesses
-            lift $ modify $ Set.insert location
+        Just (accesses, _, _) ->
+            lift $ tell $ Set.singleton location
+            where location = map accessName accesses
         Nothing -> return ()
