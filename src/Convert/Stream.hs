@@ -137,7 +137,7 @@ streamerBlock chunk inSize outSize asgn output input =
         out = name ++ "_out"
         idx = name ++ "_idx"
         -- main chunk loop
-        inits = Right [(LHSIdent idx, lo)]
+        inits = [(LHSIdent idx, lo)]
         cmp = BinOp Le (Ident idx) (BinOp Sub inSize chunk)
         incr = [(LHSIdent idx, AsgnOp Add, chunk)]
         lhs = LHSRange (LHSIdent out) IndexedMinus (BinOp Sub hi (Ident idx), chunk)

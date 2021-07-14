@@ -18,7 +18,7 @@ module Language.SystemVerilog.Parser.Parse (parse) where
 
 import Control.Monad.Except
 import Control.Monad.State.Strict
-import Data.Maybe (fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe)
 import Language.SystemVerilog.AST
 import Language.SystemVerilog.Parser.ParseDecl
 import Language.SystemVerilog.Parser.Tokens
@@ -1060,7 +1060,7 @@ StmtNonBlock :: { Stmt }
   : ";" { Null }
   | Unique "if" "(" Expr ")" Stmt "else" Stmt  { If $1 $4 $6 $8   }
   | Unique "if" "(" Expr ")" Stmt %prec NoElse { If $1 $4 $6 Null }
-  | "for" "(" ForInit ForCond ForStep ")" Stmt { For $3 $4 $5 $7 }
+  | "for" "(" ForInit ForCond ForStep ")" Stmt { makeFor $3 $4 $5 $7 }
   | CaseStmt                                   { $1 }
   | TimingControl Stmt                         { Timing $1 $2 }
   | "return" ExprOrNil ";"                     { Return $2 }
@@ -1653,5 +1653,22 @@ addPITrace trace items = trace : items
 addCITrace :: ClassItem -> [ClassItem] -> [ClassItem]
 addCITrace _ items @ ((_, Decl CommentDecl{}) : _) = items
 addCITrace trace items = trace : items
+
+makeFor :: Either [Decl] [(LHS, Expr)] -> Expr -> [(LHS, AsgnOp, Expr)] -> Stmt -> Stmt
+makeFor (Left inits) cond incr stmt =
+  Block Seq "" decls
+    [ CommentStmt msg
+    , For (catMaybes maybeAsgns) cond incr stmt
+    ]
+  where
+    (decls, maybeAsgns) = unzip $ map splitInit inits
+    CommentDecl msg : _ = inits
+makeFor (Right asgns) cond incr stmt = For asgns cond incr stmt
+
+splitInit :: Decl -> (Decl, Maybe (LHS, Expr))
+splitInit decl@CommentDecl{} = (decl, Nothing)
+splitInit decl =
+  (Variable d t ident a Nil, Just (LHSIdent ident, e))
+  where Variable d t ident a e = decl
 
 }

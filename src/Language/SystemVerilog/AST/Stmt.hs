@@ -27,7 +27,7 @@ import Text.Printf (printf)
 
 import Language.SystemVerilog.AST.ShowHelp (commas, indent, unlines', showPad, showBlock)
 import Language.SystemVerilog.AST.Attr (Attr)
-import Language.SystemVerilog.AST.Decl (Decl, showDecls)
+import Language.SystemVerilog.AST.Decl (Decl)
 import Language.SystemVerilog.AST.Expr (Expr(Nil), Args(..))
 import Language.SystemVerilog.AST.LHS (LHS)
 import Language.SystemVerilog.AST.Op (AsgnOp(AsgnOpEq))
@@ -37,7 +37,7 @@ data Stmt
     = StmtAttr Attr Stmt
     | Block   BlockKW Identifier [Decl] [Stmt]
     | Case    ViolationCheck CaseKW Expr [Case]
-    | For     (Either [Decl] [(LHS, Expr)]) Expr [(LHS, AsgnOp, Expr)] Stmt
+    | For     [(LHS, Expr)] Expr [(LHS, AsgnOp, Expr)] Stmt
     | Asgn    AsgnOp (Maybe Timing) LHS Expr
     | While   Expr Stmt
     | RepeatL Expr Stmt
@@ -77,9 +77,8 @@ instance Show Stmt where
             (commas $ map showAssign assigns)
             (indent $ show stmt)
         where
-            showInits :: Either [Decl] [(LHS, Expr)] -> String
-            showInits (Left decls) = showDecls ',' " " decls
-            showInits (Right asgns) = commas $ map showInit asgns
+            showInits :: [(LHS, Expr)] -> String
+            showInits = commas . map showInit
                 where showInit (l, e) = showAssign (l, AsgnOpEq, e)
             showAssign :: (LHS, AsgnOp, Expr) -> String
             showAssign (l, op, e) = (showPad l) ++ (showPad op) ++ (show e)

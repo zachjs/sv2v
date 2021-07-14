@@ -25,11 +25,12 @@ convertStmt (Foreach x idxs stmt) =
         toLoop :: (Integer, Identifier) -> (Stmt -> Stmt)
         toLoop (_, "") = id
         toLoop (d, i) =
-            For (Left [idxDecl]) cmp [incr]
+            Block Seq "" [idxDecl] . pure .
+                For [(LHSIdent i, queryFn FnLeft)] cmp [incr]
             where
                 queryFn f = DimFn f (Right $ Ident x) (RawNum d)
-                idxDecl = Variable Local (IntegerAtom TInteger Unspecified) i []
-                    (queryFn FnLeft)
+                idxType = IntegerAtom TInteger Unspecified
+                idxDecl = Variable Local idxType i [] Nil
                 cmp =
                     Mux (BinOp Eq (queryFn FnIncrement) (RawNum 1))
                         (BinOp Ge (Ident i) (queryFn FnRight))

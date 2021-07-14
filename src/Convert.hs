@@ -18,7 +18,7 @@ import qualified Convert.DimensionQuery
 import qualified Convert.DuplicateGenvar
 import qualified Convert.EmptyArgs
 import qualified Convert.Enum
-import qualified Convert.ForDecl
+import qualified Convert.ForAsgn
 import qualified Convert.Foreach
 import qualified Convert.FuncRet
 import qualified Convert.FuncRoutine
@@ -89,7 +89,7 @@ mainPhases selectExclude =
     , Convert.Unsigned.convert
     , Convert.Wildcard.convert
     , Convert.Enum.convert
-    , Convert.ForDecl.convert
+    , Convert.ForAsgn.convert
     , Convert.StringParam.convert
     , selectExclude Job.Interface Convert.Interface.convert
     , selectExclude Job.Succinct Convert.RemoveComments.convert

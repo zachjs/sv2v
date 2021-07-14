@@ -14,12 +14,13 @@ module Language.SystemVerilog.AST.Description
     , ClassItem
     ) where
 
+import Data.List (intercalate)
 import Text.Printf (printf)
 
 import Language.SystemVerilog.AST.ShowHelp
 
 import Language.SystemVerilog.AST.Attr (Attr)
-import Language.SystemVerilog.AST.Decl (Decl, showDecls)
+import Language.SystemVerilog.AST.Decl (Decl(CommentDecl))
 import Language.SystemVerilog.AST.Stmt (Stmt)
 import Language.SystemVerilog.AST.Type (Type, Identifier)
 import {-# SOURCE #-} Language.SystemVerilog.AST.ModuleItem (ModuleItem)
@@ -61,8 +62,18 @@ instance Show Description where
 
 showParamDecls :: [Decl] -> String
 showParamDecls [] = ""
-showParamDecls decls = " #(\n\t" ++ str ++ "\n)"
-    where str = showDecls ',' "\n\t" decls
+showParamDecls decls = " #(\n\t" ++ showDecls decls ++ "\n)"
+
+showDecls :: [Decl] -> String
+showDecls =
+    dropDelim . intercalate "\n\t" . map showDecl
+    where
+        dropDelim :: String -> String
+        dropDelim [] = []
+        dropDelim [x] = if x == ',' then [] else [x]
+        dropDelim (x : xs) = x : dropDelim xs
+        showDecl comment@CommentDecl{} = show comment
+        showDecl decl = (init $ show decl) ++ ","
 
 data PackageItem
     = Function Lifetime Type Identifier [Decl] [Stmt]

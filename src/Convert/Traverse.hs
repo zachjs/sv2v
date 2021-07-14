@@ -110,6 +110,7 @@ module Convert.Traverse
 , collectNetAsVarM
 ) where
 
+import Data.Bitraversable (bimapM)
 import Data.Functor.Identity (Identity, runIdentity)
 import Control.Monad.Writer.Strict
 import Language.SystemVerilog.AST
@@ -373,17 +374,11 @@ traverseStmtLHSsM mapper = stmtMapper
         stmtMapper (Asgn op mt lhs expr) =
             fullMapper lhs >>= \lhs' -> return $ Asgn op mt lhs' expr
         stmtMapper (For inits me incrs stmt) = do
-            inits' <- mapInits inits
+            inits' <- mapM (bimapM fullMapper return) inits
             let (lhss, asgnOps, exprs) = unzip3 incrs
             lhss' <- mapM fullMapper lhss
             let incrs' = zip3 lhss' asgnOps exprs
             return $ For inits' me incrs' stmt
-            where
-                mapInits (Left decls) = return $ Left decls
-                mapInits (Right asgns) = do
-                    let (lhss, exprs) = unzip asgns
-                    lhss' <- mapM fullMapper lhss
-                    return $ Right $ zip lhss' exprs
         stmtMapper (Assertion a) =
             assertionMapper a >>= return . Assertion
         stmtMapper other = return other
@@ -682,7 +677,7 @@ traverseStmtExprsM exprMapper = flatStmtMapper
         expr' <- exprMapper expr
         return $ Asgn op mt lhs' expr'
     flatStmtMapper (For inits cc asgns stmt) = do
-        inits' <- initsMapper inits
+        inits' <- mapM (bimapM return exprMapper) inits
         cc' <- exprMapper cc
         asgns' <- mapM asgnMapper asgns
         return $ For inits' cc' asgns' stmt
@@ -714,10 +709,6 @@ traverseStmtExprsM exprMapper = flatStmtMapper
     flatStmtMapper (Break) = return Break
     flatStmtMapper (Null) = return Null
     flatStmtMapper (CommentStmt c) = return $ CommentStmt c
-
-    initsMapper (Left decls) = mapM declMapper decls >>= return . Left
-    initsMapper (Right asgns) = mapM mapper asgns >>= return . Right
-        where mapper (l, e) = exprMapper e >>= return . (,) l
 
     asgnMapper (l, op, e) = exprMapper e >>= \e' -> return $ (l, op, e')
 

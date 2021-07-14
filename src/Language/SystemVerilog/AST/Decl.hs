@@ -10,10 +10,8 @@ module Language.SystemVerilog.AST.Decl
     ( Decl       (..)
     , Direction  (..)
     , ParamScope (..)
-    , showDecls
     ) where
 
-import Data.List (intercalate)
 import Text.Printf (printf)
 
 import Language.SystemVerilog.AST.ShowHelp (showPad, showPadBefore, unlines')
@@ -43,20 +41,6 @@ instance Show Decl where
         if elem '\n' c
             then "// " ++ show c
             else "// " ++ c
-
-showDecls :: Char -> String -> [Decl] -> String
-showDecls delim whitespace =
-    dropDelim . intercalate whitespace . map showDecl
-    where
-        dropDelim :: String -> String
-        dropDelim [] = []
-        dropDelim [x] = if x == delim then [] else [x]
-        dropDelim (x : xs) = x : dropDelim xs
-        showDecl (CommentDecl c) =
-            if whitespace == " "
-                then "/* " ++ c ++ " */"
-                else show $ CommentDecl c
-        showDecl decl = (init $ show decl) ++ [delim]
 
 data Direction
     = Input

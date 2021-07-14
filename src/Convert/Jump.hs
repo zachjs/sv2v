@@ -118,19 +118,14 @@ convertStmts stmts = do
     return stmts'
 
 
-pattern SimpleLoopInits :: String -> Type -> Identifier -> Expr
-    -> Either [Decl] [(LHS, Expr)]
-pattern SimpleLoopInits msg typ var expr =
-    Left [CommentDecl msg, Variable Local typ var [] expr]
+pattern SimpleLoopInits :: Identifier -> [(LHS, Expr)]
+pattern SimpleLoopInits var <- [(LHSIdent var, _)]
 
-pattern SimpleLoopInitsAlt :: String -> Expr -> Either [Decl] [(LHS, Expr)]
-pattern SimpleLoopInitsAlt var expr = Right [(LHSIdent var, expr)]
+pattern SimpleLoopGuard :: Identifier -> Expr
+pattern SimpleLoopGuard var <- BinOp _ (Ident var) _
 
-pattern SimpleLoopGuard :: BinOp -> Identifier -> Expr -> Expr
-pattern SimpleLoopGuard cmp var bound = BinOp cmp (Ident var) bound
-
-pattern SimpleLoopIncrs :: Identifier -> AsgnOp -> Expr -> [(LHS, AsgnOp, Expr)]
-pattern SimpleLoopIncrs var op step = [(LHSIdent var, op, step)]
+pattern SimpleLoopIncrs :: Identifier -> [(LHS, AsgnOp, Expr)]
+pattern SimpleLoopIncrs var <- [(LHSIdent var, _, _)]
 
 -- rewrites the given statement, and returns the type of any unfinished jump
 convertStmt :: Stmt -> State Info Stmt
@@ -142,6 +137,23 @@ convertStmt (Block Par x decls stmts) = do
     stmts' <- mapM convertStmt stmts
     modify $ \s -> s { sJumpAllowed = jumpAllowed }
     return $ Block Par x decls stmts'
+
+convertStmt (Block Seq ""
+    decls@[CommentDecl{}, Variable Local _ var0 [] Nil]
+    [ comment@CommentStmt{}
+    , For
+        inits@(SimpleLoopInits var1)
+        comp@(SimpleLoopGuard var2)
+        incr@(SimpleLoopIncrs var3)
+        stmt
+    ]) =
+    convertLoop localInfo loop comp incr stmt
+        >>= return . Block Seq "" decls . (comment :) . pure
+    where
+        loop c i s = For inits c i s
+        localInfo = if var0 /= var1 || var1 /= var2 || var2 /= var3
+                        then Nothing
+                        else Just ""
 
 convertStmt (Block Seq x decls stmts) =
     step stmts >>= return . Block Seq x decls
@@ -181,19 +193,9 @@ convertStmt (Case unique kw expr cases) = do
     return $ Case unique kw expr cases'
 
 convertStmt (For
-    (inits @ (SimpleLoopInits _ _ var1 _))
-    (comp @ (SimpleLoopGuard _ var2 _))
-    (incr @ (SimpleLoopIncrs var3 _ _)) stmt) =
-    convertLoop localInfo loop comp incr stmt
-    where
-        loop c i s = For inits c i s
-        localInfo = if var1 /= var2 || var2 /= var3
-                        then Nothing
-                        else Just ""
-convertStmt (For
-    (inits @ (SimpleLoopInitsAlt var1 _))
-    (comp @ (SimpleLoopGuard _ var2 _))
-    (incr @ (SimpleLoopIncrs var3 _ _)) stmt) =
+    inits@(SimpleLoopInits var1)
+    comp@(SimpleLoopGuard var2)
+    incr@(SimpleLoopIncrs var3) stmt) =
     convertLoop localInfo loop comp incr stmt
     where
         loop c i s = For inits c i s
