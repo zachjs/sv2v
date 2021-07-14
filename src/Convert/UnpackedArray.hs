@@ -20,71 +20,57 @@ import Language.SystemVerilog.AST
 
 type Location = [Identifier]
 type Locations = Map.Map Location Int
-type ST = ScoperT Decl (State Locations)
+type ST = ScoperT () (State Locations)
 
 convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription (description @ (Part _ _ Module _ _ ports _)) =
-    evalState (operation description) Map.empty
+convertDescription description@(Part _ _ Module _ _ ports _) =
+    partScoper (rewriteDeclM locations) return return return description
     where
+        locations = execState (operation description) Map.empty
         operation = partScoperT
-            (traverseDeclM ports) traverseModuleItemM noop traverseStmtM >=>
-            partScoperT rewriteDeclM noop noop noop
-        noop = return
+            (traverseDeclM ports) traverseModuleItemM return traverseStmtM
 convertDescription other = other
 
 -- tracks multi-dimensional unpacked array declarations
 traverseDeclM :: [Identifier] -> Decl -> ST Decl
-traverseDeclM _ (decl @ (Variable _ _ _ [] e)) =
+traverseDeclM _ decl@(Variable _ _ _ [] e) =
     traverseExprArgsM e >> return decl
-traverseDeclM ports (decl @ (Variable dir _ x _ e)) = do
-    insertElem x decl
-    if dir /= Local || elem x ports || e /= Nil
-        then flatUsageM x
-        else return ()
+traverseDeclM ports decl@(Variable dir _ x _ e) = do
+    insertElem x ()
+    when (dir /= Local || elem x ports || e /= Nil) $
+        flatUsageM x
     traverseExprArgsM e >> return decl
-traverseDeclM ports decl @ Net{} =
+traverseDeclM ports decl@Net{} =
     traverseNetAsVarM (traverseDeclM ports) decl
 traverseDeclM _ other = return other
 
 -- pack decls marked for packing
-rewriteDeclM :: Decl -> ST Decl
-rewriteDeclM (decl @ (Variable _ _ _ [] _)) = return decl
-rewriteDeclM (decl @ (Variable d t x a e)) = do
-    insertElem x decl
-    details <- lookupElemM x
-    let Just (accesses, _, _) = details
+rewriteDeclM :: Locations -> Decl -> Scoper () Decl
+rewriteDeclM _ decl@(Variable _ _ _ [] _) = return decl
+rewriteDeclM locations decl@(Variable d t x a e) = do
+    accesses <- localAccessesM x
     let location = map accessName accesses
-    usedAsPacked <- lift $ gets $ Map.lookup location
-    case usedAsPacked of
+    case Map.lookup location locations of
         Just depth -> do
             let (tf, rs) = typeRanges t
             let (unpacked, packed) = splitAt depth a
             let t' = tf $ packed ++ rs
             return $ Variable d t' x unpacked e
         Nothing -> return decl
-rewriteDeclM decl @ Net{} = traverseNetAsVarM rewriteDeclM decl
-rewriteDeclM other = return other
+rewriteDeclM locations decl@Net{} =
+    traverseNetAsVarM (rewriteDeclM locations) decl
+rewriteDeclM _ other = return other
 
 traverseModuleItemM :: ModuleItem -> ST ModuleItem
-traverseModuleItemM =
-    traverseModuleItemM'
-    >=> traverseLHSsM  traverseLHSM
-    >=> traverseExprsM traverseExprM
-    >=> traverseAsgnsM traverseAsgnM
-
-traverseModuleItemM' :: ModuleItem -> ST ModuleItem
-traverseModuleItemM' (Instance a b c d bindings) = do
-    bindings' <- mapM collectBinding bindings
-    return $ Instance a b c d bindings'
-    where
-        collectBinding :: PortBinding -> ST PortBinding
-        collectBinding (y, x) = do
-            flatUsageM x
-            return (y, x)
-traverseModuleItemM' other = return other
+traverseModuleItemM item@(Instance _ _ _ _ bindings) =
+    mapM_ (flatUsageM . snd) bindings >> return item
+traverseModuleItemM item =
+    traverseLHSsM traverseLHSM item
+    >>= traverseExprsM traverseExprM
+    >>= traverseAsgnsM traverseAsgnM
 
 traverseStmtM :: Stmt -> ST Stmt
 traverseStmtM =
@@ -94,9 +80,9 @@ traverseStmtM =
     traverseStmtArgsM
 
 traverseStmtArgsM :: Stmt -> ST Stmt
-traverseStmtArgsM stmt @ (Subroutine (Ident ('$' : _)) _) =
+traverseStmtArgsM stmt@(Subroutine (Ident ('$' : _)) _) =
     return stmt
-traverseStmtArgsM stmt @ (Subroutine _ (Args args [])) =
+traverseStmtArgsM stmt@(Subroutine _ (Args args [])) =
     mapM_ flatUsageM args >> return stmt
 traverseStmtArgsM stmt = return stmt
 
@@ -106,8 +92,8 @@ traverseExprM (Range x mode i) =
 traverseExprM expr = traverseExprArgsM expr
 
 traverseExprArgsM :: Expr -> ST Expr
-traverseExprArgsM expr @ (Call _ (Args args [])) =
-    mapM_ (traverseExprArgsM >> flatUsageM) args >> return expr
+traverseExprArgsM expr@(Call _ (Args args [])) =
+    mapM_ (traverseExprArgsM >=> flatUsageM) args >> return expr
 traverseExprArgsM expr =
     traverseSinglyNestedExprsM traverseExprArgsM expr
 
@@ -150,7 +136,7 @@ flatUsageM k = do
     let (k', depth) = unbit k
     details <- lookupElemM k'
     case details of
-        Just (accesses, _, _) -> do
+        Just (accesses, _, ()) -> do
             let location = map accessName accesses
             lift $ modify $ Map.insertWith min location depth
         Nothing -> return ()

@@ -41,6 +41,8 @@ module Convert.Scoper
     , injectDecl
     , lookupElem
     , lookupElemM
+    , localAccesses
+    , localAccessesM
     , Access(..)
     , ScopeKey
     , Scopes
@@ -300,11 +302,18 @@ lookupAccesses scopes accesses = do
     let side = resolveInScope (sMapping scopes) [] accesses
     if isNothing deep then side else deep
 
+localAccesses :: Scopes a -> Identifier -> [Access]
+localAccesses scopes ident =
+    foldr ((:) . toAccess) [Access ident Nil] (sCurrent scopes)
+
+localAccessesM :: Monad m => Identifier -> ScoperT a m [Access]
+localAccessesM = embedScopes localAccesses
+
 lookupLocalIdent :: Scopes a -> Identifier -> LookupResult a
 lookupLocalIdent scopes ident = do
     (replacements, element) <- directResolve (sMapping scopes) accesses
     Just (accesses, replacements, element)
-    where accesses = map toAccess (sCurrent scopes) ++ [Access ident Nil]
+    where accesses = localAccesses scopes ident
 
 toAccess :: Tier -> Access
 toAccess (Tier x "") = Access x Nil
