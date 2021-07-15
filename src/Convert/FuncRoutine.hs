@@ -23,8 +23,11 @@ convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription (description @ Part{}) =
-    traverseModuleItems (traverseStmts $ convertStmt functions) description
-    where functions = execWriter $
+    traverseModuleItems traverseModuleItem description
+    where
+        traverseModuleItem =
+            traverseStmts $ traverseNestedStmts $ convertStmt functions
+        functions = execWriter $
             collectModuleItemsM collectFunctionsM description
 convertDescription other = other
 

@@ -16,7 +16,7 @@ import Language.SystemVerilog.AST
 convert :: [AST] -> [AST]
 convert =
     map $ traverseDescriptions $ traverseModuleItems
-    (convertModuleItem . traverseStmts convertStmt)
+    (convertModuleItem . traverseStmts (traverseNestedStmts convertStmt))
 
 convertModuleItem :: ModuleItem -> ModuleItem
 convertModuleItem (MIPackageItem (Function ml t f decls stmts)) =

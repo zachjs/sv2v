@@ -28,7 +28,7 @@ convert = map $ traverseDescriptions $ traverseModuleItems convertModuleItem
 convertModuleItem :: ModuleItem -> ModuleItem
 convertModuleItem item =
     traverseExprs (traverseNestedExprs convertExpr) $
-    traverseStmts convertStmt $
+    traverseStmts (traverseNestedStmts convertStmt) $
     item
 
 convertExpr :: Expr -> Expr

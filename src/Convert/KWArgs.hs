@@ -29,7 +29,7 @@ convertDescription description =
 convertModuleItem :: TFs -> ModuleItem -> ModuleItem
 convertModuleItem tfs =
     (traverseExprs $ traverseNestedExprs $ convertExpr tfs) .
-    (traverseStmts $ convertStmt tfs)
+    (traverseStmts $ traverseNestedStmts $ convertStmt tfs)
 
 collectTF :: ModuleItem -> Writer TFs ()
 collectTF (MIPackageItem (Function _ _ f decls _)) = collectTFDecls f decls

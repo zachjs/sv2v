@@ -18,7 +18,8 @@ convertModuleItem (AssertionItem item) =
     map (GenModuleItem . MIPackageItem . Decl . CommentDecl) $
         "removed an assertion item" :
         (lines $ show $ AssertionItem item)
-convertModuleItem other = traverseStmts convertStmt other
+convertModuleItem other =
+    traverseStmts (traverseNestedStmts convertStmt) other
 
 convertStmt :: Stmt -> Stmt
 convertStmt (Assertion _) = Null

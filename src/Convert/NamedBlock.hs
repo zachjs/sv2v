@@ -23,7 +23,8 @@ convert asts =
     -- we collect all the existing blocks in the first pass to make sure we
     -- don't generate conflicting names on repeated passes of this conversion
     evalState (runner collectStmtM asts >>= runner traverseStmtM) Set.empty
-    where runner = mapM . traverseDescriptionsM . traverseModuleItemsM . traverseStmtsM
+    where runner = mapM . traverseDescriptionsM . traverseModuleItemsM .
+                        traverseStmtsM . traverseNestedStmtsM
 
 collectStmtM :: Stmt -> State Idents Stmt
 collectStmtM (Block kw x decls stmts) = do

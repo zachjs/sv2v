@@ -15,7 +15,8 @@ import Language.SystemVerilog.AST
 
 convert :: [AST] -> [AST]
 convert =
-    map $ traverseDescriptions $ traverseModuleItems $ traverseStmts convertStmt
+    map $ traverseDescriptions $ traverseModuleItems $ traverseStmts $
+        traverseNestedStmts convertStmt
 
 convertStmt :: Stmt -> Stmt
 convertStmt (If _ cc s1 s2) =

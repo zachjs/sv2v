@@ -185,19 +185,18 @@ traverseStmtsM :: Monad m => MapperM m Stmt -> MapperM m ModuleItem
 traverseStmtsM mapper = moduleItemMapper
     where
         moduleItemMapper (AlwaysC kw stmt) =
-            fullMapper stmt >>= return . AlwaysC kw
+            mapper stmt >>= return . AlwaysC kw
         moduleItemMapper (MIPackageItem (Function lifetime ret name decls stmts)) = do
-            stmts' <- mapM fullMapper stmts
+            stmts' <- mapM mapper stmts
             return $ MIPackageItem $ Function lifetime ret name decls stmts'
         moduleItemMapper (MIPackageItem (Task lifetime name decls stmts)) = do
-            stmts' <- mapM fullMapper stmts
+            stmts' <- mapM mapper stmts
             return $ MIPackageItem $ Task lifetime name decls stmts'
         moduleItemMapper (Initial stmt) =
-            fullMapper stmt >>= return . Initial
+            mapper stmt >>= return . Initial
         moduleItemMapper (Final stmt) =
-            fullMapper stmt >>= return . Final
+            mapper stmt >>= return . Final
         moduleItemMapper other = return $ other
-        fullMapper = traverseNestedStmtsM mapper
 
 traverseStmts :: Mapper Stmt -> Mapper ModuleItem
 traverseStmts = unmonad traverseStmtsM
@@ -719,7 +718,8 @@ collectStmtExprsM = collectify traverseStmtExprsM
 
 traverseLHSsM :: Monad m => MapperM m LHS -> MapperM m ModuleItem
 traverseLHSsM mapper =
-    traverseStmtsM (traverseStmtLHSsM mapper) >=> traverseModuleItemLHSsM
+    traverseStmtsM (traverseNestedStmtsM $ traverseStmtLHSsM mapper)
+        >=> traverseModuleItemLHSsM
     where
         traverseModuleItemLHSsM (Assign delay lhs expr) = do
             lhs' <- mapper lhs
@@ -1055,7 +1055,7 @@ traverseAsgnsM mapper = moduleItemMapper
             return $ Defparam lhs' expr'
         miMapperA other = return other
 
-        miMapperB = traverseStmtsM stmtMapper
+        miMapperB = traverseStmtsM $ traverseNestedStmtsM stmtMapper
         stmtMapper = traverseStmtAsgnsM mapper
 
 traverseAsgns :: Mapper (LHS, Expr) -> Mapper ModuleItem
