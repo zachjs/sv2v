@@ -3,15 +3,12 @@
  -
  - Conversion for `enum`
  -
- - This conversion replaces the enum items with localparams. The localparams are
- - explicitly sized to match the size of the converted enum type. For packages
- - and enums used in the global scope, these localparams are inserted in place.
- - For enums used within a module or interface, the localparams are injected as
- - needed using a nesting procedure from the package conversion.
+ - This conversion replaces references to enum items with their values. The
+ - values are explicitly cast to the enum's base type.
  -
  - SystemVerilog allows for enums to have any number of the items' values
  - specified or unspecified. If the first one is unspecified, it is 0. All other
- - values take on the value of the previous item, plus 1.
+ - unspecified values take on the value of the previous item, plus 1.
  -
  - It is an error for multiple items of the same enum to take on the same value,
  - whether implicitly or explicitly. We catch try to catch "obvious" instances
@@ -20,86 +17,91 @@
 
 module Convert.Enum (convert) where
 
-import Control.Monad.Writer.Strict
+import Control.Monad (zipWithM_, (>=>))
 import Data.List (elemIndices)
-import qualified Data.Set as Set
 
 import Convert.ExprUtils
-import Convert.Package (inject)
+import Convert.Scoper
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type EnumInfo = (Type, [(Identifier, Expr)])
-type Enums = Set.Set EnumInfo
+type SC = Scoper Expr
 
 convert :: [AST] -> [AST]
-convert = map $ concatMap convertDescription
+convert = map $ traverseDescriptions $ partScoper
+    traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
 
-convertDescription :: Description -> [Description]
-convertDescription (description @ Part{}) =
-    [Part attrs extern kw lifetime name ports items']
-    where
-        items' = -- only keep what's used
-            if null enumItems
-                then items
-                else inject enumItems items
-        Part attrs extern kw lifetime name ports items = description'
-        (description', enumItems) = convertDescription' description
-convertDescription other = [other]
+traverseDeclM :: Decl -> SC Decl
+traverseDeclM decl = do
+    case decl of
+        Variable _ _ x _ _ -> insertElem x Nil
+        Net  _ _ _ _ x _ _ -> insertElem x Nil
+        Param    _ _ x   _ -> insertElem x Nil
+        ParamType  _ x   _ -> insertElem x Nil
+        CommentDecl{} -> return ()
+    traverseDeclTypesM traverseTypeM decl >>=
+        traverseDeclExprsM traverseExprM
 
--- replace and collect the enum types in a description
-convertDescription' :: Description -> (Description, [PackageItem])
-convertDescription' description =
-    (description', enumItems)
-    where
-        -- replace and collect the enum types in this description
-        (description', enums) = runWriter $
-            traverseModuleItemsM traverseModuleItemM description
-        traverseModuleItemM = traverseTypesM $ traverseNestedTypesM traverseType
-        -- convert the collected enums into their corresponding localparams
-        enumItems = concatMap makeEnumItems $ Set.toList enums
+traverseModuleItemM :: ModuleItem -> SC ModuleItem
+traverseModuleItemM (Genvar x) =
+    insertElem x Nil >> return (Genvar x)
+traverseModuleItemM item =
+    traverseNodesM traverseExprM return traverseTypeM traverseLHSM return item
+    where traverseLHSM = traverseLHSExprsM traverseExprM
 
--- replace, but write down, enum types
-traverseType :: Type -> Writer Enums Type
-traverseType (Enum (t @ Alias{}) v rs) =
-    return $ Enum t v rs -- not ready
-traverseType (Enum (t @ PSAlias{}) v rs) =
-    return $ Enum t v rs -- not ready
-traverseType (Enum (t @ CSAlias{}) v rs) =
-    return $ Enum t v rs -- not ready
-traverseType (Enum (Implicit sg rl) v rs) =
-    traverseType $ Enum t' v rs
+traverseGenItemM :: GenItem -> SC GenItem
+traverseGenItemM = traverseGenItemExprsM traverseExprM
+
+traverseStmtM :: Stmt -> SC Stmt
+traverseStmtM = traverseStmtExprsM traverseExprM
+
+traverseTypeM :: Type -> SC Type
+traverseTypeM =
+    traverseSinglyNestedTypesM traverseTypeM >=>
+    traverseTypeExprsM traverseExprM >=>
+    replaceEnum
+
+traverseExprM :: Expr -> SC Expr
+traverseExprM (Ident x) = do
+    details <- lookupElemM x
+    return $ case details of
+        Just (_, _, Nil) -> Ident x
+        Just (_, _, e) -> e
+        Nothing -> Ident x
+traverseExprM expr =
+    traverseSinglyNestedExprsM traverseExprM expr
+        >>= traverseExprTypesM traverseTypeM
+
+-- replace enum types and insert enum items
+replaceEnum :: Type -> SC Type
+replaceEnum t@(Enum Alias{} v _) = -- not ready
+    mapM_ (flip insertElem Nil . fst) v >> return t
+replaceEnum (Enum (Implicit sg rl) v rs) =
+    replaceEnum $ Enum t' v rs
     where
         -- default to a 32 bit logic
         t' = IntegerVector TLogic sg rl'
         rl' = if null rl
             then [(RawNum 31, RawNum 0)]
             else rl
-traverseType (Enum t v rs) = do
-    let (tf, rl) = typeRanges t
-    rlParam <- case rl of
-        [ ] -> return [(RawNum 0, RawNum 0)]
-        [_] -> return rl
-        _   -> error $ "unexpected multi-dim enum type: " ++ show (Enum t v rs)
-    tell $ Set.singleton (tf rlParam, v) -- type of localparams
-    return $ tf (rl ++ rs) -- type of variables
-traverseType other = return other
+replaceEnum (Enum t v rs) =
+    insertEnumItems t v >> return (tf $ rl ++ rs)
+    where (tf, rl) = typeRanges t
+replaceEnum other = return other
 
-makeEnumItems :: EnumInfo -> [PackageItem]
-makeEnumItems (itemType, l) =
+insertEnumItems :: Type -> [(Identifier, Expr)] -> SC ()
+insertEnumItems itemType items =
     -- check for obviously duplicate values
     if noDuplicates
-        then zipWith toPackageItem keys vals
+        then zipWithM_ insertEnumItem keys vals
         else error $ "enum conversion has duplicate vals: "
                 ++ show (zip keys vals)
     where
-        keys = map fst l
-        vals = tail $ scanl step (UniOp UniSub $ RawNum 1) (map snd l)
+        insertEnumItem :: Identifier -> Expr -> SC ()
+        insertEnumItem x = scopeExpr . Cast (Left itemType) >=> insertElem x
+        (keys, valsRaw) = unzip items
+        vals = tail $ scanl step (UniOp UniSub $ RawNum 1) valsRaw
         noDuplicates = all (null . tail . flip elemIndices vals) vals
         step :: Expr -> Expr -> Expr
         step expr Nil = simplify $ BinOp Add expr (RawNum 1)
         step _ expr = expr
-        toPackageItem :: Identifier -> Expr -> PackageItem
-        toPackageItem x v =
-            Decl $ Param Localparam itemType x v'
-            where v' = simplify v

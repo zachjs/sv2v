@@ -18,10 +18,7 @@
  - into modules and interfaces as needed.
  -}
 
-module Convert.Package
-    ( convert
-    , inject
-    ) where
+module Convert.Package (convert) where
 
 import Control.Monad.State.Strict
 import Control.Monad.Writer.Strict
@@ -59,15 +56,6 @@ makeLocal :: PackageItem -> PackageItem
 makeLocal (Decl (Param _ t x e)) = Decl $ Param Localparam t x e
 makeLocal (Decl (ParamType _ x t)) = Decl $ ParamType Localparam x t
 makeLocal other = other
-
--- utility for inserting package items into a set of module items as needed
-inject :: [PackageItem] -> [ModuleItem] -> [ModuleItem]
-inject packageItems items =
-    addItems localPIs Set.empty (map addUsedPIs items)
-    where
-        localPIs = Map.fromList $ concatMap toPIElem packageItems
-        toPIElem :: PackageItem -> [(Identifier, PackageItem)]
-        toPIElem item = map (, item) (piNames item)
 
 -- collect packages and global package items
 collectPackageM :: Description -> Writer (Packages, Classes, [PackageItem]) ()
