@@ -11,47 +11,29 @@
 module Convert.NamedBlock (convert) where
 
 import Control.Monad.State.Strict
-import qualified Data.Set as Set
 
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type Idents = Set.Set Identifier
-
 convert :: [AST] -> [AST]
-convert asts =
-    -- we collect all the existing blocks in the first pass to make sure we
-    -- don't generate conflicting names on repeated passes of this conversion
-    evalState (runner collectStmtM asts >>= runner traverseStmtM) Set.empty
-    where runner = mapM . traverseDescriptionsM . traverseModuleItemsM .
-                        traverseStmtsM . traverseNestedStmtsM
+convert = map $ traverseDescriptions convertDescription
 
-collectStmtM :: Stmt -> State Idents Stmt
-collectStmtM (Block kw x decls stmts) = do
-    modify $ Set.insert x
-    return $ Block kw x decls stmts
-collectStmtM other = return other
+convertDescription :: Description -> Description
+convertDescription description =
+    evalState (traverseModuleItemsM traverseModuleItem description) 1
+    where
+        traverseModuleItem = traverseStmtsM $ traverseNestedStmtsM traverseStmtM
 
-traverseStmtM :: Stmt -> State Idents Stmt
+traverseStmtM :: Stmt -> State Int Stmt
 traverseStmtM (Block kw "" [] stmts) =
     return $ Block kw "" [] stmts
 traverseStmtM (Block kw "" decls stmts) = do
-    names <- get
-    let x = uniqueBlockName names
-    modify $ Set.insert x
+    x <- uniqueBlockName
     return $ Block kw x decls stmts
 traverseStmtM other = return other
 
-uniqueBlockName :: Idents -> Identifier
-uniqueBlockName names =
-    step ("sv2v_autoblock_" ++ (show $ Set.size names)) 0
-    where
-        step :: Identifier -> Int -> Identifier
-        step base n =
-            if Set.member name names
-                then step base (n + 1)
-                else name
-            where
-                name = if n == 0
-                    then base
-                    else base ++ "_" ++ show n
+uniqueBlockName :: State Int String
+uniqueBlockName = do
+    cnt <- get
+    put $ cnt + 1
+    return $ "sv2v_autoblock_" ++ show cnt
