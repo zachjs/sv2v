@@ -13,7 +13,7 @@ module Language.SystemVerilog.AST.Stmt
     , Case
     , ActionBlock  (..)
     , PropExpr     (..)
-    , SeqMatchItem
+    , SeqMatchItem (..)
     , SeqExpr      (..)
     , AssertionItem
     , AssertionExpr
@@ -28,7 +28,7 @@ import Text.Printf (printf)
 import Language.SystemVerilog.AST.ShowHelp (commas, indent, unlines', showPad, showBlock)
 import Language.SystemVerilog.AST.Attr (Attr)
 import Language.SystemVerilog.AST.Decl (Decl)
-import Language.SystemVerilog.AST.Expr (Expr(Nil), Args(..))
+import Language.SystemVerilog.AST.Expr (Expr(Call, Ident, Nil), Args(..))
 import Language.SystemVerilog.AST.LHS (LHS)
 import Language.SystemVerilog.AST.Op (AsgnOp(AsgnOpEq))
 import Language.SystemVerilog.AST.Type (Identifier)
@@ -80,8 +80,6 @@ instance Show Stmt where
             showInits :: [(LHS, Expr)] -> String
             showInits = commas . map showInit
                 where showInit (l, e) = showAssign (l, AsgnOpEq, e)
-            showAssign :: (LHS, AsgnOp, Expr) -> String
-            showAssign (l, op, e) = (showPad l) ++ (showPad op) ++ (show e)
     show (Subroutine e a) = printf "%s%s;" (show e) aStr
         where aStr = if a == Args [] [] then "" else show a
     show (Asgn  o t v e) = printf "%s %s %s%s;" (show v) (show o) tStr (show e)
@@ -104,6 +102,9 @@ instance Show Stmt where
         if elem '\n' c
             then "// " ++ show c
             else "// " ++ c
+
+showAssign :: (LHS, AsgnOp, Expr) -> String
+showAssign (l, op, e) = (showPad l) ++ (showPad op) ++ (show e)
 
 showBranch :: Stmt -> String
 showBranch (Block Seq "" [] (stmts @ [CommentStmt{}, _])) =
@@ -208,8 +209,14 @@ instance Show PropExpr where
     show (PropExprImpliesNO a b) = printf "(%s |=> %s)" (show a) (show b)
     show (PropExprFollowsO  a b) = printf "(%s #-# %s)" (show a) (show b)
     show (PropExprFollowsNO a b) = printf "(%s #=# %s)" (show a) (show b)
-    show (PropExprIff a b) = printf "(%s and %s)" (show a) (show b)
-type SeqMatchItem = Either (LHS, AsgnOp, Expr) (Identifier, Args)
+    show (PropExprIff a b) = printf "(%s iff %s)" (show a) (show b)
+data SeqMatchItem
+    = SeqMatchAsgn (LHS, AsgnOp, Expr)
+    | SeqMatchCall Identifier Args
+    deriving Eq
+instance Show SeqMatchItem where
+    show (SeqMatchAsgn asgn) = showAssign asgn
+    show (SeqMatchCall ident args) = show $ Call (Ident ident) args
 data SeqExpr
     = SeqExpr Expr
     | SeqExprAnd        SeqExpr SeqExpr
@@ -228,7 +235,7 @@ instance Show SeqExpr where
     show (SeqExprThroughout a b) = printf "(%s %s %s)" (show a) "throughout" (show b)
     show (SeqExprWithin     a b) = printf "(%s %s %s)" (show a) "within"     (show b)
     show (SeqExprDelay   me e s) = printf "%s##%s %s" (maybe "" showPad me) (show e) (show s)
-    show (SeqExprFirstMatch e a) = printf "first_match(%s, %s)" (show e) (show a)
+    show (SeqExprFirstMatch e a) = printf "first_match(%s, %s)" (show e) (commas $ map show a)
 
 type AssertionItem = (Identifier, Assertion)
 type AssertionExpr = Either PropertySpec Expr

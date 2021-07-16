@@ -309,14 +309,14 @@ traverseAssertionExprsM mapper = assertionMapper
             s' <- seqExprMapper s
             items' <- mapM seqMatchItemMapper items
             return $ SeqExprFirstMatch s' items'
-        seqMatchItemMapper (Left (a, b, c)) = do
+        seqMatchItemMapper (SeqMatchAsgn (a, b, c)) = do
             c' <- mapper c
-            return $ Left (a, b, c')
-        seqMatchItemMapper (Right (x, (Args l p))) = do
+            return $ SeqMatchAsgn (a, b, c')
+        seqMatchItemMapper (SeqMatchCall x (Args l p)) = do
             l' <- mapM mapper l
             pes <- mapM mapper $ map snd p
             let p' = zip (map fst p) pes
-            return $ Right (x, Args l' p')
+            return $ SeqMatchCall x (Args l' p')
         ppMapper constructor p1 p2 = do
             p1' <- propExprMapper p1
             p2' <- propExprMapper p2

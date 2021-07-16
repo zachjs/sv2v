@@ -774,8 +774,8 @@ SeqMatchItems :: { [SeqMatchItem] }
   : "," SeqMatchItem               { [$2] }
   | SeqMatchItems "," SeqMatchItem { $1 ++ [$3] }
 SeqMatchItem :: { SeqMatchItem }
-  : ForStepAssignment   { Left $1 }
-  | Identifier CallArgs { Right ($1, $2) }
+  : ForStepAssignment   { SeqMatchAsgn $1 }
+  | Identifier CallArgs { SeqMatchCall $1 $2 }
 
 ActionBlock :: { ActionBlock }
   : Stmt %prec NoElse { ActionBlock $1 Null }
