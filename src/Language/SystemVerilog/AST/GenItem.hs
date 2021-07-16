@@ -42,7 +42,7 @@ instance Show GenItem where
             x1 (show e1)
             (show c)
             x2 (show o2) (show e2)
-            (if s == GenNull then "begin end" else showBareBlock s)
+            (showBareBlock s)
     show (GenNull) = ";"
     show (GenModuleItem item) = show item
 
@@ -54,18 +54,8 @@ showBareBlock (GenBlock x i) =
 showBareBlock item = show item
 
 showBlockedBranch :: GenItem -> String
-showBlockedBranch genItem =
-    showBareBlock $
-    if isControl genItem
-        then GenBlock "" [genItem]
-        else genItem
-    where
-        isControl :: GenItem -> Bool
-        isControl GenIf{} = True
-        isControl GenFor{} = True
-        isControl GenCase{} = True
-        isControl GenModuleItem{} = True
-        isControl _ = False
+showBlockedBranch genItem@GenBlock{} = showBareBlock genItem
+showBlockedBranch genItem = showBareBlock $ GenBlock "" [genItem]
 
 type GenCase = ([Expr], GenItem)
 

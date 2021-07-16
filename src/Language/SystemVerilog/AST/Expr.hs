@@ -199,6 +199,5 @@ showParams :: [ParamBinding] -> String
 showParams params = indentedParenList $ map showParam params
 
 showParam :: ParamBinding -> String
-showParam ("*", Right Nil) = ".*"
 showParam ("", arg) = showEither arg
 showParam (i, arg) = printf ".%s(%s)" i (showEither arg)

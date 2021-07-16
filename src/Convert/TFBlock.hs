@@ -8,7 +8,7 @@
 
 module Convert.TFBlock (convert) where
 
-import Data.List (intersect, isPrefixOf)
+import Data.List (intersect)
 
 import Convert.Traverse
 import Language.SystemVerilog.AST
@@ -53,7 +53,7 @@ flattenOuterBlocks (Block Seq "" declsA (Block Seq name declsB stmtsA : stmtsB))
                 Block Seq name (declsA ++ declsB) (stmtsA ++ stmtsB)
         else (declsA, Block Seq name declsB stmtsA : stmtsB)
 flattenOuterBlocks (Block Seq name decls stmts)
-    | notscope name = (decls, stmts)
+    | null name = (decls, stmts)
     | otherwise = ([], [Block Seq name decls stmts])
 flattenOuterBlocks stmt = ([], [stmt])
 
@@ -72,7 +72,3 @@ declName (Net  _ _ _ _ x _ _) = x
 declName (Param _ _ x _) = x
 declName (ParamType _ x _) = x
 declName CommentDecl{} = ""
-
-notscope :: Identifier -> Bool
-notscope "" = True
-notscope name = "sv2v_autoblock_" `isPrefixOf` name

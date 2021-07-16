@@ -98,10 +98,7 @@ instance Show Stmt where
     show (Continue     ) = "continue;"
     show (Break        ) = "break;"
     show (Null         ) = ";"
-    show (CommentStmt c) =
-        if elem '\n' c
-            then "// " ++ show c
-            else "// " ++ c
+    show (CommentStmt c) = "// " ++ c
 
 showAssign :: (LHS, AsgnOp, Expr) -> String
 showAssign (l, op, e) = (showPad l) ++ (showPad op) ++ (show e)

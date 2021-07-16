@@ -21,6 +21,5 @@ convertFunction (MIPackageItem (Function ml t f decls stmts)) =
     where
         t' = case t of
             IntegerVector TReg   sg rs -> Implicit sg rs
-            IntegerVector TLogic sg rs -> Implicit sg rs
             _ -> t
 convertFunction other = other
