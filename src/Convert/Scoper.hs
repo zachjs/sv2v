@@ -532,7 +532,8 @@ scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
                     injected' <- mapM fullModuleItemMapper injected
                     genItem'' <- scopeGenItemMapper genItem'
                     let genItems = map GenModuleItem injected' ++ [genItem'']
-                    return $ GenBlock "" genItems -- flattened during traversal
+                    -- flattened during traversal
+                    return $ GenModuleItem $ Generate genItems
         scopeGenItemMapper :: GenItem -> ScoperT a m GenItem
         scopeGenItemMapper (GenFor (index, a) b c genItem) = do
             genItem' <- scopeGenItemBranchMapper index genItem

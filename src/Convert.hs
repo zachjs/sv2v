@@ -59,20 +59,18 @@ finalPhases :: Selector -> [Phase]
 finalPhases _ =
     [ Convert.NamedBlock.convert
     , Convert.DuplicateGenvar.convert
+    , Convert.AsgnOp.convert
+    , Convert.FuncRet.convert
+    , Convert.TFBlock.convert
     ]
 
 mainPhases :: Selector -> [Phase]
 mainPhases selectExclude =
-    [ Convert.AsgnOp.convert
-    , Convert.BlockDecl.convert
+    [ Convert.BlockDecl.convert
     , selectExclude Job.Logic Convert.Logic.convert
-    , Convert.FuncRet.convert
-    , Convert.FuncRoutine.convert
-    , Convert.EmptyArgs.convert
     , Convert.ImplicitNet.convert
     , Convert.Inside.convert
     , Convert.IntTypes.convert
-    , Convert.KWArgs.convert
     , Convert.MultiplePacked.convert
     , Convert.UnbasedUnsized.convert
     , Convert.Cast.convert
@@ -83,13 +81,11 @@ mainPhases selectExclude =
     , Convert.Simplify.convert
     , Convert.Stream.convert
     , Convert.Struct.convert
-    , Convert.TFBlock.convert
     , Convert.Typedef.convert
     , Convert.UnpackedArray.convert
     , Convert.Unsigned.convert
     , Convert.Wildcard.convert
     , Convert.Enum.convert
-    , Convert.ForAsgn.convert
     , Convert.StringParam.convert
     , selectExclude Job.Interface Convert.Interface.convert
     , selectExclude Job.Succinct Convert.RemoveComments.convert
@@ -97,10 +93,14 @@ mainPhases selectExclude =
 
 initialPhases :: Selector -> [Phase]
 initialPhases selectExclude =
-    [ Convert.Jump.convert
+    [ Convert.ForAsgn.convert
+    , Convert.Jump.convert
+    , Convert.KWArgs.convert
     , Convert.Unique.convert
     , Convert.LogOp.convert
+    , Convert.EmptyArgs.convert
     , Convert.Foreach.convert
+    , Convert.FuncRoutine.convert
     , selectExclude Job.Assert Convert.Assertion.convert
     , selectExclude Job.Always Convert.AlwaysKW.convert
     , Convert.Package.convert

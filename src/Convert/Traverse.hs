@@ -1016,7 +1016,7 @@ traverseNestedGenItems :: Mapper GenItem -> Mapper GenItem
 traverseNestedGenItems = unmonad traverseNestedGenItemsM
 
 flattenGenBlocks :: GenItem -> [GenItem]
-flattenGenBlocks (GenBlock "" items) = items
+flattenGenBlocks (GenModuleItem (Generate items)) = items
 flattenGenBlocks (GenFor _ _ _ GenNull) = []
 flattenGenBlocks GenNull = []
 flattenGenBlocks other = [other]
@@ -1087,18 +1087,14 @@ traverseNestedModuleItemsM mapper = fullMapper
         fullMapper (Initial Null) = return $ Generate []
         fullMapper other = mapper other
         fullGenItemMapper = traverseNestedGenItemsM genItemMapper
-        genItemMapper (GenModuleItem moduleItem) = do
-            moduleItem' <- fullMapper moduleItem
-            return $ case moduleItem' of
-                Generate subItems -> GenBlock "" subItems
-                _ -> GenModuleItem moduleItem'
+        genItemMapper (GenModuleItem moduleItem) =
+            fullMapper moduleItem >>= return . GenModuleItem
         genItemMapper (GenIf _ GenNull GenNull) = return GenNull
         genItemMapper (GenIf (Number n) s1 s2) = do
             case numberToInteger n of
                 Nothing -> return $ GenIf (Number n) s1 s2
                 Just 0 -> genItemMapper s2
                 Just _ -> genItemMapper s1
-        genItemMapper (GenBlock "" [item]) = genItemMapper item
         genItemMapper (GenBlock _ []) = return GenNull
         genItemMapper other = return other
 
