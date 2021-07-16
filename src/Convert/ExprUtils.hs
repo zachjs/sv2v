@@ -193,6 +193,7 @@ rangeSizeHiLo (hi, lo) =
 -- range; [hi:lo] chooses the first expression
 endianCondExpr :: Range -> Expr -> Expr -> Expr
 endianCondExpr SizedRange{} e _ = e
+endianCondExpr RevSzRange{} _ e = e
 endianCondExpr r e1 e2 = simplify $ Mux (uncurry (BinOp Ge) r) e1 e2
 
 -- chooses one or the other range based on the endianness of the given range,
@@ -218,3 +219,7 @@ dimensionsSize ranges =
 -- designs, we can safely assume that E >= 1, allowing for more succinct output
 pattern SizedRange :: Expr -> Range
 pattern SizedRange expr = (BinOp Sub expr (RawNum 1), RawNum 0)
+
+-- similar to the above pattern, we assume E >= 1 for any range like [0:E-1]
+pattern RevSzRange :: Expr -> Range
+pattern RevSzRange expr = (RawNum 0, BinOp Sub expr (RawNum 1))
