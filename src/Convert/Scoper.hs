@@ -38,6 +38,7 @@ module Convert.Scoper
     , scopeType
     , insertElem
     , injectItem
+    , injectTopItem
     , injectDecl
     , lookupElem
     , lookupElemM
@@ -63,6 +64,7 @@ module Convert.Scoper
 
 import Control.Monad.State.Strict
 import Data.Functor.Identity (runIdentity)
+import Data.List (partition)
 import Data.Maybe (isNothing)
 import qualified Data.Map.Strict as Map
 
@@ -97,7 +99,7 @@ data Scopes a = Scopes
     { sCurrent :: [Tier]
     , sMapping :: Mapping a
     , sProcedureLoc :: [Access]
-    , sInjectedItems :: [ModuleItem]
+    , sInjectedItems :: [(Bool, ModuleItem)]
     , sInjectedDecls :: [Decl]
     } deriving Show
 
@@ -225,7 +227,11 @@ insertElem key element = do
 
 injectItem :: Monad m => ModuleItem -> ScoperT a m ()
 injectItem item =
-    modify' $ \s -> s { sInjectedItems = item : sInjectedItems s }
+    modify' $ \s -> s { sInjectedItems = (True, item) : sInjectedItems s }
+
+injectTopItem :: Monad m => ModuleItem -> ScoperT a m ()
+injectTopItem item =
+    modify' $ \s -> s { sInjectedItems = (False, item) : sInjectedItems s }
 
 injectDecl :: Monad m => Decl -> ScoperT a m ()
 injectDecl decl =
@@ -233,10 +239,13 @@ injectDecl decl =
 
 consumeInjectedItems :: Monad m => ScoperT a m [ModuleItem]
 consumeInjectedItems = do
-    injected <- gets sInjectedItems
+    -- only pull out top items if in the top scope
+    inTopLevelScope <- gets $ (== 1) . length . sCurrent
+    let op = if inTopLevelScope then const True else fst
+    (injected, remaining) <- gets $ partition op . sInjectedItems
     when (not $ null injected) $
-        modify' $ \s -> s { sInjectedItems = [] }
-    return $ reverse injected
+        modify' $ \s -> s { sInjectedItems = remaining }
+    return $ reverse $ map snd $ injected
 
 consumeInjectedDecls :: Monad m => ScoperT a m [Decl]
 consumeInjectedDecls = do
@@ -517,7 +526,7 @@ scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
             exitProcedure
             return $ Final stmt'
         fullModuleItemMapper (Generate genItems) =
-            mapM fullGenItemMapper genItems >>= return . Generate
+            fullGenItemBlockMapper genItems >>= return . Generate
         fullModuleItemMapper (MIAttr attr item) =
             fullModuleItemMapper item >>= return . MIAttr attr
         fullModuleItemMapper item = moduleItemMapper item
@@ -526,43 +535,48 @@ scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
         fullGenItemMapper genItem = do
             genItem' <- genItemMapper genItem
             injected <- consumeInjectedItems
+            genItem'' <- scopeGenItemMapper genItem'
+            mapM_ injectItem injected -- defer until enclosing block
+            return genItem''
+
+        -- akin to fullGenItemMapper, but for lists of generate items, and
+        -- allowing module items to be injected in the middle of the list
+        fullGenItemBlockMapper :: [GenItem] -> ScoperT a m [GenItem]
+        fullGenItemBlockMapper = fmap concat . mapM genblkStep
+        genblkStep :: GenItem -> ScoperT a m [GenItem]
+        genblkStep genItem = do
+            genItem' <- fullGenItemMapper genItem
+            injected <- consumeInjectedItems
             if null injected
-                then scopeGenItemMapper genItem'
+                then return [genItem']
                 else do
                     injected' <- mapM fullModuleItemMapper injected
-                    genItem'' <- scopeGenItemMapper genItem'
-                    let genItems = map GenModuleItem injected' ++ [genItem'']
-                    -- flattened during traversal
-                    return $ GenModuleItem $ Generate genItems
+                    return $ map GenModuleItem injected' ++ [genItem']
+
+        -- enters and exits generate block scopes as appropriate
         scopeGenItemMapper :: GenItem -> ScoperT a m GenItem
+        scopeGenItemMapper (GenFor _ _ _ GenNull) = return GenNull
         scopeGenItemMapper (GenFor (index, a) b c genItem) = do
-            genItem' <- scopeGenItemBranchMapper index genItem
+            let GenBlock name genItems = genItem
+            enterScope name index
+            genItems' <- fullGenItemBlockMapper genItems
+            exitScope
+            let genItem' = GenBlock name genItems'
             return $ GenFor (index, a) b c genItem'
         scopeGenItemMapper (GenIf cond thenItem elseItem) = do
-            thenItem' <- scopeGenItemBranchMapper "" thenItem
-            elseItem' <- scopeGenItemBranchMapper "" elseItem
+            thenItem' <- fullGenItemMapper thenItem
+            elseItem' <- fullGenItemMapper elseItem
             return $ GenIf cond thenItem' elseItem'
         scopeGenItemMapper (GenBlock name genItems) = do
             enterScope name ""
-            genItems' <- mapM fullGenItemMapper genItems
+            genItems' <- fullGenItemBlockMapper genItems
             exitScope
             return $ GenBlock name genItems'
         scopeGenItemMapper (GenModuleItem moduleItem) =
             wrappedModuleItemMapper moduleItem >>= return . GenModuleItem
-        scopeGenItemMapper genItem =
+        scopeGenItemMapper genItem@GenCase{} =
             traverseSinglyNestedGenItemsM fullGenItemMapper genItem
-
-        scopeGenItemBranchMapper :: Identifier -> GenItem -> ScoperT a m GenItem
-        scopeGenItemBranchMapper index (GenBlock name genItems) = do
-            enterScope name index
-            genItems' <- mapM fullGenItemMapper genItems
-            exitScope
-            return $ GenBlock name genItems'
-        scopeGenItemBranchMapper index genItem = do
-            enterScope "" index
-            genItem' <- fullGenItemMapper genItem
-            exitScope
-            return genItem'
+        scopeGenItemMapper GenNull = return GenNull
 
 partScoper
     :: MapperM (Scoper a) Decl

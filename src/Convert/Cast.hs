@@ -117,12 +117,18 @@ convertCastM (Number size) (Number value) signed =
                         ++ " is not an integer"
 convertCastM size value signed = do
     value' <- traverseExprM value
-    useFn <- embedScopes canUseCastFn size
-    if useFn then do
+    sizeUsesLocalVars <- embedScopes usesLocalVars size
+    inProcedure <- withinProcedureM
+    if not sizeUsesLocalVars || not inProcedure then do
         let name = castFnName size signed
-        details <- lookupLocalIdentM name
-        when (details == Nothing) $
-            injectItem $ castFn name size signed
+        let item = castFn name size signed
+        if sizeUsesLocalVars
+            then do
+                details <- lookupLocalIdentM name
+                when (details == Nothing) (injectItem item)
+            else do
+                details <- lookupElemM name
+                when (details == Nothing) (injectTopItem item)
         return $ Call (Ident name) (Args [value'] [])
     else do
         name <- castDeclName 0
@@ -131,16 +137,19 @@ convertCastM size value signed = do
         injectDecl $ castDecl useVar name value' size signed
         return $ Ident name
 
--- checks if a cast size can be hoisted to a cast function
-canUseCastFn :: Scopes a -> Expr -> Bool
-canUseCastFn scopes size =
-    not (inProcedure && anyNonLocal)
+-- checks if a cast size references any vars not defined at the top level scope
+usesLocalVars :: Scopes a -> Expr -> Bool
+usesLocalVars scopes =
+    getAny . execWriter . collectNestedExprsM collectLocalVarsM
     where
-        inProcedure = withinProcedure scopes
-        anyNonLocal = getAny $ execWriter $
-            collectNestedExprsM collectNonLocalExprM size
-        collectNonLocalExprM :: Expr -> Writer Any ()
-        collectNonLocalExprM expr =
+        collectLocalVarsM :: Expr -> Writer Any ()
+        collectLocalVarsM expr@(Ident x) =
+            if isLoopVar scopes x
+                then tell $ Any True
+                else resolve expr
+        collectLocalVarsM expr = resolve expr
+        resolve :: Expr -> Writer Any ()
+        resolve expr =
             case lookupElem scopes expr of
                 Nothing -> return ()
                 Just ([_, _], _, _) -> return ()
