@@ -7,5 +7,4 @@ type Identifier = String
 
 data Type
 instance Eq Type
-instance Ord Type
 instance Show Type

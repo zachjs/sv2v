@@ -23,7 +23,7 @@ data UniOp
     | RedNor
     | RedXor
     | RedXnor
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show UniOp where
     show LogNot  = "!"
@@ -66,7 +66,7 @@ data BinOp
     | Le
     | Gt
     | Ge
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show BinOp where
     show LogAnd  = "&&"
@@ -112,7 +112,7 @@ instance Show AsgnOp where
 data StreamOp
     = StreamL
     | StreamR
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show StreamOp where
     show StreamL  = "<<"

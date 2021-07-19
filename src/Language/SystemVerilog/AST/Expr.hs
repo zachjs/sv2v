@@ -61,7 +61,7 @@ data Expr
     | Inside  Expr [Expr]
     | MinTypMax Expr Expr Expr
     | Nil
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show Expr where
     show (Nil          ) = ""
@@ -125,7 +125,7 @@ instance Show Expr where
 
 data Args
     = Args [Expr] [(Identifier, Expr)]
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show Args where
     show (Args pnArgs kwArgs) = '(' : commas strs ++ ")"
@@ -137,7 +137,7 @@ data PartSelectMode
     = NonIndexed
     | IndexedPlus
     | IndexedMinus
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show PartSelectMode where
     show NonIndexed   = ":"
@@ -148,7 +148,7 @@ data DimsFn
     = FnBits
     | FnDimensions
     | FnUnpackedDimensions
-    deriving (Eq, Ord)
+    deriving Eq
 
 data DimFn
     = FnLeft
@@ -157,7 +157,7 @@ data DimFn
     | FnHigh
     | FnIncrement
     | FnSize
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show DimsFn where
     show FnBits               = "$bits"

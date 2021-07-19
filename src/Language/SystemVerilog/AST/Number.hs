@@ -156,7 +156,7 @@ data Bit
     | Bit1
     | BitX
     | BitZ
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show Bit where
     show Bit0 = "0"
@@ -186,7 +186,7 @@ data Number
     = UnbasedUnsized Bit
     | Decimal Int Bool Integer
     | Based   Int Bool Base Integer Integer
-    deriving (Eq, Ord)
+    deriving Eq
 
 baseSize :: Integral a => Base -> a
 baseSize Binary = 2

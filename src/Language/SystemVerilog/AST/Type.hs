@@ -51,7 +51,7 @@ data Type
     | TypeOf Expr
     | TypedefRef Expr
     | UnpackedType Type [Range] -- used internally
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show Type where
     show (Alias         xx    rs) = printf "%s%s" xx (showRanges rs)
@@ -140,7 +140,7 @@ data Signing
     = Unspecified
     | Signed
     | Unsigned
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show Signing where
     show Unspecified = ""
@@ -160,12 +160,12 @@ data NetType
     | TWire
     | TWand
     | TWor
-    deriving (Eq, Ord)
+    deriving Eq
 data IntegerVectorType
     = TBit
     | TLogic
     | TReg
-    deriving (Eq, Ord)
+    deriving Eq
 data IntegerAtomType
     = TByte
     | TShortint
@@ -173,14 +173,14 @@ data IntegerAtomType
     | TLongint
     | TInteger
     | TTime
-    deriving (Eq, Ord)
+    deriving Eq
 data NonIntegerType
     = TShortreal
     | TReal
     | TRealtime
     | TString
     | TEvent
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show NetType where
     show TSupply0   = "supply0"
@@ -216,7 +216,7 @@ instance Show NonIntegerType where
 data Packing
     = Unpacked
     | Packed Signing
-    deriving (Eq, Ord)
+    deriving Eq
 
 instance Show Packing where
     show (Unpacked) = ""
