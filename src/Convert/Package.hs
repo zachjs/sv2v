@@ -264,9 +264,11 @@ processItems topName packageName moduleItems = do
             details <- lookupElemM x
             case details of
                 Nothing ->
-                    if null topName
-                        then return x
-                        else resolveGlobalIdent x
+                    -- only missing identifiers within parts should be looked up
+                    -- in the global scope
+                    if null packageName && not (null topName)
+                        then resolveGlobalIdent x
+                        else return x
                 Just ([_, _], _, Declared) ->
                     if null packageName
                         then return x
