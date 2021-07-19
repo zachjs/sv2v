@@ -292,6 +292,9 @@ convertExpr (struct @ (Struct _ fields [])) (Pattern itemsOrig) =
                         Just value = numberToInteger n
                         Right (Number n) = item
 
+convertExpr _ (Cast (Left t) expr@Pattern{}) =
+    Cast (Left t) $ convertExpr t expr
+
 convertExpr (Implicit _ []) expr = expr
 convertExpr (Implicit sg rs) expr =
     convertExpr (IntegerVector TBit sg rs) expr

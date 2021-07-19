@@ -1266,6 +1266,7 @@ Expr :: { Expr }
   | Expr "?" Expr ":" Expr      { Mux $1 $3 $5 }
   | Expr "." Identifier         { Dot $1 $3 }
   | "'" "{" PatternItems "}"    { Pattern $3 }
+  | Expr "'" "{" PatternItems "}"{ Cast (Right $1) (Pattern $4) }
   | CastingType "'" "(" Expr ")" { Cast (Left  $1) $4 }
   | Expr        "'" "(" Expr ")" { Cast (Right $1) $4 }
   | "{" StreamOp StreamSize Concat "}" { Stream $2 $3         $4 }
