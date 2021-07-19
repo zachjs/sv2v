@@ -20,7 +20,7 @@ type TypeMap = Map.Map Identifier Type
 type Modules = Map.Map Identifier TypeMap
 
 type Instance = Map.Map Identifier (Type, IdentSet)
-type Instances = Set.Set (Identifier, Instance)
+type Instances = Map.Map String (Identifier, Instance)
 
 type IdentSet = Set.Set Identifier
 type DeclMap = Map.Map Identifier Decl
@@ -34,7 +34,7 @@ convert files =
             mapM (collectDescriptionsM collectDescriptionM) files
         (files', instancesRaw) =
             runWriter $ mapM (mapM convertDescriptionM) files
-        instances = Set.toList instancesRaw
+        instances = Map.elems instancesRaw
 
         -- add type parameter instantiations
         files'' = map (concatMap explodeDescription) files'
@@ -283,8 +283,8 @@ convertModuleItemM (orig @ (Instance m bindings x r p)) =
     if hasOnlyExprs then
         return orig
     else if not hasUnresolvedTypes then do
-        tell $ Set.singleton (m, resolvedTypes)
         let m' = moduleInstanceName m resolvedTypes
+        tell $ Map.singleton m' (m, resolvedTypes)
         return $ Generate $ map GenModuleItem $
             map (MIPackageItem . Decl) addedDecls ++
             [Instance m' (additionalBindings ++ exprBindings) x r p]
@@ -292,7 +292,7 @@ convertModuleItemM (orig @ (Instance m bindings x r p)) =
         return orig
     else do
         let m' = TemplateTag m
-        tell $ Set.singleton (m, Map.empty)
+        tell $ Map.singleton m' (m, Map.empty)
         return $ Instance m' bindings x r p
     where
         hasOnlyExprs = all (isRight . snd) bindings
