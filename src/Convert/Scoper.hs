@@ -477,8 +477,12 @@ scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
         redirectTFDecl :: Type -> Identifier -> ScoperT a m (Type, Identifier)
         redirectTFDecl typ ident = do
             res <- declMapper $ Variable Local typ ident [] Nil
-            let Variable Local newType newName [] Nil = res
-            return (newType, newName)
+            let Variable Local newType newName newRanges Nil = res
+            return $ if null newRanges
+                then (newType, newName)
+                else
+                    let (tf, rs2) = typeRanges newType
+                    in (tf $ newRanges ++ rs2, newName)
 
         wrappedModuleItemMapper :: ModuleItem -> ScoperT a m ModuleItem
         wrappedModuleItemMapper item = do
