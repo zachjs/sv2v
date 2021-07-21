@@ -152,9 +152,7 @@ traverseStmtM' =
     traverseStmtAsgnsM traverseAsgnM
 
 traverseExprM :: Expr -> Scoper Type Expr
-traverseExprM =
-    (embedScopes convertSubExpr >=> return . snd) .
-    (traverseNestedExprs $ traverseExprTypes convertType)
+traverseExprM = embedScopes convertSubExpr >=> return . snd
 
 traverseLHSM :: LHS -> Scoper Type LHS
 traverseLHSM = convertLHS >=> return . snd
@@ -292,10 +290,12 @@ convertExpr (struct @ (Struct _ fields [])) (Pattern itemsOrig) =
                         Just value = numberToInteger n
                         Right (Number n) = item
 
-convertExpr _ (Cast (Left t) expr@Pattern{}) =
-    Cast (Left t) $ convertExpr t expr
+convertExpr _ (Cast (Left t) expr) =
+    Cast (Left t') $ convertExpr t expr
+    where t' = convertType t
 
-convertExpr (Implicit _ []) expr = expr
+convertExpr (Implicit _ []) expr =
+    traverseSinglyNestedExprs (convertExpr UnknownType) expr
 convertExpr (Implicit sg rs) expr =
     convertExpr (IntegerVector TBit sg rs) expr
 
@@ -343,7 +343,8 @@ convertExpr t (Concat exprs) =
         t' = dropInnerTypeRange t
         exprs' = map (convertExpr t') exprs
 
-convertExpr _ other = other
+convertExpr _ expr =
+    traverseSinglyNestedExprs (convertExpr UnknownType) expr
 
 fallbackType :: Scopes Type -> Expr -> (Type, Expr)
 fallbackType scopes e =
@@ -484,7 +485,8 @@ convertSubExpr scopes e =
         traverseSinglyNestedExprs exprMapper e
     where
         exprMapper = snd . convertSubExpr scopes
-        typeMapper = traverseNestedTypes $ traverseTypeExprs exprMapper
+        typeMapper = convertType .
+            traverseNestedTypes (traverseTypeExprs exprMapper)
 
 -- get the fields and type function of a struct or union
 getFields :: Type -> Maybe [Field]
