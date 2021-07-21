@@ -76,6 +76,11 @@ traverseDeclM decl = do
     case decl' of
         Variable{} -> return decl'
         Net{} -> return decl'
+        Param s (UnpackedType t rs1) x e -> do
+            insertElem x UnknownType
+            let (tf, rs2) = typeRanges t
+            let t' = tf $ rs1 ++ rs2
+            return $ Param s t' x e
         Param _ _ x _ ->
             insertElem x UnknownType >> return decl'
         ParamType Localparam x t -> do

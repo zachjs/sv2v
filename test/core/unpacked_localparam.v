@@ -9,4 +9,6 @@ module top;
             end
         end
     end
+    localparam [23:0] X = { 8'd5, 8'd3, 8'd2 };
+    initial $display("%0d %0d %0d", X[16+:8], X[8+:8], X[0+:8]);
 endmodule

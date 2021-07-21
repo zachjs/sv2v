@@ -9,4 +9,7 @@ module top;
             end
         end
     end
+    typedef byte T [3];
+    localparam T X = '{ 5, 3, 2 };
+    initial $display("%0d %0d %0d", X[0], X[1], X[2]);
 endmodule
