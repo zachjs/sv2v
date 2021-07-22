@@ -77,7 +77,7 @@ convert files =
             || isntTyped
             || isUsedAsUntyped
             || isUsedAsTyped && isInstantiatedViaNonTyped
-            || allTypesHaveDefaults && notInstantiated
+            || allTypesHaveDefaults && notInstantiated && isntTemplateTagged
             where
                 maybeTypeMap = Map.lookup name modules
                 Just typeMap = maybeTypeMap
@@ -88,6 +88,7 @@ convert files =
                 isInstantiatedViaNonTyped = untypedUsageSearch $ Set.singleton name
                 allTypesHaveDefaults = all (/= UnknownType) (Map.elems typeMap)
                 notInstantiated = lookup name instances == Nothing
+                isntTemplateTagged = not $ isTemplateTagged name
         keepDescription _ = True
 
         -- instantiate the type parameters if this is a used default instance
@@ -99,6 +100,7 @@ convert files =
             where
                 shouldntReduce =
                     Map.notMember name modules || Map.null typeMap ||
+                    any (== UnknownType) (Map.elems typeMap) ||
                     isTemplateTagged name
                 typeMap = modules Map.! name
                 rewriteDecl :: Decl -> Decl
