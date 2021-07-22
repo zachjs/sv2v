@@ -66,6 +66,10 @@ simplifyStep (Call (Ident "$clog2") (Args [Dec k] [])) =
         clog2 :: Integer -> Integer
         clog2 n = if n < 2 then 0 else clog2Help 1 n
 
+-- TODO: add full constant evaluation for all number literals to avoid the
+-- anti-loop hack below
+simplifyStep e@(BinOp _ (BinOp _ Number{} Number{}) Number{}) = e
+
 simplifyStep (BinOp op e1 e2) = simplifyBinOp op e1 e2
 simplifyStep other = other
 
