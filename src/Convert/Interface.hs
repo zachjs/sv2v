@@ -7,7 +7,7 @@
 
 module Convert.Interface (convert) where
 
-import Data.Maybe (isNothing, mapMaybe)
+import Data.Maybe (isJust, isNothing, mapMaybe)
 import Control.Monad.Writer.Strict
 import qualified Data.Map.Strict as Map
 
@@ -391,17 +391,26 @@ inlineInstance global ranges modportBindings items partName
                 Param     _ _ x _   -> insertElem x ()
                 ParamType _   x _   -> insertElem x ()
                 CommentDecl{} -> return ()
-            return decl
+            traverseDeclExprsM traverseExprM decl
 
         traverseModuleItemM :: ModuleItem -> Scoper () ModuleItem
-        traverseModuleItemM (item @ Modport{}) =
+        traverseModuleItemM item@Modport{} =
             traverseExprsM (scopeExpr >=> traverseExprM) item
+        traverseModuleItemM item@(Instance _ _ x _ _) =
+            insertElem x () >> traverseExprsM traverseExprM item
         traverseModuleItemM item =
             traverseExprsM traverseExprM item >>=
             traverseLHSsM  traverseLHSM
 
         traverseGenItemM :: GenItem -> Scoper () GenItem
-        traverseGenItemM = traverseGenItemExprsM traverseExprM
+        traverseGenItemM item@(GenFor (x, _) _ _ _) = do
+            -- don't want to be scoped in modports
+            insertElem x ()
+            item' <- traverseGenItemExprsM traverseExprM item
+            removeElem x
+            return item'
+        traverseGenItemM item =
+            traverseGenItemExprsM traverseExprM item
 
         traverseStmtM :: Stmt -> Scoper () Stmt
         traverseStmtM =
@@ -497,14 +506,20 @@ inlineInstance global ranges modportBindings items partName
 
         checkExprResolution :: Scopes () -> Expr -> a -> a
         checkExprResolution local expr =
-            case (lookupElem local expr, lookupElem global expr) of
-                (Nothing, Just (_, _, DeclVal)) ->
+            if not (exprResolves local expr) && exprResolves global expr
+                then
                     error $ "inlining instance \"" ++ instanceName ++ "\" of "
                         ++ inlineKind ++ " \"" ++ partName
                         ++ "\" would make expression \"" ++ show expr
                         ++ "\" used in \"" ++ instanceName
                         ++ "\" resolvable when it wasn't previously"
-                _ -> id
+                else id
+
+        exprResolves :: Scopes a -> Expr -> Bool
+        exprResolves local (Ident x) =
+            isJust (lookupElem local x) || isLoopVar local x
+        exprResolves local expr =
+            isJust (lookupElem local expr)
 
         -- unambiguous reference to the current instance
         scopedInstanceRaw = accessesToExpr $ localAccesses global instanceName

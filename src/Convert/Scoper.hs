@@ -37,6 +37,7 @@ module Convert.Scoper
     , scopeExpr
     , scopeType
     , insertElem
+    , removeElem
     , injectItem
     , injectTopItem
     , injectDecl
@@ -218,10 +219,16 @@ instance ScopePath [Access] where
                 where Ident y = iy
 
 insertElem :: Monad m => ScopePath k => k -> a -> ScoperT a m ()
-insertElem key element = do
+insertElem key = setElem key . Just
+
+removeElem :: Monad m => ScopePath k => k -> ScoperT a m ()
+removeElem key = setElem key Nothing
+
+setElem :: Monad m => ScopePath k => k -> Maybe a -> ScoperT a m ()
+setElem key maybeElement = do
     s <- get
     let mapping = sMapping s
-    let entry = Entry (Just element) "" Map.empty
+    let entry = Entry maybeElement "" Map.empty
     let mapping' = setScope (toTiers s key) entry mapping
     put $ s { sMapping = mapping' }
 
