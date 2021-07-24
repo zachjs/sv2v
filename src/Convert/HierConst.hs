@@ -71,7 +71,10 @@ traverseDeclM decl = do
             scopeExpr e >>= insertElem x . Right
         Param Localparam (Implicit sg rs) x e ->
             scopeExpr (Cast (Left t) e) >>= insertElem x . Right
-            where t = IntegerVector TLogic sg rs
+            where t = IntegerVector TBit sg rs
+        Param Localparam (IntegerVector _ sg rs) x e ->
+            scopeExpr (Cast (Left t) e) >>= insertElem x . Right
+            where t = IntegerVector TBit sg rs
         Param Localparam t x e ->
             scopeExpr (Cast (Left t) e) >>= insertElem x . Right
         _ -> return ()

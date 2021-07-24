@@ -99,7 +99,7 @@ traverseStmtM stmt = do
     return stmt'
 
 traverseExprM :: Expr -> SC Expr
-traverseExprM (Cast (Left (IntegerVector _ sg rs)) value) = do
+traverseExprM (Cast (Left (IntegerVector kw sg rs)) value) | kw /= TBit = do
     value' <- traverseExprM value
     size' <- traverseExprM size
     convertCastM size' value' signed
