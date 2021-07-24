@@ -30,6 +30,7 @@ module Convert.Cast (convert) where
 
 import Control.Monad.Writer.Strict
 import Data.List (isPrefixOf)
+import Data.Maybe (isJust)
 
 import Convert.ExprUtils
 import Convert.Scoper
@@ -46,9 +47,9 @@ convertDescription description =
         traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
         description
 
-type ST = Scoper Expr
+type SC = Scoper ()
 
-traverseDeclM :: Decl -> ST Decl
+traverseDeclM :: Decl -> SC Decl
 traverseDeclM decl = do
     decl' <- case decl of
         Variable d t x a e -> do
@@ -59,16 +60,16 @@ traverseDeclM decl = do
             if isPrefixOf "sv2v_cast_" x && details /= Nothing
                 then return $ Variable Local t DuplicateTag [] Nil
                 else do
-                    insertElem x Nil
+                    insertElem x ()
                     return $ Variable d t x a e'
         Net d n s t x a e -> do
             enterStmt
             e' <- traverseExprM e
             exitStmt
-            insertElem x Nil
+            insertElem x ()
             return $ Net d n s t x a e'
         Param _ _ x _ ->
-            insertElem x Nil >> return decl
+            insertElem x () >> return decl
         ParamType    _ _ _ -> return decl
         CommentDecl      _ -> return decl
     traverseDeclExprsM traverseExprM decl'
@@ -81,23 +82,23 @@ dropDuplicateCaster (MIPackageItem (Function _ _ DuplicateTag _ _)) =
     Generate []
 dropDuplicateCaster other = other
 
-traverseModuleItemM :: ModuleItem -> ST ModuleItem
+traverseModuleItemM :: ModuleItem -> SC ModuleItem
 traverseModuleItemM (Genvar x) =
-    insertElem x Nil >> return (Genvar x)
+    insertElem x () >> return (Genvar x)
 traverseModuleItemM item =
     traverseExprsM traverseExprM item
 
-traverseGenItemM :: GenItem -> ST GenItem
+traverseGenItemM :: GenItem -> SC GenItem
 traverseGenItemM = traverseGenItemExprsM traverseExprM
 
-traverseStmtM :: Stmt -> ST Stmt
+traverseStmtM :: Stmt -> SC Stmt
 traverseStmtM stmt = do
     enterStmt
     stmt' <- traverseStmtExprsM traverseExprM stmt
     exitStmt
     return stmt'
 
-traverseExprM :: Expr -> ST Expr
+traverseExprM :: Expr -> SC Expr
 traverseExprM (Cast (Left (IntegerVector _ sg rs)) value) = do
     value' <- traverseExprM value
     size' <- traverseExprM size
@@ -108,7 +109,7 @@ traverseExprM (Cast (Left (IntegerVector _ sg rs)) value) = do
 traverseExprM other =
     traverseSinglyNestedExprsM traverseExprM other
 
-convertCastM :: Expr -> Expr -> Bool -> ST Expr
+convertCastM :: Expr -> Expr -> Bool -> SC Expr
 convertCastM (Number size) (Number value) signed =
     return $ Number $
     case numberToInteger size of
@@ -132,7 +133,7 @@ convertCastM size value signed = do
         return $ Call (Ident name) (Args [value'] [])
     else do
         name <- castDeclName 0
-        insertElem name Nil
+        insertElem name ()
         useVar <- withinStmt
         injectDecl $ castDecl useVar name value' size signed
         return $ Ident name
@@ -191,7 +192,7 @@ castDecl useVar name value size signed =
         else Param Localparam t name value
     where t = castType size signed
 
-castDeclName :: Int -> ST String
+castDeclName :: Int -> SC String
 castDeclName counter = do
     details <- lookupElemM name
     if details == Nothing
@@ -204,19 +205,15 @@ castDeclName counter = do
         prefix = "sv2v_tmp_cast"
 
 -- track whether procedural casts should use variables
-pattern WithinStmt :: Identifier
-pattern WithinStmt = ":within_stmt:"
-withinStmt :: ST Bool
-withinStmt = do
-    details <- lookupElemM WithinStmt
-    return $ case details of
-        Just (_, _, t) -> t /= Nil
-        Nothing -> False
-enterStmt :: ST ()
+withinStmtKey :: Identifier
+withinStmtKey = ":within_stmt:"
+withinStmt :: SC Bool
+withinStmt = fmap isJust $ lookupElemM withinStmtKey
+enterStmt :: SC ()
 enterStmt = do
     inProcedure <- withinProcedureM
-    when inProcedure $ insertElem WithinStmt (RawNum 1)
-exitStmt :: ST ()
+    when inProcedure $ insertElem withinStmtKey ()
+exitStmt :: SC ()
 exitStmt = do
     inProcedure <- withinProcedureM
-    when inProcedure $ insertElem WithinStmt Nil
+    when inProcedure $ removeElem withinStmtKey
