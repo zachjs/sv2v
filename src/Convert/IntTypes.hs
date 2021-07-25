@@ -16,11 +16,17 @@ convertModuleItem :: ModuleItem -> ModuleItem
 convertModuleItem = traverseNodes
     traverseExpr traverseDecl traverseType traverseLHS traverseStmt
     where
-        traverseDecl = traverseDeclNodes traverseType traverseExpr
         traverseLHS = traverseNestedLHSs $ traverseLHSExprs traverseExpr
         traverseStmt = traverseNestedStmts $
             traverseStmtDecls (traverseDeclNodes traverseType id) .
             traverseStmtExprs traverseExpr
+
+traverseDecl :: Decl -> Decl
+traverseDecl (Net d n s t x a e) =
+    traverseDeclNodes traverseType traverseExpr $
+        Net d n s (convertTypeForce t) x a e
+traverseDecl decl =
+    traverseDeclNodes traverseType traverseExpr decl
 
 traverseType :: Type -> Type
 traverseType =
@@ -47,20 +53,20 @@ convertType other = other
 
 convertStructFields :: [(Type, Identifier)] -> [(Type, Identifier)]
 convertStructFields fields =
-    zip (map (convertStructFieldType . fst) fields) (map snd fields)
+    zip (map (convertTypeForce . fst) fields) (map snd fields)
 
-convertStructFieldType :: Type -> Type
-convertStructFieldType (IntegerAtom TInteger sg) = IntegerAtom TInt sg
-convertStructFieldType t = t
+convertTypeForce :: Type -> Type
+convertTypeForce (IntegerAtom TInteger sg) = IntegerAtom TInt sg
+convertTypeForce t = t
 
 convertExpr :: Expr -> Expr
 convertExpr (Pattern items) =
     Pattern $ zip names exprs
     where
-        names = map (convertPatternTypeOrExpr . fst) items
+        names = map (convertTypeOrExprForce . fst) items
         exprs = map snd items
 convertExpr other = other
 
-convertPatternTypeOrExpr :: TypeOrExpr -> TypeOrExpr
-convertPatternTypeOrExpr (Left t) = Left $ convertStructFieldType t
-convertPatternTypeOrExpr (Right e) = Right e
+convertTypeOrExprForce :: TypeOrExpr -> TypeOrExpr
+convertTypeOrExprForce (Left t) = Left $ convertTypeForce t
+convertTypeOrExprForce (Right e) = Right e
