@@ -84,6 +84,7 @@ simplifyBinOp Mul (Dec 0) _ = toDec 0
 simplifyBinOp Mul (Dec 1) e = e
 simplifyBinOp Mul _ (Dec 0) = toDec 0
 simplifyBinOp Mul e (Dec 1) = e
+simplifyBinOp Mod _ (Dec 1) = toDec 0
 
 simplifyBinOp Add e1 (UniOp UniSub e2) = BinOp Sub e1 e2
 simplifyBinOp Add (UniOp UniSub e1) e2 = BinOp Sub e2 e1
