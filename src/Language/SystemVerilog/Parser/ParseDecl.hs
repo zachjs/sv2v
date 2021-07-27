@@ -389,7 +389,9 @@ parseDTsAsDecls mode l0 =
         (tps, l7) = takeTrips    l6 initReason
         pos = tokPos $ head l0
         base = von dir t
-        t = tf rs
+        t = case (dir, tf rs) of
+                (Output, Implicit sg _) -> IntegerVector TLogic sg rs
+                (_, typ) -> typ
         decls =
             CommentDecl ("Trace: " ++ show pos) :
             map (\(x, a, e) -> base x a e) tps
