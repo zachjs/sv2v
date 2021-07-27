@@ -150,6 +150,8 @@ sizedLiteralFor expr bit =
     where size = DimsFn FnBits $ Right expr
 
 convertAsgn :: (LHS, Expr) -> (LHS, Expr)
+convertAsgn (lhs, UU bit) =
+    (lhs, literalFor bit)
 convertAsgn (lhs, expr) =
     (lhs, convertExpr context expr)
     where context = ContextDetermined $ lhsToExpr lhs
