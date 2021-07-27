@@ -157,18 +157,24 @@ traverseTypeM other =
 -- attempts to find the given (potentially hierarchical or generate-scoped)
 -- expression in the available scope information
 lookupTypeOf :: Expr -> ST Type
+lookupTypeOf expr@(Ident x) = do
+    details <- lookupElemM x
+    loopVar <- loopVarDepthM x
+    return $ case details of
+        Nothing ->
+            if loopVar == Nothing
+                then TypeOf expr
+                else IntegerAtom TInteger Unspecified
+        Just (accesses, replacements, typ) ->
+            if maybe True (length accesses >) loopVar
+                then replaceInType replacements typ
+                else IntegerAtom TInteger Unspecified
 lookupTypeOf expr = do
     details <- lookupElemM expr
-    case details of
-        Nothing -> case expr of
-            Ident x -> do
-                isGenvar <- isLoopVarM x
-                return $ if isGenvar
-                    then IntegerAtom TInteger Unspecified
-                    else TypeOf expr
-            _ -> return $ TypeOf expr
+    return $ case details of
+        Nothing -> TypeOf expr
         Just (_, replacements, typ) ->
-            return $ replaceInType replacements typ
+            replaceInType replacements typ
 
 -- determines the type of an expression based on the available scope information
 -- according the semantics defined in IEEE 1800-2017, especially Section 11.6

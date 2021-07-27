@@ -56,6 +56,8 @@ module Convert.Scoper
     , procedureLocM
     , isLoopVar
     , isLoopVarM
+    , loopVarDepth
+    , loopVarDepthM
     , lookupLocalIdent
     , lookupLocalIdentM
     , scopeModuleItemT
@@ -65,7 +67,7 @@ module Convert.Scoper
 
 import Control.Monad.State.Strict
 import Data.Functor.Identity (runIdentity)
-import Data.List (partition)
+import Data.List (findIndices, partition)
 import Data.Maybe (isNothing)
 import qualified Data.Map.Strict as Map
 
@@ -356,6 +358,16 @@ isLoopVar scopes x = any matches $ sCurrent scopes
 
 isLoopVarM :: Monad m => Identifier -> ScoperT a m Bool
 isLoopVarM = embedScopes isLoopVar
+
+loopVarDepth :: Scopes a -> Identifier -> Maybe Int
+loopVarDepth scopes x =
+    case findIndices matches $ sCurrent scopes of
+        [] -> Nothing
+        indices -> Just $ last indices
+    where matches = (== x) . tierIndex
+
+loopVarDepthM :: Monad m => Identifier -> ScoperT a m (Maybe Int)
+loopVarDepthM = embedScopes loopVarDepth
 
 evalScoper
     :: MapperM (Scoper a) Decl

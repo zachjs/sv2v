@@ -18,7 +18,7 @@ traverseDescription = partScoper return traverseModuleItemM return return
 
 traverseModuleItemM :: ModuleItem -> Scoper () ModuleItem
 traverseModuleItemM (Genvar x) = do
-    details <- lookupElemM x
+    details <- lookupLocalIdentM x
     if details == Nothing
         then insertElem x () >> return (Genvar x)
         else return $ Generate []
