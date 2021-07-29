@@ -49,14 +49,15 @@ pattern SimpleVector :: Signing -> Integer -> Integer -> Type
 pattern SimpleVector sg l r <- IntegerVector _ sg [(RawNum l, RawNum r)]
 
 insertExpr :: Identifier -> Expr -> Scoper Expr ()
-insertExpr ident (Cast (Left (SimpleVector sg l r)) (Number n)) =
-    insertExpr ident $ Number $ numberCast signed size n
-    where
-        signed = sg == Signed
-        size = fromIntegral $ abs $ l - r + 1
 insertExpr ident expr = do
     expr' <- substituteExprM expr
-    when (isSimpleExpr expr') $ insertElem ident expr'
+    case expr' of
+        Cast (Left (SimpleVector sg l r)) (Number n) ->
+            insertElem ident $ Number $ numberCast signed size n
+            where
+                signed = sg == Signed
+                size = fromIntegral $ abs $ l - r + 1
+        _ -> when (isSimpleExpr expr') $ insertElem ident expr'
 
 isSimpleExpr :: Expr -> Bool
 isSimpleExpr Number{}  = True
