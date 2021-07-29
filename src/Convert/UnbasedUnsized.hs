@@ -1,5 +1,4 @@
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE TupleSections #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
@@ -9,24 +8,27 @@
  - allow sign extension. For context-determined expressions, the converted
  - literals are repeated to match the context-determined size.
  -
- - As a special case, unbased, unsized literals which take on the size of a
- - module's port are replaced as above, but with the size of the port being
- - determined based on the parameter bindings of the instance and the definition
- - of the instantiated module.
+ - When an unbased, unsized literal depends on the width a module port, the
+ - constant portions of the instantiated module are inlined alongside synthetic
+ - declarations matching the size of the port and filled with the desired bit.
+ - This allows port widths to depend on functions or parameters while avoiding
+ - creating hierarchical or generate-scoped references.
  -}
 
 module Convert.UnbasedUnsized (convert) where
 
 import Control.Monad.Writer.Strict
-import Data.Maybe (mapMaybe)
+import Data.Either (isLeft)
+import Data.Maybe (isNothing, mapMaybe)
 import qualified Data.Map.Strict as Map
 
-import Convert.ExprUtils
+import Convert.Package (inject, prefixItems)
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
 type Part = [ModuleItem]
 type Parts = Map.Map Identifier Part
+type PortBit = (Identifier, Bit)
 
 data ExprContext
     = SelfDetermined
@@ -45,86 +47,122 @@ collectPartsM (Part _ _ _ _ name _ items) =
 collectPartsM _ = return ()
 
 convertModuleItem :: Parts -> ModuleItem -> ModuleItem
-convertModuleItem parts (Instance moduleName params instanceName [] bindings) =
-    if Map.member moduleName parts && not (any isTypeParam moduleItems)
-        then convertModuleItem' $
-                Instance moduleName params instanceName [] bindings'
-        else Instance moduleName params instanceName [] bindings
+convertModuleItem parts (Instance moduleName params instanceName ds bindings) =
+    if null extensionDecls || isNothing maybeModuleItems then
+        convertModuleItem' $ instanceBase bindings
+    else if hasTypeParams || not moduleIsResolved then
+        instanceBase bindings
+    else
+        Generate $ map GenModuleItem $
+            stubItems ++ [instanceBase bindings']
     where
-        bindings' = map convertBinding bindings
-        moduleItems =
-            case Map.lookup moduleName parts of
-                Nothing -> error $ "could not find module: " ++ moduleName
-                Just partInfo -> partInfo
-        isTypeParam :: ModuleItem -> Bool
-        isTypeParam (MIPackageItem (Decl ParamType{})) = True
-        isTypeParam _ = False
-        tag = Ident "~~uub~~"
-        convertBinding :: PortBinding -> PortBinding
-        convertBinding (portName, expr) =
-            (portName, ) $
-            traverseNestedExprs (replaceBindingExpr portName) $
-            convertExpr (ContextDetermined tag) expr
-        replaceBindingExpr :: Identifier -> Expr -> Expr
-        replaceBindingExpr portName (orig @ (Repeat _ [ConvertedUU a b])) =
-            if orig == sizedLiteralFor tag bit
-                then Repeat portSize [ConvertedUU a b]
-                else orig
-            where
-                bit = bitForBased a b
-                portSize = determinePortSize portName params moduleItems
-        replaceBindingExpr _ other = other
+        instanceBase = Instance moduleName params instanceName ds
+        maybeModuleItems = Map.lookup moduleName parts
+        Just moduleItems = maybeModuleItems
+
+        -- checking whether we're ready to inline
+        hasTypeParams = any (isLeft . snd) params
+        moduleIsResolved = isEntirelyResolved selectedStubItems
+
+        -- transform the existing bindings to reference extension declarations
+        (bindings', extensionDeclLists) = unzip $
+            map (convertBinding blockName) bindings
+        extensionDecls = map (MIPackageItem . Decl) $ concat extensionDeclLists
+
+        -- inline the necessary portions of the module alongside the selected
+        -- extension declarations
+        stubItems =
+            map (traverseDecls overrideParam) $
+            prefixItems blockName selectedStubItems
+        selectedStubItems = inject rawStubItems extensionDecls
+        rawStubItems = createModuleStub moduleItems
+        blockName = "sv2v_uu_" ++ instanceName
+
+        -- override a parameter value in the stub
+        overrideParam :: Decl -> Decl
+        overrideParam (Param Parameter t x e) =
+            Param Localparam t x $
+            case lookup xOrig params of
+                Just val -> e'
+                    where Right e' = val
+                Nothing -> e
+            where xOrig = drop (length blockName + 1) x
+        overrideParam decl = decl
+
 convertModuleItem _ other = convertModuleItem' other
 
-determinePortSize :: Identifier -> [ParamBinding] -> [ModuleItem] -> Expr
-determinePortSize portName instanceParams moduleItems =
-    step (reverse initialMapping) moduleItems
+-- convert a port binding and produce a list of needed extension decls
+convertBinding :: Identifier -> PortBinding -> (PortBinding, [Decl])
+convertBinding blockName (portName, expr) =
+    ((portName, exprPatched), portBits)
     where
-        initialMapping = mapMaybe createParamReplacement instanceParams
-        createParamReplacement :: ParamBinding -> Maybe (Identifier, Expr)
-        createParamReplacement (_, Left _) = Nothing
-        createParamReplacement (paramName, Right expr) =
-            Just (paramName, tagExpr expr)
+        exprRaw = convertExpr (ContextDetermined PortTag) expr
+        (exprPatched, portBits) = runWriter $ traverseNestedExprsM
+            (replaceBindingExpr blockName portName) exprRaw
 
-        step :: [(Identifier, Expr)] -> [ModuleItem] -> Expr
-        step mapping (MIPackageItem (Decl (Param _ _ x e)) : rest) =
-            step ((x, e) : mapping) rest
-        step mapping (MIPackageItem (Decl (Variable _ t x a _)) : rest) =
-            if x == portName
-                then substituteExpr (reverse mapping) size
-                else step mapping rest
-            where size = BinOp Mul (dimensionsSize a) (DimsFn FnBits $ Left t)
-        step mapping (MIPackageItem (Decl (Net d _ _ t x a e)) : rest) =
-            step mapping $ item : rest
-            where item = MIPackageItem $ Decl $ Variable d t x a e
-        step mapping (_ : rest) = step mapping rest
-        step _ [] = error $ "could not find size of port " ++ portName
+-- identify and rewrite references to the width of the current port
+replaceBindingExpr :: Identifier -> Identifier -> Expr -> Writer [Decl] Expr
+replaceBindingExpr blockName portName (PortTaggedUU v k) = do
+    tell [extensionDecl portBit]
+    return $ Ident $ blockName ++ "_" ++ extensionDeclName portBit
+    where portBit = (portName, bitForBased v k)
+replaceBindingExpr _ _ other = return other
 
-substituteExpr :: [(Identifier, Expr)] -> Expr -> Expr
-substituteExpr _ (Ident (':' : x)) =
-    Ident x
-substituteExpr mapping (Dot (Ident x) y) =
-    case lookup x mapping of
-        Nothing -> Dot (Ident x) y
-        Just (Pattern items) ->
-            case lookup (Right $ Ident y) items of
-                Just item -> substituteExpr mapping item
-                Nothing -> Dot (substituteExpr mapping (Pattern items)) y
-        Just expr -> Dot (substituteExpr mapping expr) y
-substituteExpr mapping (Ident x) =
-    case lookup x mapping of
-        Nothing -> Ident x
-        Just expr -> substituteExpr mapping expr
-substituteExpr mapping expr =
-    traverseExprTypes typeMapper $
-    traverseSinglyNestedExprs exprMapper expr
+-- standardized name format for the synthetic declarations below
+extensionDeclName :: PortBit -> Identifier
+extensionDeclName (portName, bit) = "ext_" ++ portName ++ "_" ++ show bit
+
+-- synthetic declaration with the type of the port filled with the given bit
+extensionDecl :: PortBit -> Decl
+extensionDecl portBit@(portName, bit) =
+    Param Localparam t x e
     where
-        exprMapper = substituteExpr mapping
-        typeMapper = traverseNestedTypes $ traverseTypeExprs exprMapper
+        t = Alias portName []
+        x = extensionDeclName portBit
+        e = literalFor bit
 
-tagExpr :: Expr -> Expr
-tagExpr (Ident x) = Ident (':' : x)
-tagExpr expr = traverseSinglyNestedExprs tagExpr expr
+-- create an all-constant stub for an instantiated module
+createModuleStub :: [ModuleItem] -> [PackageItem]
+createModuleStub =
+    mapMaybe stub
+    where
+        stub :: ModuleItem -> Maybe PackageItem
+        stub (MIPackageItem (Decl decl)) = fmap Decl $ stubDecl decl
+        stub (MIPackageItem item) = Just item
+        stub _ = Nothing
+        -- transform declarations into appropriate constants and type params
+        stubDecl :: Decl -> Maybe Decl
+        stubDecl (Variable d t x a _) = makePortType d t x a
+        stubDecl (Net  d _ _ t x a _) = makePortType d t x a
+        stubDecl decl = Just decl
+        -- make a type parameter for each port declaration
+        makePortType :: Direction -> Type -> Identifier -> [Range] -> Maybe Decl
+        makePortType Input UnknownType x [] = Just $ ParamType Localparam x t
+            where t = IntegerVector TLogic Unspecified []
+        makePortType Input t x [] = Just $ ParamType Localparam x t
+        makePortType _ _ _ _ = Nothing
+
+-- ensure inlining the constants doesn't produce generate-scoped exprs or
+-- expression type references
+isEntirelyResolved :: [ModuleItem] -> Bool
+isEntirelyResolved =
+    not . getAny . execWriter .
+    mapM (collectNestedModuleItemsM collectModuleItem)
+    where
+        collectModuleItem :: ModuleItem -> Writer Any ()
+        collectModuleItem item =
+            collectExprsM collectExpr item >>
+            collectTypesM collectType item
+        collectExpr :: Expr -> Writer Any ()
+        collectExpr Dot{} = tell $ Any True
+        collectExpr expr =
+            collectExprTypesM collectType expr >>
+            collectSinglyNestedExprsM collectExpr expr
+        collectType :: Type -> Writer Any ()
+        collectType TypeOf{} = tell $ Any True
+        collectType typ =
+            collectTypeExprsM collectExpr typ >>
+            collectSinglyNestedTypesM collectType typ
 
 convertModuleItem' :: ModuleItem -> ModuleItem
 convertModuleItem' =
@@ -135,8 +173,14 @@ convertModuleItem' =
 literalFor :: Bit -> Expr
 literalFor = Number . (uncurry $ Based 1 True Binary) . bitToVK
 
-pattern ConvertedUU :: Integer -> Integer -> Expr
-pattern ConvertedUU a b = Number (Based 1 True Binary a b)
+pattern PortTag :: Expr
+pattern PortTag = Ident "~~uub~~"
+
+-- a converted literal which depends on the current port's width
+pattern PortTaggedUU :: Integer -> Integer -> Expr
+pattern PortTaggedUU v k <- Repeat
+    (DimsFn FnBits (Right PortTag))
+    [Number (Based 1 True Binary v k)]
 
 bitForBased :: Integer -> Integer -> Bit
 bitForBased 0 0 = Bit0
@@ -169,12 +213,9 @@ convertExpr _ (Pattern items) =
     Pattern $ zip
     (map fst items)
     (map (convertExpr SelfDetermined . snd) items)
-convertExpr _ (Call expr (Args pnArgs kwArgs)) =
-    Call expr $ Args pnArgs' kwArgs'
-    where
-        pnArgs' = map (convertExpr SelfDetermined) pnArgs
-        kwArgs' = zip (map fst kwArgs) $
-            map (convertExpr SelfDetermined) $ map snd kwArgs
+convertExpr _ (Call expr (Args pnArgs [])) =
+    Call expr $ Args pnArgs' []
+    where pnArgs' = map (convertExpr SelfDetermined) pnArgs
 convertExpr _ (Repeat count exprs) =
     Repeat count $ map (convertExpr SelfDetermined) exprs
 convertExpr SelfDetermined (Mux cond (e1 @ UU{}) (e2 @ UU{})) =

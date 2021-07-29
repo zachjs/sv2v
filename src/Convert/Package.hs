@@ -18,7 +18,11 @@
  - into modules and interfaces as needed.
  -}
 
-module Convert.Package (convert) where
+module Convert.Package
+    ( convert
+    , inject
+    , prefixItems
+    ) where
 
 import Control.Monad.State.Strict
 import Control.Monad.Writer.Strict
@@ -56,6 +60,21 @@ makeLocal :: PackageItem -> PackageItem
 makeLocal (Decl (Param _ t x e)) = Decl $ Param Localparam t x e
 makeLocal (Decl (ParamType _ x t)) = Decl $ ParamType Localparam x t
 makeLocal other = other
+
+-- utility for inserting package items into a set of module items as needed
+inject :: [PackageItem] -> [ModuleItem] -> [ModuleItem]
+inject packageItems items =
+    addItems localPIs Set.empty (map addUsedPIs items)
+    where
+        localPIs = Map.fromList $ concatMap toPIElem packageItems
+        toPIElem :: PackageItem -> [(Identifier, PackageItem)]
+        toPIElem item = map (, item) (piNames item)
+
+-- utility for appling a prefix to all of the top level items in a module
+prefixItems :: Identifier -> [ModuleItem] -> [ModuleItem]
+prefixItems prefix items =
+    snd $ evalState (processItems "" prefix items) initialState
+    where initialState = ([], Map.empty, Map.empty)
 
 -- collect packages and global package items
 collectPackageM :: Description -> Writer (Packages, Classes, [PackageItem]) ()

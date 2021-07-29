@@ -72,6 +72,12 @@ module top;
         `TEST_OP(32'hffffffff , ==, '1, 1'b1)
         `TEST_OP(33'h1ffffffff, ==, '1, 1'b1)
 
+        `TEST_OP('1, ==,  1'h1        , 1'b1)
+        `TEST_OP('1, ==,  2'h3        , 1'b1)
+        `TEST_OP('1, ==, 31'h7fffffff , 1'b1)
+        `TEST_OP('1, ==, 32'hffffffff , 1'b1)
+        `TEST_OP('1, ==, 33'h1ffffffff, 1'b1)
+
         `TEST_OP( 1'h1        , <=, '1, 1'b1)
         `TEST_OP( 2'h3        , <=, '1, 1'b1)
         `TEST_OP(31'h7fffffff , <=, '1, 1'b1)
@@ -92,6 +98,7 @@ module top;
 
         `TEST_OP(33'h1ffffffff, &, P ? '1 : '0, 33'h1ffffffff)
         `TEST_OP(33'h1ffffffff, &, '1 & '1, 33'h1ffffffff)
+        `TEST_OP('1 & '1, &, 33'h1ffffffff, 33'h1ffffffff)
         `TEST_OP(33'h1ffffffff, &, !P ? '1 : '0 - 1, 33'h1ffffffff)
         `TEST_OP(34'h3ffffffff, &, '0 - 1, 34'h3ffffffff)
 
@@ -120,6 +127,12 @@ module top;
         #1 pick = 1;
         #1 pick = 0;
         #1 pick = 1;
+    end
+
+    initial begin
+        $display("tern %b", 1'b1);
+        $display("tern %b", A ? -1 : A);
+        $display("tern %b", A ? A : -1);
     end
 endmodule
 
