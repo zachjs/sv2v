@@ -21,7 +21,7 @@ executable sv2v
   hs-source-dirs: src
   build-tool-depends:
     , alex:alex   >= 3.2.5 && < 4
-    , happy:happy >= 1.19  && < 2
+    , happy:happy >= 1.20  && < 2
   build-depends:
     , array
     , base
@@ -105,6 +105,8 @@ executable sv2v
     Convert.Wildcard
     -- sv2v CLI modules
     Job
+    Paths_sv2v
+  autogen-modules:
     Paths_sv2v
   ghc-options:
     -O3

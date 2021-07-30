@@ -1,5 +1,5 @@
 ================================================================================
-Dependency: alex-3.2.5
+Dependency: alex-3.2.6
 ================================================================================
 
   Copyright (c) 1995-2011, Chris Dornan and Simon Marlow
@@ -123,7 +123,7 @@ Dependency: array-0.5.4.0
   
 
 ================================================================================
-Dependency: base-4.13.0.0
+Dependency: base-4.14.1.0
 ================================================================================
 
   This library (libraries/base) is derived from code from several
@@ -211,7 +211,7 @@ Dependency: base-4.13.0.0
   -----------------------------------------------------------------------------
 
 ================================================================================
-Dependency: binary-0.8.7.0
+Dependency: binary-0.8.8.0
 ================================================================================
 
   Copyright (c) Lennart Kolmodin
@@ -246,7 +246,7 @@ Dependency: binary-0.8.7.0
   POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-Dependency: bytestring-0.10.10.1
+Dependency: bytestring-0.10.12.0
 ================================================================================
 
   Copyright (c) Don Stewart 2005-2009
@@ -281,10 +281,10 @@ Dependency: bytestring-0.10.10.1
   SUCH DAMAGE.
 
 ================================================================================
-Dependency: cmdargs-0.10.20
+Dependency: cmdargs-0.10.21
 ================================================================================
 
-  Copyright Neil Mitchell 2009-2018.
+  Copyright Neil Mitchell 2009-2021.
   All rights reserved.
   
   Redistribution and use in source and binary forms, with or without
@@ -499,7 +499,7 @@ Dependency: filepath-1.4.2.1
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-Dependency: ghc-prim-0.5.3
+Dependency: ghc-prim-0.6.1
 ================================================================================
 
   This library (libraries/ghc-prim) is derived from code from several
@@ -566,7 +566,7 @@ Dependency: ghc-prim-0.5.3
   
 
 ================================================================================
-Dependency: githash-0.1.4.0
+Dependency: githash-0.1.6.1
 ================================================================================
 
   Copyright (c) 2018, Michael Snoyman, 2015, Adam C. Foltzer
@@ -598,7 +598,7 @@ Dependency: githash-0.1.4.0
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-Dependency: happy-1.19.12
+Dependency: happy-1.20.0
 ================================================================================
 
   The Happy License
@@ -668,7 +668,7 @@ Dependency: hashable-1.3.0.0
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-Dependency: integer-gmp-1.0.2.0
+Dependency: integer-gmp-1.0.3.0
 ================================================================================
 
   Copyright (c) 2014, Herbert Valerio Riedel
@@ -783,7 +783,7 @@ Dependency: pretty-1.1.3.6
   -----------------------------------------------------------------------------
 
 ================================================================================
-Dependency: primitive-0.7.0.1
+Dependency: primitive-0.7.1.0
 ================================================================================
 
   Copyright (c) 2008-2009, Roman Leshchinskiy
@@ -886,7 +886,7 @@ Dependency: process-1.6.9.0
   -----------------------------------------------------------------------------
 
 ================================================================================
-Dependency: template-haskell-2.15.0.0
+Dependency: template-haskell-2.16.0.0
 ================================================================================
 
   
@@ -924,7 +924,7 @@ Dependency: template-haskell-2.15.0.0
   
 
 ================================================================================
-Dependency: text-1.2.4.0
+Dependency: text-1.2.4.1
 ================================================================================
 
   Copyright (c) 2008-2009, Tom Harper
@@ -941,6 +941,41 @@ Dependency: text-1.2.4.0
         copyright notice, this list of conditions and the following
         disclaimer in the documentation and/or other materials provided
         with the distribution.
+  
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+================================================================================
+Dependency: th-compat-0.1.2
+================================================================================
+
+  Copyright (c) 2020, Ryan Scott
+  
+  All rights reserved.
+  
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are met:
+  
+      * Redistributions of source code must retain the above copyright
+        notice, this list of conditions and the following disclaimer.
+  
+      * Redistributions in binary form must reproduce the above
+        copyright notice, this list of conditions and the following
+        disclaimer in the documentation and/or other materials provided
+        with the distribution.
+  
+      * Neither the name of Ryan Scott nor the names of other
+        contributors may be used to endorse or promote products derived
+        from this software without specific prior written permission.
   
   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
@@ -1042,7 +1077,7 @@ Dependency: unix-2.7.2.2
   DAMAGE.
 
 ================================================================================
-Dependency: vector-0.12.1.2
+Dependency: vector-0.12.3.0
 ================================================================================
 
   Copyright (c) 2008-2012, Roman Leshchinskiy

@@ -46,10 +46,8 @@ data Job = Job
     } deriving (Typeable, Data)
 
 version :: String
-version =
-    case $$tGitInfoCwdTry of
-        Left _ -> showVersion Paths_sv2v.version
-        Right info -> giDescribe info
+version = either (const backup) giDescribe $$tGitInfoCwdTry
+    where backup = showVersion Paths_sv2v.version
 
 defaultJob :: Job
 defaultJob = Job
