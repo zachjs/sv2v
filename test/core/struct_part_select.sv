@@ -83,4 +83,5 @@ module Example;
     end
 endmodule
 module top;
+    Example e();
 endmodule

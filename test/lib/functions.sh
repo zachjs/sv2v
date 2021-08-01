@@ -17,6 +17,7 @@ simulate() {
     sim_top=$3
     shift 3
     # compile the files
+    sim_vcd_tmp=$SHUNIT_TMPDIR/simvcdtmp
     sim_prog=$SHUNIT_TMPDIR/simprog.exe
     iv_output=`iverilog \
         -Wall \
@@ -24,23 +25,17 @@ simulate() {
         -Wno-portbind \
         -o $sim_prog \
         -g2005 \
-        -DTEST_VCD="\"$sim_vcd\"" \
+        -DTEST_VCD="\"$sim_vcd_tmp\"" \
         -DTEST_TOP=$sim_top \
         $SCRIPT_DIR/tb_dumper.v \
         "$@" 2>&1`
     assertTrue "iverilog on $1 failed" $?
-    if [ -n "$iv_output" ]; then
-        assertNull "iverilog emitted warnings:" "$iv_output"
-        echo "$iv_output"
-    fi
+    assertNull "iverilog emitted warnings:\n$iv_output" "$iv_output"
     # run the simulation
-    $sim_prog > $sim_log.temp
+    $sim_prog > $sim_log
     assertTrue "simulating $1 failed" $?
-    assertExists $sim_vcd
     # remove the date from the VCD
-    sed -i.orig -e "1,3d" $sim_vcd
-    # remove extraneous log lines
-    cat $sim_log.temp | grep -v "VCD info: dumpfile" > $sim_log
+    sed -e "1,3d" < $sim_vcd_tmp > $sim_vcd
 }
 
 assertConverts() {

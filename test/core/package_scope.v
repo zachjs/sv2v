@@ -1,4 +1,7 @@
 module top;
+endmodule
+
+module dump;
     initial begin
         $display("A 3");
         $display("B 3");
