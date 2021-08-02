@@ -42,21 +42,20 @@ assertConverts() {
     ac_file=$1
 
     ac_tmpa=$SHUNIT_TMPDIR/ac-conv-tmpa.v
-    $SV2V $ac_file 2> /dev/null > $ac_tmpa
-    assertTrue "1st conversion of $ac_file failed" $?
+    convert "1st conversion of $ac_file" $ac_tmpa $ac_file
 
     ac_tmpb=$SHUNIT_TMPDIR/ac-conv-tmpb.v
-    $SV2V $ac_tmpa 2> /dev/null > $ac_tmpb
-    assertTrue "2nd conversion of $ac_file failed" $?
+    convert "2nd conversion of $ac_file" $ac_tmpb $ac_tmpa
+
     diff $ac_tmpa $ac_tmpb > /dev/null
     assertTrue "conversion of $ac_file not stable after the first iteration" $?
 
     ac_tmpc=$SHUNIT_TMPDIR/ac-conv-tmpc.v
-    $SV2V --pass-through $ac_file 2> /dev/null > $ac_tmpc
-    assertTrue "pass through of $ac_file failed" $?
+    convert "pass through of $ac_file" $ac_tmpc --pass-through $ac_file
+
     ac_tmpd=$SHUNIT_TMPDIR/ac-conv-tmpd.v
-    $SV2V $ac_tmpc 2> /dev/null > $ac_tmpd
-    assertTrue "conversion of pass through of $ac_file failed" $?
+    convert "conversion of pass through of $ac_file" $ac_tmpd $ac_tmpc
+
     diff $ac_tmpa $ac_tmpd > /dev/null
     assertTrue "pass through then conversion differs for $ac_file" $?
 
@@ -80,9 +79,15 @@ assertNotMatch() {
 
 # convert SystemVerilog source file(s)
 convert() {
-    out_file=$1; shift
-    $SV2V "$@" 2> /dev/null > $out_file
-    assertTrue "conversion failed" $?
+    description=$1
+    out_file=$2
+    shift 2
+    $SV2V "$@" 2> $SHUNIT_TMPDIR/stderr > $out_file
+    assertTrue "$description failed" $?
+    if [ -s $SHUNIT_TMPDIR/stderr ]; then
+        fail "$description emitted warnings:"
+        cat $SHUNIT_TMPDIR/stderr
+    fi
 }
 
 simpleTest() {
@@ -109,10 +114,10 @@ simpleTest() {
     fi
 
     cs=$SHUNIT_TMPDIR/cs.v
-    convert $cs $sv
+    convert "standard conversion" $cs $sv
 
     cv=$SHUNIT_TMPDIR/cv.v
-    convert $cv $sv -v
+    convert "verbose conversion" $cv $sv -v
 
     simulateAndCompare $ve $cs $cv $tb
 }

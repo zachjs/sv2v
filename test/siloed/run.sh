@@ -3,8 +3,8 @@
 test_default() {
     cs=$SHUNIT_TMPDIR/cs.v
     cv=$SHUNIT_TMPDIR/cv.v
-    convert $cs package.svh module.sv
-    convert $cv package.svh module.sv -v
+    convert "standard conversion" $cs package.svh module.sv
+    convert "verbose conversion" $cv package.svh module.sv -v
     simulateAndCompare reference.v $cs $cv "$SCRIPT_DIR/empty.v"
 }
 
