@@ -21,7 +21,6 @@ simulate() {
     sim_prog=$SHUNIT_TMPDIR/simprog.exe
     iv_output=`iverilog \
         -Wall \
-        -Wno-select-range \
         -Wno-portbind \
         -o $sim_prog \
         -g2005 \

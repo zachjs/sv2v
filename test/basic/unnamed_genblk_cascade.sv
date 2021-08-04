@@ -1,33 +1,24 @@
 module example;
     parameter P = 0;
 
-// needed because of steveicarus/iverilog#528
-`ifdef __ICARUS__
-    `define BEGIN begin : `BLK
-    `define END end
-`else
-    `define BEGIN
-    `define END
-`endif
-
 `define BLK genblk1
-         if (P == 1) `BEGIN integer w = 1; `END
-    else if (P == 2) `BEGIN integer x = 2; `END
-    else if (P == 3) `BEGIN integer y = 3; `END
-    else             `BEGIN integer z = 9; `END
+         if (P == 1) integer w = 1;
+    else if (P == 2) integer x = 2;
+    else if (P == 3) integer y = 3;
+    else             integer z = 9;
 
 `undef BLK
 `define BLK genblk2
     case (P)
-        1      : `BEGIN integer w = 1; `END
-        2      : `BEGIN integer x = 2; `END
-        3      : `BEGIN integer y = 3; `END
-        default: `BEGIN integer z = 9; `END
+        1      : integer w = 1;
+        2      : integer x = 2;
+        3      : integer y = 3;
+        default: integer z = 9;
     endcase
 
 `undef BLK
 `define BLK genblk3
-    if (1) `BEGIN wire a = 1; `END
+    if (1) wire a = 1;
 endmodule
 
 module top;

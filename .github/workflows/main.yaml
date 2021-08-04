@@ -40,31 +40,33 @@ jobs:
           - ubuntu-20.04
           - macOS-10.15
     needs: build
+    env:
+      IVERILOG_REF: 066eb0aca76f5bde06c63d67e605c07ef9f8be23
     steps:
       - uses: actions/checkout@v1
       - name: Install Dependencies (macOS)
         if: runner.os == 'macOS'
-        run: brew install shunit2 icarus-verilog
+        run: |
+          brew install shunit2 bison autoconf
+          echo "$(brew --prefix bison)/bin" >> $GITHUB_PATH
       - name: Install Dependencies (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get install -y shunit2 flex bison autoconf gperf
-      - name: Cache iverilog (Linux)
+      - name: Cache iverilog
         uses: actions/cache@v2
-        if: runner.os == 'Linux'
         with:
           path: ~/.local
-          key: ${{ runner.OS }}-iverilog-11_0
-          restore-keys: ${{ runner.OS }}-iverilog-11_0
-      - name: Install iverilog (Linux)
-        if: runner.os == 'Linux'
+          key: ${{ runner.OS }}-${{ env.IVERILOG_REF }}
+          restore-keys: ${{ runner.OS }}-${{ env.IVERILOG_REF }}
+      - name: Install iverilog
         run: |
           if [ ! -e "$HOME/.local/bin/iverilog" ]; then
-            curl -L https://github.com/steveicarus/iverilog/archive/v11_0.tar.gz > iverilog.tar.gz
-            tar -xzf iverilog.tar.gz
-            cd iverilog-11_0
+            git clone https://github.com/steveicarus/iverilog.git
+            cd iverilog
+            git checkout ${{ env.IVERILOG_REF }}
             autoconf
             ./configure --prefix=$HOME/.local
-            make
+            make -j2
             make install
             cd ..
           fi
