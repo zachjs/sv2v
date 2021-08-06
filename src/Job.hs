@@ -61,10 +61,10 @@ defaultJob = Job
         ++ " macros from earlier files are not defined in later files")
     , skipPreprocessor = nam_ "skip-preprocessor" &= help "Disable preprocessor"
     , passThrough = nam_ "pass-through" &= help "Dump input without converting"
+        &= groupname "Conversion"
     , exclude = nam_ "exclude" &= name "E" &= typ "CONV"
         &= help ("Exclude a particular conversion (always, assert, interface,"
             ++ " or logic)")
-        &= groupname "Conversion"
     , verbose = nam "verbose" &= help "Retain certain conversion artifacts"
     , write = Stdout &= ignore -- parsed from the flexible flag below
     , writeRaw = "s" &= name "write" &= name "w" &= explicit &= typ "MODE/FILE"

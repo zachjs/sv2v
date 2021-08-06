@@ -92,8 +92,8 @@ Preprocessing:
      --siloed               Lex input files separately, so macros from
                             earlier files are not defined in later files
      --skip-preprocessor    Disable preprocessor
-     --pass-through         Dump input without converting
 Conversion:
+     --pass-through         Dump input without converting
   -E --exclude=CONV         Exclude a particular conversion (always, assert,
                             interface, or logic)
   -v --verbose              Retain certain conversion artifacts
