@@ -20,6 +20,7 @@ import qualified Data.Set as Set
 import qualified Data.Vector as Vector
 
 import Language.SystemVerilog.Parser.Keywords (specMap)
+import Language.SystemVerilog.Parser.Preprocess (Contents)
 import Language.SystemVerilog.Parser.Tokens
 }
 
@@ -471,10 +472,11 @@ tokens :-
 
 {
 -- lexer entrypoint
-lexStr :: String -> [Position] -> Either String [Token]
-lexStr chars positions =
-    runExcept $ postProcess [] tokens
+lexStr :: Contents -> Except String [Token]
+lexStr contents =
+    postProcess [] tokens
     where
+        (chars, positions) = unzip contents
         tokensRaw = alexScanTokens chars
         positionsVec = Vector.fromList positions
         tokens = map (\tkf -> tkf positionsVec) tokensRaw

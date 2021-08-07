@@ -1,39 +1,62 @@
+{-# LANGUAGE TupleSections #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -}
 module Language.SystemVerilog.Parser
-    ( parseFiles
+    ( initialEnv
+    , parseFiles
+    , Config(..)
     ) where
 
 import Control.Monad.Except
+import Data.List (elemIndex)
 import qualified Data.Map.Strict as Map
+
 import Language.SystemVerilog.AST (AST)
 import Language.SystemVerilog.Parser.Lex (lexStr)
 import Language.SystemVerilog.Parser.Parse (parse)
-import Language.SystemVerilog.Parser.Preprocess (preprocess, annotate, Env)
+import Language.SystemVerilog.Parser.Preprocess (preprocess, annotate, Env, Contents)
 
--- parses a compilation unit given include search paths and predefined macros
-parseFiles :: [FilePath] -> [(String, String)] -> Bool -> Bool -> [FilePath] -> IO (Either String [AST])
-parseFiles includePaths defines siloed skipPreprocessor paths = do
-    let env = Map.map (\a -> (a, [])) $ Map.fromList defines
-    runExceptT (parseFiles' includePaths env siloed skipPreprocessor paths)
+data Config = Config
+    { cfEnv :: Env
+    , cfIncludePaths :: [FilePath]
+    , cfSiloed :: Bool
+    , cfSkipPreprocessor :: Bool
+    }
 
--- parses a compilation unit given include search paths and predefined macros
-parseFiles' :: [FilePath] -> Env -> Bool -> Bool -> [FilePath] -> ExceptT String IO [AST]
-parseFiles' _ _ _ _ [] = return []
-parseFiles' includePaths env siloed skipPreprocessor (path : paths) = do
-    (ast, envEnd) <- parseFile' includePaths env skipPreprocessor path
-    let envNext = if siloed then env else envEnd
-    asts <- parseFiles' includePaths envNext siloed skipPreprocessor paths
-    return $ ast : asts
+-- parse CLI macro definitions into the internal macro environment format
+initialEnv :: [String] -> Env
+initialEnv = Map.map (, []) . Map.fromList . map splitDefine
 
--- parses a file given include search paths, a table of predefined macros, and
--- the file path
-parseFile' :: [String] -> Env -> Bool -> FilePath -> ExceptT String IO (AST, Env)
-parseFile' includePaths env skipPreprocessor path = do
-    let runner = if skipPreprocessor then annotate else preprocess
-    preResult <- liftIO $ runner includePaths env path
-    (contents, env') <- liftEither preResult
-    tokens <- liftEither $ uncurry lexStr $ unzip contents
+-- split a raw CLI macro definition at the '=', if present
+splitDefine :: String -> (String, String)
+splitDefine str =
+    case elemIndex '=' str of
+        Nothing -> (str, "")
+        Just idx -> (name, tail rest)
+            where (name, rest) = splitAt idx str
+
+-- parse a list of files according to the given configuration
+parseFiles :: Config -> [FilePath] -> ExceptT String IO [AST]
+parseFiles _ [] = return []
+parseFiles config (path : paths) = do
+    (config', ast) <- parseFile config path
+    fmap (ast :) $ parseFiles config' paths
+
+-- parse an individual file, potentially updating the configuration
+parseFile :: Config -> FilePath -> ExceptT String IO (Config, AST)
+parseFile config path = do
+    (config', contents) <- preprocessFile config path
+    tokens <- liftEither $ runExcept $ lexStr contents
     ast <- parse tokens
-    return (ast, env')
+    return (config', ast)
+
+-- preprocess an individual file, potentially updating the configuration
+preprocessFile :: Config -> FilePath -> ExceptT String IO (Config, Contents)
+preprocessFile config path | cfSkipPreprocessor config =
+    fmap (config, ) $ annotate path
+preprocessFile config path = do
+    (env', contents) <- preprocess (cfIncludePaths config) env path
+    let config' = config { cfEnv = if cfSiloed config then env else env' }
+    return (config', contents)
+    where env = cfEnv config

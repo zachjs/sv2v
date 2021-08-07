@@ -11,6 +11,7 @@ module Language.SystemVerilog.Parser.Preprocess
     ( preprocess
     , annotate
     , Env
+    , Contents
     ) where
 
 import Control.Monad.Except
@@ -25,6 +26,7 @@ import qualified Data.Map.Strict as Map
 import Language.SystemVerilog.Parser.Tokens (Position(..))
 
 type Env = Map.Map String (String, [(String, Maybe String)])
+type Contents = [(Char, Position)]
 
 type PPS = StateT PP (ExceptT String IO)
 
@@ -67,36 +69,41 @@ elsifCond defined c =
         _ -> PreviouslyTrue
 
 -- preprocessor entrypoint
-preprocess :: [String] -> Env -> FilePath -> IO (Either String ([(Char, Position)], Env))
+preprocess :: [String] -> Env -> FilePath -> ExceptT String IO (Env, Contents)
 preprocess includePaths env path = do
-    contents <-
+    contents <- liftIO $
         if path == "-"
             then getContents
             else loadFile path
-    let initialState = PP contents [] (Position path 1 1) path env [] includePaths [] [(path, env)]
-    result <- runExceptT $ execStateT preprocessInput initialState
-    return $ case result of
-        Left msg -> Left msg
-        Right finalState ->
-            if not $ null $ ppCondStack finalState then
-                Left $ path ++ ": unfinished conditional directives: " ++
-                    (show $ length $ ppCondStack finalState)
-            else
-                Right (output, env')
-                where
-                    output = reverse $ ppOutput finalState
-                    env' = ppEnv finalState
+    let initialState = PP
+            { ppInput        = contents
+            , ppOutput       = []
+            , ppPosition     = Position path 1 1
+            , ppFilePath     = path
+            , ppEnv          = env
+            , ppCondStack    = []
+            , ppIncludePaths = includePaths
+            , ppMacroStack   = []
+            , ppIncludeStack = [(path, env)]
+            }
+    finalState <- execStateT preprocessInput initialState
+    when (not $ null $ ppCondStack finalState) $
+        throwError $ path ++ ": unfinished conditional directives: " ++
+            (show $ length $ ppCondStack finalState)
+    let env' = ppEnv finalState
+    let output = reverse $ ppOutput finalState
+    return (env', output)
 
 -- position annotator entrypoint used for files that don't need any
 -- preprocessing
-annotate :: [String] -> Env -> FilePath -> IO (Either String ([(Char, Position)], Env))
-annotate _ env path = do
-    contents <-
+annotate :: FilePath -> ExceptT String IO Contents
+annotate path = do
+    contents <- liftIO $
         if path == "-"
             then getContents
             else loadFile path
     let positions = scanl advance (Position path 1 1) contents
-    return $ Right (zip contents positions, env)
+    return $ zip contents positions
 
 -- read in the given file
 loadFile :: FilePath -> IO String

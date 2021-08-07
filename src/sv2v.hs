@@ -9,18 +9,13 @@ import System.IO (hPrint, hPutStrLn, stderr, stdout)
 import System.Exit (exitFailure, exitSuccess)
 
 import Control.Monad (filterM, when, zipWithM_)
-import Data.List (elemIndex, intercalate)
+import Control.Monad.Except (runExceptT)
+import Data.List (intercalate)
 
 import Convert (convert)
 import Job (readJob, Job(..), Write(..))
 import Language.SystemVerilog.AST
-import Language.SystemVerilog.Parser (parseFiles)
-
-splitDefine :: String -> (String, String)
-splitDefine str =
-    case elemIndex '=' str of
-        Nothing -> (str, "")
-        Just idx -> (take idx str, drop (idx + 1) str)
+import Language.SystemVerilog.Parser (initialEnv, parseFiles, Config(..))
 
 isInterface :: Description -> Bool
 isInterface (Part _ _ Interface _ _ _ _ ) = True
@@ -80,9 +75,13 @@ main :: IO ()
 main = do
     job <- readJob
     -- parse the input files
-    let defines = map splitDefine $ define job
-    result <- parseFiles (incdir job) defines (siloed job)
-        (skipPreprocessor job) (files job)
+    let config = Config
+            { cfEnv              = initialEnv (define job)
+            , cfIncludePaths     = incdir job
+            , cfSiloed           = siloed job
+            , cfSkipPreprocessor = skipPreprocessor job
+            }
+    result <- runExceptT $ parseFiles config (files job)
     case result of
         Left msg -> do
             hPutStrLn stderr msg
