@@ -229,7 +229,8 @@ convertExpr (struct @ (Struct _ fields [])) (Pattern itemsOrig) =
         isNumbered (Right (Number n)) =
             if maybeIndex == Nothing
                 then error msgNonInteger
-                else index < length fieldNames || error msgOutOfBounds
+                else 0 <= index && index < length fieldNames
+                        || error msgOutOfBounds
             where
                 maybeIndex = fmap fromIntegral $ numberToInteger n
                 Just index = maybeIndex

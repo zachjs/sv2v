@@ -110,12 +110,17 @@ traverseExprM other =
     traverseSinglyNestedExprsM traverseExprM other
 
 convertCastM :: Expr -> Expr -> Bool -> SC Expr
+convertCastM (Number size) _ _
+    | maybeInt == Nothing = illegal "an integer"
+    | int <= 0            = illegal "a positive integer"
+    where
+        maybeInt = numberToInteger size
+        Just int = maybeInt
+        illegal s = error $ "size cast width " ++ show size ++ " is not " ++ s
 convertCastM (Number size) (Number value) signed =
     return $ Number $
-    case numberToInteger size of
-        Just size' -> numberCast signed (fromIntegral size') value
-        Nothing -> error $ "size cast width " ++ show size
-                        ++ " is not an integer"
+        numberCast signed (fromIntegral size') value
+    where Just size' = numberToInteger size
 convertCastM size value signed = do
     value' <- traverseExprM value
     sizeUsesLocalVars <- embedScopes usesLocalVars size
@@ -177,11 +182,8 @@ castFnName size signed =
     "sv2v_cast_" ++ sizeStr ++ suffix
     where
         sizeStr = case size of
-            Number n ->
-                case numberToInteger n of
-                    Just v -> show v
-                    _ -> error $ "size cast width " ++ show n
-                            ++ " is not an integer"
+            Number n -> show v
+                where Just v = numberToInteger n
             _ -> shortHash size
         suffix = if signed then "_signed" else ""
 

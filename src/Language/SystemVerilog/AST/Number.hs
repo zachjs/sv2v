@@ -17,7 +17,7 @@ module Language.SystemVerilog.AST.Number
     , bitToVK
     ) where
 
-import Data.Bits (shiftL)
+import Data.Bits ((.&.), shiftL)
 import Data.Char (digitToInt, intToDigit, toLower)
 import Data.List (elemIndex)
 import Text.Read (readMaybe)
@@ -220,8 +220,13 @@ numberToInteger :: Number -> Maybe Integer
 numberToInteger (UnbasedUnsized Bit1) = Just 1
 numberToInteger (UnbasedUnsized Bit0) = Just 0
 numberToInteger UnbasedUnsized{} = Nothing
-numberToInteger (Decimal _ _ num) = Just num
-numberToInteger (Based _ _ _ num 0) = Just num
+numberToInteger (Decimal sz sg num)
+    | not sg || num .&. pow == 0 = Just num
+    | num == 1                   = Just $ -1
+    | otherwise                  = Just $ negate $ num - pow
+    where pow = 2 ^ (abs sz - 1)
+numberToInteger (Based sz sg _ num 0) =
+    numberToInteger $ Decimal sz sg num
 numberToInteger Based{} = Nothing
 
 -- return the number of bits in a number (i.e. ilog2)

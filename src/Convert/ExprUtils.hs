@@ -177,7 +177,7 @@ pattern NegDec :: Integer -> Expr
 pattern NegDec n <- UniOp UniSub (Dec n)
 
 pattern Bas :: Integer -> Expr
-pattern Bas n <- Number (Based _ _ _ n 0)
+pattern Bas n <- Number (Based _ False _ n 0)
 
 
 -- returns the size of a range

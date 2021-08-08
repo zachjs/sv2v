@@ -40,6 +40,10 @@ module top;
 
         $display("args %b", $size(RamPair, 1));
         $display("args %b", $size(RamPair, 1'b1));
+        $display("args %b", $size(RamPair, 1'sb1));
+        $display("args %b", $size(RamPair, 2'sb1));
+        $display("args %b", $size(RamPair, 2'sb01));
+        $display("args %b", $size(RamPair, 2'sb11));
         $display("args %b", $size(RamPair, '1));
         $display("args %b", $size(RamPair, 'o1));
         $display("args %b", $size(RamPair, 1'h1));

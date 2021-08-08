@@ -128,6 +128,9 @@ traverseExprM other =
 
 -- carry forward the signedness of the expression when cast to the given size
 elaborateSizeCast :: Expr -> Expr -> ST Expr
+elaborateSizeCast (Number size) _ | Just 0 == numberToInteger size =
+    -- special case because zero-width ranges cannot be represented
+    error $ "size cast width " ++ show size ++ " is not a positive integer"
 elaborateSizeCast size value = do
     t <- typeof value
     force <- isStringParam value
