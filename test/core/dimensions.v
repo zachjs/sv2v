@@ -41,6 +41,7 @@ module top;
         $display("args %b", 2);
         $display("args %b", 2);
         $display("args %b", 1'bx);
+        $display("args %b", 1'bx);
         $display("args %b", 2);
         $display("args %b", 2);
         $display("args %b", 2);

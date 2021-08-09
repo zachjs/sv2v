@@ -17,7 +17,7 @@ module Language.SystemVerilog.AST.Number
     , bitToVK
     ) where
 
-import Data.Bits ((.&.), shiftL)
+import Data.Bits ((.&.), shiftL, xor)
 import Data.Char (digitToInt, intToDigit, toLower)
 import Data.List (elemIndex)
 import Text.Read (readMaybe)
@@ -222,9 +222,10 @@ numberToInteger (UnbasedUnsized Bit0) = Just 0
 numberToInteger UnbasedUnsized{} = Nothing
 numberToInteger (Decimal sz sg num)
     | not sg || num .&. pow == 0 = Just num
-    | num == 1                   = Just $ -1
-    | otherwise                  = Just $ negate $ num - pow
-    where pow = 2 ^ (abs sz - 1)
+    | otherwise                  = Just $ negate $ num `xor` mask + 1
+    where
+        pow = 2 ^ (abs sz - 1)
+        mask = pow + pow - 1
 numberToInteger (Based sz sg _ num 0) =
     numberToInteger $ Decimal sz sg num
 numberToInteger Based{} = Nothing
