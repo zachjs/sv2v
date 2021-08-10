@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
@@ -22,36 +23,127 @@ import Data.Char (digitToInt, intToDigit, toLower)
 import Data.List (elemIndex)
 import Text.Read (readMaybe)
 
+{-# NOINLINE parseNumber #-}
+parseNumber :: Bool -> String -> (Number, String)
+parseNumber oversizedNumbers =
+    (parseNormalized oversizedNumbers) . normalizeNumber
+
 -- normalize the number first, making everything lowercase and removing
 -- visual niceties like spaces and underscores
-parseNumber :: String -> Number
-parseNumber = parseNumber' . map toLower . filter (not . isPad)
+normalizeNumber :: String -> String
+normalizeNumber = map toLower . filter (not . isPad)
     where isPad = flip elem "_ \n\t"
 
-parseNumber' :: String -> Number
-parseNumber' "'0" = UnbasedUnsized Bit0
-parseNumber' "'1" = UnbasedUnsized Bit1
-parseNumber' "'x" = UnbasedUnsized BitX
-parseNumber' "'z" = UnbasedUnsized BitZ
-parseNumber' str =
+-- truncate the given decimal number literal, if necessary
+validateDecimal :: Bool -> String -> Int -> Bool -> Integer -> (Number, String)
+validateDecimal oversizedNumbers str sz sg v
+    | sz < -32 && oversizedNumbers =
+        valid $ Decimal sz sg v
+    | sz < -32 =
+        addTruncateMessage str $
+        if sg && v' > widthMask 31
+            -- avoid zero-pad on signed decimals
+            then Based (-32) sg Hex v' 0
+            else Decimal (-32) sg v'
+    | sz > 0 && v > widthMask sz =
+        addTruncateMessage str $
+            Decimal sz sg v'
+    | otherwise =
+        valid $ Decimal sz sg v
+    where
+        v' = v .&. widthMask truncWidth
+        truncWidth = if sz < -32 then -32 else sz
+
+-- produce a warning message describing the applied truncation
+addTruncateMessage :: String -> Number -> (Number, String)
+addTruncateMessage orig trunc = (trunc, msg)
+    where
+        width = show $ numberBitLength trunc
+        bit = if width == "1" then "bit" else "bits"
+        msg = "Number literal " ++ orig ++ " exceeds " ++ width ++ " " ++ bit
+            ++ "; truncating to " ++ show trunc ++ "."
+
+-- when extending a wide unsized number, we use the bit width if the digits
+-- cover exactly that many bits, and add an extra 0 padding bit otherwise
+extendUnsizedBased :: Int -> Number -> Number
+extendUnsizedBased sizeByDigits n
+    | size > -32 || sizeByBits < 32 = n
+    | sizeByBits == sizeByDigits    = useWidth sizeByBits
+    | otherwise                     = useWidth $ sizeByBits + 1
+    where
+        Based size sg base vals knds = n
+        sizeByBits = fromIntegral $ max (bits vals) (bits knds)
+        useWidth sz = Based (negate sz) sg base vals knds
+
+-- truncate the given based number literal, if necessary
+validateBased :: String -> Int -> Int -> Number -> (Number, String)
+validateBased orig sizeIfPadded sizeByDigits n
+    -- more digits than the size would allow for, regardless of their values
+    | sizeIfPadded < sizeByDigits            = truncated
+    -- unsized literal with fewer than 32 bits
+    | 0 > size && size > -32                 = validated
+    -- no padding bits are present
+    | abs size >= sizeIfPadded               = validated
+    -- check the padding bits in the leading digit, if there are any
+    | all (isLegalPad sizethBit) paddingBits = validated
+    -- some of the padding bits aren't legal
+    | otherwise                              = truncated
+    where
+        Based size sg base vals knds = n
+        n' = Based size sg base' vals' knds'
+
+        validated = valid n
+        truncated = addTruncateMessage orig n'
+
+        -- checking padding bits
+        sizethBit = getBit $ abs size - 1
+        paddingBits = map getBit [abs size..sizeIfPadded - 1]
+        getBit = getVKBit vals knds
+
+        -- truncated the number, and selected a valid new base
+        vals' = vals .&. widthMask size
+        knds' = knds .&. widthMask size
+        base' = if size == -32 && baseSelect == Octal
+            then Binary
+            else baseSelect
+        baseSelect = selectBase base vals' knds'
+
+-- if the MSB post-truncation is X or Z, then any padding bits must match; if
+-- the MSB post-truncation is 0 or 1, then non-zero padding bits are forbidden
+isLegalPad :: Bit -> Bit -> Bool
+isLegalPad Bit1 = (== Bit0)
+isLegalPad bit = (== bit)
+
+parseNormalized :: Bool -> String -> (Number, String)
+parseNormalized _ "'0" = valid $ UnbasedUnsized Bit0
+parseNormalized _ "'1" = valid $ UnbasedUnsized Bit1
+parseNormalized _ "'x" = valid $ UnbasedUnsized BitX
+parseNormalized _ "'z" = valid $ UnbasedUnsized BitZ
+parseNormalized oversizedNumbers str =
     -- simple decimal number
     if maybeIdx == Nothing then
-        let n = readDecimal str
-        in Decimal (negate $ decimalSize True n) True n
+        let num = readDecimal str
+            sz = negate (decimalSize True num)
+        in decimal sz True num
     -- non-decimal based integral number
     else if maybeBase /= Nothing then
         let (values, kinds) = parseBasedDigits (baseSize base) digitsExtended
-        in Based size signed base values kinds
+            number = Based size signed base values kinds
+            sizeIfPadded = sizeDigits * bitsPerDigit
+            sizeByDigits = length digitsExtended * bitsPerDigit
+        in if oversizedNumbers && size < 0
+            then valid $ extendUnsizedBased sizeByDigits number
+            else validateBased str sizeIfPadded sizeByDigits number
     -- decimal X or Z literal
-    else if numDigits == 1 && elem leadDigit xzDigits then
-        let (vals, knds) = parseBasedDigits 2 $ replicate (abs size) leadDigit
-        in Based size signed Binary vals knds
+    else if numDigits == 1 && leadDigitIsXZ then
+        let vals = if elem leadDigit zDigits then widthMask size else 0
+            knds = widthMask size
+        in valid $ Based size signed Binary vals knds
     -- explicitly-based decimal number
     else
         let num = readDecimal digits
-        in if rawSize == 0
-            then Decimal (negate $ decimalSize signed num) signed num
-            else Decimal size signed num
+            sz = if rawSize == 0 then negate (decimalSize signed num) else size
+        in decimal sz signed num
     where
         -- pull out the components of the literals
         maybeIdx = elemIndex '\'' str
@@ -63,8 +155,9 @@ parseNumber' str =
         -- high-order X or Z is extended up to the size of the literal
         leadDigit = head digits
         numDigits = length digits
+        leadDigitIsXZ = elem leadDigit xzDigits
         digitsExtended =
-            if elem leadDigit xzDigits
+            if leadDigitIsXZ
                 then replicate (sizeDigits - numDigits) leadDigit ++ digits
                 else digits
 
@@ -84,11 +177,23 @@ parseNumber' str =
         size =
             if rawSize /= 0 then
                 rawSize
-            else if maybeBase /= Nothing then
-                negate $ bitsPerDigit * numDigits
-            else
+            else if maybeBase == Nothing || leadDigitIsXZ then
                 -32
+            else
+                negate $ min 32 $ bitsPerDigit * numDigits
         bitsPerDigit = bits $ baseSize base - 1
+
+        -- shortcut for decimal outputs
+        decimal :: Int -> Bool -> Integer -> (Number, String)
+        decimal = validateDecimal oversizedNumbers str
+
+-- shorthand denoting a valid number literal
+valid :: Number -> (Number, String)
+valid = (, "")
+
+-- mask with the lowest N bits set
+widthMask :: Int -> Integer
+widthMask pow = 2 ^ (abs pow) - 1
 
 -- read a simple unsigned decimal number
 readDecimal :: Read a => String -> a
@@ -170,6 +275,16 @@ bitToVK Bit0 = (0, 0)
 bitToVK Bit1 = (1, 0)
 bitToVK BitX = (0, 1)
 bitToVK BitZ = (1, 1)
+
+-- get the logical bit value at the given index in a (values, kinds) pair
+getVKBit :: Integer -> Integer -> Int -> Bit
+getVKBit v k i =
+    case (v .&. select, k .&. select) of
+        (0, 0) -> Bit0
+        (_, 0) -> Bit1
+        (0, _) -> BitX
+        (_, _) -> BitZ
+    where select = 2 ^ i
 
 data Base
     = Binary

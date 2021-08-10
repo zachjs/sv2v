@@ -29,10 +29,6 @@ module top;
         $display("%b", 32'(4));
         $display("%b", 33'(4));
         $display("%b", 33'(64'hFFFF_FFFF_FFFF_FFFF));
-        $display("%b", 32'(4294967296));
-        $display("%b", 33'(4294967296));
-        $display("%b", 32'(4294967297));
-        $display("%b", 33'(4294967297));
     end
 
     localparam bit foo = '0;

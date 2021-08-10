@@ -19,6 +19,7 @@ module Language.SystemVerilog.Parser.Parse (parse) where
 import Control.Monad.Except
 import Control.Monad.State.Strict
 import Data.Maybe (catMaybes, fromMaybe)
+import System.IO (hPutStrLn, stderr)
 import Language.SystemVerilog.AST
 import Language.SystemVerilog.Parser.ParseDecl
 import Language.SystemVerilog.Parser.Tokens
@@ -1206,7 +1207,7 @@ Real :: { String }
   : real { tokenString $1 }
 
 Number :: { Number }
-  : number { parseNumber $ tokenString $1 }
+  : number {% readNumber (tokenPosition $1) (tokenString $1) }
 
 String :: { String }
   : string { tail $ init $ tokenString $1 }
@@ -1463,25 +1464,26 @@ join         : "join"         {} | error {% missingToken "join"         }
 data ParseData = ParseData
   { pPosition :: Position
   , pTokens :: [Token]
+  , pOversizedNumbers :: Bool
   }
 
 type ParseState = StateT ParseData (ExceptT String IO)
 
-parse :: [Token] -> ExceptT String IO AST
-parse [] = return []
-parse tokens =
+parse :: Bool -> [Token] -> ExceptT String IO AST
+parse _ [] = return []
+parse oversizedNumbers tokens =
   evalStateT parseMain initialState
   where
     position = tokenPosition $ head tokens
-    initialState = ParseData position tokens
+    initialState = ParseData position tokens oversizedNumbers
 
 positionKeep :: (Token -> ParseState a) -> ParseState a
 positionKeep cont = do
-  tokens <- gets pTokens
+  ParseData _ tokens oversizedNumbers <- get
   case tokens of
     [] -> cont TokenEOF
     tok : toks -> do
-      put $ ParseData (tokenPosition tok) toks
+      put $ ParseData (tokenPosition tok) toks oversizedNumbers
       cont tok
 
 parseErrorTok :: Token -> ParseState a
@@ -1671,5 +1673,13 @@ splitInit decl@CommentDecl{} = (decl, Nothing)
 splitInit decl =
   (Variable d t ident a Nil, Just (LHSIdent ident, e))
   where Variable d t ident a e = decl
+
+readNumber :: Position -> String -> ParseState Number
+readNumber pos str = do
+  oversizedNumbers <- gets pOversizedNumbers
+  let (num, msg) = parseNumber oversizedNumbers str
+  when (not $ null msg) $ lift $ lift $
+    hPutStrLn stderr $ show pos ++ ": Warning: " ++ msg
+  return num
 
 }

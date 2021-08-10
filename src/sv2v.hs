@@ -80,6 +80,7 @@ main = do
             , cfIncludePaths     = incdir job
             , cfSiloed           = siloed job
             , cfSkipPreprocessor = skipPreprocessor job
+            , cfOversizedNumbers = oversizedNumbers job
             }
     result <- runExceptT $ parseFiles config (files job)
     case result of

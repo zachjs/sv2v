@@ -43,6 +43,7 @@ data Job = Job
     , verbose :: Bool
     , write :: Write
     , writeRaw :: String
+    , oversizedNumbers :: Bool
     } deriving (Typeable, Data)
 
 version :: String
@@ -71,13 +72,17 @@ defaultJob = Job
         &= help ("How to write output; default is 'stdout'; use 'adjacent' to"
             ++ " create a .v file next to each input; use a path ending in .v"
             ++ " to write to a file")
+    , oversizedNumbers = nam_ "oversized-numbers"
+        &= help ("Disable standard-imposed 32-bit limit on unsized number"
+            ++ " literals (e.g., 'h1_ffff_ffff, 4294967296)")
+        &= groupname "Other"
     }
     &= program "sv2v"
     &= summary ("sv2v " ++ version)
     &= details [ "sv2v converts SystemVerilog to Verilog."
                , "More info: https://github.com/zachjs/sv2v"
                , "(C) 2019-2021 Zachary Snow, 2011-2015 Tom Hawkins" ]
-    &= helpArg [explicit, name "help", groupname "Other"]
+    &= helpArg [explicit, name "help"]
     &= versionArg [explicit, name "version"]
     &= verbosityArgs [ignore] [ignore]
     where

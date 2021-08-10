@@ -22,6 +22,7 @@ data Config = Config
     , cfIncludePaths :: [FilePath]
     , cfSiloed :: Bool
     , cfSkipPreprocessor :: Bool
+    , cfOversizedNumbers :: Bool
     }
 
 -- parse CLI macro definitions into the internal macro environment format
@@ -48,7 +49,7 @@ parseFile :: Config -> FilePath -> ExceptT String IO (Config, AST)
 parseFile config path = do
     (config', contents) <- preprocessFile config path
     tokens <- liftEither $ runExcept $ lexStr contents
-    ast <- parse tokens
+    ast <- parse (cfOversizedNumbers config) tokens
     return (config', ast)
 
 -- preprocess an individual file, potentially updating the configuration

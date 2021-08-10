@@ -24,12 +24,20 @@ simulate() {
         -Wno-portbind \
         -o $sim_prog \
         -g2005 \
+        -gstrict-expr-width \
         -DTEST_VCD="\"$sim_vcd_tmp\"" \
         -DTEST_TOP=$sim_top \
+        "$@" \
         $SCRIPT_DIR/tb_dumper.v \
-        "$@" 2>&1`
-    assertTrue "iverilog on $1 failed" $?
-    assertNull "iverilog emitted warnings:\n$iv_output" "$iv_output"
+        2>&1`
+    if [ $? -ne 0 ]; then
+        fail "iverilog on $1 failed:\n$iv_output"
+        return
+    elif [ "$EXPECT_IVERILOG_WARNINGS" != "0" ]; then
+        assertNull "iverilog on $1 emitted warnings:\n$iv_output" "$iv_output"
+    else
+        assertNotNull "iverilog on $1 did not emit any warnings" "$iv_output"
+    fi
     # run the simulation
     $sim_prog > $sim_log
     assertTrue "simulating $1 failed" $?

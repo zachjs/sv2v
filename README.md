@@ -101,6 +101,8 @@ Conversion:
                             'adjacent' to create a .v file next to each input;
                             use a path ending in .v to write to a file
 Other:
+     --oversized-numbers    Disable standard-imposed 32-bit limit on unsized
+                            number literals (e.g., 'h1_ffff_ffff, 4294967296)
      --help                 Display help message
      --version              Print version information
      --numeric-version      Print just the version number
