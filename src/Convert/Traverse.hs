@@ -520,10 +520,7 @@ collectLHSExprsM :: Monad m => CollectorM m Expr -> CollectorM m LHS
 collectLHSExprsM = collectify traverseLHSExprsM
 
 mapBothM :: Monad m => MapperM m t -> MapperM m (t, t)
-mapBothM mapper (a, b) = do
-    a' <- mapper a
-    b' <- mapper b
-    return (a', b')
+mapBothM mapper = bimapM mapper mapper
 
 traverseExprsM :: Monad m => MapperM m Expr -> MapperM m ModuleItem
 traverseExprsM exprMapper =
