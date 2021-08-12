@@ -31,10 +31,10 @@ initialState :: Info
 initialState = ([], 1)
 
 traverseModuleItemM :: ModuleItem -> S ModuleItem
-traverseModuleItemM (item @ (Genvar x)) = declaration x item
-traverseModuleItemM (item @ (NInputGate  _ _ x _ _)) = declaration x item
-traverseModuleItemM (item @ (NOutputGate _ _ x _ _)) = declaration x item
-traverseModuleItemM (item @ (Instance    _ _ x _ _)) = declaration x item
+traverseModuleItemM item@(Genvar x) = declaration x item
+traverseModuleItemM item@(NInputGate  _ _ x _ _) = declaration x item
+traverseModuleItemM item@(NOutputGate _ _ x _ _) = declaration x item
+traverseModuleItemM item@(Instance    _ _ x _ _) = declaration x item
 traverseModuleItemM (MIPackageItem (Decl decl)) =
     traverseDeclM decl >>= return . MIPackageItem . Decl
 traverseModuleItemM (MIAttr attr item) =
@@ -56,10 +56,10 @@ traverseDeclM decl =
 -- label the generate blocks within an individual generate item which is already
 -- in a list of generate items (top level or generate block)
 traverseGenItemM :: GenItem -> S GenItem
-traverseGenItemM (item @ GenIf{}) = do
+traverseGenItemM item@GenIf{} = do
     item' <- labelGenElse item
     incrCount >> return item'
-traverseGenItemM (item @ GenBlock{}) = do
+traverseGenItemM item@GenBlock{} = do
     item' <- labelBlock item
     incrCount >> return item'
 traverseGenItemM (GenFor a b c item) = do

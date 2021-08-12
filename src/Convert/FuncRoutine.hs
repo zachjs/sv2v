@@ -22,7 +22,7 @@ convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription (description @ Part{}) =
+convertDescription description@Part{} =
     traverseModuleItems traverseModuleItem description
     where
         traverseModuleItem =

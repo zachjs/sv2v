@@ -49,20 +49,20 @@ traverseDeclM decl = do
 traverseModuleItemM :: DefaultNetType -> ModuleItem -> Scoper () ModuleItem
 traverseModuleItemM _ (Genvar x) =
     insertElem x () >> return (Genvar x)
-traverseModuleItemM defaultNetType (orig @ (Assign _ x _)) = do
+traverseModuleItemM defaultNetType orig@(Assign _ x _) = do
     needsLHS defaultNetType x
     return orig
-traverseModuleItemM defaultNetType (orig @ (NInputGate _ _ x lhs exprs)) = do
+traverseModuleItemM defaultNetType orig@(NInputGate _ _ x lhs exprs) = do
     insertElem x ()
     needsLHS defaultNetType lhs
     _ <- mapM (needsExpr defaultNetType) exprs
     return orig
-traverseModuleItemM defaultNetType (orig @ (NOutputGate _ _ x lhss expr)) = do
+traverseModuleItemM defaultNetType orig@(NOutputGate _ _ x lhss expr) = do
     insertElem x ()
     _ <- mapM (needsLHS defaultNetType) lhss
     needsExpr defaultNetType expr
     return orig
-traverseModuleItemM defaultNetType (orig @ (Instance _ _ x _ ports)) = do
+traverseModuleItemM defaultNetType orig@(Instance _ _ x _ ports) = do
     insertElem x ()
     _ <- mapM (needsExpr defaultNetType . snd) ports
     return orig

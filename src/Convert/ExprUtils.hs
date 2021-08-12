@@ -44,9 +44,9 @@ simplifyStep (Concat [Number (Decimal size _ value)]) =
     Number $ Decimal size False value
 simplifyStep (Concat [Number (Based size _ base value kinds)]) =
     Number $ Based size False base value kinds
-simplifyStep (Concat [e @ Stream{}]) = e
-simplifyStep (Concat [e @ Concat{}]) = e
-simplifyStep (Concat [e @ Repeat{}]) = e
+simplifyStep (Concat [e@Stream{}]) = e
+simplifyStep (Concat [e@Concat{}]) = e
+simplifyStep (Concat [e@Repeat{}]) = e
 simplifyStep (Concat es) = Concat $ filter (/= Concat []) es
 simplifyStep (Repeat (Dec 0) _) = Concat []
 simplifyStep (Repeat (Dec 1) es) = Concat es
@@ -91,23 +91,23 @@ simplifyBinOp Add (UniOp UniSub e1) e2 = BinOp Sub e2 e1
 simplifyBinOp Sub e1 (UniOp UniSub e2) = BinOp Add e1 e2
 simplifyBinOp Sub (UniOp UniSub e1) e2 = UniOp UniSub $ BinOp Add e1 e2
 
-simplifyBinOp Add (BinOp Add e (n1 @ Number{})) (n2 @ Number{}) =
+simplifyBinOp Add (BinOp Add e n1@Number{}) n2@Number{} =
     BinOp Add e (BinOp Add n1 n2)
-simplifyBinOp Sub (n1 @ Number{}) (BinOp Sub (n2 @ Number{}) e) =
+simplifyBinOp Sub n1@Number{} (BinOp Sub n2@Number{} e) =
     BinOp Add (BinOp Sub n1 n2) e
-simplifyBinOp Sub (n1 @ Number{}) (BinOp Sub e (n2 @ Number{})) =
+simplifyBinOp Sub n1@Number{} (BinOp Sub e n2@Number{}) =
     BinOp Sub (BinOp Add n1 n2) e
-simplifyBinOp Sub (BinOp Add e (n1 @ Number{})) (n2 @ Number{}) =
+simplifyBinOp Sub (BinOp Add e n1@Number{}) n2@Number{} =
     BinOp Add e (BinOp Sub n1 n2)
-simplifyBinOp Add (n1 @ Number{}) (BinOp Add (n2 @ Number{}) e) =
+simplifyBinOp Add n1@Number{} (BinOp Add n2@Number{} e) =
     BinOp Add (BinOp Add n1 n2) e
-simplifyBinOp Add (n1 @ Number{}) (BinOp Sub e (n2 @ Number{})) =
+simplifyBinOp Add n1@Number{} (BinOp Sub e n2@Number{}) =
     BinOp Add e (BinOp Sub n1 n2)
-simplifyBinOp Sub (BinOp Sub e (n1 @ Number{})) (n2 @ Number{}) =
+simplifyBinOp Sub (BinOp Sub e n1@Number{}) n2@Number{} =
     BinOp Sub e (BinOp Add n1 n2)
-simplifyBinOp Add (BinOp Sub e (n1 @ Number{})) (n2 @ Number{}) =
+simplifyBinOp Add (BinOp Sub e n1@Number{}) n2@Number{} =
     BinOp Sub e (BinOp Sub n1 n2)
-simplifyBinOp Add (BinOp Sub (n1 @ Number{}) e) (n2 @ Number{}) =
+simplifyBinOp Add (BinOp Sub n1@Number{} e) n2@Number{} =
     BinOp Sub (BinOp Add n1 n2) e
 simplifyBinOp Ge (BinOp Sub e (Dec 1)) (Dec 0) = BinOp Ge e (toDec 1)
 

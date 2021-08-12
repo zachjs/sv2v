@@ -105,7 +105,7 @@ addJumpStateDeclStmt stmt =
     where (decls, [stmt']) = addJumpStateDeclTF [] [stmt]
 
 removeJumpState :: Stmt -> Stmt
-removeJumpState (orig @ (Asgn _ _ (LHSIdent ident) _)) =
+removeJumpState orig@(Asgn _ _ (LHSIdent ident) _) =
     if ident == jumpState
         then Null
         else orig

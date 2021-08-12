@@ -55,7 +55,7 @@ convertStmt tfs (Subroutine expr args) =
 convertStmt _ other = other
 
 convertInvoke :: TFs -> (Expr -> Args -> a) -> Expr -> Args -> a
-convertInvoke tfs constructor (Ident func) (Args pnArgs (kwArgs @ (_ : _))) =
+convertInvoke tfs constructor (Ident func) (Args pnArgs kwArgs@(_ : _)) =
     case tfs Map.!? func of
         Nothing -> constructor (Ident func) (Args pnArgs kwArgs)
         Just ordered -> constructor (Ident func) (Args args [])

@@ -1578,7 +1578,7 @@ caseInsideKW tok kw =
   parseError (tokenPosition tok) $ "cannot use inside with " ++ show kw
 
 addMIAttr :: Attr -> ModuleItem -> ModuleItem
-addMIAttr _ (item @ (MIPackageItem (Decl CommentDecl{}))) = item
+addMIAttr _ item@(MIPackageItem (Decl CommentDecl{})) = item
 addMIAttr attr item = MIAttr attr item
 
 missingToken :: String -> ParseState a
@@ -1646,15 +1646,15 @@ makeTypeOf (Token _ _ pos) expr = (pos, check)
     check sg [] = unexpectedSigning pos sg (show typ)
 
 addMITrace :: ModuleItem -> [ModuleItem] -> [ModuleItem]
-addMITrace _ items @ (MIPackageItem (Decl CommentDecl{}) : _) = items
+addMITrace _ items@(MIPackageItem (Decl CommentDecl{}) : _) = items
 addMITrace trace items = trace : items
 
 addPITrace :: PackageItem -> [PackageItem] -> [PackageItem]
-addPITrace _ items @ (Decl CommentDecl{} : _) = items
+addPITrace _ items@(Decl CommentDecl{} : _) = items
 addPITrace trace items = trace : items
 
 addCITrace :: ClassItem -> [ClassItem] -> [ClassItem]
-addCITrace _ items @ ((_, Decl CommentDecl{}) : _) = items
+addCITrace _ items@((_, Decl CommentDecl{}) : _) = items
 addCITrace trace items = trace : items
 
 makeFor :: Either [Decl] [(LHS, Expr)] -> Expr -> [(LHS, AsgnOp, Expr)] -> Stmt -> Stmt

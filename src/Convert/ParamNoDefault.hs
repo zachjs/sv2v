@@ -65,7 +65,7 @@ traverseDeclM other = return other
 
 -- check for instances missing values for parameters without defaults
 traverseModuleItem :: Parts -> ModuleItem -> ModuleItem
-traverseModuleItem parts (orig @ (Instance part params name _ _)) =
+traverseModuleItem parts orig@(Instance part params name _ _) =
     if maybePartInfo == Nothing || null missingParams
         then orig
         else error $ "instance " ++ show name ++ " of " ++ show part

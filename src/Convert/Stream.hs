@@ -27,7 +27,7 @@ traverseDeclM (Variable d t x [] (Stream StreamR _ exprs)) =
         expr' = resize exprSize lhsSize expr
         lhsSize = DimsFn FnBits $ Left t
         exprSize = sizeof expr
-traverseDeclM (Variable d t x [] (expr @ (Stream StreamL chunk exprs))) = do
+traverseDeclM (Variable d t x [] expr@(Stream StreamL chunk exprs)) = do
     inProcedure <- withinProcedureM
     if inProcedure
         then return $ Variable d t x [] expr
@@ -40,7 +40,7 @@ traverseDeclM (Variable d t x [] (expr @ (Stream StreamL chunk exprs))) = do
         expr' = Call (Ident fnName) (Args [Concat exprs] [])
 traverseDeclM (Variable d t x a expr) =
     traverseExprM expr >>= return . Variable d t x a
-traverseDeclM decl @ Net{} = traverseNetAsVarM traverseDeclM decl
+traverseDeclM decl@Net{} = traverseNetAsVarM traverseDeclM decl
 traverseDeclM decl = return decl
 
 traverseModuleItemM :: ModuleItem -> Scoper () ModuleItem

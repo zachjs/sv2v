@@ -24,7 +24,7 @@ convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription (description @ (Part _ _ Module _ _ _ _)) =
+convertDescription description@(Part _ _ Module _ _ _ _) =
     partScoper traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
     description
 convertDescription other = other
@@ -103,7 +103,7 @@ convertType t1 =
 
 -- write down the types of declarations
 traverseDeclM :: Decl -> Scoper Type Decl
-traverseDeclM decl @ Net{} =
+traverseDeclM decl@Net{} =
     traverseNetAsVarM traverseDeclM decl
 traverseDeclM decl = do
     decl' <- case decl of
@@ -196,7 +196,7 @@ convertExpr t (Mux c e1 e2) =
         e1' = convertExpr t e1
         e2' = convertExpr t e2
 
-convertExpr (struct @ (Struct _ fields [])) (Pattern itemsOrig) =
+convertExpr struct@(Struct _ fields []) (Pattern itemsOrig) =
     if not (null extraNames) then
         error $ "pattern " ++ show (Pattern itemsOrig) ++
             " has extra named fields " ++ show extraNames ++
@@ -302,7 +302,7 @@ convertExpr (Implicit sg rs) expr =
 
 -- TODO: This is a conversion for concat array literals with elements
 -- that are unsized numbers. This probably belongs somewhere else.
-convertExpr (t @ IntegerVector{}) (Concat exprs) =
+convertExpr t@IntegerVector{} (Concat exprs) =
     if all isUnsizedNumber exprs
         then Concat $ map (Cast $ Left t') exprs
         else Concat $ map (convertExpr t') exprs
@@ -317,7 +317,7 @@ convertExpr (t @ IntegerVector{}) (Concat exprs) =
 
 -- TODO: This is really a conversion for using default patterns to
 -- populate arrays. Maybe this should be somewhere else?
-convertExpr t (orig @ (Pattern [(Left UnknownType, expr)])) =
+convertExpr t orig@(Pattern [(Left UnknownType, expr)]) =
     if null rs
         then orig
         else Repeat count [expr']

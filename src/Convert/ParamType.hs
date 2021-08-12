@@ -39,7 +39,7 @@ convert files =
         -- add type parameter instantiations
         files'' = map (concatMap explodeDescription) files'
         explodeDescription :: Description -> [Description]
-        explodeDescription (part @ (Part _ _ _ _ name _ _)) =
+        explodeDescription part@(Part _ _ _ _ name _ _) =
             (part :) $
             filter (not . alreadyExists) $
             map (rewriteModule part) theseInstances
@@ -57,7 +57,7 @@ convert files =
             both (Map.fromListWith Set.union) $
             execWriter $ mapM (mapM collectUsageM) files''
         collectUsageM :: Description -> Writer (UsageMap, UsageMap) ()
-        collectUsageM (part @ (Part _ _ _ _ name _ _)) =
+        collectUsageM part@(Part _ _ _ _ name _ _) =
             tell $ both makeList $ execWriter $
                 (collectModuleItemsM collectModuleItemM) part
             where makeList s = zip (Set.toList s) (repeat $ Set.singleton name)
@@ -93,7 +93,7 @@ convert files =
 
         -- instantiate the type parameters if this is a used default instance
         reduceTypeDefaults :: Description -> Description
-        reduceTypeDefaults (part @ (Part _ _ _ _ name _ _)) =
+        reduceTypeDefaults part@(Part _ _ _ _ name _ _) =
             if shouldntReduce
                 then part
                 else traverseModuleItems (traverseDecls rewriteDecl) part
@@ -149,7 +149,7 @@ convert files =
                 additionalParamItems = concatMap makeAddedParams $
                     Map.toList $ Map.map snd inst
                 rewriteExpr :: Expr -> Expr
-                rewriteExpr (orig @ (Dot (Ident x) y)) =
+                rewriteExpr orig@(Dot (Ident x) y) =
                     if x == m
                         then Dot (Ident m') y
                         else orig
@@ -157,7 +157,7 @@ convert files =
                     traverseExprTypes rewriteType $
                     traverseSinglyNestedExprs rewriteExpr other
                 rewriteLHS :: LHS -> LHS
-                rewriteLHS (orig @ (LHSDot (LHSIdent x) y)) =
+                rewriteLHS orig@(LHSDot (LHSIdent x) y) =
                     if x == m
                         then LHSDot (LHSIdent m') y
                         else orig
@@ -192,7 +192,7 @@ convert files =
 
 -- write down module parameter names and type parameters
 collectDescriptionM :: Description -> Writer Modules ()
-collectDescriptionM (part @ (Part _ _ _ _ name _ _)) =
+collectDescriptionM part@(Part _ _ _ _ name _ _) =
     tell $ Map.singleton name typeMap
     where
         typeMap = Map.fromList $ execWriter $
@@ -250,7 +250,7 @@ prepareTypeExprs instanceName paramName =
         (traverseTypeExprsM $ traverseNestedExprsM prepareExpr)
     where
         prepareExpr :: Expr -> Writer (IdentSet, DeclMap) Expr
-        prepareExpr (e @ Call{}) = do
+        prepareExpr e@Call{} = do
             tell (Set.empty, Map.singleton x decl)
             prepareExpr $ Ident x
             where
@@ -281,7 +281,7 @@ convertGenItemM other =
 
 -- attempt to rewrite instantiations with type parameters
 convertModuleItemM :: ModuleItem -> Writer Instances ModuleItem
-convertModuleItemM (orig @ (Instance m bindings x r p)) =
+convertModuleItemM orig@(Instance m bindings x r p) =
     if hasOnlyExprs then
         return orig
     else if not hasUnresolvedTypes then do

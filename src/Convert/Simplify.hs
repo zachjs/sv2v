@@ -155,6 +155,6 @@ substitute scopes expr =
 substituteIdent :: Scopes Expr -> Expr -> Expr
 substituteIdent scopes (Ident x) =
     case lookupElem scopes x of
-        Just (_, _, n @ Number{}) -> n
+        Just (_, _, n@Number{}) -> n
         _ -> Ident x
 substituteIdent _ other = other

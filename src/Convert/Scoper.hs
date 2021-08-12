@@ -276,7 +276,7 @@ directResolve mapping (Access x Nil : rest) = do
     Entry _ "" subMapping <- Map.lookup x mapping
     directResolve subMapping rest
 directResolve mapping (Access x e : rest) = do
-    Entry _ (index @ (_ : _)) subMapping <- Map.lookup x mapping
+    Entry _ index@(_ : _) subMapping <- Map.lookup x mapping
     (replacements, element) <- directResolve subMapping rest
     let replacements' = Map.insert index e replacements
     Just (replacements', element)

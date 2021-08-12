@@ -42,7 +42,7 @@ convertStmt (Block Seq name decls stmts) =
 convertStmt other = other
 
 splitDecl :: Decl -> (Decl, Maybe (LHS, Expr))
-splitDecl (decl @ (Variable _ _ _ _ Nil)) =
+splitDecl decl@(Variable _ _ _ _ Nil) =
     (decl, Nothing)
 splitDecl (Variable d t ident a e) =
     (Variable d t ident a Nil, Just (LHSIdent ident, e))

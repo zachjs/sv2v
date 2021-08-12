@@ -72,7 +72,7 @@ collectQueriedIdentsM _ _ = return ()
 elaborateStringParam :: Idents -> ModuleItem -> ModuleItem
 elaborateStringParam idents (MIAttr attr item) =
     MIAttr attr $ elaborateStringParam idents item
-elaborateStringParam idents (orig @ (StringParam x str)) =
+elaborateStringParam idents orig@(StringParam x str) =
     if Set.member x idents
         then Generate $ map wrap [width, param]
         else orig
@@ -99,7 +99,7 @@ mapInstance partStringParams (Instance m params x rs ports) =
     where
         expand :: [Identifier] -> ParamBinding -> [ParamBinding]
         expand _ (paramName, Left t) = [(paramName, Left t)]
-        expand stringParams (orig @ (paramName, Right expr)) =
+        expand stringParams orig@(paramName, Right expr) =
             if elem paramName stringParams
                 then [(widthName paramName, Right width), orig]
                 else [orig]

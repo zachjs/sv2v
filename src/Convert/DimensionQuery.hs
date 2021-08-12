@@ -56,12 +56,12 @@ convertExpr (DimsFn fn (Right e)) =
     DimsFn fn $ Left $ TypeOf e
 convertExpr (DimFn fn (Right e) d) =
     DimFn fn (Left $ TypeOf e) d
-convertExpr (orig @ (DimsFn FnUnpackedDimensions (Left t))) =
+convertExpr orig@(DimsFn FnUnpackedDimensions (Left t)) =
     case t of
         UnpackedType _ rs -> RawNum $ fromIntegral $ length rs
         TypeOf{} -> orig
         _ -> RawNum 0
-convertExpr (orig @ (DimsFn FnDimensions (Left t))) =
+convertExpr orig@(DimsFn FnDimensions (Left t)) =
     case t of
         IntegerAtom{} -> RawNum 1
         Alias{} -> orig

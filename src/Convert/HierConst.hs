@@ -48,7 +48,7 @@ convertDescription (Part attrs extern kw lifetime name ports items) =
 convertDescription description = description
 
 expandParam :: [Identifier] -> ModuleItem -> ModuleItem
-expandParam shadowed (MIPackageItem (Decl (param @ (Param Parameter _ x _)))) =
+expandParam shadowed (MIPackageItem (Decl param@(Param Parameter _ x _))) =
     if elem x shadowed
         then Generate $ map (GenModuleItem . wrap) [param, extra]
         else wrap param
@@ -82,14 +82,14 @@ traverseDeclM decl = do
 
 -- substitute hierarchical references to constants
 traverseExprM :: Expr -> ST Expr
-traverseExprM (expr @ (Dot _ x)) = do
+traverseExprM expr@(Dot _ x) = do
     expr' <- traverseSinglyNestedExprsM traverseExprM expr
     detailsE <- lookupElemM expr'
     detailsX <- lookupElemM x
     case (detailsE, detailsX) of
         (Just ([_, _], _, Left{}), Just ([_, _], _, Left{})) ->
             return $ Ident x
-        (Just (accesses @ [Access _ Nil, _], _, Left False), _) -> do
+        (Just (accesses@[Access _ Nil, _], _, Left False), _) -> do
             details <- lookupElemM $ prefix x
             when (details == Nothing) $
                 insertElem accesses (Left True)

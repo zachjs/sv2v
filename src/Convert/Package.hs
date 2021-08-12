@@ -87,8 +87,8 @@ collectPackageM (Class _ name decls items) =
     tell (Map.empty, Map.singleton name (decls, map unpackClassItem items), [])
     where
         unpackClassItem :: ClassItem -> PackageItem
-        unpackClassItem (item @ (_, Task{})) = checkTF item
-        unpackClassItem (item @ (_, Function{})) = checkTF item
+        unpackClassItem item@(_, Task{}) = checkTF item
+        unpackClassItem item@(_, Function{}) = checkTF item
         unpackClassItem item = checkNonTF item
         checkTF :: ClassItem -> PackageItem
         checkTF (QStatic, item) = item
@@ -242,7 +242,7 @@ processItems topName packageName moduleItems = do
         -- produces partial mappings of exported identifiers, while also
         -- checking the validity of the exports
         resolveExportMI :: IdentStateMap -> ModuleItem -> PackagesState IdentStateMap
-        resolveExportMI mapping (MIPackageItem (item @ (Export pkg ident))) =
+        resolveExportMI mapping (MIPackageItem item@(Export pkg ident)) =
             if null packageName
                 then error $ "invalid " ++ (init $ show item)
                         ++ " outside of package"
@@ -304,12 +304,12 @@ processItems topName packageName moduleItems = do
                         ++ intercalate ", " rootPkgs
 
         traversePackageItemM :: PackageItem -> Scope PackageItem
-        traversePackageItemM (orig @ (Import pkg ident)) = do
+        traversePackageItemM orig@(Import pkg ident) = do
             if null ident
                 then wildcardImports pkg
                 else explicitImport pkg ident
             return $ Decl $ CommentDecl $ "removed " ++ show orig
-        traversePackageItemM (orig @ (Export pkg ident)) = do
+        traversePackageItemM orig@(Export pkg ident) = do
             () <- when (not (null pkg || null ident)) $ do
                 localName <- resolveIdent ident
                 rootPkg <- lift $ resolveRootPackage pkg ident
@@ -459,7 +459,7 @@ findPackage packageName = do
     assertMsg (not $ elem packageName stack) $
         "package dependency loop: " ++ show first ++ " depends on "
             ++ intercalate ", which depends on " (map show rest)
-    let Just (package @ (exports, _))= maybePackage
+    let Just package@(exports, _) = maybePackage
     if Map.null exports
         then do
             -- process and resolve this package
@@ -613,7 +613,7 @@ toRootPackage sourcePackage identState =
 
 -- nests packages items missing from modules
 convertDescription :: PIs -> Description -> Description
-convertDescription pis (orig @ Part{}) =
+convertDescription pis orig@Part{} =
     if Map.null pis
         then orig
         else Part attrs extern kw lifetime name ports items'

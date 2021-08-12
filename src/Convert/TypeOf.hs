@@ -41,7 +41,7 @@ type ST = Scoper Type
 
 -- insert the given declaration into the scope, and convert an TypeOfs within
 traverseDeclM :: Decl -> ST Decl
-traverseDeclM decl @ Net{} =
+traverseDeclM decl@Net{} =
     traverseNetAsVarM traverseDeclM decl
 traverseDeclM decl = do
     decl' <- traverseDeclNodesM traverseTypeM traverseExprM decl
@@ -98,7 +98,7 @@ traverseExprM (Cast (Left (Implicit sg [])) expr) =
 traverseExprM (Cast (Left t) (Number (UnbasedUnsized bit))) =
     -- defer until this expression becomes explicit
     return $ Cast (Left t) (Number (UnbasedUnsized bit))
-traverseExprM (Cast (Left (t @ (IntegerAtom TInteger _))) expr) =
+traverseExprM (Cast (Left t@(IntegerAtom TInteger _)) expr) =
     -- convert to cast to an integer vector type
     traverseExprM $ Cast (Left t') expr
     where
@@ -189,14 +189,14 @@ typeof (Number n) =
         size = numberBitLength n
         sg = if numberIsSigned n then Signed else Unspecified
 typeof (Call (Ident x) args) = typeofCall x args
-typeof (orig @ (Bit e _)) = do
+typeof orig@(Bit e _) = do
     t <- typeof e
     let t' = popRange t
     case t of
         TypeOf{} -> lookupTypeOf orig
         Alias{} -> return $ TypeOf orig
         _ -> return $ typeSignednessOverride t' Unsigned t'
-typeof (orig @ (Range e NonIndexed r)) = do
+typeof orig@(Range e NonIndexed r) = do
     t <- typeof e
     let t' = replaceRange r t
     return $ case t of
@@ -217,7 +217,7 @@ typeof (Range expr mode (base, len)) =
             if mode == IndexedPlus
                 then BinOp Sub (BinOp Add base len) (RawNum 1)
                 else BinOp Add (BinOp Sub base len) (RawNum 1)
-typeof (orig @ (Dot e x)) = do
+typeof orig@(Dot e x) = do
     t <- typeof e
     case t of
         Struct _ fields [] -> return $ fieldsType fields
@@ -404,7 +404,7 @@ typeCastUnneeded t1 t2 =
         sz2 = typeSize t2
         typeSize :: Type -> Maybe Expr
         typeSize (IntegerVector _ _ rs) = Just $ dimensionsSize rs
-        typeSize (t @ IntegerAtom{}) =
+        typeSize t@IntegerAtom{} =
             typeSize $ tf [(RawNum 1, RawNum 1)]
             where (tf, []) = typeRanges t
         typeSize _ = Nothing

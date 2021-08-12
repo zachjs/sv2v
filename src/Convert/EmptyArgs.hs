@@ -20,7 +20,7 @@ convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription (description @ Part{}) =
+convertDescription description@Part{} =
     traverseModuleItems
         (traverseExprs $ traverseNestedExprs $ convertExpr functions)
         description'

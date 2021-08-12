@@ -449,7 +449,7 @@ chunk base n0 =
 
 -- number concatenation
 instance Semigroup Number where
-    (n1 @ Based{}) <> (n2 @ Based{}) =
+    n1@Based{} <> n2@Based{} =
         Based size signed base values kinds
         where
             size = size1 + size2
@@ -465,7 +465,7 @@ instance Semigroup Number where
     n1 <> n2 =
         toBased n1 <> toBased n2
         where
-            toBased (n @ Based{}) = n
+            toBased n@Based{} = n
             toBased (Decimal size signed num) =
                 Based size signed Hex num 0
             toBased (UnbasedUnsized bit) =

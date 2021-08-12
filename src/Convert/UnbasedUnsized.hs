@@ -207,7 +207,7 @@ convertExpr _ (Cast te e) =
     Cast te $ convertExpr SelfDetermined e
 convertExpr _ (Concat exprs) =
     Concat $ map (convertExpr SelfDetermined) exprs
-convertExpr context (Pattern [(Left UnknownType, e @ UU{})]) =
+convertExpr context (Pattern [(Left UnknownType, e@UU{})]) =
     convertExpr context e
 convertExpr _ (Pattern items) =
     Pattern $ zip
@@ -218,7 +218,7 @@ convertExpr _ (Call expr (Args pnArgs [])) =
     where pnArgs' = map (convertExpr SelfDetermined) pnArgs
 convertExpr _ (Repeat count exprs) =
     Repeat count $ map (convertExpr SelfDetermined) exprs
-convertExpr SelfDetermined (Mux cond (e1 @ UU{}) (e2 @ UU{})) =
+convertExpr SelfDetermined (Mux cond e1@UU{} e2@UU{}) =
     Mux
     (convertExpr SelfDetermined cond)
     (convertExpr SelfDetermined e1)

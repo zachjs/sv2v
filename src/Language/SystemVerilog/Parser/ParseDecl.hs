@@ -82,7 +82,7 @@ parseDTsAsPortDecls = parseDTsAsPortDecls' . dropTrailingComma
     where
         dropTrailingComma :: [DeclToken] -> [DeclToken]
         dropTrailingComma [] = []
-        dropTrailingComma [DTComma{}, end @ DTEnd{}] = [end]
+        dropTrailingComma [DTComma{}, end@DTEnd{}] = [end]
         dropTrailingComma (tok : toks) = tok : dropTrailingComma toks
 
 -- internal parseDTsAsPortDecls after the removal of an optional trailing comma
@@ -102,7 +102,7 @@ parseDTsAsPortDecls' pieces =
         pieces' = filter (not . isAttr) pieces
 
         propagateDirections :: Direction -> [Decl] -> [Decl]
-        propagateDirections dir (decl @ (Variable _ InterfaceT{} _ _ _) : decls) =
+        propagateDirections dir (decl@(Variable _ InterfaceT{} _ _ _) : decls) =
             decl : propagateDirections dir decls
         propagateDirections lastDir (Variable currDir t x a e : decls) =
             decl : propagateDirections dir decls
@@ -167,7 +167,7 @@ parseDTsAsModuleItems tokens =
 -- internal; attempt to parse an elaboration system task
 asElabTask :: [DeclToken] -> Maybe ModuleItem
 asElabTask tokens = do
-    DTIdent _ x @ ('$' : _) <- return $ head tokens
+    DTIdent _ x@('$' : _) <- return $ head tokens
     severity <- lookup x elabTasks
     Just $ ElabTask severity args
     where
@@ -328,7 +328,7 @@ parseDTsAsAsgns tokens =
             "unexpected " ++ surprise ++ " in for loop initialization"
 
 shiftIncOrDec :: [DeclToken] -> [DeclToken]
-shiftIncOrDec (tok @ (DTAsgn _ AsgnOp{} _ _) : toks) =
+shiftIncOrDec (tok@(DTAsgn _ AsgnOp{} _ _) : toks) =
     before ++ tok : delim : shiftIncOrDec after
     where (before, delim : after) = break isCommaOrEnd toks
 shiftIncOrDec [] = []

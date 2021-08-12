@@ -104,9 +104,9 @@ showAssign :: (LHS, AsgnOp, Expr) -> String
 showAssign (l, op, e) = (showPad l) ++ (showPad op) ++ (show e)
 
 showBranch :: Stmt -> String
-showBranch (Block Seq "" [] (stmts @ [CommentStmt{}, _])) =
+showBranch (Block Seq "" [] stmts@[CommentStmt{}, _]) =
     '\n' : (indent $ show stmts)
-showBranch (block @ Block{}) = ' ' : show block
+showBranch block@Block{} = ' ' : show block
 showBranch stmt = '\n' : (indent $ show stmt)
 
 showBlockedBranch :: Stmt -> String
@@ -129,11 +129,11 @@ showBlockedBranch stmt =
             _ -> False
 
 showElseBranch :: Stmt -> String
-showElseBranch (stmt @ If{}) = ' ' : show stmt
+showElseBranch stmt@If{} = ' ' : show stmt
 showElseBranch stmt = showBranch stmt
 
 showShortBranch :: Stmt -> String
-showShortBranch (stmt @ Asgn{}) = ' ' : show stmt
+showShortBranch stmt@Asgn{} = ' ' : show stmt
 showShortBranch stmt = showBranch stmt
 
 showCase :: Case -> String

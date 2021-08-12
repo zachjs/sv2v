@@ -91,11 +91,11 @@ instance Show Expr where
             showPatternItem (Left t, v) = printf "%s: %s" tStr (show v)
                 where tStr = if null (show t) then "default" else show t
     show (MinTypMax a b c) = printf "(%s : %s : %s)" (show a) (show b) (show c)
-    show (e @ UniOp{}) = showsPrec 0 e ""
-    show (e @ BinOp{}) = showsPrec 0 e ""
-    show (e @ Dot  {}) = showsPrec 0 e ""
-    show (e @ Mux  {}) = showsPrec 0 e ""
-    show (e @ Call {}) = showsPrec 0 e ""
+    show e@UniOp{} = showsPrec 0 e ""
+    show e@BinOp{} = showsPrec 0 e ""
+    show e@Dot  {} = showsPrec 0 e ""
+    show e@Mux  {} = showsPrec 0 e ""
+    show e@Call {} = showsPrec 0 e ""
 
     showsPrec _ (UniOp   o e  ) =
         shows o .
@@ -185,12 +185,12 @@ showRange :: Range -> String
 showRange (h, l) = '[' : show h ++ ':' : show l ++ "]"
 
 showUniOpPrec :: Expr -> ShowS
-showUniOpPrec (e @ UniOp{}) = (showParen True . shows) e
-showUniOpPrec (e @ BinOp{}) = (showParen True . shows) e
+showUniOpPrec e@UniOp{} = (showParen True . shows) e
+showUniOpPrec e@BinOp{} = (showParen True . shows) e
 showUniOpPrec e = shows e
 
 showBinOpPrec :: Expr -> ShowS
-showBinOpPrec (e @ BinOp{}) = (showParen True . shows) e
+showBinOpPrec e@BinOp{} = (showParen True . shows) e
 showBinOpPrec e = shows e
 
 type ParamBinding = (Identifier, TypeOrExpr)

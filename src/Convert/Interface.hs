@@ -88,7 +88,7 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
         traverseModuleItemM :: ModuleItem -> Scoper [ModportDecl] ModuleItem
         traverseModuleItemM (Modport modportName modportDecls) =
             insertElem modportName modportDecls >> return (Generate [])
-        traverseModuleItemM (instanceItem @ Instance{}) = do
+        traverseModuleItemM instanceItem@Instance{} = do
             modports <- embedScopes (\l () -> l) ()
             if isNothing maybePartInfo then
                 return instanceItem
@@ -129,7 +129,7 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
 
         -- add explicit slices for bindings of entire modport instance arrays
         addImpliedSlice :: Scopes [ModportDecl] -> Expr -> Expr
-        addImpliedSlice modports (orig @ (Dot expr modportName)) =
+        addImpliedSlice modports orig@(Dot expr modportName) =
             case lookupIntfElem modports (InstArrKey expr) of
                 Just (_, _, InstArrVal l r) ->
                     Dot (Range expr NonIndexed (l, r)) modportName
@@ -485,7 +485,7 @@ inlineInstance global ranges modportBindings items partName
             case lookup (Bit expr Tag) exprReplacements of
                 Just resolved -> replaceArrTag (replaceExpr' local elt) resolved
                 Nothing -> Bit (replaceExpr' local expr) (replaceExpr' local elt)
-        replaceExpr' local (expr @ (Dot Ident{} _)) =
+        replaceExpr' local expr@(Dot Ident{} _) =
             case lookup expr exprReplacements of
                 Just expr' -> expr'
                 Nothing -> checkExprResolution local expr $
@@ -555,7 +555,7 @@ inlineInstance global ranges modportBindings items partName
                     Implicit Unspecified rs ->
                         IntegerVector TLogic Unspecified rs
                     _ -> t
-        removeDeclDir decl @ Net{} =
+        removeDeclDir decl@Net{} =
             traverseNetAsVar removeDeclDir decl
         removeDeclDir other = other
 
@@ -620,7 +620,7 @@ inlineInstance global ranges modportBindings items partName
         collectDeclDir (Variable dir _ ident _ _) =
             when (dir /= Local) $
                 tell $ Map.singleton ident dir
-        collectDeclDir net @ Net{} =
+        collectDeclDir net@Net{} =
             collectNetAsVarM collectDeclDir net
         collectDeclDir _ = return ()
         findDeclDir :: Identifier -> Direction
@@ -641,7 +641,7 @@ inlineInstance global ranges modportBindings items partName
         loopVar = "_arr_" ++ key
 
         isArray = not $ null ranges
-        [arrayRange @ (arrayLeft, arrayRight)] = ranges
+        [arrayRange@(arrayLeft, arrayRight)] = ranges
 
         -- wrap the given item in a generate loop if necessary
         wrapInstance :: Identifier -> [ModuleItem] -> ModuleItem
