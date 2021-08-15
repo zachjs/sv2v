@@ -101,23 +101,6 @@ parseDTsAsPortDecls' pieces =
 
         pieces' = filter (not . isAttr) pieces
 
-        propagateDirections :: Direction -> [Decl] -> [Decl]
-        propagateDirections dir (decl@(Variable _ InterfaceT{} _ _ _) : decls) =
-            decl : propagateDirections dir decls
-        propagateDirections lastDir (Variable currDir t x a e : decls) =
-            decl : propagateDirections dir decls
-            where
-                decl = Variable dir t x a e
-                dir = if currDir == Local then lastDir else currDir
-        propagateDirections lastDir (Net currDir n s t x a e : decls) =
-            decl : propagateDirections dir decls
-            where
-                decl = Net dir n s t x a e
-                dir = if currDir == Local then lastDir else currDir
-        propagateDirections dir (decl : decls) =
-            decl : propagateDirections dir decls
-        propagateDirections _ [] = []
-
         portNames :: [Decl] -> [Identifier]
         portNames = filter (not . null) . map portName
         portName :: Decl -> Identifier
@@ -140,6 +123,24 @@ parseDTsAsPortDecls' pieces =
 
         wrapDecl :: [Attr] -> Decl -> ModuleItem
         wrapDecl attrs decl = foldr MIAttr (MIPackageItem $ Decl decl) attrs
+
+-- internal utility for carying forward port directions in a port list
+propagateDirections :: Direction -> [Decl] -> [Decl]
+propagateDirections dir (decl@(Variable _ InterfaceT{} _ _ _) : decls) =
+    decl : propagateDirections dir decls
+propagateDirections lastDir (Variable currDir t x a e : decls) =
+    decl : propagateDirections dir decls
+    where
+        decl = Variable dir t x a e
+        dir = if currDir == Local then lastDir else currDir
+propagateDirections lastDir (Net currDir n s t x a e : decls) =
+    decl : propagateDirections dir decls
+    where
+        decl = Net dir n s t x a e
+        dir = if currDir == Local then lastDir else currDir
+propagateDirections dir (decl : decls) =
+    decl : propagateDirections dir decls
+propagateDirections _ [] = []
 
 -- internal utility for a simple list of port identifiers
 parseDTsAsIdents :: [DeclToken] -> Maybe [Identifier]
@@ -235,7 +236,7 @@ parseDTsAsIntantiation l0 delimTok =
 
 -- [PUBLIC]: parser for comma-separated task/function port declarations
 parseDTsAsTFDecls :: [DeclToken] -> [Decl]
-parseDTsAsTFDecls = parseDTsAsDecls ModeDefault
+parseDTsAsTFDecls = propagateDirections Input . parseDTsAsDecls ModeDefault
 
 
 -- [PUBLIC]; used for "single" declarations, i.e., declarations appearing
