@@ -16,8 +16,9 @@ module Language.SystemVerilog.AST.Stmt
     , SeqMatchItem (..)
     , SeqExpr      (..)
     , AssertionItem
-    , AssertionExpr
     , Assertion    (..)
+    , AssertionKind(..)
+    , Deferral     (..)
     , PropertySpec (..)
     , ViolationCheck (..)
     , BlockKW (..)
@@ -235,20 +236,34 @@ instance Show SeqExpr where
     show (SeqExprFirstMatch e a) = printf "first_match(%s, %s)" (show e) (commas $ map show a)
 
 type AssertionItem = (Identifier, Assertion)
-type AssertionExpr = Either PropertySpec Expr
+
 data Assertion
-    = Assert AssertionExpr ActionBlock
-    | Assume AssertionExpr ActionBlock
-    | Cover  AssertionExpr Stmt
+    = Assert AssertionKind ActionBlock
+    | Assume AssertionKind ActionBlock
+    | Cover  AssertionKind Stmt
     deriving Eq
 instance Show Assertion where
-    show (Assert e a) = printf "assert %s%s" (showAssertionExpr e) (show a)
-    show (Assume e a) = printf "assume %s%s" (showAssertionExpr e) (show a)
-    show (Cover  e a) = printf  "cover %s%s" (showAssertionExpr e) (show a)
+    show (Assert k a) = printf "assert %s%s" (show k) (show a)
+    show (Assume k a) = printf "assume %s%s" (show k) (show a)
+    show (Cover  k a) = printf  "cover %s%s" (show k) (show a)
 
-showAssertionExpr :: AssertionExpr -> String
-showAssertionExpr (Left e) = printf "property (%s\n)" (show e)
-showAssertionExpr (Right e) = printf "(%s)" (show e)
+data AssertionKind
+    = Concurrent PropertySpec
+    | Immediate Deferral Expr
+    deriving Eq
+instance Show AssertionKind where
+    show (Concurrent e) = printf "property (%s\n)" (show e)
+    show (Immediate d e) = printf "%s(%s)" (showPad d) (show e)
+
+data Deferral
+    = NotDeferred
+    | ObservedDeferred
+    | FinalDeferred
+    deriving Eq
+instance Show Deferral where
+    show NotDeferred = ""
+    show ObservedDeferred = "#0"
+    show FinalDeferred = "final"
 
 data PropertySpec
     = PropertySpec (Maybe Sense) Expr PropExpr

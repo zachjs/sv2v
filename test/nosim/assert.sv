@@ -12,7 +12,15 @@ module top;
         assert (1);
         assume (1);
         cover (1);
-        assume (1);
+        assert #0 (1);
+        assume #0 (1);
+        cover #0 (1);
+        assert #0_0 (1);
+        assume #0_0 (1);
+        cover #0_0 (1);
+        assert final (1);
+        assume final (1);
+        cover final (1);
     end
     assert property (@(posedge clk) 1)
         else $display("FOO");

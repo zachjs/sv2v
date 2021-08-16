@@ -345,10 +345,10 @@ traverseAssertionExprsM mapper = assertionMapper
             e' <- mapper e
             pe' <- propExprMapper pe
             return $ PropertySpec ms e' pe'
-        assertionExprMapper (Left e) =
-            propSpecMapper e >>= return . Left
-        assertionExprMapper (Right e) =
-            mapper e >>= return . Right
+        assertionExprMapper (Concurrent e) =
+            propSpecMapper e >>= return . Concurrent
+        assertionExprMapper (Immediate d e) =
+            mapper e >>= return . Immediate d
         assertionMapper (Assert e ab) = do
             e' <- assertionExprMapper e
             return $ Assert e' ab
@@ -389,10 +389,10 @@ traverseStmtLHSsM mapper = stmtMapper
             s2' <- senseMapper s2
             return $ SenseOr s1' s2'
         senseMapper (SenseStar       ) = return SenseStar
-        assertionExprMapper (Left (PropertySpec (Just sense) me pe)) = do
+        assertionExprMapper (Concurrent (PropertySpec (Just sense) me pe)) = do
             sense' <- senseMapper sense
-            return $ Left $ PropertySpec (Just sense') me pe
-        assertionExprMapper other = return $ other
+            return $ Concurrent $ PropertySpec (Just sense') me pe
+        assertionExprMapper other = return other
         assertionMapper (Assert e ab) = do
             e' <- assertionExprMapper e
             return $ Assert e' ab

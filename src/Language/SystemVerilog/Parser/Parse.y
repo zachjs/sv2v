@@ -733,16 +733,18 @@ ConcurrentAssertionItem :: { AssertionItem }
   : Identifier ":" ConcurrentAssertionStatement { ($1, $3) }
   |                ConcurrentAssertionStatement { ("", $1) }
 ConcurrentAssertionStatement :: { Assertion }
-  : "assert" "property" "(" PropertySpec ")" ActionBlock { Assert (Left $4) $6 }
-  | "assume" "property" "(" PropertySpec ")" ActionBlock { Assume (Left $4) $6 }
-  | "cover"  "property" "(" PropertySpec ")" Stmt        { Cover  (Left $4) $6 }
+  : "assert" "property" "(" PropertySpec ")" ActionBlock { Assert (Concurrent $4) $6 }
+  | "assume" "property" "(" PropertySpec ")" ActionBlock { Assume (Concurrent $4) $6 }
+  | "cover"  "property" "(" PropertySpec ")" Stmt        { Cover  (Concurrent $4) $6 }
 
 ImmediateAssertionStatement :: { Assertion }
-  : SimpleImmediateAssertionStatement { $1 }
-SimpleImmediateAssertionStatement :: { Assertion }
-  : "assert" "(" Expr ")" ActionBlock { Assert (Right $3) $5 }
-  | "assume" "(" Expr ")" ActionBlock { Assume (Right $3) $5 }
-  | "cover"  "(" Expr ")" Stmt        { Cover  (Right $3) $5 }
+  : "assert" Deferral "(" Expr ")" ActionBlock { Assert (Immediate $2 $4) $6 }
+  | "assume" Deferral "(" Expr ")" ActionBlock { Assume (Immediate $2 $4) $6 }
+  | "cover"  Deferral "(" Expr ")" Stmt        { Cover  (Immediate $2 $4) $6 }
+Deferral :: { Deferral }
+  : {- empty -} { NotDeferred }
+  | "#" number {% expectZeroDelay $2 ObservedDeferred }
+  | "final" { FinalDeferred }
 
 PropertySpec :: { PropertySpec }
   : opt(ClockingEvent) "disable" "iff" "(" Expr ")" PropExpr { PropertySpec $1 $5  $7 }
@@ -1681,5 +1683,13 @@ readNumber pos str = do
   when (not $ null msg) $ lift $ lift $
     hPutStrLn stderr $ show pos ++ ": Warning: " ++ msg
   return num
+
+expectZeroDelay :: Token -> a -> ParseState a
+expectZeroDelay tok a = do
+  num <- readNumber pos str
+  case num of
+    Decimal (-32) True 0 -> return a
+    _ -> parseError pos $ "expected 0 after #, but found " ++ str
+  where Token { tokenString = str, tokenPosition = pos } = tok
 
 }
