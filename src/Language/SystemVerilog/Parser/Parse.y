@@ -1173,6 +1173,9 @@ CycleDelay :: { Expr }
 EventControl :: { Sense }
   : "@" "(" Senses ")" { $3 }
   | "@" "(*)"          { SenseStar }
+  | "@" "(" "*" ")"    { SenseStar }
+  | "@" "(*" ")"       { SenseStar }
+  | "@" "(" "*)"       { SenseStar }
   | "@*"               { SenseStar }
   | "@" Identifier     { Sense $ LHSIdent $2 }
 Senses :: { Sense }
