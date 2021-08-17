@@ -25,7 +25,7 @@ jobs:
         run: make
       - name: Prepare Artifact
         shell: bash
-        run: cp LICENSE NOTICE README.md bin
+        run: cp LICENSE NOTICE README.md CHANGELOG.md bin
       - name: Upload Artifact
         uses: actions/upload-artifact@v1
         with:
