@@ -12,6 +12,10 @@
   literal (e.g., `1'b01`, `'h0_FFFF_FFFF`) now produce a warning
 * Non-positive integer size casts are now detected and forbidden
 * Negative indices in struct pattern literals are now detected and forbidden
+* Fix parsing of alternate spacings of `@(*)`
+* Tolerate escaped vendor block comments in macro bodies
+* Support deferred immediate assertion statements
+* Apply implicit port directions to tasks and functions
 
 ## v0.0.8
 
