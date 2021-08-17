@@ -17,6 +17,7 @@
 * Support deferred immediate assertion statements
 * Apply implicit port directions to tasks and functions
 * Support bare delay controls with real number delays
+* Fix parsing of sized ports with implicit directions
 
 ## v0.0.8
 

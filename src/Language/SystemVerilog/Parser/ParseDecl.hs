@@ -96,8 +96,7 @@ parseDTsAsPortDecls' pieces =
         Just simpleIdents = maybeSimpleIdents
         isSimpleList = maybeSimpleIdents /= Nothing
 
-        declarations = propagateDirections Input $
-            parseDTsAsDecls ModeDefault pieces'
+        declarations = parseDTsAsDecls Input ModeDefault pieces'
 
         pieces' = filter (not . isAttr) pieces
 
@@ -123,24 +122,6 @@ parseDTsAsPortDecls' pieces =
 
         wrapDecl :: [Attr] -> Decl -> ModuleItem
         wrapDecl attrs decl = foldr MIAttr (MIPackageItem $ Decl decl) attrs
-
--- internal utility for carying forward port directions in a port list
-propagateDirections :: Direction -> [Decl] -> [Decl]
-propagateDirections dir (decl@(Variable _ InterfaceT{} _ _ _) : decls) =
-    decl : propagateDirections dir decls
-propagateDirections lastDir (Variable currDir t x a e : decls) =
-    decl : propagateDirections dir decls
-    where
-        decl = Variable dir t x a e
-        dir = if currDir == Local then lastDir else currDir
-propagateDirections lastDir (Net currDir n s t x a e : decls) =
-    decl : propagateDirections dir decls
-    where
-        decl = Net dir n s t x a e
-        dir = if currDir == Local then lastDir else currDir
-propagateDirections dir (decl : decls) =
-    decl : propagateDirections dir decls
-propagateDirections _ [] = []
 
 -- internal utility for a simple list of port identifiers
 parseDTsAsIdents :: [DeclToken] -> Maybe [Identifier]
@@ -236,13 +217,13 @@ parseDTsAsIntantiation l0 delimTok =
 
 -- [PUBLIC]: parser for comma-separated task/function port declarations
 parseDTsAsTFDecls :: [DeclToken] -> [Decl]
-parseDTsAsTFDecls = propagateDirections Input . parseDTsAsDecls ModeDefault
+parseDTsAsTFDecls = parseDTsAsDecls Input ModeDefault
 
 
 -- [PUBLIC]; used for "single" declarations, i.e., declarations appearing
 -- outside of a port list
 parseDTsAsDecl :: [DeclToken] -> [Decl]
-parseDTsAsDecl = parseDTsAsDecls ModeSingle
+parseDTsAsDecl = parseDTsAsDecls Local ModeSingle
 
 
 -- [PUBLIC]: parser for single block item declarations or assign or arg-less
@@ -259,7 +240,7 @@ declLookahead :: [DeclToken] -> Bool
 declLookahead l0 =
     length l0 /= length l6 && tripLookahead l6
     where
-        (_, l1) = takeDir      l0
+        (_, l1) = takeDir      l0 Local
         (_, l2) = takeLifetime l1
         (_, l3) = takeConst    l2
         (_, l4) = takeVarOrNet l3
@@ -303,7 +284,7 @@ portsToArgs bindings =
 parseDTsAsDeclsOrAsgns :: [DeclToken] -> Either [Decl] [(LHS, Expr)]
 parseDTsAsDeclsOrAsgns tokens =
     if declLookahead tokens
-        then Left $ parseDTsAsDecls ModeForLoop tokens
+        then Left $ parseDTsAsDecls Local ModeForLoop tokens
         else Right $ parseDTsAsAsgns $ shiftIncOrDec tokens
 
 -- internal parser for basic assignment lists
@@ -363,8 +344,8 @@ data Mode
     deriving Eq
 
 -- internal; entrypoint of the critical portion of our parser
-parseDTsAsDecls :: Mode -> [DeclToken] -> [Decl]
-parseDTsAsDecls mode l0 =
+parseDTsAsDecls :: Direction -> Mode -> [DeclToken] -> [Decl]
+parseDTsAsDecls backupDir mode l0 =
     if l /= Nothing && l /= Just Automatic then
         parseError (head l1) "unexpected non-automatic lifetime"
     else if dir == Local && isImplicit t && not (isNet $ head l3) then
@@ -374,14 +355,14 @@ parseDTsAsDecls mode l0 =
     else if mode == ModeSingle then
         parseError (head l7) "unexpected token in declaration"
     else
-        decls ++ parseDTsAsDecls mode l7
+        decls ++ parseDTsAsDecls dir mode l7
     where
         initReason
             | hasDriveStrength (head l3) = "net with drive strength"
             | mode == ModeForLoop = "for loop"
             | con = "const"
             | otherwise = ""
-        (dir, l1) = takeDir      l0
+        (dir, l1) = takeDir      l0 backupDir
         (l  , l2) = takeLifetime l1
         (con, l3) = takeConst    l2
         (von, l4) = takeVarOrNet l3
@@ -432,9 +413,9 @@ tripLookahead l0 =
         (_, l2) = takeRanges l1
         (_, l3) = takeAsgn   l2 ""
 
-takeDir :: [DeclToken] -> (Direction, [DeclToken])
-takeDir (DTDir _ dir : rest) = (dir  , rest)
-takeDir                rest  = (Local, rest)
+takeDir :: [DeclToken] -> Direction -> (Direction, [DeclToken])
+takeDir (DTDir _ dir : rest) _   = (dir, rest)
+takeDir                rest  dir = (dir, rest)
 
 takeLifetime :: [DeclToken] -> (Maybe Lifetime, [DeclToken])
 takeLifetime (DTLifetime _ l : rest) = (Just  l, rest)
