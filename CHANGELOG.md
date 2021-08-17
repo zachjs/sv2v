@@ -16,6 +16,7 @@
 * Tolerate escaped vendor block comments in macro bodies
 * Support deferred immediate assertion statements
 * Apply implicit port directions to tasks and functions
+* Support bare delay controls with real number delays
 
 ## v0.0.8
 

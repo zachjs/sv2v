@@ -1162,6 +1162,7 @@ DelayOrEvent :: { Timing }
   | EventControl { Event $1 }
 DelayControl :: { Expr }
   : "#" Number { Number $2 }
+  | "#" Real   { Real   $2 }
   | "#" Time   { Time   $2 }
   | "#" "(" Expr ")"  { $3 }
   | "#" "(" Expr ":" Expr ":" Expr ")" { MinTypMax $3 $5 $7 }
