@@ -546,6 +546,10 @@ preprocessInput = do
         '/' : '*' : _ -> removeThrough "*/"
         '`' : '"' : _ -> handleBacktickString
         '"' : _ -> handleString
+        '/' : '`' : '`' : '*' : _ ->
+            if null macroStack
+                then consume
+                else removeThrough "*``/"
         '`' : '`' : _ -> do
             if null macroStack
                 then do
