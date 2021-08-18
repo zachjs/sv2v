@@ -460,13 +460,13 @@ TypeAlias :: { Type }
   | Identifier ParamBindings "::" Identifier Dimensions { CSAlias $1 $2 $4 $5 }
 TypeNonIdent :: { Type }
   : PartialType OptSigning Dimensions { $1 $2 $3 }
-  | "type" "(" Expr ")" { TypeOf $3 }
 PartialType :: { Signing -> [Range] -> Type }
   : PartialTypeP { snd $1 }
 PartialTypeP :: { (Position, Signing -> [Range] -> Type) }
   : IntegerVectorTypeP { (fst $1, makeIntegerVector $1) }
   | IntegerAtomTypeP   { (fst $1, makeIntegerAtom   $1) }
   | NonIntegerTypeP    { (fst $1, makeNonInteger    $1) }
+  | "type" "(" Expr ")" { makeTypeOf $1 $3 }
   | "enum" EnumBaseType "{" EnumItems   "}" { makeComplex $1 $ Enum   $2 $4 }
   | "struct" Packing    "{" StructItems "}" { makeComplex $1 $ Struct $2 $4 }
   | "union"  Packing    "{" StructItems "}" { makeComplex $1 $ Union  $2 $4 }
@@ -652,7 +652,6 @@ DeclToken :: { DeclToken }
   | "[" Expr "]"                       { DTBit      (tokenPosition $1) $2 }
   | "." Identifier                     { DTDot      (tokenPosition $1) $2 }
   | "automatic"                        { DTLifetime (tokenPosition $1) Automatic }
-  | "type" "(" Expr ")"                { uncurry DTType $ makeTypeOf $1 $3 }
   | IncOrDecOperatorP                  { DTAsgn     (fst $1) (AsgnOp $ snd $1) Nothing (RawNum 1) }
   | IdentifierP               "::" Identifier { uncurry DTPSIdent $1    $3 }
   | IdentifierP ParamBindings "::" Identifier { uncurry DTCSIdent $1 $2 $4 }
