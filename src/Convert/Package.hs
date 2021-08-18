@@ -31,7 +31,7 @@ import Data.Maybe (mapMaybe)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
-import Convert.ResolveBindings (exprToType, resolveBindings)
+import Convert.ResolveBindings (resolveBindings)
 import Convert.Scoper
 import Convert.Traverse
 import Language.SystemVerilog.AST

@@ -28,6 +28,7 @@ module Language.SystemVerilog.AST
     , module Type
     , exprToLHS
     , lhsToExpr
+    , exprToType
     , shortHash
     ) where
 
@@ -80,6 +81,20 @@ lhsToExpr (LHSRange  l m r ) = Range (lhsToExpr l) m r
 lhsToExpr (LHSDot    l x   ) = Dot   (lhsToExpr l) x
 lhsToExpr (LHSConcat     ls) = Concat $ map lhsToExpr ls
 lhsToExpr (LHSStream o e ls) = Stream o e $ map lhsToExpr ls
+
+-- attempt to convert an expression to a syntactically equivalent type
+exprToType :: Expr -> Maybe Type
+exprToType (Ident       x) = Just $ Alias       x []
+exprToType (PSIdent y   x) = Just $ PSAlias y   x []
+exprToType (CSIdent y p x) = Just $ CSAlias y p x []
+exprToType (Range e NonIndexed r) = do
+    (tf, rs) <- fmap typeRanges $ exprToType e
+    Just $ tf (rs ++ [r])
+exprToType (Bit e i) = do
+    (tf, rs) <- fmap typeRanges $ exprToType e
+    let r = (BinOp Sub i (RawNum 1), RawNum 0)
+    Just $ tf (rs ++ [r])
+exprToType _ = Nothing
 
 shortHash :: (Show a) => a -> String
 shortHash x =

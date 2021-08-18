@@ -12,7 +12,6 @@
 
 module Convert.ResolveBindings
     ( convert
-    , exprToType
     , resolveBindings
     ) where
 
@@ -20,7 +19,6 @@ import Control.Monad.Writer.Strict
 import Data.List (intercalate, (\\))
 import qualified Data.Map.Strict as Map
 
-import Convert.ExprUtils (simplify)
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
@@ -99,20 +97,6 @@ mapInstance parts (Instance m paramBindings x rs portBindings) =
                 ++ ' ' : show value
 
 mapInstance _ other = other
-
--- attempt to convert an expression to syntactically equivalent type
-exprToType :: Expr -> Maybe Type
-exprToType (Ident       x) = Just $ Alias       x []
-exprToType (PSIdent y   x) = Just $ PSAlias y   x []
-exprToType (CSIdent y p x) = Just $ CSAlias y p x []
-exprToType (Range e NonIndexed r) = do
-    (tf, rs) <- fmap typeRanges $ exprToType e
-    Just $ tf (rs ++ [r])
-exprToType (Bit e i) = do
-    (tf, rs) <- fmap typeRanges $ exprToType e
-    let r = (simplify $ BinOp Sub i (RawNum 1), RawNum 0)
-    Just $ tf (rs ++ [r])
-exprToType _ = Nothing
 
 type Binding t = (Identifier, t)
 -- give a set of bindings explicit names
