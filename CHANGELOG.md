@@ -18,6 +18,7 @@
 * Apply implicit port directions to tasks and functions
 * Support bare delay controls with real number delays
 * Fix parsing of sized ports with implicit directions
+* Ensure arrays used in nested ternary expressions are properly flattened
 
 ## v0.0.8
 

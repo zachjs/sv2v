@@ -101,11 +101,6 @@ traverseLHSM :: LHS -> ST LHS
 traverseLHSM x = flatUsageM x >> return x
 
 traverseAsgnM :: (LHS, Expr) -> ST (LHS, Expr)
-traverseAsgnM (x, Mux cond y z) = do
-    flatUsageM x
-    flatUsageM y
-    flatUsageM z
-    return (x, Mux cond y z)
 traverseAsgnM (x, y) = do
     flatUsageM x
     flatUsageM y
@@ -113,6 +108,8 @@ traverseAsgnM (x, y) = do
 
 class ScopeKey t => Key t where
     unbit :: t -> (t, Int)
+    split :: t -> Maybe (t, t)
+    split = const Nothing
 
 instance Key Expr where
     unbit (Bit e _) = (e', n + 1)
@@ -120,6 +117,8 @@ instance Key Expr where
     unbit (Range e _ _) = (e', n)
         where (e', n) = unbit e
     unbit e = (e, 0)
+    split (Mux _ a b) = Just (a, b)
+    split _ = Nothing
 
 instance Key LHS where
     unbit (LHSBit e _) = (e', n + 1)
@@ -132,6 +131,8 @@ instance Key Identifier where
     unbit x = (x, 0)
 
 flatUsageM :: Key k => k -> ST ()
+flatUsageM k | Just (a, b) <- split k =
+    flatUsageM a >> flatUsageM b
 flatUsageM k = do
     let (k', depth) = unbit k
     details <- lookupElemM k'
