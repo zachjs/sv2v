@@ -1176,6 +1176,7 @@ EventControl :: { Sense }
   | "@" "(" "*" ")"    { SenseStar }
   | "@" "(*" ")"       { SenseStar }
   | "@" "(" "*)"       { SenseStar }
+  | "@" "*"            { SenseStar }
   | "@*"               { SenseStar }
   | "@" Identifier     { Sense $ LHSIdent $2 }
 Senses :: { Sense }
