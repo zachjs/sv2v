@@ -1,7 +1,7 @@
 resolver: lts-18.4
 pvp-bounds: both
 ghc-options:
-    $locals: -j
+    $locals: -j2
 
 packages:
     - .
