@@ -570,21 +570,9 @@ PackageImportDeclaration :: { [ModuleItem] }
 Params :: { [ModuleItem] }
   : PIParams { map (MIPackageItem . Decl) $1 }
 PIParams :: { [Decl] }
-  : {- empty -}          { [] }
-  | "#" "(" ")"          { [] }
-  | "#" "(" ParamsFollow { $3 }
-ParamsFollow :: { [Decl] }
-  : ParamAsgn ParamsEnd        { $1 }
-  | ParamAsgn "," ParamsFollow { $1 ++ $3 }
-  |               ParamsDecl   { $1 }
-ParamsDecl :: { [Decl] }
-  : ModuleParameterDecl(ParamsEnd)      { $1 }
-  | ModuleParameterDecl(",") ParamsDecl { $1 ++ $2 }
-ParamAsgn :: { [Decl] }
-  : DeclTrace Identifier "=" Expr { [$1, Param Parameter (Implicit Unspecified []) $2 $4] }
-ParamsEnd
-  :     ")" {}
-  | "," ")" {}
+  : {- empty -} { [] }
+  | "#" "(" ")" { [] }
+  | "#" "(" ParamDeclTokens(")") { parseDTsAsParams $3 }
 
 PortDecls :: { ([Identifier], [ModuleItem]) }
   : "(" PortDeclTokens(")") { parseDTsAsPortDecls $2 }
@@ -658,8 +646,9 @@ DeclToken :: { DeclToken }
 DTDelim(delim) :: { DeclToken }
   : delim { DTEnd (tokenPosition $1) (head $ tokenString $1) }
 DeclTokenAsgn :: { DeclToken }
-  : "=" opt(DelayOrEvent) Expr { DTAsgn (tokenPosition $1) AsgnOpEq $2 $3 }
-  | AsgnBinOpP Expr            { uncurry DTAsgn $1 Nothing $2 }
+  : "=" DelayOrEvent Expr       { DTAsgn (tokenPosition $1) AsgnOpEq (Just $2) $3 }
+  | "="              Expr       { DTAsgn (tokenPosition $1) AsgnOpEq Nothing   $2 }
+  | AsgnBinOpP       Expr       { uncurry DTAsgn $1 Nothing $2 }
   | "<=" opt(DelayOrEvent) Expr { DTAsgn (tokenPosition $1) AsgnOpNonBlocking $2 $3 }
 PortDeclTokens(delim) :: { [DeclToken] }
   : DeclTokensBase(PortDeclTokens(delim), delim) { $1 }
@@ -672,6 +661,16 @@ ModuleDeclTokens(delim) :: { [DeclToken] }
   | GenericInterfaceDecl            DTDelim(delim) { $1 ++ [$2] }
 GenericInterfaceDecl :: { [DeclToken] }
   : "interface" IdentifierP { [DTType (tokenPosition $1) (\Unspecified -> InterfaceT "" ""), uncurry DTIdent $2] }
+
+ParamDeclTokens(delim) :: { [DeclToken] }
+  : DeclTokensBase(ParamDeclTokens(delim), delim) { $1 }
+  | DeclTokenAsgn ","              DTDelim(delim) { [$1, DTComma (tokenPosition $2), $3] }
+  | ParamDeclToken         ParamDeclTokens(delim) { $1 ++ $2 }
+  | ParamDeclToken                 DTDelim(delim) { $1 ++ [$2] }
+ParamDeclToken :: { [DeclToken] }
+  : "=" PartialTypeP   { [DTTypeAsgn (tokenPosition $1), uncurry DTType  $2] }
+  | "type" IdentifierP { [DTTypeDecl (tokenPosition $1), uncurry DTIdent $2] }
+  | ParameterDeclKW    { [uncurry DTParamKW $1] }
 
 VariablePortIdentifiers :: { [(Identifier, Expr)] }
   : VariablePortIdentifier                             { [$1] }
@@ -1130,9 +1129,6 @@ DeclOrStmt :: { ([Decl], [Stmt]) }
   : DeclTokens(";")    { parseDTsAsDeclOrStmt $1 }
   | ParameterDecl(";") { ($1, []) }
 
-ModuleParameterDecl(delim) :: { [Decl] }
-  : ParameterDecl(delim) { $1 }
-  | DeclTrace "type" TypeAsgns delim { $1 : map (uncurry $ ParamType Parameter) $3 }
 ParameterDecl(delim) :: { [Decl] }
   : ParameterDeclKW           DeclAsgns delim { makeParamDecls $1 (Implicit Unspecified []) $2 }
   | ParameterDeclKW ParamType DeclAsgns delim { makeParamDecls $1 $2 $3 }

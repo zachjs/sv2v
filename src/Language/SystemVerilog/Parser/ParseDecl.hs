@@ -29,6 +29,12 @@
  - portion of a for loop also allows for declarations and assignments, and so a
  - similar interface is provided for this case.
  -
+ - Parameter port lists allow the omission of the `parameter` and `localparam`
+ - keywords, and so require special handling in the same vein as other
+ - declarations. However, this custom parsing is not necessary for parameter
+ - declarations outside of parameter port lists because the leading keyword is
+ - otherwise required.
+ -
  - This parser is very liberal, and so accepts some syntactically invalid files.
  - In the future, we may add some basic type-checking to complain about
  - malformed input files. However, we generally assume that users have tested
@@ -43,6 +49,7 @@ module Language.SystemVerilog.Parser.ParseDecl
 , parseDTsAsDecl
 , parseDTsAsDeclOrStmt
 , parseDTsAsDeclsOrAsgns
+, parseDTsAsParams
 ) where
 
 import Data.List (findIndex, partition, uncons)
@@ -73,17 +80,22 @@ data DeclToken
     | DTLifetime Position Lifetime
     | DTAttr     Position Attr
     | DTEnd      Position Char
+    | DTParamKW  Position ParamScope
+    | DTTypeDecl Position
+    | DTTypeAsgn Position
 
 
 -- [PUBLIC]: parser for module port declarations, including interface ports
 -- Example: `input foo, bar, One inst`
 parseDTsAsPortDecls :: [DeclToken] -> ([Identifier], [ModuleItem])
 parseDTsAsPortDecls = parseDTsAsPortDecls' . dropTrailingComma
-    where
-        dropTrailingComma :: [DeclToken] -> [DeclToken]
-        dropTrailingComma [] = []
-        dropTrailingComma [DTComma{}, end@DTEnd{}] = [end]
-        dropTrailingComma (tok : toks) = tok : dropTrailingComma toks
+
+-- internal utility to drop a single trailing comma in port or parameter lists,
+-- which we allow for compatibility with Yosys
+dropTrailingComma :: [DeclToken] -> [DeclToken]
+dropTrailingComma [] = []
+dropTrailingComma [DTComma{}, end@DTEnd{}] = [end]
+dropTrailingComma (tok : toks) = tok : dropTrailingComma toks
 
 -- internal parseDTsAsPortDecls after the removal of an optional trailing comma
 parseDTsAsPortDecls' :: [DeclToken] -> ([Identifier], [ModuleItem])
@@ -333,7 +345,6 @@ takeLHSStep curr (DTRange _ m r : toks) = takeLHSStep (LHSRange curr m r) toks
 takeLHSStep curr (DTDot   _ x   : toks) = takeLHSStep (LHSDot   curr x  ) toks
 takeLHSStep lhs toks = (lhs, toks)
 
-
 type DeclBase = Identifier -> [Range] -> Expr -> Decl
 type Triplet = (Identifier, [Range], Expr)
 
@@ -369,14 +380,16 @@ parseDTsAsDecls backupDir mode l0 =
         (tf , l5) = takeType     l4
         (rs , l6) = takeRanges   l5
         (tps, l7) = takeTrips    l6 initReason
-        pos = tokPos $ head l0
         base = von dir t
         t = case (dir, tf rs) of
                 (Output, Implicit sg _) -> IntegerVector TLogic sg rs
                 (_, typ) -> typ
         decls =
-            CommentDecl ("Trace: " ++ show pos) :
+            traceComment l0 :
             map (\(x, a, e) -> base x a e) tps
+
+traceComment :: [DeclToken] -> Decl
+traceComment = CommentDecl . ("Trace: " ++) . show . tokPos . head
 
 hasDriveStrength :: DeclToken -> Bool
 hasDriveStrength (DTNet _ _ DriveStrength{}) = True
@@ -412,6 +425,85 @@ tripLookahead l0 =
         (_, l1) = takeIdent  l0
         (_, l2) = takeRanges l1
         (_, l3) = takeAsgn   l2 ""
+
+
+-- [PUBLIC]: parser for parameter lists in headers of modules, interfaces, etc.
+parseDTsAsParams :: [DeclToken] -> [Decl]
+parseDTsAsParams = parseDTsAsParams' Parameter . dropTrailingComma
+
+-- internal variant of the above, used recursively after the optional trailing
+-- comma has been removed
+parseDTsAsParams' :: ParamScope -> [DeclToken] -> [Decl]
+parseDTsAsParams' _ [] = []
+parseDTsAsParams' prevParamScope l0 =
+    nextStep paramScope l2
+    where
+        nextStep = if isParamType
+            then parseDTsAsParamType
+            else parseDTsAsParam
+        (paramScope , l1) = takeParamScope l0 prevParamScope
+        (isParamType, l2) = takeParamType  l1
+
+-- parse one or more regular parameter declarations at the beginning of the decl
+-- token list before continuing on to subsequent declarations
+parseDTsAsParam :: ParamScope -> [DeclToken] -> [Decl]
+parseDTsAsParam paramScope l0 =
+    traceComment l0 :
+    map base tps ++
+    parseDTsAsParams' paramScope l3
+    where
+        (tfO, l1) = takeType   l0
+        (rsO, l2) = takeRanges l1
+        (tps, l3) = takeTrips  l2 ""
+        base :: Triplet -> Decl
+        (tf, rs) = typeRanges $ tfO rsO -- for packing tolerance
+        base (x, a, e) = Param paramScope (tf $ a ++ rs) x e
+
+-- parse a single type parameter declaration at the beginning of the decl token
+-- list before continuing on to subsequent declarations
+parseDTsAsParamType :: ParamScope -> [DeclToken] -> [Decl]
+parseDTsAsParamType paramScope l0 =
+    traceComment l0 :
+    ParamType paramScope x t :
+    nextStep paramScope l3
+    where
+        nextStep = if typeAsgnLookahead l3
+            then parseDTsAsParamType
+            else parseDTsAsParams'
+        (x, l1) = takeIdent    l0
+        (t, l2) = takeTypeAsgn l1
+        l3 = takeCommaOrEnd    l2
+
+-- take the optional default value assignment for a type parameter declaration;
+-- note that aliases are parsed as regular assignments to avoid conflicts, and
+-- so are converted to types when encountered
+takeTypeAsgn :: [DeclToken] -> (Type, [DeclToken])
+takeTypeAsgn (DTTypeAsgn _ : l0) =
+    (tf rs, l2)
+    where
+        (tf, l1) = takeType   l0
+        (rs, l2) = takeRanges l1
+takeTypeAsgn (DTAsgn pos AsgnOpEq Nothing expr : toks) =
+    case exprToType expr of
+        Nothing -> parseError pos "unexpected non-type parameter assignment"
+        Just t -> (t, toks)
+takeTypeAsgn toks = (UnknownType, toks)
+
+-- check whether the front of the tokens could plausibly form a type parameter
+-- declaration and optional assignment; type parameter declaration assignments
+-- can only be "escaped" using an explicit non-type parameter/localparam keyword
+typeAsgnLookahead :: [DeclToken] -> Bool
+typeAsgnLookahead l0 =
+    not (null l0) &&
+    -- every type assignment *must* begin with an identifier
+    isIdent (head l0) &&
+    -- expecting to see a comma or the ending token after the identifier and
+    -- optional assignment
+    isCommaOrEnd (head l2)
+    where
+        (_, l1) = takeIdent    l0
+        (_, l2) = takeTypeAsgn l1
+
 
 takeDir :: [DeclToken] -> Direction -> (Direction, [DeclToken])
 takeDir (DTDir _ dir : rest) _   = (dir, rest)
@@ -523,6 +615,15 @@ takeIdent (DTIdent _ x : rest) = (x, rest)
 takeIdent tokens = parseError (head tokens) "expected identifier"
 
 
+takeParamScope :: [DeclToken] -> ParamScope -> (ParamScope, [DeclToken])
+takeParamScope (DTParamKW _ psc : toks) _   = (psc, toks)
+takeParamScope                    toks  psc = (psc, toks)
+
+takeParamType :: [DeclToken] -> (Bool, [DeclToken])
+takeParamType (DTTypeDecl _ : toks) = (True , toks)
+takeParamType                 toks  = (False, toks)
+
+
 isAttr :: DeclToken -> Bool
 isAttr DTAttr{} = True
 isAttr _ = False
@@ -573,6 +674,9 @@ tokPos (DTSigning  p _) = p
 tokPos (DTLifetime p _) = p
 tokPos (DTAttr     p _) = p
 tokPos (DTEnd      p _) = p
+tokPos (DTParamKW  p _) = p
+tokPos (DTTypeDecl p) = p
+tokPos (DTTypeAsgn p) = p
 
 class Loc t where
     parseError :: t -> String -> a

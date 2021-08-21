@@ -20,6 +20,8 @@
 * Fix parsing of sized ports with implicit directions
 * Ensure arrays used in nested ternary expressions are properly flattened
 * Support parameters which use a type-of as the data type
+* Support typed valued parameters declared in parameter port lists without
+  explicitly providing a leading `parameter` or `localparam` marker
 
 ## v0.0.8
 
