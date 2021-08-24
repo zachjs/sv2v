@@ -432,7 +432,7 @@ time               { Token Lit_time        _ _ }
 
 %%
 
-opt(p)
+opt(p) :: { Maybe Token }
   : p { Just $1 }
   |   { Nothing }
 
@@ -646,10 +646,10 @@ DeclToken :: { DeclToken }
 DTDelim(delim) :: { DeclToken }
   : delim { DTEnd (tokenPosition $1) (head $ tokenString $1) }
 DeclTokenAsgn :: { DeclToken }
-  : "=" DelayOrEvent Expr       { DTAsgn (tokenPosition $1) AsgnOpEq (Just $2) $3 }
-  | "="              Expr       { DTAsgn (tokenPosition $1) AsgnOpEq Nothing   $2 }
-  | AsgnBinOpP       Expr       { uncurry DTAsgn $1 Nothing $2 }
-  | "<=" opt(DelayOrEvent) Expr { DTAsgn (tokenPosition $1) AsgnOpNonBlocking $2 $3 }
+  : "=" DelayOrEvent     Expr { DTAsgn (tokenPosition $1) AsgnOpEq (Just $2) $3 }
+  | "="                  Expr { DTAsgn (tokenPosition $1) AsgnOpEq Nothing   $2 }
+  | "<=" OptDelayOrEvent Expr { DTAsgn (tokenPosition $1) AsgnOpNonBlocking $2 $3 }
+  | AsgnBinOpP           Expr { uncurry DTAsgn $1 Nothing $2 }
 PortDeclTokens(delim) :: { [DeclToken] }
   : DeclTokensBase(PortDeclTokens(delim), delim) { $1 }
   | GenericInterfaceDecl   PortDeclTokens(delim) { $1 ++ $2}
@@ -745,8 +745,11 @@ Deferral :: { Deferral }
   | "final" { FinalDeferred }
 
 PropertySpec :: { PropertySpec }
-  : opt(ClockingEvent) "disable" "iff" "(" Expr ")" PropExpr { PropertySpec $1 $5  $7 }
-  | opt(ClockingEvent)                              PropExpr { PropertySpec $1 Nil $2 }
+  : OptClockingEvent "disable" "iff" "(" Expr ")" PropExpr { PropertySpec $1 $5  $7 }
+  | OptClockingEvent                              PropExpr { PropertySpec $1 Nil $2 }
+OptClockingEvent :: { Maybe Sense }
+  : ClockingEvent { Just $1 }
+  | {- empty -}   { Nothing }
 
 PropExpr :: { PropExpr }
   : SeqExpr { PropExpr $1 }
@@ -804,15 +807,15 @@ NOutputGates :: { [(Expr, Identifier, [LHS], Expr)] }
   | NOutputGates "," NOutputGate { $1 ++ [$3]}
 
 NInputGate :: { (Expr, Identifier, LHS, [Expr]) }
-  : DelayControlOrNil opt(Identifier) "(" LHS "," Exprs ")" { ($1, fromMaybe "" $2, $4, $6) }
+  : DelayControlOrNil OptIdentifier "(" LHS "," Exprs ")" { ($1, $2, $4, $6) }
 NOutputGate :: { (Expr, Identifier, [LHS], Expr) }
-  : DelayControlOrNil opt(Identifier) "(" NOutputGateItems { ($1, fromMaybe "" $2, fst $4, snd $4) }
-NOutputGateItems :: { ([LHS], Expr) }
-  : Expr ")" { ([], $1) }
-  | Expr "," NOutputGateItems { (toLHS $1 : fst $3, snd $3) }
+  : DelayControlOrNil OptIdentifier "(" Exprs "," Expr ")" { ($1, $2, map toLHS $4, $6) }
 DelayControlOrNil :: { Expr }
   : DelayControl { $1 }
   | {- empty -} { Nil }
+OptIdentifier :: { Identifier }
+  : Identifier  { $1 }
+  | {- empty -} { "" }
 
 NInputGateKW :: { NInputGateKW }
   : "and"  { GateAnd  }
@@ -1038,9 +1041,9 @@ Stmt :: { Stmt }
   | StmtTrace StmtNonAsgn { $2 }
 
 StmtAsgn :: { Stmt }
-  : LHS "="  opt(DelayOrEvent) Expr ";" { Asgn AsgnOpEq $3 $1 $4 }
-  | LHS "<=" opt(DelayOrEvent) Expr ";" { Asgn AsgnOpNonBlocking $3 $1 $4 }
-  | LHS AsgnBinOp              Expr ";" { Asgn $2  Nothing $1 $3 }
+  : LHS "="  OptDelayOrEvent Expr ";" { Asgn AsgnOpEq $3 $1 $4 }
+  | LHS "<=" OptDelayOrEvent Expr ";" { Asgn AsgnOpNonBlocking $3 $1 $4 }
+  | LHS AsgnBinOp            Expr ";" { Asgn $2  Nothing $1 $3 }
   | LHS IncOrDecOperator ";" { Asgn (AsgnOp $2) Nothing $1 (RawNum 1) }
   | IncOrDecOperator LHS ";" { Asgn (AsgnOp $1) Nothing $2 (RawNum 1) }
   | LHS          ";" { Subroutine (lhsToExpr $1) (Args [] []) }
@@ -1077,6 +1080,10 @@ StmtNonBlock :: { Stmt }
   | AttributeInstance Stmt                     { StmtAttr $1 $2 }
   | ProceduralAssertionStatement               { Assertion $1 }
   | "void" "'" "(" Expr CallArgs ")" ";"       { Subroutine $4 $5 }
+
+OptDelayOrEvent :: { Maybe Timing }
+  : DelayOrEvent { Just $1 }
+  | {- empty -}  { Nothing }
 
 CaseStmt :: { Stmt }
   : Unique CaseKW "(" Expr ")"          Cases       "endcase" { Case $1 $2                   $4 $ validateCases $5 $6 }
@@ -1196,7 +1203,7 @@ Cases :: { [Case] }
   : Case       { [$1] }
   | Case Cases { $1 : $2 }
 Case :: { Case }
-  : Exprs ":"  Stmt { ($1, $3) }
+  : Exprs         ":"  Stmt { ($1, $3) }
   | "default" opt(":") Stmt { ([], $3) }
 InsideCases :: { [Case] }
   : InsideCase             { [$1] }
@@ -1451,15 +1458,15 @@ Trace :: { String }
 position :: { Position }
   : {- empty -} {% gets pPosition }
 
-end          : "end"          {} | error {% missingToken "end"          }
-endclass     : "endclass"     {} | error {% missingToken "endclass"     }
-endfunction  : "endfunction"  {} | error {% missingToken "endfunction"  }
-endgenerate  : "endgenerate"  {} | error {% missingToken "endgenerate"  }
-endinterface : "endinterface" {} | error {% missingToken "endinterface" }
-endmodule    : "endmodule"    {} | error {% missingToken "endmodule"    }
-endpackage   : "endpackage"   {} | error {% missingToken "endpackage"   }
-endtask      : "endtask"      {} | error {% missingToken "endtask"      }
-join         : "join"         {} | error {% missingToken "join"         }
+end          :: { () } : "end"          { () } | error {% missingToken "end"          }
+endclass     :: { () } : "endclass"     { () } | error {% missingToken "endclass"     }
+endfunction  :: { () } : "endfunction"  { () } | error {% missingToken "endfunction"  }
+endgenerate  :: { () } : "endgenerate"  { () } | error {% missingToken "endgenerate"  }
+endinterface :: { () } : "endinterface" { () } | error {% missingToken "endinterface" }
+endmodule    :: { () } : "endmodule"    { () } | error {% missingToken "endmodule"    }
+endpackage   :: { () } : "endpackage"   { () } | error {% missingToken "endpackage"   }
+endtask      :: { () } : "endtask"      { () } | error {% missingToken "endtask"      }
+join         :: { () } : "join"         { () } | error {% missingToken "join"         }
 
 {
 
