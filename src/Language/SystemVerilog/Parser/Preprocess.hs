@@ -21,6 +21,7 @@ import Data.List (tails, isPrefixOf, findIndex, intercalate)
 import Data.Maybe (isJust, fromJust)
 import System.Directory (findFile)
 import System.FilePath (dropFileName)
+import System.IO (hGetContents, openFile, stdin, IOMode(ReadMode))
 import qualified Data.Map.Strict as Map
 
 import Language.SystemVerilog.Parser.Tokens (Position(..))
@@ -71,10 +72,7 @@ elsifCond defined c =
 -- preprocessor entrypoint
 preprocess :: [String] -> Env -> FilePath -> ExceptT String IO (Env, Contents)
 preprocess includePaths env path = do
-    contents <- liftIO $
-        if path == "-"
-            then getContents
-            else loadFile path
+    contents <- liftIO $ loadFile path
     let initialState = PP
             { ppInput        = contents
             , ppOutput       = []
@@ -98,24 +96,25 @@ preprocess includePaths env path = do
 -- preprocessing
 annotate :: FilePath -> ExceptT String IO Contents
 annotate path = do
-    contents <- liftIO $
-        if path == "-"
-            then getContents
-            else loadFile path
+    contents <- liftIO $ loadFile path
     let positions = scanl advance (Position path 1 1) contents
     return $ zip contents positions
 
 -- read in the given file
 loadFile :: FilePath -> IO String
 loadFile path = do
-    contents <- readFile path
+    handle <-
+        if path == "-"
+            then return stdin
+            else openFile path ReadMode
+    contents <- hGetContents handle
     return $ normalize contents
-    where
-        -- removes carriage returns before newlines
-        normalize :: String -> String
-        normalize ('\r' : '\n' : rest) = '\n' : (normalize rest)
-        normalize (ch : chs) = ch : (normalize chs)
-        normalize [] = []
+
+-- removes carriage returns before newlines
+normalize :: String -> String
+normalize ('\r' : '\n' : rest) = '\n' : (normalize rest)
+normalize (ch : chs) = ch : (normalize chs)
+normalize [] = []
 
 -- find the given file for inclusion
 includeSearch :: FilePath -> PPS FilePath
