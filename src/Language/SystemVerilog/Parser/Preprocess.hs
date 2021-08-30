@@ -19,9 +19,11 @@ import Control.Monad.State.Strict
 import Data.Char (ord)
 import Data.List (tails, isPrefixOf, findIndex, intercalate)
 import Data.Maybe (isJust, fromJust)
+import GHC.IO.Encoding.Failure (CodingFailureMode(TransliterateCodingFailure))
+import GHC.IO.Encoding.UTF8 (mkUTF8)
 import System.Directory (findFile)
 import System.FilePath (dropFileName)
-import System.IO (hGetContents, openFile, stdin, IOMode(ReadMode))
+import System.IO (hGetContents, hSetEncoding, openFile, stdin, IOMode(ReadMode))
 import qualified Data.Map.Strict as Map
 
 import Language.SystemVerilog.Parser.Tokens (Position(..))
@@ -107,6 +109,7 @@ loadFile path = do
         if path == "-"
             then return stdin
             else openFile path ReadMode
+    hSetEncoding handle $ mkUTF8 TransliterateCodingFailure
     contents <- hGetContents handle
     return $ normalize contents
 

@@ -22,6 +22,8 @@
 * Support parameters which use a type-of as the data type
 * Support typed valued parameters declared in parameter port lists without
   explicitly providing a leading `parameter` or `localparam` marker
+* Use UTF-8 on all platforms and tolerate transcoding failures, enabling reading
+  files encoding using Latin-1 with special characters in comments
 
 ## v0.0.8
 
