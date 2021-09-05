@@ -89,9 +89,9 @@ main = do
             exitFailure
         Right asts -> do
             -- convert the files if requested
-            let asts' = if passThrough job
-                            then asts
-                            else convert (exclude job) asts
+            asts' <- if passThrough job
+                        then return asts
+                        else convert (dumpPrefix job) (exclude job) asts
             emptyWarnings (concat asts) (concat asts')
             -- write the converted files out
             writeOutput (write job) (files job) asts'

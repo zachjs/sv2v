@@ -6,6 +6,8 @@
 
 module Convert (convert) where
 
+import Control.Monad ((>=>))
+
 import Language.SystemVerilog.AST
 import qualified Job (Exclude(..))
 
@@ -53,6 +55,7 @@ import qualified Convert.Unsigned
 import qualified Convert.Wildcard
 
 type Phase = [AST] -> [AST]
+type IOPhase = [AST] -> IO [AST]
 type Selector = Job.Exclude -> Phase -> Phase
 
 finalPhases :: Selector -> [Phase]
@@ -109,22 +112,48 @@ initialPhases selectExclude =
     , Convert.UnnamedGenBlock.convert
     ]
 
-convert :: [Job.Exclude] -> Phase
-convert excludes =
-    final . loopMain . initial
+convert :: FilePath -> [Job.Exclude] -> IOPhase
+convert dumpPrefix excludes =
+    step "parse"   id      >=>
+    step "initial" initial >=>
+    loop 1 "main"  main    >=>
+    step "final"   final
     where
         final = combine $ finalPhases selectExclude
         main = combine $ mainPhases selectExclude
         initial = combine $ initialPhases selectExclude
         combine = foldr1 (.)
-        loopMain :: Phase
-        loopMain descriptions =
-            if descriptions == descriptions'
-                then descriptions
-                else loopMain descriptions'
-            where descriptions' = main descriptions
+
         selectExclude :: Selector
         selectExclude exclude phase =
             if elem exclude excludes
                 then id
                 else phase
+
+        dumper :: String -> IOPhase
+        dumper =
+            if null dumpPrefix
+                then const return
+                else fileDumper dumpPrefix
+
+        -- add debug dumping to a phase
+        step :: String -> Phase -> IOPhase
+        step key = (dumper key .)
+
+        -- add convergence and debug dumping to a phase
+        loop :: Int -> String -> Phase -> IOPhase
+        loop idx key phase files =
+            if files == files'
+                then return files
+                else dumper key' files' >>= loop (idx + 1) key phase
+            where
+                files' = phase files
+                key' = key ++ "_" ++ show idx
+
+-- pass through dumper which writes ASTs to a file
+fileDumper :: String -> String -> IOPhase
+fileDumper prefix key files = do
+    let path = prefix ++ key ++ ".sv"
+    let output = show $ concat files
+    writeFile path output
+    return files

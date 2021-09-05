@@ -44,6 +44,7 @@ data Job = Job
     , write :: Write
     , writeRaw :: String
     , oversizedNumbers :: Bool
+    , dumpPrefix :: FilePath
     } deriving (Typeable, Data)
 
 version :: String
@@ -76,6 +77,9 @@ defaultJob = Job
         &= help ("Disable standard-imposed 32-bit limit on unsized number"
             ++ " literals (e.g., 'h1_ffff_ffff, 4294967296)")
         &= groupname "Other"
+    , dumpPrefix = def &= name "dump-prefix" &= explicit &= typ "PATH"
+        &= help ("Create intermediate output files with the given path prefix;"
+            ++ " used for internal debugging")
     }
     &= program "sv2v"
     &= summary ("sv2v " ++ version)

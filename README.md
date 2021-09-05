@@ -103,6 +103,8 @@ Conversion:
 Other:
      --oversized-numbers    Disable standard-imposed 32-bit limit on unsized
                             number literals (e.g., 'h1_ffff_ffff, 4294967296)
+     --dump-prefix=PATH     Create intermediate output files with the given
+                            path prefix; used for internal debugging
      --help                 Display help message
      --version              Print version information
      --numeric-version      Print just the version number
