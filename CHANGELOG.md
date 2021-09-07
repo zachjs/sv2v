@@ -24,6 +24,8 @@
   explicitly providing a leading `parameter` or `localparam` marker
 * Use UTF-8 on all platforms and tolerate transcoding failures, enabling reading
   files encoding using Latin-1 with special characters in comments
+* Support for non-ANSI style port declarations where the port declaration is
+  separate from the corresponding net or variable declaration
 
 ## v0.0.8
 

@@ -90,6 +90,7 @@ executable sv2v
     Convert.Package
     Convert.ParamNoDefault
     Convert.ParamType
+    Convert.PortDecl
     Convert.RemoveComments
     Convert.ResolveBindings
     Convert.Scoper

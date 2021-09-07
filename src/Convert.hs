@@ -38,6 +38,7 @@ import qualified Convert.NamedBlock
 import qualified Convert.Package
 import qualified Convert.ParamNoDefault
 import qualified Convert.ParamType
+import qualified Convert.PortDecl
 import qualified Convert.RemoveComments
 import qualified Convert.ResolveBindings
 import qualified Convert.Simplify
@@ -107,6 +108,7 @@ initialPhases selectExclude =
     , selectExclude Job.Assert Convert.Assertion.convert
     , selectExclude Job.Always Convert.AlwaysKW.convert
     , Convert.Package.convert
+    , Convert.PortDecl.convert
     , Convert.ParamNoDefault.convert
     , Convert.ResolveBindings.convert
     , Convert.UnnamedGenBlock.convert

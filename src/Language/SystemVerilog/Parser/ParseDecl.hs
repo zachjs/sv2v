@@ -381,9 +381,7 @@ parseDTsAsDecls backupDir mode l0 =
         (rs , l6) = takeRanges   l5
         (tps, l7) = takeTrips    l6 initReason
         base = von dir t
-        t = case (dir, tf rs) of
-                (Output, Implicit sg _) -> IntegerVector TLogic sg rs
-                (_, typ) -> typ
+        t = tf rs
         decls =
             traceComment l0 :
             map (\(x, a, e) -> base x a e) tps
