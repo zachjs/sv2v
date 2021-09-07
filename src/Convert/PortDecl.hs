@@ -28,11 +28,20 @@ traverseDescription :: Description -> Description
 traverseDescription (Part attrs extern kw liftetime name ports items) =
     Part attrs extern kw liftetime name ports items'
     where items' = convertPorts name ports items
+traverseDescription (PackageItem item) =
+    PackageItem $ convertPackageItem item
 traverseDescription other = other
+
+convertPackageItem :: PackageItem -> PackageItem
+convertPackageItem (Function l t x decls stmts) =
+   Function l t x (convertTFDecls decls) stmts
+convertPackageItem (Task l x decls stmts) =
+   Task l x (convertTFDecls decls) stmts
+convertPackageItem other = other
 
 convertPorts :: Identifier -> [Identifier] -> [ModuleItem] -> [ModuleItem]
 convertPorts name ports items
-    | not (null extraPorts) =
+    | not (null name) && not (null extraPorts) =
         error $ "declared ports " ++ intercalate ", " extraPorts
             ++ " are not in the port list of " ++ name
     | otherwise =
@@ -48,6 +57,8 @@ convertPorts name ports items
             | Variable d _ x _ e <- decl = rewrite decl (combineIdent x) d x e
             | Net  d _ _ _ x _ e <- decl = rewrite decl (combineIdent x) d x e
             | otherwise = MIPackageItem $ Decl decl
+        traverseItem (MIPackageItem item) =
+            MIPackageItem $ convertPackageItem item
         traverseItem other = other
 
         -- produce the combined declaration for a port, if it has one
@@ -56,6 +67,17 @@ convertPorts name ports items
             portDecl <- lookup x portDecls
             dataDecl <- lookup x dataDecls
             Just $ combineDecls portDecl dataDecl
+
+-- wrapper for convertPorts enabling its application to task or function decls
+convertTFDecls :: [Decl] -> [Decl]
+convertTFDecls =
+    map unwrap . convertPorts "" [] . map wrap
+    where
+        wrap :: Decl -> ModuleItem
+        wrap = MIPackageItem . Decl
+        unwrap :: ModuleItem -> Decl
+        unwrap item = decl
+            where MIPackageItem (Decl decl) = item
 
 -- given helpfully extracted information, update the given declaration
 rewrite :: Decl -> Maybe Decl -> Direction -> Identifier -> Expr -> ModuleItem
