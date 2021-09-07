@@ -81,9 +81,9 @@ convertTFDecls =
 
 -- given helpfully extracted information, update the given declaration
 rewrite :: Decl -> Maybe Decl -> Direction -> Identifier -> Expr -> ModuleItem
--- implicitly-typed ports default to `logic` in SystemVerilog
-rewrite (Variable d (Implicit sg rs) x a e) Nothing _ _ _ =
-    MIPackageItem $ Decl $ Variable d (IntegerVector TLogic sg rs) x a e
+-- implicitly-typed output ports default to `logic` in SystemVerilog
+rewrite (Variable Output (Implicit sg rs) x a e) Nothing _ _ _ =
+    MIPackageItem $ Decl $ Variable Output (IntegerVector TLogic sg rs) x a e
 -- not a relevant port declaration
 rewrite decl Nothing _ _ _ =
     MIPackageItem $ Decl decl
