@@ -720,28 +720,43 @@ AssignOption :: { AssignOption }
 
 -- for ModuleItem, for now
 AssertionItem :: { AssertionItem }
-  : ConcurrentAssertionItem { $1 }
+  : ConcurrentAssertionItem        { $1 }
+  | DeferredImmediateAssertionItem { $1 }
 
 -- for Stmt, for now
 ProceduralAssertionStatement :: { Assertion }
   : ConcurrentAssertionStatement { $1 }
   | ImmediateAssertionStatement  { $1 }
 
+ImmediateAssertionStatement :: { Assertion }
+  : SimpleImmediateAssertionStatement   { $1 }
+  | DeferredImmediateAssertionStatement { $1 }
+
+DeferredImmediateAssertionItem :: { AssertionItem }
+  : Identifier ":" DeferredImmediateAssertionStatement { ($1, $3) }
+  |                DeferredImmediateAssertionStatement { ("", $1) }
+
 ConcurrentAssertionItem :: { AssertionItem }
   : Identifier ":" ConcurrentAssertionStatement { ($1, $3) }
   |                ConcurrentAssertionStatement { ("", $1) }
+
 ConcurrentAssertionStatement :: { Assertion }
   : "assert" "property" "(" PropertySpec ")" ActionBlock { Assert (Concurrent $4) $6 }
   | "assume" "property" "(" PropertySpec ")" ActionBlock { Assume (Concurrent $4) $6 }
   | "cover"  "property" "(" PropertySpec ")" Stmt        { Cover  (Concurrent $4) $6 }
 
-ImmediateAssertionStatement :: { Assertion }
+DeferredImmediateAssertionStatement :: { Assertion }
   : "assert" Deferral "(" Expr ")" ActionBlock { Assert (Immediate $2 $4) $6 }
   | "assume" Deferral "(" Expr ")" ActionBlock { Assume (Immediate $2 $4) $6 }
   | "cover"  Deferral "(" Expr ")" Stmt        { Cover  (Immediate $2 $4) $6 }
+
+SimpleImmediateAssertionStatement :: { Assertion }
+  : "assert" "(" Expr ")" ActionBlock { Assert (Immediate NotDeferred $3) $5 }
+  | "assume" "(" Expr ")" ActionBlock { Assume (Immediate NotDeferred $3) $5 }
+  | "cover"  "(" Expr ")" Stmt        { Cover  (Immediate NotDeferred $3) $5 }
+
 Deferral :: { Deferral }
-  : {- empty -} { NotDeferred }
-  | "#" number {% expectZeroDelay $2 ObservedDeferred }
+  : "#" number {% expectZeroDelay $2 ObservedDeferred }
   | "final" { FinalDeferred }
 
 PropertySpec :: { PropertySpec }
