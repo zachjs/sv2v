@@ -22,6 +22,21 @@ module top;
         assume final (1);
         cover final (1);
     end
+
+    assert final (1);
+    assume final (1);
+    cover final (1);
+    a1: assert final (1);
+    a2: assume final (1);
+    a3: cover final (1);
+
+    assert #0 (1);
+    assume #0 (1);
+    cover #0 (1);
+    b1: assert #0 (1);
+    b2: assume #0 (1);
+    b3: cover #0 (1);
+
     assert property (@(posedge clk) 1)
         else $display("FOO");
     assume property (@(posedge clk) 1)

@@ -720,21 +720,21 @@ AssignOption :: { AssignOption }
 
 -- for ModuleItem, for now
 AssertionItem :: { AssertionItem }
-  : ConcurrentAssertionItem { $1 }
+  : ConcurrentAssertionItem        { $1 }
   | DeferredImmediateAssertionItem { $1 }
 
 -- for Stmt, for now
 ProceduralAssertionStatement :: { Assertion }
   : ConcurrentAssertionStatement { $1 }
-  | SimpleImmediateAssertionStatement  { $1 }
+  | ImmediateAssertionStatement  { $1 }
 
 ImmediateAssertionStatement :: { Assertion }
-  : SimpleImmediateAssertionStatement  { $1 }
+  : SimpleImmediateAssertionStatement   { $1 }
   | DeferredImmediateAssertionStatement { $1 }
 
 DeferredImmediateAssertionItem :: { AssertionItem }
   : Identifier ":" DeferredImmediateAssertionStatement { ($1, $3) }
-  |                DeferredImmediateAssertionStatement { ("", $1) }  
+  |                DeferredImmediateAssertionStatement { ("", $1) }
 
 ConcurrentAssertionItem :: { AssertionItem }
   : Identifier ":" ConcurrentAssertionStatement { ($1, $3) }
@@ -745,7 +745,7 @@ ConcurrentAssertionStatement :: { Assertion }
   | "assume" "property" "(" PropertySpec ")" ActionBlock { Assume (Concurrent $4) $6 }
   | "cover"  "property" "(" PropertySpec ")" Stmt        { Cover  (Concurrent $4) $6 }
 
-DeferredImmediateAssertionStatement :: {Assertion }
+DeferredImmediateAssertionStatement :: { Assertion }
   : "assert" Deferral "(" Expr ")" ActionBlock { Assert (Immediate $2 $4) $6 }
   | "assume" Deferral "(" Expr ")" ActionBlock { Assume (Immediate $2 $4) $6 }
   | "cover"  Deferral "(" Expr ")" Stmt        { Cover  (Immediate $2 $4) $6 }
