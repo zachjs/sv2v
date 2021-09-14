@@ -951,4 +951,7 @@ removeThrough pattern = do
             let chars = patternIdx + length pattern
             let (dropped, rest) = splitAt chars str
             advancePositions dropped
+            when (pattern == "\n") $ do
+                pos <- getPosition
+                pushChar '\n' pos
             setInput rest
