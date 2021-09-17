@@ -27,11 +27,14 @@ convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
 convertDescription description@(Part _ _ Module _ _ ports _) =
-    partScoper (rewriteDeclM locations) return return return description
+    evalScoper $ scopePart conScoper description
     where
-        locations = execState (operation description) Map.empty
-        operation = partScoperT
+        locations = execState
+            (evalScoperT $ scopePart locScoper description) Map.empty
+        locScoper = scopeModuleItem
             (traverseDeclM ports) traverseModuleItemM return traverseStmtM
+        conScoper = scopeModuleItem
+            (rewriteDeclM locations) return return return
 convertDescription other = other
 
 -- tracks multi-dimensional unpacked array declarations

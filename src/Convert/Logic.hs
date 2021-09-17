@@ -64,15 +64,15 @@ convert =
         collectDeclDirsM _ = return ()
 
 convertDescription :: Ports -> Description -> Description
-convertDescription ports description@(Part _ _ Module _ _ _ _) =
-    -- rewrite reg continuous assignments and output port connections
-    partScoper (rewriteDeclM locations) (traverseModuleItemM ports)
-        return return description
+convertDescription ports description =
+    evalScoper $ scopeModule conScoper description
     where
+        locations = execWriter $ evalScoperT $ scopePart locScoper description
         -- write down which vars are procedurally assigned
-        locations = execWriter $ partScoperT
-            traverseDeclM return return traverseStmtM description
-convertDescription _ other = other
+        locScoper = scopeModuleItem traverseDeclM return return traverseStmtM
+        -- rewrite reg continuous assignments and output port connections
+        conScoper = scopeModuleItem
+            (rewriteDeclM locations) (traverseModuleItemM ports) return return
 
 traverseModuleItemM :: Ports -> ModuleItem -> Scoper Type ModuleItem
 traverseModuleItemM ports = embedScopes $ traverseModuleItem ports

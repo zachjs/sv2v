@@ -63,11 +63,8 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
         PackageItem $ Decl $ CommentDecl $
             "removed module with interface ports: " ++ name
     where
-        items' = evalScoper
-            traverseDeclM traverseModuleItemM return return name items
-
-        convertNested =
-            scopeModuleItemT traverseDeclM traverseModuleItemM return return
+        items' = evalScoper $ scopeModuleItems scoper name items
+        scoper = scopeModuleItem traverseDeclM traverseModuleItemM return return
 
         traverseDeclM :: Decl -> Scoper [ModportDecl] Decl
         traverseDeclM decl = do
@@ -94,7 +91,7 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                 return instanceItem
             else if partKind == Interface then
                 -- inline instantiation of an interface
-                convertNested $ Generate $ map GenModuleItem $
+                scoper $ Generate $ map GenModuleItem $
                     inlineInstance modports rs []
                     partItems part instanceName paramBindings portBindings
             else if null modportInstances then
@@ -108,7 +105,7 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                             ++ " has interface ports "
                             ++ showKeys modportInstances ++ ", but only "
                             ++ showKeys modportBindings ++ " are connected"
-                    else convertNested $ Generate $ map GenModuleItem $
+                    else scoper $ Generate $ map GenModuleItem $
                             inlineInstance modports rs modportBindings partItems
                             part instanceName paramBindings portBindings
             where
@@ -338,12 +335,13 @@ inlineInstance global ranges modportBindings items partName
     wrapInstance instanceName items'
     : portBindings
     where
-        items' = evalScoper traverseDeclM traverseModuleItemM traverseGenItemM
-            traverseStmtM partName $
+        items' = evalScoper $ scopeModuleItems scoper partName $
             map (traverseNestedModuleItems rewriteItem) $
             if null modportBindings
                 then items ++ [typeModport, dimensionModport, bundleModport]
                 else items
+        scoper = scopeModuleItem
+            traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
 
         key = shortHash (partName, instanceName)
 

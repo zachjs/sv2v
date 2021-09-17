@@ -226,8 +226,7 @@ explicitImport pkg ident = do
 processItems :: Identifier -> Identifier -> [ModuleItem]
     -> PackagesState (IdentStateMap, [ModuleItem])
 processItems topName packageName moduleItems = do
-    (moduleItems', scopes) <- runScoperT
-        traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
+    (moduleItems', scopes) <- runScoperT $ scopeModuleItems scoper
         topName (reorderItems moduleItems)
     let rawIdents = extractMapping scopes
     externalIdentMaps <- mapM (resolveExportMI rawIdents) moduleItems
@@ -239,6 +238,9 @@ processItems topName packageName moduleItems = do
                     else exports
     seq exports return (exports', moduleItems')
     where
+        scoper = scopeModuleItem
+            traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
+
         -- produces partial mappings of exported identifiers, while also
         -- checking the validity of the exports
         resolveExportMI :: IdentStateMap -> ModuleItem -> PackagesState IdentStateMap
@@ -677,9 +679,9 @@ addUsedPIs :: ModuleItem -> (ModuleItem, Idents)
 addUsedPIs item =
     (item, usedPIs)
     where
-        usedPIs = execWriter $ evalScoperT
-            writeDeclIdents writeModuleItemIdents writeGenItemIdents writeStmtIdents
-            "" [item]
+        usedPIs = execWriter $ evalScoperT $ scoper item
+        scoper = scopeModuleItem writeDeclIdents writeModuleItemIdents
+            writeGenItemIdents writeStmtIdents
 
 type IdentWriter = ScoperT () (Writer Idents)
 

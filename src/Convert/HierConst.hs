@@ -37,11 +37,12 @@ convertDescription (Part attrs extern kw lifetime name ports items) =
             then items'
             else map expand items'
     where
-        (items', mapping) = runScoper traverseDeclM
+        (items', mapping) = runScoper $ scopeModuleItems scoper name items
+        scoper = scopeModuleItem
+            traverseDeclM
             (traverseExprsM traverseExprM)
             (traverseGenItemExprsM traverseExprM)
             (traverseStmtExprsM traverseExprM)
-            name items
         shadowedParams = Map.keys $ Map.filter (fromLeft False) $
             extractMapping mapping
         expand = traverseNestedModuleItems $ expandParam shadowedParams

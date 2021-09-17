@@ -30,7 +30,10 @@ module Convert.Scoper
     , runScoper
     , runScoperT
     , partScoper
-    , partScoperT
+    , scopeModuleItem
+    , scopeModuleItems
+    , scopePart
+    , scopeModule
     , accessesToExpr
     , replaceInType
     , replaceInExpr
@@ -60,13 +63,11 @@ module Convert.Scoper
     , loopVarDepthM
     , lookupLocalIdent
     , lookupLocalIdentM
-    , scopeModuleItemT
     , Replacements
     , LookupResult
     ) where
 
 import Control.Monad.State.Strict
-import Data.Functor.Identity (runIdentity)
 import Data.List (findIndices, partition)
 import Data.Maybe (isNothing)
 import qualified Data.Map.Strict as Map
@@ -369,75 +370,57 @@ loopVarDepth scopes x =
 loopVarDepthM :: Monad m => Identifier -> ScoperT a m (Maybe Int)
 loopVarDepthM = embedScopes loopVarDepth
 
-evalScoper
-    :: MapperM (Scoper a) Decl
-    -> MapperM (Scoper a) ModuleItem
-    -> MapperM (Scoper a) GenItem
-    -> MapperM (Scoper a) Stmt
+scopeModuleItems
+    :: Monad m
+    => MapperM (ScoperT a m) ModuleItem
     -> Identifier
-    -> [ModuleItem]
-    -> [ModuleItem]
-evalScoper declMapper moduleItemMapper genItemMapper stmtMapper topName items =
-    runIdentity $ evalScoperT
-    declMapper moduleItemMapper genItemMapper stmtMapper topName items
-
-evalScoperT
-    :: forall a m. Monad m
-    => MapperM (ScoperT a m) Decl
-    -> MapperM (ScoperT a m) ModuleItem
-    -> MapperM (ScoperT a m) GenItem
-    -> MapperM (ScoperT a m) Stmt
-    -> Identifier
-    -> [ModuleItem]
-    -> m [ModuleItem]
-evalScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items = do
-    (items', _) <- runScoperT
-        declMapper moduleItemMapper genItemMapper stmtMapper
-        topName items
+    -> MapperM (ScoperT a m) [ModuleItem]
+scopeModuleItems moduleItemMapper topName items = do
+    enterScope topName ""
+    items' <- mapM moduleItemMapper items
+    exitScope
     return items'
 
-runScoper
-    :: MapperM (Scoper a) Decl
-    -> MapperM (Scoper a) ModuleItem
-    -> MapperM (Scoper a) GenItem
-    -> MapperM (Scoper a) Stmt
-    -> Identifier
-    -> [ModuleItem]
-    -> ([ModuleItem], Scopes a)
-runScoper declMapper moduleItemMapper genItemMapper stmtMapper topName items =
-    runIdentity $ runScoperT
-    declMapper moduleItemMapper genItemMapper stmtMapper topName items
+scopeModule :: Monad m
+    => MapperM (ScoperT a m) ModuleItem
+    -> MapperM (ScoperT a m) Description
+scopeModule moduleItemMapper description
+    | Part _ _ Module _ _ _ _ <- description =
+        scopePart moduleItemMapper description
+    | otherwise = return description
 
-runScoperT
+scopePart :: Monad m
+    => MapperM (ScoperT a m) ModuleItem
+    -> MapperM (ScoperT a m) Description
+scopePart moduleItemMapper description
+    | Part attrs extern kw liftetime name ports items <- description =
+        scopeModuleItems moduleItemMapper name items >>=
+        return . Part attrs extern kw liftetime name ports
+    | otherwise = return description
+
+evalScoper :: Scoper a x -> x
+evalScoper = flip evalState initialState
+
+evalScoperT :: Monad m => ScoperT a m x -> m x
+evalScoperT = flip evalStateT initialState
+
+runScoper :: Scoper a x -> (x, Scopes a)
+runScoper = flip runState initialState
+
+runScoperT :: Monad m => ScoperT a m x -> m (x, Scopes a)
+runScoperT = flip runStateT initialState
+
+initialState :: Scopes a
+initialState = Scopes [] Map.empty [] [] []
+
+scopeModuleItem
     :: forall a m. Monad m
     => MapperM (ScoperT a m) Decl
     -> MapperM (ScoperT a m) ModuleItem
     -> MapperM (ScoperT a m) GenItem
     -> MapperM (ScoperT a m) Stmt
-    -> Identifier
-    -> [ModuleItem]
-    -> m ([ModuleItem], Scopes a)
-runScoperT declMapper moduleItemMapper genItemMapper stmtMapper topName items =
-    runStateT operation initialState
-    where
-        operation :: ScoperT a m [ModuleItem]
-        operation = do
-            enterScope topName ""
-            mapM wrappedModuleItemMapper items
-        initialState = Scopes [] Map.empty [] [] []
-
-        wrappedModuleItemMapper = scopeModuleItemT
-            declMapper moduleItemMapper genItemMapper stmtMapper
-
-scopeModuleItemT
-    :: forall a m. Monad m
-    => MapperM (ScoperT a m) Decl
     -> MapperM (ScoperT a m) ModuleItem
-    -> MapperM (ScoperT a m) GenItem
-    -> MapperM (ScoperT a m) Stmt
-    -> ModuleItem
-    -> ScoperT a m ModuleItem
-scopeModuleItemT declMapper moduleItemMapper genItemMapper stmtMapper =
+scopeModuleItem declMapper moduleItemMapper genItemMapper stmtMapper =
     wrappedModuleItemMapper
     where
         fullStmtMapper :: Stmt -> ScoperT a m Stmt
@@ -606,26 +589,8 @@ partScoper
     -> MapperM (Scoper a) ModuleItem
     -> MapperM (Scoper a) GenItem
     -> MapperM (Scoper a) Stmt
-    -> Description
-    -> Description
-partScoper declMapper moduleItemMapper genItemMapper stmtMapper part =
-    runIdentity $ partScoperT
-        declMapper moduleItemMapper genItemMapper stmtMapper part
-
-partScoperT
-    :: Monad m
-    => MapperM (ScoperT a m) Decl
-    -> MapperM (ScoperT a m) ModuleItem
-    -> MapperM (ScoperT a m) GenItem
-    -> MapperM (ScoperT a m) Stmt
-    -> Description
-    -> m Description
-partScoperT declMapper moduleItemMapper genItemMapper stmtMapper =
-    mapper
-    where
-        operation = evalScoperT
+    -> Mapper Description
+partScoper declMapper moduleItemMapper genItemMapper stmtMapper =
+    evalScoper . scopePart scoper
+    where scoper = scopeModuleItem
             declMapper moduleItemMapper genItemMapper stmtMapper
-        mapper (Part attrs extern kw liftetime name ports items) = do
-            items' <- operation name items
-            return $ Part attrs extern kw liftetime name ports items'
-        mapper description = return description

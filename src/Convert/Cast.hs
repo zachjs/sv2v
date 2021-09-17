@@ -41,11 +41,10 @@ convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
 
 convertDescription :: Description -> Description
-convertDescription description =
-    traverseModuleItems dropDuplicateCaster $
-    partScoper
-        traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
-        description
+convertDescription =
+    traverseModuleItems dropDuplicateCaster . evalScoper . scopePart scoper
+    where scoper = scopeModuleItem
+            traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
 
 type SC = Scoper ()
 
