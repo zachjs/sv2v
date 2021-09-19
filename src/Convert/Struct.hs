@@ -126,6 +126,7 @@ traverseDeclM decl = do
         isRangeable IntegerAtom{} = False
         isRangeable NonInteger{}  = False
         isRangeable TypeOf{}      = False
+        isRangeable TypedefRef{}  = False
         isRangeable _ = True
 
 traverseGenItemM :: GenItem -> Scoper Type GenItem

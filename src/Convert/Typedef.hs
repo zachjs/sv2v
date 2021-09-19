@@ -16,8 +16,9 @@ import Convert.Traverse
 import Language.SystemVerilog.AST
 
 convert :: [AST] -> [AST]
-convert = map $ traverseDescriptions $ partScoper
-    traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
+convert = map $ traverseDescriptions $ evalScoper . scopeModule scoper
+    where scoper = scopeModuleItem
+            traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
 
 traverseTypeOrExprM :: TypeOrExpr -> Scoper Type TypeOrExpr
 traverseTypeOrExprM (Left (TypeOf (Ident x))) = do

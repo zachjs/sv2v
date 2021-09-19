@@ -882,7 +882,16 @@ traverseTypeExprsM exprMapper =
         typeOrExprMapper (Right e) = exprMapper e >>= return . Right
         typeMapper (TypeOf expr) =
             exprMapper expr >>= return . TypeOf
-        -- TypedefRef is excluded because it isn't really an expression
+        -- TypedefRef root is a reference to a port, but the "field" here is
+        -- really a typename; this indirection circumvents the interface
+        -- expression resolution check and ensures the underlying modport is
+        -- appropriately resolved to the corresponding interface instance
+        typeMapper (TypedefRef expr) = do
+            let Dot inn typ = expr
+            let wrap = Dot inn "*"
+            wrap' <- exprMapper wrap
+            let Dot inn' "*" = wrap'
+            return $ TypedefRef $ Dot inn' typ
         typeMapper (CSAlias ps pm xx rs) = do
             vals' <- mapM typeOrExprMapper $ map snd pm
             let pm' = zip (map fst pm) vals'

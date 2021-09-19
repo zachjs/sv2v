@@ -30,6 +30,8 @@
   whitespace except for the newline which terminates the comment
 * Fix conversion of references to modports nested within types in expressions
 * Fix conversion of module-scoped references to modports
+* Fix conversion of interface-based typedefs when used with explicit modports,
+  unpacked arrays, or in designs with multi-dimensional instances
 
 ## v0.0.8
 
