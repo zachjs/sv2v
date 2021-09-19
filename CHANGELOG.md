@@ -28,6 +28,8 @@
   separate from the corresponding net or variable declaration
 * Fix preprocessing of line comments which are neither preceded nor followed by
   whitespace except for the newline which terminates the comment
+* Fix conversion of references to modports nested within types in expressions
+* Fix conversion of module-scoped references to modports
 
 ## v0.0.8
 

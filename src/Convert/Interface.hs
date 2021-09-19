@@ -425,10 +425,13 @@ inlineInstance global ranges modportBindings items partName
             embedScopes tagLHS >=>
             embedScopes replaceLHS
         tagLHS :: Scopes () -> LHS -> LHS
-        tagLHS scopes lhs =
-            if lookupElem scopes lhs /= Nothing
-                then LHSDot (renamePartLHS lhs) "@"
-                else traverseSinglyNestedLHSs (tagLHS scopes) lhs
+        tagLHS scopes lhs
+            | lookupElem scopes lhs /= Nothing =
+                LHSDot (renamePartLHS lhs) "@"
+            | Just portName <- partScopedModportRef $ lhsToExpr lhs =
+                LHSIdent portName
+            | otherwise =
+                traverseSinglyNestedLHSs (tagLHS scopes) lhs
         renamePartLHS :: LHS -> LHS
         renamePartLHS (LHSDot (LHSIdent x) y) =
             if x == partName
@@ -455,16 +458,19 @@ inlineInstance global ranges modportBindings items partName
             embedScopes tagExpr >=>
             embedScopes replaceExpr
         tagExpr :: Scopes () -> Expr -> Expr
-        tagExpr scopes expr =
-            if lookupElem scopes expr /= Nothing
-                then Dot (renamePartExpr expr) "@"
-                else traverseSinglyNestedExprs (tagExpr scopes) expr
+        tagExpr scopes expr
+            | lookupElem scopes expr /= Nothing =
+                Dot (renamePartExpr expr) "@"
+            | Just portName <- partScopedModportRef expr =
+                Ident portName
+            | otherwise =
+                visitExprsStep (tagExpr scopes) expr
         renamePartExpr :: Expr -> Expr
         renamePartExpr (Dot (Ident x) y) =
             if x == partName
                 then Dot scopedInstanceExpr y
                 else Dot (Ident x) y
-        renamePartExpr expr = traverseSinglyNestedExprs renamePartExpr expr
+        renamePartExpr expr = visitExprsStep renamePartExpr expr
         replaceExpr :: Scopes () -> Expr -> Expr
         replaceExpr _ (Dot expr "@") = expr
         replaceExpr local (Ident x) =
@@ -487,7 +493,7 @@ inlineInstance global ranges modportBindings items partName
             case lookup expr exprReplacements of
                 Just expr' -> expr'
                 Nothing -> checkExprResolution local expr $
-                    traverseSinglyNestedExprs (replaceExprAny local) expr
+                    visitExprsStep (replaceExprAny local) expr
         replaceExpr' local (Ident x) =
             checkExprResolution local (Ident x) (Ident x)
         replaceExpr' local expr = replaceExprAny local expr
@@ -496,11 +502,24 @@ inlineInstance global ranges modportBindings items partName
             case lookup expr exprReplacements of
                 Just expr' -> expr'
                 Nothing -> checkExprResolution local expr $
-                    traverseSinglyNestedExprs (replaceExpr' local) expr
+                    visitExprsStep (replaceExpr' local) expr
         replaceArrTag :: Expr -> Expr -> Expr
         replaceArrTag replacement Tag = replacement
         replaceArrTag replacement expr =
-            traverseSinglyNestedExprs (replaceArrTag replacement) expr
+            visitExprsStep (replaceArrTag replacement) expr
+
+        partScopedModportRef :: Expr -> Maybe Identifier
+        partScopedModportRef (Dot (Ident x) y) =
+            if x == partName && lookup y modportBindings /= Nothing
+                then Just y
+                else Nothing
+        partScopedModportRef _ = Nothing
+
+        visitExprsStep :: (Expr -> Expr) -> Expr -> Expr
+        visitExprsStep exprMapper =
+            traverseSinglyNestedExprs exprMapper
+            . traverseExprTypes (traverseNestedTypes typeMapper)
+            where typeMapper = traverseTypeExprs exprMapper
 
         checkExprResolution :: Scopes () -> Expr -> a -> a
         checkExprResolution local expr =
