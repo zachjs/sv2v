@@ -606,18 +606,15 @@ inlineInstance global ranges modportBindings items partName
 
         overrideParam :: Decl -> Decl
         overrideParam (Param Parameter t x e) =
+            Param Localparam t x $
             case lookup x instanceParams of
-                Nothing -> Param Localparam t x e
-                Just (Right _) -> Param Localparam t x (Ident $ paramTmp ++ x)
-                Just (Left t') -> error $ inlineKind ++ " param " ++ x
-                        ++ " expected expr, found type: " ++ show t'
+                Nothing -> e
+                Just _  -> Ident $ paramTmp ++ x
         overrideParam (ParamType Parameter x t) =
+            ParamType Localparam x $
             case lookup x instanceParams of
-                Nothing -> ParamType Localparam x t
-                Just (Left _) ->
-                    ParamType Localparam x $ Alias (paramTmp ++ x) []
-                Just (Right e') -> error $ inlineKind ++ " param " ++ x
-                        ++ " expected type, found expr: " ++ show e'
+                Nothing -> t
+                Just _  -> Alias (paramTmp ++ x) []
         overrideParam other = other
 
         portBindingItem :: PortBinding -> ModuleItem
