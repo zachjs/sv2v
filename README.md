@@ -114,12 +114,14 @@ Other:
 ## Supported Features
 
 sv2v supports most synthesizable SystemVerilog features. Current notable
-exceptions include `defparam` on interface instances and certain synthesizable
-usages of parameterized classes. Assertions are also supported, but are simply
-dropped during conversion.
+exceptions include `defparam` on interface instances, certain synthesizable
+usages of parameterized classes, and the `bind` keyword. Assertions are also
+supported, but are simply dropped during conversion.
 
-If you find a bug or have a feature request, please create an issue. Preference
-will be given to issues which include examples or test cases.
+If you find a bug or have a feature request, please [create an issue].
+Preference will be given to issues which include examples or test cases.
+
+[create an issue]: https://github.com/zachjs/sv2v/issues/new
 
 
 ## SystemVerilog Front End
