@@ -217,7 +217,9 @@ traverseSinglyNestedStmtsM fullMapper = cs
     where
         cs (StmtAttr a stmt) = fullMapper stmt >>= return . StmtAttr a
         cs (Block _ "" [] []) = return Null
+        cs (Block _ "" [] [CommentStmt{}]) = return Null
         cs (Block _ "" [] [stmt]) = fullMapper stmt
+        cs (Block _ "" [CommentDecl{}] []) = return Null
         cs (Block Seq name decls stmts) = do
             stmts' <- mapM fullMapper stmts
             return $ Block Seq name decls $ concatMap explode stmts'

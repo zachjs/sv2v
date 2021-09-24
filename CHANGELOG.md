@@ -44,6 +44,7 @@
   unpacked arrays, or in designs with multi-dimensional instances
 * Fixed conversion of module-scoped references to modports
 * Fixed conversion of references to modports nested within types in expressions
+* Fixed assertion removal in verbose mode causing orphaned statements
 
 ## v0.0.8
 
