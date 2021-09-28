@@ -32,6 +32,8 @@
 * Non-positive integer size casts are now detected and forbidden
 * Negative indices in struct pattern literals are now detected and forbidden
 * Escaped vendor block comments in macro bodies are now tolerated
+* Illegal bit-selects and part-selects of scalar struct fields are now detected
+  and forbidden, rather than yielding an internal assertion failure
 
 ### Bug Fixes
 

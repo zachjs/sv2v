@@ -386,6 +386,9 @@ convertSubExpr scopes (Range (Dot e x) NonIndexed rOuter) =
         (UnknownType, orig')
     else if structIsntReady subExprType then
         (replaceInnerTypeRange NonIndexed rOuter' fieldType, orig')
+    else if null dims then
+        error $ "illegal access to range " ++ show (Range Nil NonIndexed rOuter)
+            ++ " of " ++ show (Dot e x) ++ ", which has type " ++ show fieldType
     else
         (replaceInnerTypeRange NonIndexed rOuter' fieldType, undotted)
     where
@@ -408,6 +411,9 @@ convertSubExpr scopes (Range (Dot e x) mode (baseO, lenO)) =
         (UnknownType, orig')
     else if structIsntReady subExprType then
         (replaceInnerTypeRange mode (baseO', lenO') fieldType, orig')
+    else if null dims then
+        error $ "illegal access to range " ++ show (Range Nil mode (baseO, lenO))
+            ++ " of " ++ show (Dot e x) ++ ", which has type " ++ show fieldType
     else
         (replaceInnerTypeRange mode (baseO', lenO') fieldType, undotted)
     where
@@ -438,6 +444,9 @@ convertSubExpr scopes (Bit (Dot e x) i) =
         (dropInnerTypeRange backupType, orig')
     else if structIsntReady subExprType then
         (dropInnerTypeRange fieldType, orig')
+    else if null dims then
+        error $ "illegal access to bit " ++ show i ++ " of " ++ show (Dot e x)
+            ++ ", which has type " ++ show fieldType
     else
         (dropInnerTypeRange fieldType, Bit e' iFlat)
     where
