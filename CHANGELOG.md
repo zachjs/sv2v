@@ -1,3 +1,10 @@
+## Unreleased
+
+### New Features
+
+* Added support for excluding the conversion of unbased unsized literals (e.g.,
+  `'1`, `'x`) via `--exclude UnbasedUniszed`
+
 ## v0.0.9
 
 ### Breaking Changes

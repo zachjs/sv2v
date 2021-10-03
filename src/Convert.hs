@@ -76,7 +76,7 @@ mainPhases selectExclude =
     , Convert.Inside.convert
     , Convert.IntTypes.convert
     , Convert.MultiplePacked.convert
-    , Convert.UnbasedUnsized.convert
+    , selectExclude Job.UnbasedUnsized Convert.UnbasedUnsized.convert
     , Convert.Cast.convert
     , Convert.ParamType.convert
     , Convert.HierConst.convert

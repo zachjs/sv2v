@@ -24,6 +24,7 @@ data Exclude
     | Interface
     | Logic
     | Succinct
+    | UnbasedUnsized
     deriving (Typeable, Data, Eq)
 
 data Write
