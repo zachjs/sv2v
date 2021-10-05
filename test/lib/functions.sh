@@ -3,12 +3,6 @@
 SCRIPT_DIR=`dirname "${BASH_SOURCE[0]}"`
 SV2V="$SCRIPT_DIR/../../bin/sv2v +RTS -N1 -RTS"
 
-assertExists() {
-    file=$1
-    [ -f "$file" ]
-    assertTrue "$file does not exist" $?
-}
-
 # USAGE: simulate <vcd-file> <log-file> <top-module> <file> [<file> ...]
 simulate() {
     # arguments
@@ -70,17 +64,29 @@ assertConverts() {
     filtered=`sed -E 's/"([^"]|\")+"//g' $ac_tmpa`
     # check for various things iverilog accepts which we don't want to output
     prefix="conversion of $ac_file still contains"
-    assertNotMatch "$filtered" "$prefix dimension queries" \
+    assertNotMatch "$prefix dimension queries" "$filtered" \
         '\$bits|\$dimensions|\$unpacked_dimensions|\$left|\$right|\$low|\$high|\$increment|\$size'
-    assertNotMatch "$filtered" "$prefix SystemVerilog types" \
+    assertNotMatch "$prefix SystemVerilog types" "$filtered" \
         '[[:space:]](int|bit|logic|byte|struct|enum|longint|shortint)[[:space:]]'
-    assertNotMatch "$filtered" "$prefix unsigned keyword" \
+    assertNotMatch "$prefix unsigned keyword" "$filtered" \
         '[^\$a-zA-Z_]unsigned'
 }
 
+extractFlag() {
+    raw_line=`grep -m1 "^\/\/ $1: " $2`
+    to_drop=$((${#1}+5))
+    flag="${raw_line:to_drop}"
+}
+
+assertMatch() {
+    if [[ ! "$2" =~ $3 ]]; then
+        fail "$1 doesn't match\nexpected: $3\nactual: $2"
+    fi
+}
+
 assertNotMatch() {
-    if [[ "$1" =~ $3 ]]; then
-        fail "$2"
+    if [[ "$2" =~ $3 ]]; then
+        fail "$1"
     fi
 }
 

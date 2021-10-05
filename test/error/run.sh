@@ -1,17 +1,20 @@
 #!/bin/bash
 
 runErrorTest() {
+    extractFlag pattern $1.sv
+    pattern="${flag:-.}"
+
     runAndCapture $1.sv
-    assertFalse "conversion should have failed" $result
-    assertNull "stdout should be empty" "$stdout"
-    assertNotNull "stderr should not be empty" "$stderr"
-    line=`head -n1 $1.sv`
-    if [[ "$line" =~ \/\/\ pattern:\ .* ]]; then
-        pattern=${line:12}
-        if [[ ! "$stderr" =~ $pattern ]]; then
-            fail "error message doesn't match\nexpected: $pattern\nactual: $stderr"
-        fi
-    fi
+    assertFalse "regular conversion should have failed" $result
+    assertNull "regular stdout should be empty" "$stdout"
+    assertNotNull "regular stderr should not be empty" "$stderr"
+    assertMatch "regular error message" "$stderr" "$pattern"
+
+    runAndCapture -v $1.sv
+    assertFalse "verbose conversion should have failed" $result
+    assertNull "verbose stdout should be empty" "$stdout"
+    assertNotNull "verbose stderr should not be empty" "$stderr"
+    assertMatch "verbose error message" "$stderr" "$pattern"
 }
 
 addTest() {
