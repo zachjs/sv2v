@@ -5,6 +5,11 @@
 * Added support for excluding the conversion of unbased unsized literals (e.g.,
   `'1`, `'x`) via `--exclude UnbasedUniszed`
 
+### Other Enhancements
+
+* Certain errors raised during conversion now also provide hierarchical and
+  approximate source location information to help locate the error
+
 ## v0.0.9
 
 ### Breaking Changes

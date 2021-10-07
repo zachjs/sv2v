@@ -57,6 +57,8 @@ module Convert.Scoper
     , withinProcedureM
     , procedureLoc
     , procedureLocM
+    , scopedError
+    , scopedErrorM
     , isLoopVar
     , isLoopVarM
     , loopVarDepth
@@ -68,7 +70,7 @@ module Convert.Scoper
     ) where
 
 import Control.Monad.State.Strict
-import Data.List (findIndices, partition)
+import Data.List (findIndices, intercalate, isPrefixOf, partition)
 import Data.Maybe (isNothing)
 import qualified Data.Map.Strict as Map
 
@@ -105,6 +107,7 @@ data Scopes a = Scopes
     , sProcedureLoc :: [Access]
     , sInjectedItems :: [(Bool, ModuleItem)]
     , sInjectedDecls :: [Decl]
+    , sLatestTrace :: String
     } deriving Show
 
 extractMapping :: Scopes a -> Map.Map Identifier a
@@ -353,6 +356,26 @@ procedureLocM = gets procedureLoc
 procedureLoc :: Scopes a -> [Access]
 procedureLoc = sProcedureLoc
 
+debugLocation :: Scopes a -> String
+debugLocation s =
+    hierarchy ++
+    if null latestTrace
+        then " (use -v to get approximate source location)"
+        else ", near " ++ latestTrace
+    where
+        hierarchy = intercalate "." $ map tierToStr $ sCurrent s
+        latestTrace = sLatestTrace s
+        tierToStr :: Tier -> String
+        tierToStr (Tier "" _) = "<unnamed_block>"
+        tierToStr (Tier x "") = x
+        tierToStr (Tier x y) = x ++ '[' : y ++ "]"
+
+scopedErrorM :: Monad m => String -> ScoperT a m x
+scopedErrorM msg = get >>= flip scopedError msg
+
+scopedError :: Scopes a -> String -> x
+scopedError scopes = error . (++ ", within scope " ++ debugLocation scopes)
+
 isLoopVar :: Scopes a -> Identifier -> Bool
 isLoopVar scopes x = any matches $ sCurrent scopes
     where matches = (== x) . tierIndex
@@ -411,7 +434,10 @@ runScoperT :: Monad m => ScoperT a m x -> m (x, Scopes a)
 runScoperT = flip runStateT initialState
 
 initialState :: Scopes a
-initialState = Scopes [] Map.empty [] [] []
+initialState = Scopes [] Map.empty [] [] [] ""
+
+tracePrefix :: String
+tracePrefix = "Trace: "
 
 scopeModuleItem
     :: forall a m. Monad m
@@ -420,7 +446,7 @@ scopeModuleItem
     -> MapperM (ScoperT a m) GenItem
     -> MapperM (ScoperT a m) Stmt
     -> MapperM (ScoperT a m) ModuleItem
-scopeModuleItem declMapper moduleItemMapper genItemMapper stmtMapper =
+scopeModuleItem declMapperRaw moduleItemMapper genItemMapper stmtMapperRaw =
     wrappedModuleItemMapper
     where
         fullStmtMapper :: Stmt -> ScoperT a m Stmt
@@ -437,6 +463,21 @@ scopeModuleItem declMapper moduleItemMapper genItemMapper stmtMapper =
             if null injected
                 then traverseSinglyNestedStmtsM fullStmtMapper stmt'
                 else fullStmtMapper $ Block Seq "" injected [stmt']
+
+        declMapper :: Decl -> ScoperT a m Decl
+        declMapper decl@(CommentDecl c) =
+            consumeComment c >> return decl
+        declMapper decl = declMapperRaw decl
+
+        stmtMapper :: Stmt -> ScoperT a m Stmt
+        stmtMapper stmt@(CommentStmt c) =
+            consumeComment c >> return stmt
+        stmtMapper stmt = stmtMapperRaw stmt
+
+        consumeComment :: String -> ScoperT a m ()
+        consumeComment c =
+            when (tracePrefix `isPrefixOf` c) $
+                modify' $ \s -> s { sLatestTrace = drop (length tracePrefix) c }
 
         -- converts a decl and adds decls injected during conversion
         declMapper' :: Decl -> ScoperT a m [Decl]

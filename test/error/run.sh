@@ -3,6 +3,9 @@
 runErrorTest() {
     extractFlag pattern $1.sv
     pattern="${flag:-.}"
+    extractFlag location $1.sv
+    location="${flag//./\.}"
+    location="${location:-.}"
 
     runAndCapture $1.sv
     assertFalse "regular conversion should have failed" $result
@@ -15,6 +18,7 @@ runErrorTest() {
     assertNull "verbose stdout should be empty" "$stdout"
     assertNotNull "verbose stderr should not be empty" "$stderr"
     assertMatch "verbose error message" "$stderr" "$pattern"
+    assertMatch "verbose location" "$stderr" "$location[^0-9]"
 }
 
 addTest() {

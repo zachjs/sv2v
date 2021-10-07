@@ -115,7 +115,8 @@ convertCastM (Number size) _ _
     where
         maybeInt = numberToInteger size
         Just int = maybeInt
-        illegal s = error $ "size cast width " ++ show size ++ " is not " ++ s
+        illegal = scopedErrorM . msg
+        msg s = "size cast width " ++ show size ++ " is not " ++ s
 convertCastM (Number size) (Number value) signed =
     return $ Number $
         numberCast signed (fromIntegral size') value
