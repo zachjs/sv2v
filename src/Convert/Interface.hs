@@ -7,6 +7,7 @@
 
 module Convert.Interface (convert) where
 
+import Data.List (intercalate, (\\))
 import Data.Maybe (isJust, isNothing, mapMaybe)
 import Control.Monad.Writer.Strict
 import qualified Data.Map.Strict as Map
@@ -57,7 +58,7 @@ convertDescription :: PartInfos -> Description -> Description
 convertDescription _ (Part _ _ Interface _ name _ _) =
     PackageItem $ Decl $ CommentDecl $ "removed interface: " ++ name
 convertDescription parts (Part attrs extern Module lifetime name ports items) =
-    if null $ extractModportInstances $ PartInfo Module ports items then
+    if null $ extractModportInstances name $ PartInfo Module ports items then
         Part attrs extern Module lifetime name ports items'
     else
         PackageItem $ Decl $ CommentDecl $
@@ -99,12 +100,12 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
             else do
                 -- inline instantiation of a module
                 let modportBindings = getModportBindings modports
-                if length modportInstances /= length modportBindings
-                    then
-                        error $ "instance " ++ instanceName ++ " of " ++ part
-                            ++ " has interface ports "
-                            ++ showKeys modportInstances ++ ", but only "
-                            ++ showKeys modportBindings ++ " are connected"
+                let unconnected = map fst modportInstances \\
+                                    map fst modportBindings
+                if not (null unconnected)
+                    then scopedErrorM $ "instance " ++ instanceName ++ " of "
+                            ++ part ++ " has unconnected interface ports: "
+                            ++ intercalate ", " unconnected
                     else scoper $ Generate $ map GenModuleItem $
                             inlineInstance modports rs modportBindings partItems
                             part instanceName paramBindings portBindings
@@ -115,12 +116,11 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                 Just partInfo = maybePartInfo
                 PartInfo partKind _ partItems = partInfo
 
-                modportInstances = extractModportInstances partInfo
+                modportInstances = extractModportInstances part partInfo
                 getModportBindings modports = mapMaybe
                     (inferModportBinding modports modportInstances) $
                     map (second $ addImpliedSlice modports) portBindings
                 second f = \(a, b) -> (a, f b)
-                showKeys = show . map fst
 
         traverseModuleItemM other = return other
 
@@ -195,8 +195,8 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                 -- given entire interface, but just bound to a modport
                 foundModport $ Dot expr modportName
             else if modportInstance /= Nothing then
-                error $ "could not resolve modport binding " ++ show expr
-                    ++ " for port " ++ portName ++ " of type "
+                scopedError modports $ "could not resolve modport binding "
+                    ++ show expr ++ " for port " ++ portName ++ " of type "
                     ++ showModportType interfaceName modportName
             else
                 Nothing
@@ -208,14 +208,15 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                 (interfaceName, modportName) =
                     case modportInstance of
                         Just x -> x
-                        Nothing -> error $ "can't deduce modport for interface "
-                            ++ show expr ++ " bound to port " ++ portName
+                        Nothing -> scopedError modports $
+                            "can't deduce modport for interface " ++ show expr
+                            ++ " bound to port " ++ portName
 
                 foundModport modportE =
                     if (null interfaceName || bInterfaceName == interfaceName)
                         && (null modportName || bModportName == modportName)
                         then Just (instanceE, qualifyModport modportE)
-                        else error msg
+                        else scopedError modports msg
                     where
                         bModportName =
                             case modportE of
@@ -246,8 +247,8 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                         Nothing ->
                             case lookupIntfElem modports (Dot e "") of
                                 Just (accesses, _, _) -> init accesses
-                                Nothing ->
-                                    error $ "could not find modport " ++ show e
+                                Nothing -> scopedError modports $
+                                    "could not find modport " ++ show e
 
         showModportType :: Identifier -> Identifier -> String
         showModportType "" "" = "generic interface"
@@ -271,23 +272,26 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                         e' = replaceInExpr replacements e
 
         -- association list of modport instances in the given module body
-        extractModportInstances :: PartInfo -> ModportInstances
-        extractModportInstances partInfo =
-            execWriter $ mapM (collectDeclsM collectDecl) (pItems partInfo)
+        extractModportInstances :: Identifier -> PartInfo -> ModportInstances
+        extractModportInstances part partInfo =
+            execWriter $ runScoperT $ scopeModuleItems collector part decls
             where
-                collectDecl :: Decl -> Writer ModportInstances ()
-                collectDecl (Variable _ t x _ _) =
+                collector = scopeModuleItem checkDecl return return return
+                decls = filter isDecl $ pItems partInfo
+                checkDecl :: Decl -> ScoperT () (Writer ModportInstances) Decl
+                checkDecl decl@(Variable _ t x _ _) =
                     if maybeInfo == Nothing then
-                        return ()
+                        return decl
                     else if elem x (pPorts partInfo) then
-                        tell [(x, info)]
+                        tell [(x, info)] >> return decl
                     else
-                        error $ "Modport not in port list: " ++ show (t, x)
+                        scopedErrorM $
+                            "Modport not in port list: " ++ show t ++ " " ++ x
                             ++ ". Is this an interface missing a port list?"
                     where
                         maybeInfo = extractModportInfo t
                         Just info = maybeInfo
-                collectDecl _ = return ()
+                checkDecl decl = return decl
 
         extractModportInfo :: Type -> Maybe (Identifier, Identifier)
         extractModportInfo (InterfaceT "" "" _) = Just ("", "")
@@ -308,6 +312,10 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                 Just info -> pKind info == Interface
 
 convertDescription _ other = other
+
+isDecl :: ModuleItem -> Bool
+isDecl (MIPackageItem Decl{}) = True
+isDecl _ = False
 
 -- produce the implicit modport decls for an interface bundle
 impliedModport :: [ModuleItem] -> [ModportDecl]
@@ -525,8 +533,8 @@ inlineInstance global ranges modportBindings items partName
         checkExprResolution local expr =
             if not (exprResolves local expr) && exprResolves global expr
                 then
-                    error $ "inlining instance \"" ++ instanceName ++ "\" of "
-                        ++ inlineKind ++ " \"" ++ partName
+                    scopedError local $ "inlining instance \"" ++ instanceName
+                        ++ "\" of " ++ inlineKind ++ " \"" ++ partName
                         ++ "\" would make expression \"" ++ show expr
                         ++ "\" used in \"" ++ instanceName
                         ++ "\" resolvable when it wasn't previously"

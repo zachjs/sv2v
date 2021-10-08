@@ -1,4 +1,5 @@
 // pattern: could not find modport intf1\.ModportC
+// location: interface_mismatch_6.sv:9:5
 `include "interface_mismatch.svh"
 module Module(intf);
     Interface1.ModportC intf;
