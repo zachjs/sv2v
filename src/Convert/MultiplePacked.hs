@@ -144,10 +144,8 @@ traverseLHSM = traverseNestedLHSsM traverseLHSSingleM
         traverseLHSSingleM lhs = do
             let expr = lhsToExpr lhs
             expr' <- convertExprM expr
-            case exprToLHS expr' of
-                Just lhs' -> return lhs'
-                Nothing -> error $ "multi-packed conversion created non-LHS from "
-                    ++ (show expr) ++ " to " ++ (show expr')
+            let Just lhs' = exprToLHS expr'
+            return lhs'
 
 convertExprM :: Expr -> Scoper TypeInfo Expr
 convertExprM = embedScopes convertExpr

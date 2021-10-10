@@ -141,12 +141,7 @@ traverseModuleItem ports scopes =
                         items =
                             [ MIPackageItem $ Decl decl
                             , always_comb $ Asgn AsgnOpEq Nothing lhs tmpExpr]
-                        lhs = case exprToLHS expr of
-                            Just l -> l
-                            Nothing ->
-                                error $ "bad non-lhs, non-net expr "
-                                    ++ show expr ++ " connected to output port "
-                                    ++ portName ++ " of " ++ instanceName
+                        Just lhs = exprToLHS expr
                 maybeModulePorts = Map.lookup moduleName ports
         fixModuleItem other = other
 
