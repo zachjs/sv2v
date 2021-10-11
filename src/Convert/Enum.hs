@@ -94,7 +94,7 @@ insertEnumItems itemType items =
     -- check for obviously duplicate values
     if noDuplicates
         then zipWithM_ insertEnumItem keys vals
-        else error $ "enum conversion has duplicate vals: "
+        else scopedErrorM $ "enum conversion has duplicate vals: "
                 ++ show (zip keys vals)
     where
         insertEnumItem :: Identifier -> Expr -> SC ()
