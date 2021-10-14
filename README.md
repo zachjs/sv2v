@@ -94,8 +94,8 @@ Preprocessing:
      --skip-preprocessor    Disable preprocessor
 Conversion:
      --pass-through         Dump input without converting
-  -E --exclude=CONV         Exclude a particular conversion (always, assert,
-                            interface, or logic)
+  -E --exclude=CONV         Exclude a particular conversion (Always, Assert,
+                            Interface, Logic, or UnbasedUnsized)
   -v --verbose              Retain certain conversion artifacts
   -w --write=MODE/FILE      How to write output; default is 'stdout'; use
                             'adjacent' to create a .v file next to each input;

@@ -66,8 +66,8 @@ defaultJob = Job
     , passThrough = nam_ "pass-through" &= help "Dump input without converting"
         &= groupname "Conversion"
     , exclude = nam_ "exclude" &= name "E" &= typ "CONV"
-        &= help ("Exclude a particular conversion (always, assert, interface,"
-            ++ " or logic)")
+        &= help ("Exclude a particular conversion (Always, Assert, Interface,"
+            ++ " Logic, or UnbasedUnsized)")
     , verbose = nam "verbose" &= help "Retain certain conversion artifacts"
     , write = Stdout &= ignore -- parsed from the flexible flag below
     , writeRaw = "s" &= name "write" &= name "w" &= explicit &= typ "MODE/FILE"
