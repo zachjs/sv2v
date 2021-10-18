@@ -8,6 +8,7 @@
 module Convert.Struct (convert) where
 
 import Control.Monad ((>=>), when)
+import Control.Monad.State.Strict (get)
 import Data.Either (isLeft)
 import Data.List (elemIndex, find, partition, (\\))
 import Data.Maybe (fromJust)
@@ -111,12 +112,14 @@ traverseDeclM decl = do
             let (tf, rs) = typeRanges t
             when (isRangeable t) $
                 scopeType (tf $ a ++ rs) >>= insertElem x
-            let e' = convertExpr t e
+            scopes <- get
+            let e' = convertExpr scopes t e
             let t' = convertType t
             return $ Variable d t' x a e'
         Param s t x e -> do
             scopeType t >>= insertElem x
-            let e' = convertExpr t e
+            scopes <- get
+            let e' = convertExpr scopes t e
             let t' = convertType t
             return $ Param s t' x e'
         _ -> return decl
@@ -182,24 +185,27 @@ traverseAsgnM (lhs, expr) = do
     (typ, lhs') <- convertLHS lhs
     -- convert the RHS using the LHS type information, and then the innermost
     -- type information on the resulting RHS
-    (_, expr') <- embedScopes convertSubExpr $ convertExpr typ expr
+    scopes <- get
+    let (_, expr') =
+            convertSubExpr scopes $
+            convertExpr scopes typ expr
     return (lhs', expr')
 
 structIsntReady :: Type -> Bool
 structIsntReady = (Nothing ==) . convertStruct
 
 -- try expression conversion by looking at the *outermost* type first
-convertExpr :: Type -> Expr -> Expr
-convertExpr _ Nil = Nil
-convertExpr t (Mux c e1 e2) =
+convertExpr :: Scopes a -> Type -> Expr -> Expr
+convertExpr _ _ Nil = Nil
+convertExpr scopes t (Mux c e1 e2) =
     Mux c e1' e2'
     where
-        e1' = convertExpr t e1
-        e2' = convertExpr t e2
+        e1' = convertExpr scopes t e1
+        e2' = convertExpr scopes t e2
 
-convertExpr struct@(Struct _ fields []) (Pattern itemsOrig) =
+convertExpr scopes struct@(Struct _ fields []) (Pattern itemsOrig) =
     if not (null extraNames) then
-        error $ "pattern " ++ show (Pattern itemsOrig) ++
+        scopedError scopes $ "pattern " ++ show (Pattern itemsOrig) ++
             " has extra named fields " ++ show extraNames ++
             " that are not in " ++ show struct
     else if structIsntReady struct then
@@ -215,7 +221,8 @@ convertExpr struct@(Struct _ fields []) (Pattern itemsOrig) =
                 itemsOrig
             -- position-based patterns should cover every field
             else if length itemsOrig /= length fields then
-                error $ "struct pattern " ++ show (Pattern itemsOrig) ++
+                scopedError scopes $ "struct pattern " ++
+                    show (Pattern itemsOrig) ++
                     " doesn't have the same number of items as " ++ show struct
             -- if the pattern does not use identifiers, use the
             -- identifiers from the struct type definition in order
@@ -229,9 +236,9 @@ convertExpr struct@(Struct _ fields []) (Pattern itemsOrig) =
         isNumbered :: TypeOrExpr -> Bool
         isNumbered (Right (Number n)) =
             if maybeIndex == Nothing
-                then error msgNonInteger
+                then scopedError scopes msgNonInteger
                 else 0 <= index && index < length fieldNames
-                        || error msgOutOfBounds
+                        || scopedError scopes msgOutOfBounds
             where
                 maybeIndex = fmap fromIntegral $ numberToInteger n
                 Just index = maybeIndex
@@ -245,7 +252,7 @@ convertExpr struct@(Struct _ fields []) (Pattern itemsOrig) =
         right = \(Right x) -> x
         getName :: Expr -> Identifier
         getName (Ident x) = x
-        getName e = error $ "invalid pattern key " ++ show e
+        getName e = scopedError scopes $ "invalid pattern key " ++ show e
                         ++ " is not a type, field name, or index"
 
         items = zip
@@ -253,7 +260,7 @@ convertExpr struct@(Struct _ fields []) (Pattern itemsOrig) =
             (map resolveField fieldNames)
         resolveField :: Identifier -> Expr
         resolveField fieldName =
-            convertExpr fieldType $
+            convertExpr scopes fieldType $
             -- look up by name
             if valueByName /= Nothing then
                 fromJust valueByName
@@ -269,7 +276,7 @@ convertExpr struct@(Struct _ fields []) (Pattern itemsOrig) =
             else if valueByIndex /= Nothing then
                 fromJust valueByIndex
             else
-                error $ "couldn't find field '" ++ fieldName ++
+                scopedError scopes $ "couldn't find field '" ++ fieldName ++
                     "' from struct definition " ++ show struct ++
                     " in struct pattern " ++ show (Pattern itemsOrig)
             where
@@ -292,21 +299,21 @@ convertExpr struct@(Struct _ fields []) (Pattern itemsOrig) =
                         Just value = numberToInteger n
                         Right (Number n) = item
 
-convertExpr _ (Cast (Left t) expr) =
-    Cast (Left t') $ convertExpr t expr
+convertExpr scopes _ (Cast (Left t) expr) =
+    Cast (Left t') $ convertExpr scopes t expr
     where t' = convertType t
 
-convertExpr (Implicit _ []) expr =
-    traverseSinglyNestedExprs (convertExpr UnknownType) expr
-convertExpr (Implicit sg rs) expr =
-    convertExpr (IntegerVector TBit sg rs) expr
+convertExpr scopes (Implicit _ []) expr =
+    traverseSinglyNestedExprs (convertExpr scopes UnknownType) expr
+convertExpr scopes (Implicit sg rs) expr =
+    convertExpr scopes (IntegerVector TBit sg rs) expr
 
 -- TODO: This is a conversion for concat array literals with elements
 -- that are unsized numbers. This probably belongs somewhere else.
-convertExpr t@IntegerVector{} (Concat exprs) =
+convertExpr scopes t@IntegerVector{} (Concat exprs) =
     if all isUnsizedNumber exprs
         then Concat $ map (Cast $ Left t') exprs
-        else Concat $ map (convertExpr t') exprs
+        else Concat $ map (convertExpr scopes t') exprs
     where
         t' = dropInnerTypeRange t
         isUnsizedNumber :: Expr -> Bool
@@ -318,35 +325,35 @@ convertExpr t@IntegerVector{} (Concat exprs) =
 
 -- TODO: This is really a conversion for using default patterns to
 -- populate arrays. Maybe this should be somewhere else?
-convertExpr t orig@(Pattern [(Left UnknownType, expr)]) =
+convertExpr scopes t orig@(Pattern [(Left UnknownType, expr)]) =
     if null rs
         then orig
         else Repeat count [expr']
     where
         count = rangeSize $ head rs
-        expr' = Cast (Left t') $ convertExpr t' expr
+        expr' = Cast (Left t') $ convertExpr scopes t' expr
         (_, rs) = typeRanges t
         t' = dropInnerTypeRange t
 
 -- pattern syntax used for simple array literals
-convertExpr t (Pattern items) =
+convertExpr scopes t (Pattern items) =
     if all (== Right Nil) names
-        then convertExpr t $ Concat exprs'
+        then convertExpr scopes t $ Concat exprs'
         else Pattern items
     where
         (names, exprs) = unzip items
         t' = dropInnerTypeRange t
-        exprs' = map (convertExpr t') exprs
+        exprs' = map (convertExpr scopes t') exprs
 
 -- propagate types through concatenation expressions
-convertExpr t (Concat exprs) =
+convertExpr scopes t (Concat exprs) =
     Concat exprs'
     where
         t' = dropInnerTypeRange t
-        exprs' = map (convertExpr t') exprs
+        exprs' = map (convertExpr scopes t') exprs
 
-convertExpr _ expr =
-    traverseSinglyNestedExprs (convertExpr UnknownType) expr
+convertExpr scopes _ expr =
+    traverseSinglyNestedExprs (convertExpr scopes UnknownType) expr
 
 fallbackType :: Scopes Type -> Expr -> (Type, Expr)
 fallbackType scopes e =
@@ -375,7 +382,7 @@ convertSubExpr scopes (Dot e x) =
         (fieldType, undotted)
     where
         (subExprType, e') = convertSubExpr scopes e
-        (fieldType, bounds, dims) = lookupFieldInfo subExprType x
+        (fieldType, bounds, dims) = lookupFieldInfo scopes subExprType e' x
         base = fst bounds
         len = rangeSize bounds
         undotted = if null dims || rangeSize (head dims) == RawNum 1
@@ -387,8 +394,9 @@ convertSubExpr scopes (Range (Dot e x) NonIndexed rOuter) =
     else if structIsntReady subExprType then
         (replaceInnerTypeRange NonIndexed rOuter' fieldType, orig')
     else if null dims then
-        error $ "illegal access to range " ++ show (Range Nil NonIndexed rOuter)
-            ++ " of " ++ show (Dot e x) ++ ", which has type " ++ show fieldType
+        scopedError scopes $ "illegal access to range "
+            ++ show (Range Nil NonIndexed rOuter) ++ " of " ++ show (Dot e x)
+            ++ ", which has type " ++ show fieldType
     else
         (replaceInnerTypeRange NonIndexed rOuter' fieldType, undotted)
     where
@@ -398,7 +406,7 @@ convertSubExpr scopes (Range (Dot e x) NonIndexed rOuter) =
         (_, roRight') = convertSubExpr scopes roRight
         rOuter' = (roLeft', roRight')
         orig' = Range (Dot e' x) NonIndexed rOuter'
-        (fieldType, bounds, dims) = lookupFieldInfo subExprType x
+        (fieldType, bounds, dims) = lookupFieldInfo scopes subExprType e' x
         [dim] = dims
         rangeLeft = ( BinOp Sub (fst bounds) $ BinOp Sub (fst dim) roLeft'
                     , BinOp Sub (fst bounds) $ BinOp Sub (fst dim) roRight' )
@@ -412,8 +420,9 @@ convertSubExpr scopes (Range (Dot e x) mode (baseO, lenO)) =
     else if structIsntReady subExprType then
         (replaceInnerTypeRange mode (baseO', lenO') fieldType, orig')
     else if null dims then
-        error $ "illegal access to range " ++ show (Range Nil mode (baseO, lenO))
-            ++ " of " ++ show (Dot e x) ++ ", which has type " ++ show fieldType
+        scopedError scopes $ "illegal access to range "
+            ++ show (Range Nil mode (baseO, lenO)) ++ " of " ++ show (Dot e x)
+            ++ ", which has type " ++ show fieldType
     else
         (replaceInnerTypeRange mode (baseO', lenO') fieldType, undotted)
     where
@@ -421,7 +430,7 @@ convertSubExpr scopes (Range (Dot e x) mode (baseO, lenO)) =
         (_, baseO') = convertSubExpr scopes baseO
         (_, lenO') = convertSubExpr scopes lenO
         orig' = Range (Dot e' x) mode (baseO', lenO')
-        (fieldType, bounds, dims) = lookupFieldInfo subExprType x
+        (fieldType, bounds, dims) = lookupFieldInfo scopes subExprType e' x
         [dim] = dims
         baseLeft  = BinOp Sub (fst bounds) $ BinOp Sub (fst dim) baseO'
         baseRight = BinOp Add (snd bounds) $ BinOp Sub (snd dim) baseO'
@@ -445,8 +454,8 @@ convertSubExpr scopes (Bit (Dot e x) i) =
     else if structIsntReady subExprType then
         (dropInnerTypeRange fieldType, orig')
     else if null dims then
-        error $ "illegal access to bit " ++ show i ++ " of " ++ show (Dot e x)
-            ++ ", which has type " ++ show fieldType
+        scopedError scopes $ "illegal access to bit " ++ show i ++ " of "
+            ++ show (Dot e x) ++ ", which has type " ++ show fieldType
     else
         (dropInnerTypeRange fieldType, Bit e' iFlat)
     where
@@ -454,7 +463,7 @@ convertSubExpr scopes (Bit (Dot e x) i) =
         (_, i') = convertSubExpr scopes i
         (backupType, _) = fallbackType scopes $ Dot e' x
         orig' = Bit (Dot e' x) i'
-        (fieldType, bounds, dims) = lookupFieldInfo subExprType x
+        (fieldType, bounds, dims) = lookupFieldInfo scopes subExprType e' x
         [dim] = dims
         left  = BinOp Sub (fst bounds) $ BinOp Sub (fst dim) i'
         right = BinOp Add (snd bounds) $ BinOp Sub (snd dim) i'
@@ -508,11 +517,14 @@ getFields _ = Nothing
 isntStruct :: Type -> Bool
 isntStruct = (== Nothing) . getFields
 
--- get the field type, flattended bounds, and original type dimensions
-lookupFieldInfo :: Type -> Identifier -> (Type, Range, [Range])
-lookupFieldInfo struct fieldName =
+-- get the field type, flattened bounds, and original type dimensions
+lookupFieldInfo :: Scopes Type -> Type -> Expr -> Identifier
+    -> (Type, Range, [Range])
+lookupFieldInfo scopes struct base fieldName =
     if maybeFieldType == Nothing
-        then error $ "field '" ++ fieldName ++ "' not found in " ++ show struct
+        then scopedError scopes $ "field '" ++ fieldName ++ "' not found in "
+                ++ show struct ++ ", in expression "
+                ++ show (Dot base fieldName)
         else (fieldType, bounds, dims)
     where
         Just fields = getFields struct
@@ -538,4 +550,4 @@ convertCall scopes fn (Args pnArgs kwArgs) =
                 details = lookupElem scopes $ LHSDot lhs x
                 typ = maybe UnknownType thd3 details
                 thd3 (_, _, c) = c
-                (_, e') = convertSubExpr scopes $ convertExpr typ e
+                (_, e') = convertSubExpr scopes $ convertExpr scopes typ e

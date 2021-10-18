@@ -1,4 +1,5 @@
 // pattern: field 'y' not found in struct packed \{..logic x;.\}
+// location: struct_unknown_field.sv:8:5
 module top;
     struct packed {
         logic x;
