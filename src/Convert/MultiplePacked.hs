@@ -118,9 +118,9 @@ combineRanges r1 r2 = r
             where
                 size1 = rangeSizeHiLo (s1, e1)
                 size2 = rangeSizeHiLo (s2, e2)
-                lower = BinOp Add e2 (BinOp Mul e1 size2)
-                upper = BinOp Add (BinOp Mul size1 size2)
-                            (BinOp Sub lower (RawNum 1))
+                lower = binOp Add e2 (binOp Mul e1 size2)
+                upper = binOp Add (binOp Mul size1 size2)
+                            (binOp Sub lower (RawNum 1))
 
 traverseStmtM :: Stmt -> Scoper TypeInfo Stmt
 traverseStmtM =
@@ -217,7 +217,7 @@ convertExpr scopes =
         orientIdx r e =
             endianCondExpr r e eSwapped
             where
-                eSwapped = BinOp Sub (snd r) (BinOp Sub e (fst r))
+                eSwapped = binOp Sub (snd r) (binOp Sub e (fst r))
 
         -- Converted idents are prefixed with an invalid character to ensure
         -- that are not converted twice when the traversal steps downward. When
@@ -240,8 +240,8 @@ convertExpr scopes =
                 Just (dimInner, dimOuter, expr') = maybeDims
                 idxInner' = orientIdx dimInner idxInner
                 idxOuter' = orientIdx dimOuter idxOuter
-                base = BinOp Mul idxInner' (rangeSize dimOuter)
-                idx' = simplify $ BinOp Add base idxOuter'
+                base = binOp Mul idxInner' (rangeSize dimOuter)
+                idx' = simplify $ binOp Add base idxOuter'
         rewriteExpr orig@(Range (Bit expr idxInner) NonIndexed rangeOuter) =
             if isJust maybeDims && expr == rewriteExpr expr
                 then rewriteExpr $ Range exprOuter IndexedMinus range
@@ -250,7 +250,7 @@ convertExpr scopes =
                 maybeDims = dims expr
                 exprOuter = Bit expr idxInner
                 baseDec = fst rangeOuter
-                baseInc = BinOp Sub (BinOp Add baseDec len) (RawNum 1)
+                baseInc = binOp Sub (binOp Add baseDec len) (RawNum 1)
                 base = endianCondExpr rangeOuter baseDec baseInc
                 len = rangeSize rangeOuter
                 range = (base, len)
@@ -264,11 +264,11 @@ convertExpr scopes =
                 idxInner' = orientIdx dimInner idxInner
                 (baseOuter, lenOuter) = rangeOuter
                 baseOuter' = orientIdx dimOuter baseOuter
-                start = BinOp Mul idxInner' (rangeSize dimOuter)
-                baseDec = BinOp Add start baseOuter'
+                start = binOp Mul idxInner' (rangeSize dimOuter)
+                baseDec = binOp Add start baseOuter'
                 baseInc = if modeOuter == IndexedPlus
-                    then BinOp Add (BinOp Sub baseDec len) one
-                    else BinOp Sub (BinOp Add baseDec len) one
+                    then binOp Add (binOp Sub baseDec len) one
+                    else binOp Sub (binOp Add baseDec len) one
                 base = endianCondExpr dimOuter baseDec baseInc
                 len = lenOuter
                 range' = (base, len)
@@ -287,7 +287,7 @@ convertExpr scopes =
                 mode' = IndexedPlus
                 idx' = orientIdx dimInner idx
                 len = rangeSize dimOuter
-                base = BinOp Add (endianCondExpr dimOuter (snd dimOuter) (fst dimOuter)) (BinOp Mul idx' len)
+                base = binOp Add (endianCondExpr dimOuter (snd dimOuter) (fst dimOuter)) (binOp Mul idx' len)
                 range' = (simplify base, simplify len)
         rewriteExprLowPrec orig@(Range expr NonIndexed range) =
             if isJust maybeDims && expr == rewriteExpr expr
@@ -296,7 +296,7 @@ convertExpr scopes =
             where
                 maybeDims = dims expr
                 baseDec = fst range
-                baseInc = BinOp Sub (BinOp Add baseDec len) (RawNum 1)
+                baseInc = binOp Sub (binOp Add baseDec len) (RawNum 1)
                 base = endianCondExpr range baseDec baseInc
                 len = rangeSize range
                 range' = (base, len)
@@ -310,20 +310,41 @@ convertExpr scopes =
                 sizeOuter = rangeSize dimOuter
                 offsetOuter = uncurry (endianCondExpr dimOuter) $ swap dimOuter
                 (baseOrig, lenOrig) = range
-                lenOrigMinusOne = BinOp Sub lenOrig (RawNum 1)
+                lenOrigMinusOne = binOp Sub lenOrig (RawNum 1)
                 baseSwapped =
                     orientIdx dimInner $
                     if mode == IndexedPlus
                         then
                             endianCondExpr dimInner
                             baseOrig
-                            (BinOp Add baseOrig lenOrigMinusOne)
+                            (binOp Add baseOrig lenOrigMinusOne)
                         else
                             endianCondExpr dimInner
-                            (BinOp Sub baseOrig lenOrigMinusOne)
+                            (binOp Sub baseOrig lenOrigMinusOne)
                             baseOrig
-                base = BinOp Add offsetOuter (BinOp Mul sizeOuter baseSwapped)
+                base = binOp Add offsetOuter (binOp Mul sizeOuter baseSwapped)
                 mode' = IndexedPlus
-                len = BinOp Mul sizeOuter lenOrig
+                len = binOp Mul sizeOuter lenOrig
                 range' = (base, len)
         rewriteExprLowPrec other = other
+
+-- Traditional identity operations like `+ 0` and `* 1` are not no-ops in
+-- SystemVerilog because they may implicitly extend the width of the other
+-- operand. Encouraged by the official language specifications (e.g., Section
+-- 11.6.2 of IEEE 1800-2017), these operations are used in real designs as
+-- workarounds for the standard expression evaluation semantics.
+--
+-- The process of flattening arrays in this conversion can naturally lead to
+-- unnecessary identity operations. Previously, `simplifyStep` was responsible
+-- for cleaning up the below unnecessary operations produced by this conversion,
+-- but it inadvertently changed the behavior of legitimate input designs.
+--
+-- Rather than applying these specific simplifications to all expressions, they
+-- are now only considered when constructing a new binary operation expression
+-- as part of array flattening.
+binOp :: BinOp -> Expr -> Expr -> Expr
+binOp Add (RawNum 0) e = e
+binOp Add e (RawNum 0) = e
+binOp Mul (RawNum 1) e = e
+binOp Mul e (RawNum 1) = e
+binOp op a b = BinOp op a b

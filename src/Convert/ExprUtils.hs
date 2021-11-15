@@ -76,14 +76,10 @@ simplifyStep other = other
 
 simplifyBinOp :: BinOp -> Expr -> Expr -> Expr
 
-simplifyBinOp Add (Dec 0) e = e
-simplifyBinOp Add e (Dec 0) = e
 simplifyBinOp Sub e (Dec 0) = e
 simplifyBinOp Sub (Dec 0) e = UniOp UniSub e
 simplifyBinOp Mul (Dec 0) _ = toDec 0
-simplifyBinOp Mul (Dec 1) e = e
 simplifyBinOp Mul _ (Dec 0) = toDec 0
-simplifyBinOp Mul e (Dec 1) = e
 simplifyBinOp Mod _ (Dec 1) = toDec 0
 
 simplifyBinOp Add e1 (UniOp UniSub e2) = BinOp Sub e1 e2

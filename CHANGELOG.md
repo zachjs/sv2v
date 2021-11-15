@@ -10,6 +10,11 @@
 * Certain errors raised during conversion now also provide hierarchical and
   approximate source location information to help locate the error
 
+### Bug Fixes
+
+* Fixed inadvertent design behavior changes caused by constant folding removing
+  intentional width-extending operations such as `+ 0` and `* 1`
+
 ## v0.0.9
 
 ### Breaking Changes
