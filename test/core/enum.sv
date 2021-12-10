@@ -43,6 +43,18 @@ typedef enum int {
     Z_1, Z_2, Z_3
 } EnumZ;
 
+typedef enum int {
+    K_A,
+    K_B = 10,
+    K_C[3],
+    K_D[3] = 20,
+    K_E[4:6],
+    K_F[4:6] = 30,
+    K_G[6:4],
+    K_H[6:4] = 40,
+    K_I[3:3] = 50
+} EnumK;
+
 `define PRINT(name, val) \
     dummy``name = name``_``val; \
     $display(`"name %h %h %0d %0d`", \
@@ -58,6 +70,7 @@ module top;
     EnumG dummyG;
     EnumH dummyH;
     EnumI dummyI;
+    EnumK dummyK;
 
     initial begin
 
@@ -95,6 +108,28 @@ module top;
 
         `PRINT(I, 1)
         `PRINT(I, 2)
+
+        `PRINT(K, A)
+        `PRINT(K, B)
+        `PRINT(K, C0)
+        `PRINT(K, C1)
+        `PRINT(K, C2)
+        `PRINT(K, D0)
+        `PRINT(K, D1)
+        `PRINT(K, D2)
+        `PRINT(K, E4)
+        `PRINT(K, E5)
+        `PRINT(K, E6)
+        `PRINT(K, F4)
+        `PRINT(K, F5)
+        `PRINT(K, F6)
+        `PRINT(K, G6)
+        `PRINT(K, G5)
+        `PRINT(K, G4)
+        `PRINT(K, H6)
+        `PRINT(K, H5)
+        `PRINT(K, H4)
+        `PRINT(K, I3)
 
     end
 

@@ -519,8 +519,17 @@ NonIntegerTypeP :: { (Position, NonIntegerType) }
   | "string"    { withPos $1 TString    }
   | "event"     { withPos $1 TEvent     }
 
-EnumItems :: { [(Identifier, Expr)] }
-  : VariablePortIdentifiers { $1 }
+EnumItems :: { [EnumItem] }
+  : EnumItem               { $1 }
+  | EnumItem "," EnumItems { $1 ++ $3 }
+EnumItem :: { [EnumItem] }
+  : Identifier                    OptAsgn { [($1, $2)] }
+  | IdentifierP IntegralDimension OptAsgn {% makeEnumItems $1 $2 $3 }
+IntegralDimension :: { (Integer, Integer) }
+  : "[" IntegralNumber                    "]" { ( 0, $2 - 1) }
+  | "[" IntegralNumber ":" IntegralNumber "]" { ($2,     $4) }
+IntegralNumber :: { Integer }
+  : number {% readIntegralNumber (tokenPosition $1) (tokenString $1) }
 
 StructItems :: { [(Type, Identifier)] }
   : StructItem             { $1 }
@@ -671,12 +680,6 @@ ParamDeclToken :: { [DeclToken] }
   : "=" PartialTypeP   { [DTTypeAsgn (tokenPosition $1), uncurry DTType  $2] }
   | "type" IdentifierP { [DTTypeDecl (tokenPosition $1), uncurry DTIdent $2] }
   | ParameterDeclKW    { [uncurry DTParamKW $1] }
-
-VariablePortIdentifiers :: { [(Identifier, Expr)] }
-  : VariablePortIdentifier                             { [$1] }
-  | VariablePortIdentifiers "," VariablePortIdentifier { $1 ++ [$3] }
-VariablePortIdentifier :: { (Identifier, Expr) }
-  : Identifier OptAsgn { ($1,$2) }
 
 Direction :: { Direction }
   : DirectionP { snd $1 }
@@ -1713,5 +1716,30 @@ expectZeroDelay tok a = do
     Decimal (-32) True 0 -> return a
     _ -> parseError pos $ "expected 0 after #, but found " ++ str
   where Token { tokenString = str, tokenPosition = pos } = tok
+
+readIntegralNumber :: Position -> String -> ParseState Integer
+readIntegralNumber pos str = do
+  num <- readNumber pos str
+  case numberToInteger num of
+    Nothing ->
+      parseError pos $ "expected an integral number, but found " ++ str
+    Just integer | integer < 0 ->
+      parseError pos $ "expected a non-negative number, but found " ++ str
+    Just integer ->
+      return integer
+
+makeEnumItems :: (Position, Identifier) -> (Integer, Integer) -> Expr
+  -> ParseState [EnumItem]
+makeEnumItems (pos, _) (0, -1) _ =
+  parseError pos "expected a positive number, but found zero"
+makeEnumItems (_, root) (l, r) base =
+  return $ (name, base) : map (, Nil) names
+  where
+    name : names =
+      map (root ++) $
+      map show $
+      if l >= r
+        then reverse [r..l]
+        else [l..r]
 
 }

@@ -14,6 +14,7 @@ module top;
     reg [0:0] dummyG;
     reg [3:0] dummyH;
     reg [31:0] dummyI;
+    reg [31:0] dummyK;
 
     initial begin
 
@@ -51,6 +52,28 @@ module top;
 
         `PRINT(I, 'b0)
         `PRINT(I, 'b1)
+
+        `PRINT(K, 0)
+        `PRINT(K, 10)
+        `PRINT(K, 11)
+        `PRINT(K, 12)
+        `PRINT(K, 13)
+        `PRINT(K, 20)
+        `PRINT(K, 21)
+        `PRINT(K, 22)
+        `PRINT(K, 23)
+        `PRINT(K, 24)
+        `PRINT(K, 25)
+        `PRINT(K, 30)
+        `PRINT(K, 31)
+        `PRINT(K, 32)
+        `PRINT(K, 33)
+        `PRINT(K, 34)
+        `PRINT(K, 35)
+        `PRINT(K, 40)
+        `PRINT(K, 41)
+        `PRINT(K, 42)
+        `PRINT(K, 50)
 
     end
 

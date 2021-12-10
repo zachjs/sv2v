@@ -4,6 +4,7 @@
 
 * Added support for excluding the conversion of unbased unsized literals (e.g.,
   `'1`, `'x`) via `--exclude UnbasedUniszed`
+* Added support for enumerated type ranges (e.g., `enum { X[3:5] }`)
 
 ### Other Enhancements
 

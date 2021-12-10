@@ -9,6 +9,7 @@
 
 module Language.SystemVerilog.AST.Type
     ( Identifier
+    , EnumItem
     , Field
     , Type               (..)
     , Signing            (..)
@@ -33,7 +34,7 @@ import Language.SystemVerilog.AST.ShowHelp
 
 type Identifier = String
 
-type Item = (Identifier, Expr)
+type EnumItem = (Identifier, Expr)
 type Field = (Type, Identifier)
 
 data Type
@@ -44,7 +45,7 @@ data Type
     | Alias               Identifier           [Range]
     | PSAlias  Identifier Identifier           [Range]
     | CSAlias  Identifier [ParamBinding] Identifier [Range]
-    | Enum     Type         [Item]             [Range]
+    | Enum     Type         [EnumItem]         [Range]
     | Struct   Packing      [Field]            [Range]
     | Union    Packing      [Field]            [Range]
     | InterfaceT Identifier Identifier         [Range]
@@ -66,7 +67,7 @@ instance Show Type where
     show (Enum t vals r) = printf "enum %s{%s}%s" tStr (commas $ map showVal vals) (showRanges r)
         where
             tStr = showPad t
-            showVal :: (Identifier, Expr) -> String
+            showVal :: EnumItem -> String
             showVal (x, e) = x ++ (showAssignment e)
     show (Struct p items r) = printf "struct %s{\n%s\n}%s" (showPad p) (showFields items) (showRanges r)
     show (Union  p items r) = printf  "union %s{\n%s\n}%s" (showPad p) (showFields items) (showRanges r)
