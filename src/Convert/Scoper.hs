@@ -520,7 +520,11 @@ scopeModuleItem declMapperRaw moduleItemMapper genItemMapper stmtMapperRaw =
         redirectTFDecl :: Type -> Identifier -> ScoperT a m (Type, Identifier)
         redirectTFDecl typ ident = do
             res <- declMapper $ Variable Local typ ident [] Nil
-            let Variable Local newType newName newRanges Nil = res
+            (newType, newName, newRanges) <-
+                return $ case res of
+                    Variable Local t x r Nil -> (t, x, r)
+                    Net Local TWire DefaultStrength t x r Nil -> (t, x, r)
+                    _ -> error "redirectTFDecl invariant violated"
             return $ if null newRanges
                 then (newType, newName)
                 else
