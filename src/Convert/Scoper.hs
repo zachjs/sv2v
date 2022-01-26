@@ -561,6 +561,14 @@ scopeModuleItem declMapperRaw moduleItemMapper genItemMapper stmtMapperRaw =
             return $ MIPackageItem $ Task ml x' decls' stmts'
         fullModuleItemMapper (MIPackageItem (Decl decl)) =
             declMapper decl >>= return . MIPackageItem . Decl
+        fullModuleItemMapper (MIPackageItem item@DPIImport{}) = do
+            let DPIImport spec prop alias typ name decls = item
+            (typ', name') <- redirectTFDecl typ name
+            decls' <- mapM declMapper decls
+            let item' = DPIImport spec prop alias typ' name' decls'
+            return $ MIPackageItem item'
+        fullModuleItemMapper (MIPackageItem (DPIExport spec alias kw name)) =
+            return $ MIPackageItem $ DPIExport spec alias kw name
         fullModuleItemMapper (AlwaysC kw stmt) = do
             enterProcedure
             stmt' <- fullStmtMapper stmt

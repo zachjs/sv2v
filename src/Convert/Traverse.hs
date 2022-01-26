@@ -618,6 +618,14 @@ traverseNodesM exprMapper declMapper typeMapper lhsMapper stmtMapper =
         return $ MIPackageItem $ Import x y
     moduleItemMapper (MIPackageItem (Export x y)) =
         return $ MIPackageItem $ Export x y
+    moduleItemMapper (MIPackageItem item@DPIImport{}) = do
+        let DPIImport spec prop alias typ name decls = item
+        typ' <- typeMapper typ
+        decls' <- mapM declMapper decls
+        let item' = DPIImport spec prop alias typ' name decls'
+        return $ MIPackageItem item'
+    moduleItemMapper (MIPackageItem (DPIExport spec alias kw name)) =
+        return $ MIPackageItem $ DPIExport spec alias kw name
     moduleItemMapper (AssertionItem (mx, a)) = do
         a' <- traverseAssertionStmtsM stmtMapper a
         a'' <- traverseAssertionExprsM exprMapper a'

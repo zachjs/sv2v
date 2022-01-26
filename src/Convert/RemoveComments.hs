@@ -39,6 +39,9 @@ convertPackageItem (Task     l   x decls stmts) =
     where
         decls' = convertDecls decls
         stmts' = convertStmts stmts
+convertPackageItem (DPIImport spec prop alias typ name decls) =
+    DPIImport spec prop alias typ name decls'
+    where decls' = convertDecls decls
 convertPackageItem other = other
 
 convertStmt :: Stmt -> Stmt

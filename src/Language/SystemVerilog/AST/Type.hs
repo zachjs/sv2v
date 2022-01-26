@@ -181,6 +181,7 @@ data NonIntegerType
     | TRealtime
     | TString
     | TEvent
+    | TChandle
     deriving Eq
 
 instance Show NetType where
@@ -213,6 +214,7 @@ instance Show NonIntegerType where
     show TRealtime  = "realtime"
     show TString    = "string"
     show TEvent     = "event"
+    show TChandle   = "chandle"
 
 data Packing
     = Unpacked

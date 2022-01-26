@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  - Initial Verilog AST Author: Tom Hawkins <tomahawkins@gmail.com>
@@ -12,6 +13,8 @@ module Language.SystemVerilog.AST.Description
     , Lifetime    (..)
     , Qualifier   (..)
     , ClassItem
+    , DPIImportProperty (..)
+    , DPIExportKW (..)
     ) where
 
 import Data.List (intercalate)
@@ -22,7 +25,7 @@ import Language.SystemVerilog.AST.ShowHelp
 import Language.SystemVerilog.AST.Attr (Attr)
 import Language.SystemVerilog.AST.Decl (Decl(CommentDecl))
 import Language.SystemVerilog.AST.Stmt (Stmt)
-import Language.SystemVerilog.AST.Type (Type, Identifier)
+import Language.SystemVerilog.AST.Type (Type, Identifier, pattern UnknownType)
 import {-# SOURCE #-} Language.SystemVerilog.AST.ModuleItem (ModuleItem)
 
 data Description
@@ -82,6 +85,8 @@ data PackageItem
     | Export Identifier Identifier
     | Decl Decl
     | Directive String
+    | DPIImport String DPIImportProperty Identifier Type Identifier [Decl]
+    | DPIExport String Identifier DPIExportKW Identifier
     deriving Eq
 
 instance Show PackageItem where
@@ -95,6 +100,22 @@ instance Show PackageItem where
     show (Export x y) = printf "export %s::%s;" (showWildcard x) (showWildcard y)
     show (Decl decl) = show decl
     show (Directive str) = str
+    show (DPIImport spec prop alias typ name decls) =
+        printf "import %s %s%s %s %s(%s);"
+            (show spec) (showPad prop) aliasStr protoStr name declsStr
+        where
+            aliasStr = if null alias then "" else alias ++ " = "
+            protoStr =
+                if typ == UnknownType
+                    then "task"
+                    else "function " ++ show typ
+            declsStr =
+                if null decls
+                    then ""
+                    else "\n\t" ++ showDecls decls ++ "\n"
+    show (DPIExport spec alias kw name) =
+        printf "export %s %s%s %s;" (show spec) aliasStr (show kw) name
+        where aliasStr = if null alias then "" else alias ++ " = "
 
 showWildcard :: Identifier -> String
 showWildcard "" = "*"
@@ -137,3 +158,23 @@ instance Show Qualifier where
     show QStatic    = "static"
     show QLocal     = "local"
     show QProtected = "protected"
+
+data DPIImportProperty
+    = DPIContext
+    | DPIPure
+    | DPINone
+    deriving Eq
+
+instance Show DPIImportProperty where
+    show DPIContext = "context"
+    show DPIPure    = "pure"
+    show DPINone    = ""
+
+data DPIExportKW
+    = DPIExportTask
+    | DPIExportFunction
+    deriving Eq
+
+instance Show DPIExportKW where
+    show DPIExportTask     = "task"
+    show DPIExportFunction = "function"

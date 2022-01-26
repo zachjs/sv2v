@@ -518,6 +518,7 @@ NonIntegerTypeP :: { (Position, NonIntegerType) }
   | "realtime"  { withPos $1 TRealtime  }
   | "string"    { withPos $1 TString    }
   | "event"     { withPos $1 TEvent     }
+  | "chandle"   { withPos $1 TChandle   }
 
 EnumItems :: { [EnumItem] }
   : EnumItem               { $1 }
@@ -904,6 +905,7 @@ NonDeclPackageItem :: { [PackageItem] }
   | ImportOrExport       { $1 }
   | ForwardTypedef ";"   { $1 }
   | TimeunitsDeclaration { $1 }
+  | DPIImportExport      { [$1] }
   | Directive            { [Directive $1] }
 
 ImportOrExport :: { [PackageItem] }
@@ -930,6 +932,31 @@ TimeunitsDeclaration :: { [PackageItem] }
   : "timeunit" Time          ";" { [] }
   | "timeunit" Time "/" Time ";" { [] }
   | "timeprecision" Time     ";" { [] }
+
+DPIImportExport :: { PackageItem }
+  : "import" DPISpecString OptDPIImportProperty OptDPIAlias DPITFProto     { makeDPIImport $2 $3 $4 $5 }
+  | "export" DPISpecString OptDPIAlias          DPIExportKW Identifier ";" { DPIExport $2 $3 $4 $5 }
+
+DPIExportKW :: { DPIExportKW }
+  : "task"     { DPIExportTask }
+  | "function" { DPIExportFunction }
+
+DPISpecString :: { String }
+  : String { $1 }
+
+OptDPIAlias :: { Identifier }
+  : Identifier "=" { $1 }
+  | {- empty -}    { "" }
+
+OptDPIImportProperty :: { DPIImportProperty }
+  : "context"   { DPIContext }
+  | "pure"      { DPIPure }
+  | {- empty -} { DPINone }
+
+DPITFProto :: { (Type, Identifier, [Decl]) }
+  : "function" FuncRetAndName    TFItems { (fst $2     , snd $2, $3) }
+  | "function" "void" Identifier TFItems { (UnknownType,     $3, $4) }
+  | "task"     Identifier        TFItems { (UnknownType,     $2, $3) }
 
 Directive :: { String }
   : "`celldefine"          { tokenString $1 }
@@ -1741,5 +1768,9 @@ makeEnumItems (_, root) (l, r) base =
       if l >= r
         then reverse [r..l]
         else [l..r]
+
+makeDPIImport :: String -> DPIImportProperty -> Identifier
+  -> (Type, Identifier, [Decl]) -> PackageItem
+makeDPIImport a b c (d, e, f) = DPIImport a b c d e f
 
 }
