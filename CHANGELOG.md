@@ -6,6 +6,7 @@
   `'1`, `'x`) via `--exclude UnbasedUniszed`
 * Added support for enumerated type ranges (e.g., `enum { X[3:5] }`)
 * Added support for passing through DPI imports and exports
+* Added support for passing through functions with output ports
 
 ### Other Enhancements
 

@@ -1571,9 +1571,10 @@ combineDeclsAndStmts (a1, b1) (a2, b2) =
 makeInput :: Decl -> Decl
 makeInput (Variable Local t x a e) = Variable Input t x a e
 makeInput (Variable Input t x a e) = Variable Input t x a e
+makeInput (Variable Output t x a e) = Variable Output t x a e
 makeInput (CommentDecl c) = CommentDecl c
 makeInput other =
-  error $ "unexpected non-var or non-input decl: " ++ (show other)
+  error $ "unexpected non-var or non-port function decl: " ++ (show other)
 
 checkTag :: String -> String -> a -> ParseState a
 checkTag _ "" x = return x
