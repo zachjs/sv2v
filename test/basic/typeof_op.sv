@@ -43,12 +43,10 @@ module top;
         `TEST(4'b1011 + 5'b01110)
         `TEST(4'b1011 - 5'b01110)
         `TEST(4'b1011 ** 5'b01110)
+        `TEST(4'b1011 -> 5'b01110)
         `TEST(4'b1011 <-> 5'b01110)
         `TEST(4'b1011 ==? 5'b01110)
         `TEST(4'b1011 !=? 5'b01110)
-
-        // TODO: not yet supported by iverilog
-        // `TEST(4'b1011 -> 5'b01110)
 
     end
 endmodule
