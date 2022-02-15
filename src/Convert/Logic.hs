@@ -186,6 +186,9 @@ traverseStmtM :: Stmt -> ST Stmt
 traverseStmtM stmt@Timing{} =
     -- ignore the timing LHSs
     return stmt
+traverseStmtM (Asgn op Just{} lhs expr) =
+    -- ignore the timing LHSs
+    traverseStmtM $ Asgn op Nothing lhs expr
 traverseStmtM stmt@(Subroutine (Ident f) (Args (_ : Ident x : _) [])) =
     when (f == "$readmemh" || f == "$readmemb") (collectLHSM $ LHSIdent x)
         >> return stmt

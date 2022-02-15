@@ -17,6 +17,8 @@
 
 * Fixed inadvertent design behavior changes caused by constant folding removing
   intentional width-extending operations such as `+ 0` and `* 1`
+* Fixed forced conversion to `reg` of data sensed in an edge-controlled
+  procedural assignment
 
 ## v0.0.9
 
