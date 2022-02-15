@@ -52,6 +52,6 @@ module top;
 
     initial begin
         $monitor("%0d %b %b", $time, clock, intf.req);
-        #100 $finish;
+        #100 $finish(0);
     end
 endmodule

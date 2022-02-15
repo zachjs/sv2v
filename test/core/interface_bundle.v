@@ -23,7 +23,7 @@ module impl;
     initial begin
         $monitor("%b %b %b %b", b_index, b_clock, b_inp, b_out);
         #100;
-        $finish;
+        $finish(0);
     end
 endmodule
 

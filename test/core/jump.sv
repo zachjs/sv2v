@@ -112,7 +112,7 @@ module top;
             break;
             $display("UNREACHABLE ", `__LINE__);
         end
-    initial #5 $finish;
+    initial #5 $finish(0);
 
     initial begin
         for (int unsigned i = 0; i < 5; ++i) begin

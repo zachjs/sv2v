@@ -9,6 +9,6 @@ module top;
         #1;
         #10; a = 'h5;
         #10;
-        $finish;
+        $finish(0);
     end
 endmodule

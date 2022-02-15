@@ -35,6 +35,6 @@ module top;
     initial begin
         $monitor("%b %b %b %b", b.index, b.clock, b.inp, b.out);
         #100;
-        $finish;
+        $finish(0);
     end
 endmodule

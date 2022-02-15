@@ -87,7 +87,7 @@ module top;
             i = 10;
         end
     end
-    initial #5 $finish;
+    initial #5 $finish(0);
 
     initial begin : loops_de
         reg unsigned [31:0] i;
