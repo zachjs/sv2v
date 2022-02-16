@@ -1233,11 +1233,13 @@ Senses :: { Sense }
   | Senses ","  Sense { SenseOr $1 $3 }
 Sense :: { Sense }
   : "(" Sense ")"         {              $2 }
-  |               LHS     { Sense        $1 }
-  | "posedge"     LHS     { SensePosedge $2 }
-  | "negedge"     LHS     { SenseNegedge $2 }
-  | "posedge" "(" LHS ")" { SensePosedge $3 }
-  | "negedge" "(" LHS ")" { SenseNegedge $3 }
+  |           LHS         { Sense        $1 }
+  | "posedge" LHSOptParen { SensePosedge $2 }
+  | "negedge" LHSOptParen { SenseNegedge $2 }
+  | "edge"    LHSOptParen { SenseEdge    $2 }
+LHSOptParen :: { LHS }
+  :     LHS     { $1 }
+  | "(" LHS ")" { $2 }
 
 CaseKW :: { CaseKW }
   : "case"  { CaseN }

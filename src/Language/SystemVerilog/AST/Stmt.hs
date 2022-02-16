@@ -175,6 +175,7 @@ data Sense
     | SenseOr      Sense Sense
     | SensePosedge LHS
     | SenseNegedge LHS
+    | SenseEdge    LHS
     | SenseStar
     deriving Eq
 
@@ -183,6 +184,7 @@ instance Show Sense where
     show (SenseOr      a b) = printf "%s or %s" (show a) (show b)
     show (SensePosedge a  ) = printf "posedge %s" (show a)
     show (SenseNegedge a  ) = printf "negedge %s" (show a)
+    show (SenseEdge    a  ) = printf "edge %s" (show a)
     show (SenseStar       ) = "*"
 
 data ActionBlock

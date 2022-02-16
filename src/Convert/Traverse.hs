@@ -386,6 +386,7 @@ traverseStmtLHSsM mapper = stmtMapper
         senseMapper (Sense        lhs) = fullMapper lhs >>= return . Sense
         senseMapper (SensePosedge lhs) = fullMapper lhs >>= return . SensePosedge
         senseMapper (SenseNegedge lhs) = fullMapper lhs >>= return . SenseNegedge
+        senseMapper (SenseEdge    lhs) = fullMapper lhs >>= return . SenseEdge
         senseMapper (SenseOr    s1 s2) = do
             s1' <- senseMapper s1
             s2' <- senseMapper s2

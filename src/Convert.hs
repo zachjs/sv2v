@@ -41,6 +41,7 @@ import qualified Convert.ParamType
 import qualified Convert.PortDecl
 import qualified Convert.RemoveComments
 import qualified Convert.ResolveBindings
+import qualified Convert.SenseEdge
 import qualified Convert.Simplify
 import qualified Convert.Stream
 import qualified Convert.StringParam
@@ -101,6 +102,7 @@ initialPhases selectExclude =
     , Convert.Jump.convert
     , Convert.KWArgs.convert
     , Convert.Unique.convert
+    , Convert.SenseEdge.convert
     , Convert.LogOp.convert
     , Convert.EmptyArgs.convert
     , Convert.Foreach.convert
