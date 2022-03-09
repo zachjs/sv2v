@@ -790,8 +790,8 @@ SeqExprParens :: { SeqExpr }
   | SeqExpr "intersect"  SeqExpr { SeqExprIntersect  $1 $3 }
   | Expr    "throughout" SeqExpr { SeqExprThroughout $1 $3 }
   | SeqExpr "within"     SeqExpr { SeqExprWithin     $1 $3 }
-  | SeqExpr "##" Number  SeqExpr { SeqExprDelay (Just $1) (Number $3) $4 }
-  |         "##" Number  SeqExpr { SeqExprDelay (Nothing) (Number $2) $3 }
+  | SeqExpr "##" CycleDelayRange SeqExpr { SeqExprDelay (Just $1) $3 $4 }
+  |         "##" CycleDelayRange SeqExpr { SeqExprDelay (Nothing) $2 $3 }
   | "first_match" "(" SeqExpr SeqMatchItems ")" { SeqExprFirstMatch $3 $4 }
 SeqMatchItems :: { [SeqMatchItem] }
   : "," SeqMatchItem               { [$2] }
@@ -799,6 +799,16 @@ SeqMatchItems :: { [SeqMatchItem] }
 SeqMatchItem :: { SeqMatchItem }
   : ForStepAssignment   { SeqMatchAsgn $1 }
   | Identifier CallArgs { SeqMatchCall $1 $2 }
+
+CycleDelayRange :: { Range }
+  : Range { $1 }
+  | Number       { (Nil, Number $1) }
+  | Identifier   { (Nil, Ident  $1) }
+  | "(" Expr ")" { (Nil,        $2) }
+  | "[" "+" "]"  { (RawNum 1, Nil) }
+  | "[" "*" "]"  { (RawNum 0, Nil) }
+  | "[*"    "]"  { (RawNum 0, Nil) }
+  | "[" Expr ":" "$" "]" { ($2, Nil) }
 
 ActionBlock :: { ActionBlock }
   : Stmt %prec NoElse { ActionBlock $1 Null }

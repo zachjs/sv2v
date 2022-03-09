@@ -6,6 +6,7 @@
   `'1`, `'x`) via `--exclude UnbasedUniszed`
 * Added support for enumerated type ranges (e.g., `enum { X[3:5] }`)
 * Added support for the SystemVerilog `edge` event
+* Added support for cycle delay ranges in assertion sequence expressions
 * Added support for passing through DPI imports and exports
 * Added support for passing through functions with output ports
 

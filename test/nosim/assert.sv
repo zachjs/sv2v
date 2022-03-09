@@ -49,6 +49,15 @@ module top;
         1 and 1 or 1 intersect 1 throughout 1 within 1);
     assert property (@(posedge clk) 1 ##1 1);
     assert property (@(posedge clk) ##1 1);
+    localparam C = 1;
+    assert property (@(posedge clk) ##C 1);
+    assert property (@(posedge clk) ##(C + 1) 1);
+    assert property (@(posedge clk) ##[C:1] 1);
+    assert property (@(posedge clk) ##[+] 1);
+    assert property (@(posedge clk) ##[*] 1);
+    assert property (@(posedge clk) ##[ *] 1);
+
     integer x;
+    // TODO: The assignment below should only be allowed in a property decleration.
     assert property (@(posedge clk) first_match(1, x++, $display("a", clk), $display("b", clk)));
 endmodule

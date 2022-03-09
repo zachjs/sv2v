@@ -300,13 +300,13 @@ traverseAssertionExprsM mapper = assertionMapper
             e' <- mapper e
             s' <- seqExprMapper s
             return $ SeqExprThroughout e' s'
-        seqExprMapper (SeqExprDelay ms e s) = do
+        seqExprMapper (SeqExprDelay ms r s) = do
             ms' <- case ms of
                 Nothing -> return Nothing
                 Just x -> seqExprMapper x >>= return . Just
-            e' <- mapper e
+            r' <- mapBothM mapper r
             s' <- seqExprMapper s
-            return $ SeqExprDelay ms' e' s'
+            return $ SeqExprDelay ms' r' s'
         seqExprMapper (SeqExprFirstMatch s items) = do
             s' <- seqExprMapper s
             items' <- mapM seqMatchItemMapper items

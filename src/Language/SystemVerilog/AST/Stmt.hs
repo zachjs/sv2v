@@ -29,7 +29,7 @@ import Text.Printf (printf)
 import Language.SystemVerilog.AST.ShowHelp (commas, indent, unlines', showPad, showBlock)
 import Language.SystemVerilog.AST.Attr (Attr)
 import Language.SystemVerilog.AST.Decl (Decl)
-import Language.SystemVerilog.AST.Expr (Expr(Call, Ident, Nil), Args(..))
+import Language.SystemVerilog.AST.Expr (Expr(Call, Ident, Nil), Args(..), Range, showRange)
 import Language.SystemVerilog.AST.LHS (LHS)
 import Language.SystemVerilog.AST.Op (AsgnOp(AsgnOpEq))
 import Language.SystemVerilog.AST.Type (Identifier)
@@ -224,7 +224,7 @@ data SeqExpr
     | SeqExprIntersect  SeqExpr SeqExpr
     | SeqExprThroughout Expr    SeqExpr
     | SeqExprWithin     SeqExpr SeqExpr
-    | SeqExprDelay (Maybe SeqExpr) Expr SeqExpr
+    | SeqExprDelay (Maybe SeqExpr) Range SeqExpr
     | SeqExprFirstMatch SeqExpr [SeqMatchItem]
     deriving Eq
 instance Show SeqExpr where
@@ -234,8 +234,13 @@ instance Show SeqExpr where
     show (SeqExprIntersect  a b) = printf "(%s %s %s)" (show a) "intersect"  (show b)
     show (SeqExprThroughout a b) = printf "(%s %s %s)" (show a) "throughout" (show b)
     show (SeqExprWithin     a b) = printf "(%s %s %s)" (show a) "within"     (show b)
-    show (SeqExprDelay   me e s) = printf "%s##%s %s" (maybe "" showPad me) (show e) (show s)
+    show (SeqExprDelay   me r s) = printf "%s##%s %s" (maybe "" showPad me) (showCycleDelayRange r) (show s)
     show (SeqExprFirstMatch e a) = printf "first_match(%s, %s)" (show e) (commas $ map show a)
+
+showCycleDelayRange :: Range -> String
+showCycleDelayRange (Nil, e) = printf "(%s)" (show e)
+showCycleDelayRange (e, Nil) = printf "[%s:$]" (show e)
+showCycleDelayRange r = showRange r
 
 type AssertionItem = (Identifier, Assertion)
 

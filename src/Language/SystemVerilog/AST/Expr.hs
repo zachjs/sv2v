@@ -15,6 +15,7 @@ module Language.SystemVerilog.AST.Expr
     , DimsFn (..)
     , DimFn (..)
     , showAssignment
+    , showRange
     , showRanges
     , ParamBinding
     , showParams
