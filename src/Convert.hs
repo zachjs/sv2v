@@ -17,6 +17,7 @@ import qualified Convert.Assertion
 import qualified Convert.BlockDecl
 import qualified Convert.Cast
 import qualified Convert.DimensionQuery
+import qualified Convert.DoWhile
 import qualified Convert.DuplicateGenvar
 import qualified Convert.EmptyArgs
 import qualified Convert.Enum
@@ -105,6 +106,7 @@ initialPhases selectExclude =
     , Convert.SenseEdge.convert
     , Convert.LogOp.convert
     , Convert.EmptyArgs.convert
+    , Convert.DoWhile.convert
     , Convert.Foreach.convert
     , Convert.FuncRoutine.convert
     , selectExclude Job.Assert Convert.Assertion.convert

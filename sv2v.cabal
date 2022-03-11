@@ -68,6 +68,7 @@ executable sv2v
     Convert.BlockDecl
     Convert.Cast
     Convert.DimensionQuery
+    Convert.DoWhile
     Convert.DuplicateGenvar
     Convert.EmptyArgs
     Convert.Enum

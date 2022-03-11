@@ -208,9 +208,6 @@ convertStmt (For inits comp incr stmt) =
 convertStmt (While comp stmt) =
     convertLoop Nothing loop comp [] stmt
     where loop c _ s = While c s
-convertStmt (DoWhile comp stmt) =
-    convertLoop Nothing loop comp [] stmt
-    where loop c _ s = DoWhile c s
 
 convertStmt (Continue) = do
     loopDepth <- gets sLoopDepth
