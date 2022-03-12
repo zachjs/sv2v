@@ -1385,6 +1385,11 @@ Expr :: { Expr }
   | "^"  Expr %prec REDUCE_OP { UniOp RedXor  $2 }
   | "~^" Expr %prec REDUCE_OP { UniOp RedXnor $2 }
   | "^~" Expr %prec REDUCE_OP { UniOp RedXnor $2 }
+  -- assignments within expressions
+  | "(" Expr "="        Expr ")" {% makeExprAsgn (tokenPosition $3, AsgnOpEq) $2 $4 }
+  | "(" Expr AsgnBinOpP Expr ")" {% makeExprAsgn $3                           $2 $4 }
+  | Expr IncOrDecOperatorP            {% makeIncrExprAsgn True  $2 $1 }
+  | IncOrDecOperatorP Expr %prec "++" {% makeIncrExprAsgn False $1 $2 }
 
 ExprOrNil :: { Expr }
   : Expr        { $1 }
@@ -1785,5 +1790,25 @@ makeEnumItems (_, root) (l, r) base =
 makeDPIImport :: String -> DPIImportProperty -> Identifier
   -> (Type, Identifier, [Decl]) -> PackageItem
 makeDPIImport a b c (d, e, f) = DPIImport a b c d e f
+
+makeExprAsgn :: (Position, AsgnOp) -> Expr -> Expr -> ParseState Expr
+makeExprAsgn (pos, AsgnOpEq) l r = do
+  case exprToLHS l of
+    Just{} -> return ()
+    Nothing -> parseError pos $ "cannot convert expression to LHS: " ++ show l
+  return $ ExprAsgn l r
+makeExprAsgn (pos, op) l r =
+  makeExprAsgn (pos, AsgnOpEq) l r'
+  where
+    AsgnOp binop = op
+    r' = BinOp binop l r
+
+makeIncrExprAsgn :: Bool -> (Position, BinOp) -> Expr -> ParseState Expr
+makeIncrExprAsgn False (pos, op) expr =
+  makeExprAsgn (pos, AsgnOp op) expr (RawNum 1)
+makeIncrExprAsgn True (pos, op) expr = do
+  expr' <- makeIncrExprAsgn False (pos, op) expr
+  return $ BinOp op expr' minusOne
+  where minusOne = Number $ Decimal 1 True 1
 
 }

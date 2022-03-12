@@ -61,6 +61,7 @@ data Expr
     | Pattern [(TypeOrExpr, Expr)]
     | Inside  Expr [Expr]
     | MinTypMax Expr Expr Expr
+    | ExprAsgn Expr Expr
     | Nil
     deriving Eq
 
@@ -92,6 +93,7 @@ instance Show Expr where
             showPatternItem (Left t, v) = printf "%s: %s" tStr (show v)
                 where tStr = if null (show t) then "default" else show t
     show (MinTypMax a b c) = printf "(%s : %s : %s)" (show a) (show b) (show c)
+    show (ExprAsgn l r) = printf "(%s = %s)" (show l) (show r)
     show e@UniOp{} = showsPrec 0 e ""
     show e@BinOp{} = showsPrec 0 e ""
     show e@Dot  {} = showsPrec 0 e ""

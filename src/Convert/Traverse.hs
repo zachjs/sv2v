@@ -497,6 +497,10 @@ traverseSinglyNestedExprsM exprMapper = em
             e2' <- exprMapper e2
             e3' <- exprMapper e3
             return $ MinTypMax e1' e2' e3'
+        em (ExprAsgn e1 e2) = do
+            e1' <- exprMapper e1
+            e2' <- exprMapper e2
+            return $ ExprAsgn e1' e2'
         em (Nil) = return Nil
 
 traverseSinglyNestedExprs :: Mapper Expr -> Mapper Expr

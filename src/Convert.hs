@@ -21,6 +21,7 @@ import qualified Convert.DoWhile
 import qualified Convert.DuplicateGenvar
 import qualified Convert.EmptyArgs
 import qualified Convert.Enum
+import qualified Convert.ExprAsgn
 import qualified Convert.ForAsgn
 import qualified Convert.Foreach
 import qualified Convert.FuncRet
@@ -101,6 +102,7 @@ initialPhases :: Selector -> [Phase]
 initialPhases selectExclude =
     [ Convert.ForAsgn.convert
     , Convert.Jump.convert
+    , Convert.ExprAsgn.convert
     , Convert.KWArgs.convert
     , Convert.Unique.convert
     , Convert.SenseEdge.convert
