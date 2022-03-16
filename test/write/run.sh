@@ -45,13 +45,13 @@ test_adjacent() {
 test_adjacent_exist() {
     createArtifacts
     runAndCapture --write=adjacent *.sv
-    clearArtifacts
-
-    assertFalse "adjacent conversion should fail" $result
+    assertTrue "adjacent conversion should overwrite and succeed" $result
     assertNull "stdout should be empty" "$stdout"
-    assertEquals "stderr should list existing files" \
-        "Refusing to write output because the following files would be overwritten: one.v, two.v" \
-        "$stderr"
+    assertNull "stderr should be empty" "$stderr"
+
+    actual=`cat one.v two.v`
+    assertEquals "adjacent output should match combined" "$expected" "$actual"
+    clearArtifacts
 }
 
 test_adjacent_extension() {

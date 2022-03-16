@@ -4,13 +4,11 @@
  - conversion entry point
  -}
 
-import System.Directory (doesFileExist)
 import System.IO (hPrint, hPutStrLn, stderr, stdout)
 import System.Exit (exitFailure, exitSuccess)
 
-import Control.Monad (filterM, when, zipWithM_)
+import Control.Monad (when, zipWithM_)
 import Control.Monad.Except (runExceptT)
-import Data.List (intercalate)
 
 import Convert (convert)
 import Job (readJob, Job(..), Write(..))
@@ -63,11 +61,6 @@ writeOutput (File f) _ asts =
     writeFile f $ show $ concat asts
 writeOutput Adjacent inPaths asts = do
     outPaths <- mapM rewritePath inPaths
-    badPaths <- filterM doesFileExist outPaths
-    when (not $ null badPaths) $ do
-        hPutStrLn stderr $ "Refusing to write output because the following"
-            ++ " files would be overwritten: " ++ intercalate ", " badPaths
-        exitFailure
     let results = map (++ "\n") $ map show asts
     zipWithM_ writeFile outPaths results
 

@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Breaking Changes
+
+* `--write adjacent` no longer forbids overwriting existing generated files
+
 ### New Features
 
 * Added support for assignments within expressions (e.g., `x = ++y;`)
