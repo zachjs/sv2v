@@ -72,6 +72,7 @@ executable sv2v
     Convert.DuplicateGenvar
     Convert.EmptyArgs
     Convert.Enum
+    Convert.EventEdge
     Convert.ExprAsgn
     Convert.ExprUtils
     Convert.ForAsgn
@@ -96,7 +97,6 @@ executable sv2v
     Convert.RemoveComments
     Convert.ResolveBindings
     Convert.Scoper
-    Convert.SenseEdge
     Convert.Simplify
     Convert.Stream
     Convert.StringParam

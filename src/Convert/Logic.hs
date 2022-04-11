@@ -94,7 +94,7 @@ traverseModuleItem ports scopes =
                         Just (_, _, t) -> tell [isRegType t]
                         _ -> tell [False]
 
-        always_comb = AlwaysC Always . Timing (Event SenseStar)
+        always_comb = AlwaysC Always . Timing (Event EventStar)
 
         fixModuleItem :: ModuleItem -> ModuleItem
         -- rewrite bad continuous assignments to use procedural assignments
@@ -183,9 +183,6 @@ rewriteDeclM _ (Param s (IntegerVector _ sg rs) x e) =
 rewriteDeclM _ decl = return decl
 
 traverseStmtM :: Stmt -> ST Stmt
-traverseStmtM stmt@Timing{} =
-    -- ignore the timing LHSs
-    return stmt
 traverseStmtM (Asgn op Just{} lhs expr) =
     -- ignore the timing LHSs
     traverseStmtM $ Asgn op Nothing lhs expr

@@ -8,7 +8,7 @@
  - or fully supported downstream.
  -}
 
-module Convert.SenseEdge (convert) where
+module Convert.EventEdge (convert) where
 
 import Convert.Traverse
 import Language.SystemVerilog.AST
@@ -26,12 +26,16 @@ convertStmt (Timing timing stmt) =
 convertStmt other = other
 
 convertTiming :: Timing -> Timing
-convertTiming (Event sense) = Event $ convertSense sense
+convertTiming (Event event) = Event $ convertEvent event
 convertTiming other = other
 
-convertSense :: Sense -> Sense
-convertSense (SenseOr s1 s2) =
-    SenseOr (convertSense s1) (convertSense s2)
-convertSense (SenseEdge lhs) =
-    SenseOr (SensePosedge lhs) (SenseNegedge lhs)
-convertSense other = other
+convertEvent :: Event -> Event
+convertEvent EventStar = EventStar
+convertEvent (EventExpr e) = EventExpr $ convertEventExpr e
+
+convertEventExpr :: EventExpr -> EventExpr
+convertEventExpr (EventExprOr v1 v2) =
+    EventExprOr (convertEventExpr v1) (convertEventExpr v2)
+convertEventExpr (EventExprEdge Edge lhs) =
+    EventExprOr (EventExprEdge Posedge lhs) (EventExprEdge Negedge lhs)
+convertEventExpr other@EventExprEdge{} = other

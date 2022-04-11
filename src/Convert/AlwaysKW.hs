@@ -18,9 +18,9 @@ convert = map $ traverseDescriptions $ traverseModuleItems replaceAlwaysKW
 
 replaceAlwaysKW :: ModuleItem -> ModuleItem
 replaceAlwaysKW (AlwaysC AlwaysLatch stmt) =
-    AlwaysC Always $ Timing (Event SenseStar) stmt
+    AlwaysC Always $ Timing (Event EventStar) stmt
 replaceAlwaysKW (AlwaysC AlwaysComb stmt) =
-    AlwaysC Always $ Timing (Event SenseStar) stmt
+    AlwaysC Always $ Timing (Event EventStar) stmt
 replaceAlwaysKW (AlwaysC AlwaysFF stmt) =
     AlwaysC Always stmt
 replaceAlwaysKW other = other

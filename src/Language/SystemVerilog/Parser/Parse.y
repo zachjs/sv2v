@@ -406,7 +406,7 @@ time               { Token Lit_time        _ _ }
 %nonassoc "else"
 %right  "|->" "|=>" "#-#" "#=#"
 %right "iff"
-%left "or"
+%left "or" ","
 %left "and"
 %left "intersect"
 %left "within"
@@ -766,7 +766,7 @@ Deferral :: { Deferral }
 PropertySpec :: { PropertySpec }
   : OptClockingEvent "disable" "iff" "(" Expr ")" PropExpr { PropertySpec $1 $5  $7 }
   | OptClockingEvent                              PropExpr { PropertySpec $1 Nil $2 }
-OptClockingEvent :: { Maybe Sense }
+OptClockingEvent :: { Maybe EventExpr }
   : ClockingEvent { Just $1 }
   | {- empty -}   { Nothing }
 
@@ -1208,8 +1208,8 @@ TypeAsgn :: { (Identifier, Type) }
   | Identifier          { ($1, UnknownType) }
 
 -- TODO: This does not allow for @identifier
-ClockingEvent :: { Sense }
-  : "@" "(" Senses ")" { $3 }
+ClockingEvent :: { EventExpr }
+  : "@" "(" EventExpr ")" { $3 }
 
 TimingControl :: { Timing }
   : DelayOrEvent { $1 }
@@ -1228,28 +1228,27 @@ DelayControl :: { Expr }
   | "#" Identifier ParamBindings "::" Identifier { CSIdent $2 $3 $5 }
 CycleDelay :: { Expr }
   : "##" Expr { $2 }
-EventControl :: { Sense }
-  : "@" "(" Senses ")" { $3 }
-  | "@" "(*)"          { SenseStar }
-  | "@" "(" "*" ")"    { SenseStar }
-  | "@" "(*" ")"       { SenseStar }
-  | "@" "(" "*)"       { SenseStar }
-  | "@" "*"            { SenseStar }
-  | "@*"               { SenseStar }
-  | "@" Identifier     { Sense $ LHSIdent $2 }
-Senses :: { Sense }
-  : Sense             { $1 }
-  | Senses "or" Sense { SenseOr $1 $3 }
-  | Senses ","  Sense { SenseOr $1 $3 }
-Sense :: { Sense }
-  : "(" Sense ")"         {              $2 }
-  |           LHS         { Sense        $1 }
-  | "posedge" LHSOptParen { SensePosedge $2 }
-  | "negedge" LHSOptParen { SenseNegedge $2 }
-  | "edge"    LHSOptParen { SenseEdge    $2 }
-LHSOptParen :: { LHS }
-  :     LHS     { $1 }
-  | "(" LHS ")" { $2 }
+EventControl :: { Event }
+  : "@*"            { EventStar }
+  | "@" "(*)"       { EventStar }
+  | "@" "(" "*" ")" { EventStar }
+  | "@" "(*" ")"    { EventStar }
+  | "@" "(" "*)"    { EventStar }
+  | "@" "*"         { EventStar }
+  | "@" "(" EventExpr ")" { EventExpr $3 }
+  | "@" Identifier        { EventExpr $ EventExprEdge NoEdge $ Ident $2 }
+EventExpr :: { EventExpr }
+  : Expr { EventExprEdge NoEdge $1 }
+  | EventExprComplex { $1 }
+EventExprComplex :: { EventExpr }
+  : "(" EventExprComplex ")" { $2 }
+  | Edge Expr { EventExprEdge $1 $2 }
+  | EventExpr "or" EventExpr { EventExprOr $1 $3 }
+  | EventExpr ","  EventExpr { EventExprOr $1 $3 }
+Edge :: { Edge }
+  : "posedge" { Posedge }
+  | "negedge" { Negedge }
+  | "edge"    { Edge    }
 
 CaseKW :: { CaseKW }
   : "case"  { CaseN }

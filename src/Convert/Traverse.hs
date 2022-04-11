@@ -343,10 +343,11 @@ traverseAssertionExprsM mapper = assertionMapper
             spMapper PropExprFollowsNO se pe
         propExprMapper (PropExprIff p1 p2) =
             ppMapper PropExprIff p1 p2
-        propSpecMapper (PropertySpec ms e pe) = do
+        propSpecMapper (PropertySpec mv e pe) = do
+            mv' <- mapM (traverseEventExprsM mapper) mv
             e' <- mapper e
             pe' <- propExprMapper pe
-            return $ PropertySpec ms e' pe'
+            return $ PropertySpec mv' e' pe'
         assertionExprMapper (Concurrent e) =
             propSpecMapper e >>= return . Concurrent
         assertionExprMapper (Immediate d e) =
@@ -365,13 +366,6 @@ traverseStmtLHSsM :: Monad m => MapperM m LHS -> MapperM m Stmt
 traverseStmtLHSsM mapper = stmtMapper
     where
         fullMapper = mapper
-        stmtMapper (Timing (Event sense) stmt) = do
-            sense' <- senseMapper sense
-            return $ Timing (Event sense') stmt
-        stmtMapper (Asgn op (Just (Event sense)) lhs expr) = do
-            lhs' <- fullMapper lhs
-            sense' <- senseMapper sense
-            return $ Asgn op (Just $ Event sense') lhs' expr
         stmtMapper (Asgn op mt lhs expr) =
             fullMapper lhs >>= \lhs' -> return $ Asgn op mt lhs' expr
         stmtMapper (For inits me incrs stmt) = do
@@ -380,31 +374,7 @@ traverseStmtLHSsM mapper = stmtMapper
             lhss' <- mapM fullMapper lhss
             let incrs' = zip3 lhss' asgnOps exprs
             return $ For inits' me incrs' stmt
-        stmtMapper (Assertion a) =
-            assertionMapper a >>= return . Assertion
         stmtMapper other = return other
-        senseMapper (Sense        lhs) = fullMapper lhs >>= return . Sense
-        senseMapper (SensePosedge lhs) = fullMapper lhs >>= return . SensePosedge
-        senseMapper (SenseNegedge lhs) = fullMapper lhs >>= return . SenseNegedge
-        senseMapper (SenseEdge    lhs) = fullMapper lhs >>= return . SenseEdge
-        senseMapper (SenseOr    s1 s2) = do
-            s1' <- senseMapper s1
-            s2' <- senseMapper s2
-            return $ SenseOr s1' s2'
-        senseMapper (SenseStar       ) = return SenseStar
-        assertionExprMapper (Concurrent (PropertySpec (Just sense) me pe)) = do
-            sense' <- senseMapper sense
-            return $ Concurrent $ PropertySpec (Just sense') me pe
-        assertionExprMapper other = return other
-        assertionMapper (Assert e ab) = do
-            e' <- assertionExprMapper e
-            return $ Assert e' ab
-        assertionMapper (Assume e ab) = do
-            e' <- assertionExprMapper e
-            return $ Assume e' ab
-        assertionMapper (Cover e stmt) = do
-            e' <- assertionExprMapper e
-            return $ Cover e' stmt
 
 traverseStmtLHSs :: Mapper LHS -> Mapper Stmt
 traverseStmtLHSs = unmonad traverseStmtLHSsM
@@ -672,7 +642,6 @@ traverseStmtExprsM exprMapper = flatStmtMapper
     caseMapper (exprs, stmt) = do
         exprs' <- mapM exprMapper exprs
         return (exprs', stmt)
-    stmtMapper = traverseNestedStmtsM flatStmtMapper
     flatStmtMapper (StmtAttr attr stmt) =
         -- note: we exclude expressions in attributes from conversion
         return $ StmtAttr attr stmt
@@ -702,7 +671,8 @@ traverseStmtExprsM exprMapper = flatStmtMapper
     flatStmtMapper (Foreach x vars stmt) = return $ Foreach x vars stmt
     flatStmtMapper (If u cc s1 s2) =
         exprMapper cc >>= \cc' -> return $ If u cc' s1 s2
-    flatStmtMapper (Timing event stmt) = return $ Timing event stmt
+    flatStmtMapper (Timing timing stmt) =
+        timingMapper timing >>= \timing' -> return $ Timing timing' stmt
     flatStmtMapper (Subroutine e (Args l p)) = do
         e' <- exprMapper e
         l' <- mapM exprMapper l
@@ -712,16 +682,30 @@ traverseStmtExprsM exprMapper = flatStmtMapper
     flatStmtMapper (Return expr) =
         exprMapper expr >>= return . Return
     flatStmtMapper (Trigger blocks x) = return $ Trigger blocks x
-    flatStmtMapper (Assertion a) = do
-        a' <- traverseAssertionStmtsM stmtMapper a
-        a'' <- traverseAssertionExprsM exprMapper a'
-        return $ Assertion a''
+    flatStmtMapper (Assertion a) =
+        traverseAssertionExprsM exprMapper a >>= return . Assertion
     flatStmtMapper (Continue) = return Continue
     flatStmtMapper (Break) = return Break
     flatStmtMapper (Null) = return Null
     flatStmtMapper (CommentStmt c) = return $ CommentStmt c
 
     asgnMapper (l, op, e) = exprMapper e >>= \e' -> return $ (l, op, e')
+
+    timingMapper (Event e) = eventMapper e >>= return . Event
+    timingMapper (Delay e) = exprMapper e >>= return . Delay
+    timingMapper (Cycle e) = exprMapper e >>= return . Cycle
+
+    eventMapper EventStar = return EventStar
+    eventMapper (EventExpr e) =
+        traverseEventExprsM exprMapper e >>= return . EventExpr
+
+traverseEventExprsM :: Monad m => MapperM m Expr -> MapperM m EventExpr
+traverseEventExprsM mapper (EventExprEdge edge expr) =
+    mapper expr >>= return . EventExprEdge edge
+traverseEventExprsM mapper (EventExprOr e1 e2) = do
+    e1' <- traverseEventExprsM mapper e1
+    e2' <- traverseEventExprsM mapper e2
+    return $ EventExprOr e1' e2'
 
 traverseStmtExprs :: Mapper Expr -> Mapper Stmt
 traverseStmtExprs = unmonad traverseStmtExprsM

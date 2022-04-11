@@ -8,7 +8,9 @@
 module Language.SystemVerilog.AST.Stmt
     ( Stmt   (..)
     , Timing (..)
-    , Sense  (..)
+    , Event        (..)
+    , EventExpr    (..)
+    , Edge         (..)
     , CaseKW (..)
     , Case
     , ActionBlock  (..)
@@ -160,32 +162,46 @@ instance Show CaseKW where
 type Case = ([Expr], Stmt)
 
 data Timing
-    = Event Sense
+    = Event Event
     | Delay Expr
     | Cycle Expr
     deriving Eq
 
 instance Show Timing where
-    show (Event s) = printf  "@(%s)" (show s)
+    show (Event e) = printf  "@(%s)" (show e)
     show (Delay e) = printf  "#(%s)" (show e)
     show (Cycle e) = printf "##(%s)" (show e)
 
-data Sense
-    = Sense        LHS
-    | SenseOr      Sense Sense
-    | SensePosedge LHS
-    | SenseNegedge LHS
-    | SenseEdge    LHS
-    | SenseStar
+data Event
+    = EventStar
+    | EventExpr EventExpr
     deriving Eq
 
-instance Show Sense where
-    show (Sense        a  ) = show a
-    show (SenseOr      a b) = printf "%s or %s" (show a) (show b)
-    show (SensePosedge a  ) = printf "posedge %s" (show a)
-    show (SenseNegedge a  ) = printf "negedge %s" (show a)
-    show (SenseEdge    a  ) = printf "edge %s" (show a)
-    show (SenseStar       ) = "*"
+instance Show Event where
+    show EventStar = "*"
+    show (EventExpr e) = show e
+
+data EventExpr
+    = EventExprEdge Edge Expr
+    | EventExprOr EventExpr EventExpr
+    deriving Eq
+
+instance Show EventExpr where
+    show (EventExprEdge g e) = printf "%s%s" (showPad g) (show e)
+    show (EventExprOr   a b) = printf "%s or %s" (show a) (show b)
+
+data Edge
+    = Posedge
+    | Negedge
+    | Edge
+    | NoEdge
+    deriving Eq
+
+instance Show Edge where
+    show Posedge = "posedge"
+    show Negedge = "negedge"
+    show Edge    = "edge"
+    show NoEdge  = ""
 
 data ActionBlock
     = ActionBlock Stmt Stmt
@@ -273,15 +289,15 @@ instance Show Deferral where
     show FinalDeferred = "final"
 
 data PropertySpec
-    = PropertySpec (Maybe Sense) Expr PropExpr
+    = PropertySpec (Maybe EventExpr) Expr PropExpr
     deriving Eq
 instance Show PropertySpec where
-    show (PropertySpec ms e pe) =
-        printf "%s%s\n\t%s" msStr eStr (show pe)
+    show (PropertySpec mv e pe) =
+        printf "%s%s\n\t%s" mvStr eStr (show pe)
         where
-            msStr = case ms of
+            mvStr = case mv of
                 Nothing -> ""
-                Just s -> printf "@(%s) " (show s)
+                Just v -> printf "@(%s) " (show v)
             eStr = case e of
                 Nil -> ""
                 _ -> printf "disable iff (%s)" (show e)

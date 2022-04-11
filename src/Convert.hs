@@ -21,6 +21,7 @@ import qualified Convert.DoWhile
 import qualified Convert.DuplicateGenvar
 import qualified Convert.EmptyArgs
 import qualified Convert.Enum
+import qualified Convert.EventEdge
 import qualified Convert.ExprAsgn
 import qualified Convert.ForAsgn
 import qualified Convert.Foreach
@@ -43,7 +44,6 @@ import qualified Convert.ParamType
 import qualified Convert.PortDecl
 import qualified Convert.RemoveComments
 import qualified Convert.ResolveBindings
-import qualified Convert.SenseEdge
 import qualified Convert.Simplify
 import qualified Convert.Stream
 import qualified Convert.StringParam
@@ -105,7 +105,7 @@ initialPhases selectExclude =
     , Convert.ExprAsgn.convert
     , Convert.KWArgs.convert
     , Convert.Unique.convert
-    , Convert.SenseEdge.convert
+    , Convert.EventEdge.convert
     , Convert.LogOp.convert
     , Convert.EmptyArgs.convert
     , Convert.DoWhile.convert
