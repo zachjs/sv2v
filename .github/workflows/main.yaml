@@ -41,7 +41,7 @@ jobs:
           - macOS-10.15
     needs: build
     env:
-      IVERILOG_REF: 96a1cbf7b2866c41ba8fcdcc0f76f22590d08030
+      IVERILOG_REF: 7c5694e5163e905b7ba85096ae67e5f28862db48
     steps:
       - uses: actions/checkout@v1
       - name: Install Dependencies (macOS)

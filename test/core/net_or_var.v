@@ -2,9 +2,9 @@
 module top;
     `TEST_ALL(reg, logic)
     `TEST_ALL(wire, wire)
-    `TEST_ALL(wire logic, wire_logic)
+    `TEST_ALL(wire, wire_logic)
     `TEST_ALL(wand, wand)
-    `TEST_ALL(wand logic, wand_logic)
+    `TEST_ALL(wand, wand_logic)
     `TEST_ALL(reg, var)
     `TEST_ALL(reg, var_logic)
     `TEST_ALL(reg, reg)
