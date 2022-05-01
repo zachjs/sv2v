@@ -34,6 +34,13 @@ module top;
         else
             k = inp * 2 + 1;
     endfunction
+    function automatic integer l;
+        input integer inp;
+        if (inp > 5)
+            l = 32;
+        else
+            l = 2 ** inp;
+    endfunction
     integer i;
     initial
         for (i = 0; i < 10; i = i + 1) begin
@@ -42,5 +49,6 @@ module top;
             $display("h(%0d) = %0d", i, h(i));
             $display("j(%0d) = %0d", i, j(i));
             $display("k(%0d) = %0d", i, k(i));
+            $display("l(%0d) = %0d", i, l(i));
         end
 endmodule

@@ -44,6 +44,15 @@ module top;
                 return k * 3;
         k = k * 2 + 1;
     endfunction
+    function automatic integer l;
+        input integer inp;
+        l = 1;
+        for (integer idx = inp; 0 < idx; idx--) begin
+            if (l == 32)
+                break;
+            l = l * 2;
+        end
+    endfunction
     integer i;
     initial
         for (i = 0; i < 10; i = i + 1) begin
@@ -52,5 +61,6 @@ module top;
             $display("h(%0d) = %0d", i, h(i));
             $display("j(%0d) = %0d", i, j(i));
             $display("k(%0d) = %0d", i, k(i));
+            $display("l(%0d) = %0d", i, l(i));
         end
 endmodule

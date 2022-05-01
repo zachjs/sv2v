@@ -121,11 +121,24 @@ convertStmts stmts = do
 pattern SimpleLoopInits :: Identifier -> [(LHS, Expr)]
 pattern SimpleLoopInits var <- [(LHSIdent var, _)]
 
-pattern SimpleLoopGuard :: Identifier -> Expr
-pattern SimpleLoopGuard var <- BinOp _ (Ident var) _
-
 pattern SimpleLoopIncrs :: Identifier -> [(LHS, AsgnOp, Expr)]
 pattern SimpleLoopIncrs var <- [(LHSIdent var, _, _)]
+
+-- check if an expression contains a reference to the given identifier
+usesIdent :: Identifier -> Expr -> Writer Any ()
+usesIdent x (Ident y)
+    | x == y = tell $ Any True
+    | otherwise = return ()
+usesIdent x expr =
+    collectSinglyNestedExprsM (usesIdent x) expr
+
+-- identifies loops which could likely be statically unrolled, and so may
+-- benefit from avoiding complicating the loop guard with jump state, assuming
+-- the guard and incrementation do not have side effects
+simpleLoopVar :: [(LHS, Expr)] -> Expr -> [(LHS, AsgnOp, Expr)] -> Identifier
+simpleLoopVar (SimpleLoopInits var1) comp (SimpleLoopIncrs var3)
+    | var1 == var3, getAny $ execWriter $ usesIdent var1 comp = var1
+simpleLoopVar _ _ _ = ""
 
 -- rewrites the given statement, and returns the type of any unfinished jump
 convertStmt :: Stmt -> State Info Stmt
@@ -140,20 +153,12 @@ convertStmt (Block Par x decls stmts) = do
 
 convertStmt (Block Seq ""
     decls@[CommentDecl{}, Variable Local _ var0 [] Nil]
-    [ comment@CommentStmt{}
-    , For
-        inits@(SimpleLoopInits var1)
-        comp@(SimpleLoopGuard var2)
-        incr@(SimpleLoopIncrs var3)
-        stmt
-    ]) =
-    convertLoop localInfo loop comp incr stmt
+    [comment@CommentStmt{}, For inits comp incr stmt])
+    | var1@(_ : _) <- simpleLoopVar inits comp incr, var0 == var1 =
+    convertLoop (Just var1) loop comp incr stmt
         >>= return . Block Seq "" decls . (comment :) . pure
     where
         loop c i s = For inits c i s
-        localInfo = if var0 /= var1 || var1 /= var2 || var2 /= var3
-                        then Nothing
-                        else Just ""
 
 convertStmt (Block Seq x decls stmts) =
     step stmts >>= return . Block Seq x decls
@@ -192,16 +197,11 @@ convertStmt (Case unique kw expr cases) = do
     modify $ \s -> s { sHasJump = hasJump }
     return $ Case unique kw expr cases'
 
-convertStmt (For
-    inits@(SimpleLoopInits var1)
-    comp@(SimpleLoopGuard var2)
-    incr@(SimpleLoopIncrs var3) stmt) =
-    convertLoop localInfo loop comp incr stmt
+convertStmt (For inits comp incr stmt)
+    | var@(_ : _) <- simpleLoopVar inits comp incr =
+    convertLoop (Just var) loop comp incr stmt
     where
         loop c i s = For inits c i s
-        localInfo = if var1 /= var2 || var2 /= var3
-                        then Nothing
-                        else Just var1
 convertStmt (For inits comp incr stmt) =
     convertLoop Nothing loop comp incr stmt
     where loop c i s = For inits c i s
