@@ -52,6 +52,7 @@ data Type
     | TypeOf Expr
     | TypedefRef Expr
     | UnpackedType Type [Range] -- used internally
+    | Void
     deriving Eq
 
 instance Show Type where
@@ -74,6 +75,7 @@ instance Show Type where
     show (TypeOf expr) = printf "type(%s)" (show expr)
     show (UnpackedType t rs) = printf "UnpackedType(%s, %s)" (show t) (showRanges rs)
     show (TypedefRef e) = show e
+    show Void = "void"
 
 showFields :: [Field] -> String
 showFields items = itemsStr
@@ -102,6 +104,7 @@ typeRanges typ =
         NonInteger    kw       -> (nullRange $ NonInteger  kw   , [])
         TypeOf            expr -> (nullRange $ TypeOf       expr, [])
         TypedefRef        expr -> (nullRange $ TypedefRef   expr, [])
+        Void                   -> (nullRange Void               , [])
 
 nullRange :: Type -> ([Range] -> Type)
 nullRange t [] = t

@@ -32,6 +32,7 @@ convertDescription description@Part{} =
 convertDescription other = other
 
 collectFunctionsM :: ModuleItem -> Writer Idents ()
+collectFunctionsM (MIPackageItem (Function _ Void _ _ _)) = return ()
 collectFunctionsM (MIPackageItem (Function _ _ f _ _)) =
     tell $ Set.singleton f
 collectFunctionsM _ = return ()

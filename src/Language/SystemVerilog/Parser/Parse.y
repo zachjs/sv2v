@@ -924,7 +924,6 @@ ImportOrExport :: { [PackageItem] }
   | "export" "*" "::" "*" ";"       { [Export "" ""] }
 TaskOrFunction :: { PackageItem }
   : "function" Lifetime FuncRetAndName    TFItems DeclsAndStmts endfunction StrTag {% checkTag (snd $3) $7 $ Function $2 (fst $3) (snd $3) (map makeInput $4 ++ fst $5) (snd $5) }
-  | "function" Lifetime "void" Identifier TFItems DeclsAndStmts endfunction StrTag {% checkTag $4       $8 $ Task     $2 $4                ($5 ++ fst $6) (snd $6) }
   | "task"     Lifetime Identifier        TFItems DeclsAndStmts endtask     StrTag {% checkTag $3       $7 $ Task     $2 $3                ($4 ++ fst $5) (snd $5) }
 Typedef :: { Decl }
   : "typedef" Type Identifier ";" { ParamType Localparam $3 $2 }
@@ -965,7 +964,6 @@ OptDPIImportProperty :: { DPIImportProperty }
 
 DPITFProto :: { (Type, Identifier, [Decl]) }
   : "function" FuncRetAndName    TFItems { (fst $2     , snd $2, $3) }
-  | "function" "void" Identifier TFItems { (UnknownType,     $3, $4) }
   | "task"     Identifier        TFItems { (UnknownType,     $2, $3) }
 
 Directive :: { String }
@@ -995,6 +993,7 @@ FuncRetAndName :: { (Type, Identifier) }
   | Signing                    Identifier { (Implicit $1          [], $2) }
   |         DimensionsNonEmpty Identifier { (Implicit Unspecified $1, $2) }
   | Signing DimensionsNonEmpty Identifier { (Implicit $1          $2, $3) }
+  | "void"                     Identifier { (Void                   , $2) }
 
 AlwaysKW :: { AlwaysKW }
   : "always"       { Always      }

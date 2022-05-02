@@ -30,14 +30,16 @@ convertDescription description@Part{} =
 convertDescription other = other
 
 traverseFunctionsM :: ModuleItem -> Writer Idents ModuleItem
-traverseFunctionsM (MIPackageItem (Function ml t f decls stmts)) = do
+traverseFunctionsM item@(MIPackageItem (Function _ Void _ _ _)) =
+    return item
+traverseFunctionsM (MIPackageItem (Function l t f decls stmts)) = do
     decls' <-
         if any isInput decls
             then return decls
             else do
                 tell $ Set.singleton f
                 return $ dummyDecl : decls
-    return $ MIPackageItem $ Function ml t f decls' stmts
+    return $ MIPackageItem $ Function l t f decls' stmts
     where
         dummyType = IntegerVector TReg Unspecified []
         dummyDecl = Variable Input dummyType "_sv2v_unused" [] Nil

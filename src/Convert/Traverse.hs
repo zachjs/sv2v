@@ -834,6 +834,7 @@ traverseSinglyNestedTypesM mapper = tm
         tm (UnpackedType t r) = do
             t' <- mapper t
             return $ UnpackedType t' r
+        tm Void = return Void
 
 traverseSinglyNestedTypes :: Mapper Type -> Mapper Type
 traverseSinglyNestedTypes = unmonad traverseSinglyNestedTypesM
