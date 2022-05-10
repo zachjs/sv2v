@@ -29,6 +29,8 @@
   intentional width-extending operations such as `+ 0` and `* 1`
 * Fixed forced conversion to `reg` of data sensed in an edge-controlled
   procedural assignment
+* `always_comb` and `always_latch` now generate explicit sensitivity lists where
+  necessary because of calls to functions which reference non-local data
 
 ## v0.0.9
 
