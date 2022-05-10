@@ -31,7 +31,7 @@ import Text.Printf (printf)
 import Language.SystemVerilog.AST.ShowHelp (commas, indent, unlines', showPad, showBlock)
 import Language.SystemVerilog.AST.Attr (Attr)
 import Language.SystemVerilog.AST.Decl (Decl)
-import Language.SystemVerilog.AST.Expr (Expr(Call, Ident, Nil), Args(..), Range, showRange)
+import Language.SystemVerilog.AST.Expr (Expr(Call, Ident, Nil), Args(..), Range, showRange, showAssignment)
 import Language.SystemVerilog.AST.LHS (LHS)
 import Language.SystemVerilog.AST.Op (AsgnOp(AsgnOpEq))
 import Language.SystemVerilog.AST.Type (Identifier)
@@ -53,6 +53,7 @@ data Stmt
     | Subroutine Expr Args
     | Trigger Bool Identifier
     | Assertion Assertion
+    | Force Bool LHS Expr
     | Continue
     | Break
     | Null
@@ -98,6 +99,13 @@ instance Show Stmt where
     show (Timing    t s) = printf "%s%s" (show t) (showShortBranch s)
     show (Trigger   b x) = printf "->%s %s;" (if b then "" else ">") x
     show (Assertion   a) = show a
+    show (Force  kw l e) = printf "%s %s%s;" kwStr (show l) (showAssignment e)
+        where
+            kwStr = case (kw, e /= Nil) of
+                (True , True ) -> "force"
+                (True , False) -> "release"
+                (False, True ) -> "assign"
+                (False, False) -> "deassign"
     show (Continue     ) = "continue;"
     show (Break        ) = "break;"
     show (Null         ) = ";"

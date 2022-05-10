@@ -1134,6 +1134,10 @@ StmtNonBlock :: { Stmt }
   | AttributeInstance Stmt                     { StmtAttr $1 $2 }
   | ProceduralAssertionStatement               { Assertion $1 }
   | "void" "'" "(" Expr CallArgs ")" ";"       { Subroutine $4 $5 }
+  | "assign"   LHS "=" Expr ";"                { Force False $2  $4 }
+  | "deassign" LHS          ";"                { Force False $2 Nil }
+  | "force"    LHS "=" Expr ";"                { Force True  $2  $4 }
+  | "release"  LHS          ";"                { Force True  $2 Nil }
 
 OptDelayOrEvent :: { Maybe Timing }
   : DelayOrEvent { Just $1 }

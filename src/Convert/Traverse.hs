@@ -255,6 +255,7 @@ traverseSinglyNestedStmtsM fullMapper = cs
         cs (Return expr) = return $ Return expr
         cs (Subroutine expr exprs) = return $ Subroutine expr exprs
         cs (Trigger blocks x) = return $ Trigger blocks x
+        cs stmt@Force{} = return stmt
         cs (Assertion a) =
             traverseAssertionStmtsM fullMapper a >>= return . Assertion
         cs (Continue) = return Continue
@@ -374,6 +375,8 @@ traverseStmtLHSsM mapper = stmtMapper
             lhss' <- mapM fullMapper lhss
             let incrs' = zip3 lhss' asgnOps exprs
             return $ For inits' me incrs' stmt
+        stmtMapper (Force kw l e) =
+            fullMapper l >>= \l' -> return $ Force kw l' e
         stmtMapper other = return other
 
 traverseStmtLHSs :: Mapper LHS -> Mapper Stmt
@@ -682,6 +685,10 @@ traverseStmtExprsM exprMapper = flatStmtMapper
     flatStmtMapper (Return expr) =
         exprMapper expr >>= return . Return
     flatStmtMapper (Trigger blocks x) = return $ Trigger blocks x
+    flatStmtMapper (Force kw l e) = do
+        l' <- lhsMapper l
+        e' <- exprMapper e
+        return $ Force kw l' e'
     flatStmtMapper (Assertion a) =
         traverseAssertionExprsM exprMapper a >>= return . Assertion
     flatStmtMapper (Continue) = return Continue
@@ -1075,6 +1082,9 @@ traverseStmtAsgnsM mapper = stmtMapper
         stmtMapper (Asgn op mt lhs expr) = do
             (lhs', expr') <- mapper (lhs, expr)
             return $ Asgn op mt lhs' expr'
+        stmtMapper (Force kw lhs expr) | expr /= Nil = do
+            (lhs', expr') <- mapper (lhs, expr)
+            return $ Force kw lhs' expr'
         stmtMapper other = return other
 
 traverseStmtAsgns :: Mapper (LHS, Expr) -> Mapper Stmt

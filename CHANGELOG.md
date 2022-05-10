@@ -13,6 +13,8 @@
 * Added support for complex event expressions (e.g., `@(x ^ y)`)
 * Added support for the SystemVerilog `edge` event
 * Added support for cycle delay ranges in assertion sequence expressions
+* Added support for procedural continuous assignments (`assign`/`deassign` and
+  `force`/`release`)
 * Added conversion for `do` `while` loops
 * Added support for passing through DPI imports and exports
 * Added support for passing through functions with output ports
