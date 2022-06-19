@@ -156,9 +156,9 @@ convertExpr scopes =
     where
         -- removes the innermost dimensions of the given type information, and
         -- applies the given transformation to the expression
-        dropLevel :: (Expr -> Expr) -> (TypeInfo, Expr) -> (TypeInfo, Expr)
-        dropLevel nest ((t, a), expr) =
-            ((tf rs', a'), nest expr)
+        dropLevel :: TypeInfo -> TypeInfo
+        dropLevel (t, a) =
+            (tf rs', a')
             where
                 (tf, rs) = typeRanges t
                 (rs', a') = case (rs, a) of
@@ -166,48 +166,46 @@ convertExpr scopes =
                     (packed, []) -> (tail packed, [])
                     (packed, unpacked) -> (packed, tail unpacked)
 
-        -- given an expression, returns its type information and a tagged
-        -- version of the expression, if possible
-        levels :: Expr -> Maybe (TypeInfo, Expr)
+        -- given an expression, returns its type information, if possible
+        levels :: Expr -> Maybe TypeInfo
         levels (Bit expr a) =
             case levels expr of
-                Just info -> Just $ dropLevel (\expr' -> Bit expr' a) info
+                Just info -> Just $ dropLevel info
                 Nothing -> fallbackLevels $ Bit expr a
-        levels (Range expr a b) =
-            fmap (dropLevel $ \expr' -> Range expr' a b) (levels expr)
+        levels (Range expr _ _) =
+            fmap dropLevel $ levels expr
         levels (Dot expr x) =
             case levels expr of
-                Just ((Struct _ fields [], []), expr') -> dropDot fields expr'
-                Just ((Union  _ fields [], []), expr') -> dropDot fields expr'
+                Just (Struct _ fields [], []) -> dropDot fields
+                Just (Union  _ fields [], []) -> dropDot fields
                 _ -> fallbackLevels $ Dot expr x
             where
-                dropDot :: [Field] -> Expr -> Maybe (TypeInfo, Expr)
-                dropDot fields expr' =
+                dropDot :: [Field] -> Maybe TypeInfo
+                dropDot fields =
                     if Map.member x fieldMap
-                        then Just ((fieldType, []), Dot expr' x)
+                        then Just (fieldType, [])
                         else Nothing
                     where
                         fieldMap = Map.fromList $ map swap fields
                         fieldType = fieldMap Map.! x
         levels expr = fallbackLevels expr
 
-        fallbackLevels :: Expr -> Maybe (TypeInfo, Expr)
+        fallbackLevels :: Expr -> Maybe TypeInfo
         fallbackLevels expr =
-            fmap ((, expr) . thd3) res
+            fmap thd3 res
             where
                 res = lookupElem scopes expr
                 thd3 (_, _, c) = c
 
         -- given an expression, returns the two most significant (innermost,
-        -- leftmost) packed dimensions and a tagged version of the expression,
-        -- if possible
-        dims :: Expr -> Maybe (Range, Range, Expr)
+        -- leftmost) packed dimensions
+        dims :: Expr -> Maybe (Range, Range)
         dims expr =
             case levels expr of
-                Just ((t, []), expr') ->
+                Just (t, []) ->
                     case snd $ typeRanges t of
                         dimInner : dimOuter : _ ->
-                            Just (dimInner, dimOuter, expr')
+                            Just (dimInner, dimOuter)
                         _ -> Nothing
                 _ -> Nothing
 
@@ -224,20 +222,15 @@ convertExpr scopes =
         -- the prefixed identifier is encountered at the lowest level, it is
         -- removed.
 
-        tag = ':'
-
         rewriteExpr :: Expr -> Expr
-        rewriteExpr (Ident x) =
-            if head x == tag
-                then Ident $ tail x
-                else Ident x
+        rewriteExpr expr@Ident{} = expr
         rewriteExpr orig@(Bit (Bit expr idxInner) idxOuter) =
             if isJust maybeDims && expr == rewriteExpr expr
-                then Bit expr' idx'
+                then Bit expr idx'
                 else rewriteExprLowPrec orig
             where
                 maybeDims = dims expr
-                Just (dimInner, dimOuter, expr') = maybeDims
+                Just (dimInner, dimOuter) = maybeDims
                 idxInner' = orientIdx dimInner idxInner
                 idxOuter' = orientIdx dimOuter idxOuter
                 base = binOp Mul idxInner' (rangeSize dimOuter)
@@ -256,11 +249,11 @@ convertExpr scopes =
                 range = (base, len)
         rewriteExpr orig@(Range (Bit expr idxInner) modeOuter rangeOuter) =
             if isJust maybeDims && expr == rewriteExpr expr
-                then Range expr' modeOuter range'
+                then Range expr modeOuter range'
                 else rewriteExprLowPrec orig
             where
                 maybeDims = dims expr
-                Just (dimInner, dimOuter, expr') = maybeDims
+                Just (dimInner, dimOuter) = maybeDims
                 idxInner' = orientIdx dimInner idxInner
                 (baseOuter, lenOuter) = rangeOuter
                 baseOuter' = orientIdx dimOuter baseOuter
@@ -279,11 +272,11 @@ convertExpr scopes =
         rewriteExprLowPrec :: Expr -> Expr
         rewriteExprLowPrec orig@(Bit expr idx) =
             if isJust maybeDims && expr == rewriteExpr expr
-                then Range expr' mode' range'
+                then Range expr mode' range'
                 else orig
             where
                 maybeDims = dims expr
-                Just (dimInner, dimOuter, expr') = maybeDims
+                Just (dimInner, dimOuter) = maybeDims
                 mode' = IndexedPlus
                 idx' = orientIdx dimInner idx
                 len = rangeSize dimOuter
@@ -302,11 +295,11 @@ convertExpr scopes =
                 range' = (base, len)
         rewriteExprLowPrec orig@(Range expr mode range) =
             if isJust maybeDims && expr == rewriteExpr expr
-                then Range expr' mode' range'
+                then Range expr mode' range'
                 else orig
             where
                 maybeDims = dims expr
-                Just (dimInner, dimOuter, expr') = maybeDims
+                Just (dimInner, dimOuter) = maybeDims
                 sizeOuter = rangeSize dimOuter
                 offsetOuter = uncurry (endianCondExpr dimOuter) $ swap dimOuter
                 (baseOrig, lenOrig) = range
