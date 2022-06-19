@@ -206,4 +206,34 @@ module top;
     `ASSERT_UNSIGNED(STR_L)
     `ASSERT_UNSIGNED(64'(STR_P))
     `ASSERT_UNSIGNED(64'(STR_L))
+
+    struct packed {
+        logic w;
+        logic signed x;
+        logic [1:0] y;
+        logic signed [1:0] z;
+        struct packed {
+            logic w;
+            logic signed x;
+            logic [1:0] y;
+            logic signed [1:0] z;
+        } i;
+    } s = '1;
+    struct packed signed {
+        logic w;
+        logic signed x;
+        logic [1:0] y;
+        logic signed [1:0] z;
+    } t = '1;
+    `ASSERT_UNSIGNED(s)
+    `ASSERT_UNSIGNED(s.w)
+    `ASSERT_UNSIGNED(s.y)
+    `ASSERT_SIGNED(s.x)
+    `ASSERT_SIGNED(s.z)
+    `ASSERT_UNSIGNED(s.i)
+    `ASSERT_UNSIGNED(s.i.w)
+    `ASSERT_UNSIGNED(s.i.y)
+    `ASSERT_SIGNED(s.i.x)
+    `ASSERT_SIGNED(s.i.z)
+    `ASSERT_SIGNED(t)
 endmodule

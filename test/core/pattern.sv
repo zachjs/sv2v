@@ -5,8 +5,15 @@ module test;
         logic z;
     } struct_a;
     struct_a a;
+    wire signed [31:0] a_w, a_x;
+    wire signed [7:0] a_y;
+    assign a_w = a.w;
+    assign a_x = a.x;
+    assign a_y = a.y;
     initial begin
-        $monitor("%2d: %b %b %b %b %b", $time, a, a.w, a.x, a.y, a.z);
+        // TODO: The signed fields should not have to be indirected here, but
+        // iverilog does not currently support complex arguments to $monitor.
+        $monitor("%2d: %b %b %b %b %b", $time, a, a_w, a_x, a_y, a.z);
 
         #1 a.w = 0;
         #1 a.x = 0;
@@ -41,9 +48,13 @@ module test;
         logic z;
     } struct_b;
     struct_b b;
+    wire signed [31:0] b_x;
+    assign b_x = b.x;
     initial begin
         #100;
-        $monitor("%2d: %b %b %b %b", $time, b, b.x, b.y, b.z);
+        // TODO: The signed fields should not have to be indirected here, but
+        // iverilog does not currently support complex arguments to $monitor.
+        $monitor("%2d: %b %b %b %b", $time, b, b_x, b.y, b.z);
 
         #1 b.x = 0;
         #1 b.y = 0;

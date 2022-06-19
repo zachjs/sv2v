@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TupleSections #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
@@ -363,12 +364,19 @@ fallbackType scopes e =
                 Nothing -> UnknownType
                 Just (_, _, typ) -> typ
 
+pattern MakeSigned :: Expr -> Expr
+pattern MakeSigned e = Call (Ident "$signed") (Args [e] [])
+
 -- converting LHSs by looking at the innermost types first
 convertLHS :: LHS -> Scoper Type (Type, LHS)
 convertLHS l = do
     let e = lhsToExpr l
     (t, e') <- embedScopes convertSubExpr e
-    let Just l' = exprToLHS e'
+    -- per IEEE 1800-2017 sections 10.7 and 11.8, the signedness of the LHS does
+    -- not affect the evaluation and sign-extension of the RHS
+    let Just l' = exprToLHS $ case e' of
+                        MakeSigned e'' -> e''
+                        _ -> e'
     return (t, l')
 
 -- try expression conversion by looking at the *innermost* type first
@@ -379,7 +387,7 @@ convertSubExpr scopes (Dot e x) =
     else if structIsntReady subExprType then
         (fieldType, Dot e' x)
     else
-        (fieldType, undotted)
+        (fieldType, undottedWithSign)
     where
         (subExprType, e') = convertSubExpr scopes e
         (fieldType, bounds, dims) = lookupFieldInfo scopes subExprType e' x
@@ -388,6 +396,14 @@ convertSubExpr scopes (Dot e x) =
         undotted = if null dims || rangeSize (head dims) == RawNum 1
             then Bit e' (fst bounds)
             else Range e' IndexedMinus (base, len)
+        -- retain signedness of fields which would otherwise be lost via the
+        -- resulting bit or range selection
+        IntegerVector _ fieldSg _ = fieldType
+        undottedWithSign =
+            if fieldSg == Signed
+                then MakeSigned undotted
+                else undotted
+
 convertSubExpr scopes (Range (Dot e x) NonIndexed rOuter) =
     if isntStruct subExprType then
         (UnknownType, orig')

@@ -33,6 +33,8 @@
   procedural assignment
 * `always_comb` and `always_latch` now generate explicit sensitivity lists where
   necessary because of calls to functions which reference non-local data
+* Fixed signed `struct` fields being converted to unsigned expressions when
+  accessed directly
 
 ## v0.0.9
 

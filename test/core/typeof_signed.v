@@ -27,4 +27,9 @@ module top;
     `MAKE_PRIM(logic, 1)
 
     reg signed [5:0] arr;
+
+    reg signed [11:0] s;
+    initial s = 1'sb1;
+    reg [5:0] t;
+    initial t = 1'sb1;
 endmodule
