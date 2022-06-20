@@ -5,7 +5,7 @@
  - Conversion for flattening variables with multiple packed dimensions
  -
  - This removes one packed dimension per identifier per pass. This works fine
- - because all conversions are repeatedly applied.
+ - because this conversion is repeatedly applied.
  -
  - We previously had a very complex conversion which used `generate` to make
  - flattened and unflattened versions of the array as necessary. This has now
@@ -28,6 +28,7 @@ module Convert.MultiplePacked (convert) where
 
 import Convert.ExprUtils
 import Control.Monad ((>=>))
+import Data.Bifunctor (first)
 import Data.Tuple (swap)
 import Data.Maybe (isJust)
 import qualified Data.Map.Strict as Map
@@ -59,30 +60,34 @@ traverseDeclM (Param s t ident e) = do
     traverseDeclExprsM traverseExprM $ Param s t' ident e
 traverseDeclM other = traverseDeclExprsM traverseExprM other
 
+-- write down the given declaration and then flatten it
 traverseTypeM :: Type -> [Range] -> Identifier -> Scoper TypeInfo Type
 traverseTypeM t a ident = do
     tScoped <- scopeType t
     insertElem ident (tScoped, a)
-    t' <- case t of
-        Struct pk fields rs -> do
-            fields' <- flattenFields fields
-            return $ Struct pk fields' rs
-        Union  pk fields rs -> do
-            fields' <- flattenFields fields
-            return $ Union  pk fields' rs
-        _ -> return t
-    let (tf, rs) = typeRanges t'
-    if length rs <= 1
-        then return t'
-        else do
-            let r1 : r2 : rest = rs
-            let rs' = (combineRanges r1 r2) : rest
-            return $ tf rs'
+    return $ flattenType t
+
+-- flatten the innermost dimension of the given type, and any types it contains
+flattenType :: Type -> Type
+flattenType t =
+    tf $ if length ranges <= 1
+        then ranges
+        else rangesFlat
     where
-        flattenFields fields = do
-            let (fieldTypes, fieldNames) = unzip fields
-            fieldTypes' <- mapM (\x -> traverseTypeM x [] "") fieldTypes
-            return $ zip fieldTypes' fieldNames
+        (tf, ranges) = case t of
+            Struct pk fields rs ->
+                (Struct pk fields', rs)
+                where fields' = flattenFields fields
+            Union  pk fields rs ->
+                (Union  pk fields', rs)
+                where fields' = flattenFields fields
+            _ -> typeRanges t
+        r1 : r2 : rest = ranges
+        rangesFlat = combineRanges r1 r2 : rest
+
+-- flatten the types in a given list of struct/union fields
+flattenFields :: [Field] -> [Field]
+flattenFields = map $ first flattenType
 
 traverseModuleItemM :: ModuleItem -> Scoper TypeInfo ModuleItem
 traverseModuleItemM (Instance m p x rs l) = do
@@ -266,6 +271,8 @@ convertExpr scopes =
                 len = lenOuter
                 range' = (base, len)
                 one = RawNum 1
+        rewriteExpr (Cast (Left t) expr) =
+            Cast (Left $ flattenType t) expr
         rewriteExpr other =
             rewriteExprLowPrec other
 

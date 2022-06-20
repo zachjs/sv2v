@@ -35,6 +35,7 @@
   necessary because of calls to functions which reference non-local data
 * Fixed signed `struct` fields being converted to unsigned expressions when
   accessed directly
+* Fixed conversion of casts using structs containing multi-dimensional fields
 
 ## v0.0.9
 
