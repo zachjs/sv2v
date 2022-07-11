@@ -16,6 +16,7 @@
 * Added support for procedural continuous assignments (`assign`/`deassign` and
   `force`/`release`)
 * Added conversion for `do` `while` loops
+* Added support for hierarchical calls to functions with no inputs
 * Added support for passing through DPI imports and exports
 * Added support for passing through functions with output ports
 * Extended applicability of simplified Yosys-compatible `for` loop elaboration

@@ -67,6 +67,7 @@ finalPhases _ =
     [ Convert.NamedBlock.convert
     , Convert.DuplicateGenvar.convert
     , Convert.AsgnOp.convert
+    , Convert.EmptyArgs.convert
     , Convert.FuncRet.convert
     , Convert.TFBlock.convert
     ]
@@ -107,7 +108,6 @@ initialPhases selectExclude =
     , Convert.Unique.convert
     , Convert.EventEdge.convert
     , Convert.LogOp.convert
-    , Convert.EmptyArgs.convert
     , Convert.DoWhile.convert
     , Convert.Foreach.convert
     , Convert.FuncRoutine.convert
