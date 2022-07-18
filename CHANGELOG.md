@@ -38,6 +38,7 @@
   accessed directly
 * Fixed conversion of casts using structs containing multi-dimensional fields
 * Fixed incorrect name resolution conflicts raised during interface inlining
+* Fixed handling of interface instances which shadow other declarations
 
 ## v0.0.9
 

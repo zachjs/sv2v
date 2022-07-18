@@ -652,7 +652,7 @@ reorderGenItem item = item
 -- iteratively inserts missing package items exactly where they are needed
 addItems :: PIs -> Idents -> [(ModuleItem, Idents)] -> [ModuleItem]
 addItems pis existingPIs ((item, usedPIs) : items) =
-    if not $ Set.disjoint existingPIs thisPI then
+    if not $ forceKeep || Set.disjoint existingPIs thisPI then
         -- this item was re-imported earlier in the module
         addItems pis existingPIs items
     else if Map.null itemsToAdd then
@@ -666,7 +666,11 @@ addItems pis existingPIs ((item, usedPIs) : items) =
         thisPI = case item of
             MIPackageItem packageItem ->
                 Set.fromList $ piNames packageItem
+            Instance _ _ x _ _ -> Set.singleton x
             _ -> Set.empty
+        forceKeep = case item of
+            Instance{} -> True
+            _ -> False
         neededPIs = Set.difference (Set.difference usedPIs existingPIs) thisPI
         itemsToAdd = Map.restrictKeys pis neededPIs
         (chosenName, chosenPI) = Map.findMin itemsToAdd
