@@ -26,7 +26,7 @@ module Convert.Package
 
 import Control.Monad.State.Strict
 import Control.Monad.Writer.Strict
-import Data.List (insert, intercalate)
+import Data.List (insert, intercalate, isPrefixOf)
 import Data.Maybe (mapMaybe)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -74,7 +74,7 @@ inject packageItems items =
 prefixItems :: Identifier -> [ModuleItem] -> [ModuleItem]
 prefixItems prefix items =
     snd $ evalState (processItems "" prefix items) initialState
-    where initialState = ([], Map.empty, Map.empty)
+    where initialState = PK [] Map.empty Map.empty Set.empty
 
 -- collect packages and global package items
 collectPackageM :: Description -> Writer (Packages, Classes, [PackageItem]) ()
@@ -107,13 +107,41 @@ convertPackages :: [AST] -> ([AST], Packages)
 convertPackages files =
     (files', packages')
     where
-        (files', ([], packages', _)) = runState op ([], packages, classes)
+        (files', PK [] packages' _ _) = runState op initialState
+        initialState = PK [] packages classes conflicts
         op = mapM (traverseDescriptionsM traverseDescriptionM) files
         packages = Map.insert "" (Map.empty, globalItems) realPackages
         (realPackages, classes, globalItems) =
             execWriter $ mapM (collectDescriptionsM collectPackageM) files
+        prefixes = Set.union (Map.keysSet classes) (Map.keysSet realPackages)
+        conflicts =
+            if Set.null prefixes
+                then Set.empty
+                else execWriter $ mapM (collectIdentConflicts prefixes) files
 
-type PackagesState = State ([Identifier], Packages, Classes)
+-- write down identifiers that might conflict with the generated names for
+-- injected package items
+collectIdentConflicts :: Idents -> AST -> Writer Idents ()
+collectIdentConflicts prefixes =
+    mapM_ $ collectModuleItemsM $ collectify traverseIdentsM $
+    collectIdent prefixes
+
+-- write down identifiers that have a package name as a prefix
+collectIdent :: Idents -> Identifier -> Writer Idents ()
+collectIdent prefixes ident =
+    case Set.lookupLE ident prefixes of
+        Just prefix -> when (prefix `isPrefixOf` ident) found
+            where found = tell $ Set.singleton ident
+        Nothing -> return ()
+
+data PK = PK
+    { pkStack :: [Identifier]
+    , pkPackages :: Packages
+    , pkClasses :: Classes
+    , pkConflicts :: Idents
+    }
+
+type PackagesState = State PK
 
 traverseDescriptionM :: Description -> PackagesState Description
 traverseDescriptionM (PackageItem item) = do
@@ -264,7 +292,7 @@ processItems topName packageName moduleItems = do
                     insertElem x Declared
                     if inProcedure || null packageName
                         then return x
-                        else return $ packageName ++ '_' : x
+                        else lift $ makeIdent packageName x
 
         -- check the global scope for declarations or imports
         resolveGlobalIdent :: Identifier -> Scope Identifier
@@ -293,13 +321,13 @@ processItems topName packageName moduleItems = do
                 Just ([_, _], _, Declared) ->
                     if null packageName
                         then return x
-                        else return $ packageName ++ '_' : x
+                        else lift $ makeIdent packageName x
                 Just (_, _, Declared) -> return x
                 Just (_, _, Imported rootPkg) ->
-                    return $ rootPkg ++ '_' : x
+                    lift $ makeIdent rootPkg x
                 Just (accesses, _, Available [rootPkg]) -> do
                     insertElem accesses $ Imported rootPkg
-                    return $ rootPkg ++ '_' : x
+                    lift $ makeIdent rootPkg x
                 Just (_, _, Available rootPkgs) ->
                     error $ "identifier " ++ show x
                         ++ " ambiguously refers to the definitions in any of "
@@ -404,9 +432,11 @@ processItems topName packageName moduleItems = do
                 lift $ resolvePSIdent p x
             else do
                 details <- lookupElemM $ Dot (Ident p) x
-                return $ case details of
-                    Just ([_, _], _, Declared) -> p ++ '_' : x
-                    Just ([_, _], _, Imported rootPkg) -> rootPkg ++ '_' : x
+                case details of
+                    Just ([_, _], _, Declared) ->
+                        lift $ makeIdent p x
+                    Just ([_, _], _, Imported rootPkg) ->
+                        lift $ makeIdent rootPkg x
                     _ -> error $ "package " ++ show p ++ " references"
                             ++ " undeclared local \"" ++ p ++ "::" ++ x ++ "\""
 
@@ -425,7 +455,7 @@ processItems topName packageName moduleItems = do
         -- inject the given class item and its dependencies into the local scope
         classScopeInject :: Identifier -> Identifier -> Scope ()
         classScopeInject rootPkg fullName = do
-            (_, packages, _) <- lift get
+            packages <- lift $ gets pkPackages
             let (_, packageItems) = packages Map.! rootPkg
             let localPIs = Map.fromList $ concatMap toPIElem packageItems
             mapM_ injectIfMissing $
@@ -451,7 +481,7 @@ processItems topName packageName moduleItems = do
 -- locate a package by name, processing its contents if necessary
 findPackage :: Identifier -> PackagesState Package
 findPackage packageName = do
-    (stack, packages, classes) <- get
+    PK { pkStack = stack, pkPackages = packages } <- get
     let maybePackage = Map.lookup packageName packages
     assertMsg (maybePackage /= Nothing) $
         "could not find package " ++ show packageName
@@ -465,10 +495,12 @@ findPackage packageName = do
     if Map.null exports
         then do
             -- process and resolve this package
-            put (packageName : stack, packages, classes)
+            modify' $ \pk -> pk { pkStack = packageName : pkStack pk }
             package' <- processPackage packageName $ snd package
-            (_, packages', _) <- get
-            put (stack, Map.insert packageName package' packages', classes)
+            pk <- get
+            let stack' = tail $ pkStack pk
+            let packages' = Map.insert packageName package' $ pkPackages pk
+            put $ pk { pkStack = stack', pkPackages = packages' }
             return package'
         else return package
 
@@ -490,11 +522,11 @@ processPackage packageName packageItems = do
 -- resolve a package scoped identifier to its unique global name
 resolvePSIdent :: Identifier -> Identifier -> PackagesState Identifier
 resolvePSIdent packageName itemName = do
-    (_, _, classes) <- get
+    classes <- gets pkClasses
     case Map.lookup packageName classes of
         Nothing -> do
             rootPkg <- resolveRootPackage packageName itemName
-            return $ rootPkg ++ '_' : itemName
+            makeIdent rootPkg itemName
         Just ([], _) -> resolveCSIdent packageName [] Set.empty itemName
         Just _ -> error $ "reference to " ++ show itemName
             ++ " in parameterized class " ++ show packageName
@@ -532,7 +564,7 @@ bindingsScopeKeys =
 resolveCSIdent :: Identifier -> [ParamBinding] -> Idents -> Identifier -> PackagesState Identifier
 resolveCSIdent className paramBindings scopeKeys itemName = do
     -- find the specified class
-    (_, _, classes) <- get
+    classes <- gets pkClasses
     let maybeClass = Map.lookup className classes
     assertMsg (maybeClass /= Nothing) $
         "could not find class " ++ show className
@@ -550,13 +582,13 @@ resolveCSIdent className paramBindings scopeKeys itemName = do
     let classItems'' = map overrider classItems'
     -- add the synthetic package to the state
     let package = (exports, classItems'')
-    (stack, packages, _) <- get
-    put (stack, Map.insert packageName package packages, classes)
+    packages' <- gets $ Map.insert packageName package . pkPackages
+    modify' $ \pk -> pk { pkPackages = packages' }
     -- ensure the item actually exists
     let maybeIdentState = Map.lookup itemName exports
     assertMsg (maybeIdentState /= Nothing) $
         "could not find " ++ show itemName ++ " in class " ++ show className
-    return $ packageName ++ '_' : itemName
+    makeIdent packageName itemName
     where
         extractParameterName :: Decl -> Maybe Identifier
         extractParameterName (Param Parameter _ x _) = Just x
@@ -599,6 +631,19 @@ resolveCSIdent className paramBindings scopeKeys itemName = do
                             else t
             where x' = drop (1 + length packageName) x
         overrideParam _ _ other = other
+
+-- construct a new identifier for a package scoped identifier
+makeIdent :: Identifier -> Identifier -> PackagesState Identifier
+makeIdent x y = do
+    conflicts <- gets pkConflicts
+    return $ uniqueIdent conflicts $ x ++ '_' : y
+
+-- prepend underscores until the name is unique
+uniqueIdent :: Idents -> Identifier -> Identifier
+uniqueIdent conflicts ident =
+    if Set.member ident conflicts
+        then uniqueIdent conflicts $ '_' : ident
+        else ident
 
 -- errors with the given message when the check is false
 assertMsg :: Monad m => Bool -> String -> m ()

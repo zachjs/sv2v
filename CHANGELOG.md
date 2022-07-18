@@ -39,6 +39,7 @@
 * Fixed conversion of casts using structs containing multi-dimensional fields
 * Fixed incorrect name resolution conflicts raised during interface inlining
 * Fixed handling of interface instances which shadow other declarations
+* Fixed names like `<pkg>_<name>` being shadowed by elaborated packages
 
 ## v0.0.9
 
