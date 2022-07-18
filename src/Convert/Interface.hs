@@ -346,8 +346,10 @@ inlineInstance global ranges modportBindings items partName
         items' = evalScoper $ scopeModuleItems scoper partName $
             map (traverseNestedModuleItems rewriteItem) $
             if null modportBindings
-                then items ++ [typeModport, dimensionModport, bundleModport]
-                else items
+                then itemsChecked ++ infoModports
+                else itemsChecked
+        itemsChecked = checkBeforeInline global partName items checkErrMsg
+        infoModports = [typeModport, dimensionModport, bundleModport]
         scoper = scopeModuleItem
             traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
 
@@ -430,8 +432,8 @@ inlineInstance global ranges modportBindings items partName
         -- LHSs are replaced using simple substitutions
         traverseLHSM :: LHS -> Scoper () LHS
         traverseLHSM =
-            embedScopes tagLHS >=>
-            embedScopes replaceLHS
+            fmap replaceLHS .
+            embedScopes tagLHS
         tagLHS :: Scopes () -> LHS -> LHS
         tagLHS scopes lhs
             | lookupElem scopes lhs /= Nothing =
@@ -446,25 +448,24 @@ inlineInstance global ranges modportBindings items partName
                 then LHSDot scopedInstanceLHS y
                 else LHSDot (LHSIdent x) y
         renamePartLHS lhs = traverseSinglyNestedLHSs renamePartLHS lhs
-        replaceLHS :: Scopes () -> LHS -> LHS
-        replaceLHS _ (LHSDot lhs "@") = lhs
-        replaceLHS local (LHSDot (LHSBit lhs elt) field) =
+        replaceLHS :: LHS -> LHS
+        replaceLHS (LHSDot lhs "@") = lhs
+        replaceLHS (LHSDot (LHSBit lhs elt) field) =
             case lookup (LHSDot (LHSBit lhs Tag) field) lhsReplacements of
                 Just resolved -> replaceLHSArrTag elt resolved
-                Nothing -> LHSDot (replaceLHS local $ LHSBit lhs elt) field
-        replaceLHS local lhs =
+                Nothing -> LHSDot (replaceLHS $ LHSBit lhs elt) field
+        replaceLHS lhs =
             case lookup lhs lhsReplacements of
                 Just lhs' -> lhs'
-                Nothing -> checkExprResolution local (lhsToExpr lhs) $
-                    traverseSinglyNestedLHSs (replaceLHS local) lhs
+                Nothing -> traverseSinglyNestedLHSs replaceLHS lhs
         replaceLHSArrTag :: Expr -> LHS -> LHS
         replaceLHSArrTag =
             traverseNestedLHSs . (traverseLHSExprs . replaceArrTag)
         -- top-level expressions may be modports bound to other modports
         traverseExprM :: Expr -> Scoper () Expr
         traverseExprM =
-            embedScopes tagExpr >=>
-            embedScopes replaceExpr
+            fmap replaceExpr .
+            embedScopes tagExpr
         tagExpr :: Scopes () -> Expr -> Expr
         tagExpr scopes expr
             | lookupElem scopes expr /= Nothing =
@@ -479,38 +480,35 @@ inlineInstance global ranges modportBindings items partName
                 then Dot scopedInstanceExpr y
                 else Dot (Ident x) y
         renamePartExpr expr = visitExprsStep renamePartExpr expr
-        replaceExpr :: Scopes () -> Expr -> Expr
-        replaceExpr _ (Dot expr "@") = expr
-        replaceExpr local (Ident x) =
+        replaceExpr :: Expr -> Expr
+        replaceExpr (Dot expr "@") = expr
+        replaceExpr (Ident x) =
             case lookup x modportBindings of
                 Just (_, m) -> m
-                Nothing -> checkExprResolution local (Ident x) (Ident x)
-        replaceExpr local expr =
-            replaceExpr' local expr
-        replaceExpr' :: Scopes () -> Expr -> Expr
-        replaceExpr' _ (Dot expr "@") = expr
-        replaceExpr' local (Dot (Bit expr elt) field) =
+                Nothing -> Ident x
+        replaceExpr expr =
+            replaceExpr' expr
+        replaceExpr' :: Expr -> Expr
+        replaceExpr' (Dot expr "@") = expr
+        replaceExpr' (Dot (Bit expr elt) field) =
             case lookup (Dot (Bit expr Tag) field) exprReplacements of
-                Just resolved -> replaceArrTag (replaceExpr' local elt) resolved
-                Nothing -> Dot (replaceExpr' local $ Bit expr elt) field
-        replaceExpr' local (Bit expr elt) =
+                Just resolved -> replaceArrTag (replaceExpr' elt) resolved
+                Nothing -> Dot (replaceExpr' $ Bit expr elt) field
+        replaceExpr' (Bit expr elt) =
             case lookup (Bit expr Tag) exprReplacements of
-                Just resolved -> replaceArrTag (replaceExpr' local elt) resolved
-                Nothing -> Bit (replaceExpr' local expr) (replaceExpr' local elt)
-        replaceExpr' local expr@(Dot Ident{} _) =
+                Just resolved -> replaceArrTag (replaceExpr' elt) resolved
+                Nothing -> Bit (replaceExpr' expr) (replaceExpr' elt)
+        replaceExpr' expr@(Dot Ident{} _) =
             case lookup expr exprReplacements of
                 Just expr' -> expr'
-                Nothing -> checkExprResolution local expr $
-                    visitExprsStep (replaceExprAny local) expr
-        replaceExpr' local (Ident x) =
-            checkExprResolution local (Ident x) (Ident x)
-        replaceExpr' local expr = replaceExprAny local expr
-        replaceExprAny :: Scopes () -> Expr -> Expr
-        replaceExprAny local expr =
+                Nothing -> visitExprsStep replaceExprAny expr
+        replaceExpr' (Ident x) = Ident x
+        replaceExpr' expr = replaceExprAny expr
+        replaceExprAny :: Expr -> Expr
+        replaceExprAny expr =
             case lookup expr exprReplacements of
                 Just expr' -> expr'
-                Nothing -> checkExprResolution local expr $
-                    visitExprsStep (replaceExpr' local) expr
+                Nothing -> visitExprsStep replaceExpr' expr
         replaceArrTag :: Expr -> Expr -> Expr
         replaceArrTag replacement Tag = replacement
         replaceArrTag replacement expr =
@@ -529,22 +527,11 @@ inlineInstance global ranges modportBindings items partName
             . traverseExprTypes (traverseNestedTypes typeMapper)
             where typeMapper = traverseTypeExprs exprMapper
 
-        checkExprResolution :: Scopes () -> Expr -> a -> a
-        checkExprResolution local expr =
-            if not (exprResolves local expr) && exprResolves global expr
-                then
-                    scopedError local $ "inlining instance \"" ++ instanceName
-                        ++ "\" of " ++ inlineKind ++ " \"" ++ partName
-                        ++ "\" would make expression \"" ++ show expr
-                        ++ "\" used in \"" ++ instanceName
-                        ++ "\" resolvable when it wasn't previously"
-                else id
-
-        exprResolves :: Scopes a -> Expr -> Bool
-        exprResolves local (Ident x) =
-            isJust (lookupElem local x) || isLoopVar local x
-        exprResolves local expr =
-            isJust (lookupElem local expr)
+        checkErrMsg :: String -> String
+        checkErrMsg exprStr = "inlining instance \"" ++ instanceName
+            ++ "\" of " ++ inlineKind ++ " \"" ++ partName
+            ++ "\" would make expression \"" ++ exprStr ++ "\" used in \""
+            ++ instanceName ++ "\" resolvable when it wasn't previously"
 
         -- unambiguous reference to the current instance
         scopedInstanceRaw = accessesToExpr $ localAccesses global instanceName
@@ -723,3 +710,74 @@ sliceLo :: PartSelectMode -> Range -> Expr
 sliceLo NonIndexed (l, r) = endianCondExpr (l, r) r l
 sliceLo IndexedPlus (base, _) = base
 sliceLo IndexedMinus (base, len) = BinOp Add (BinOp Sub base len) (RawNum 1)
+
+-- check for cases where an expression in an inlined part only resolves after
+-- inlining, potentially hiding a design error
+checkBeforeInline :: Scopes a -> Identifier -> [ModuleItem]
+    -> (String -> String) -> [ModuleItem]
+checkBeforeInline global partName items checkErrMsg =
+    evalScoper $ scopeModuleItems scoper partName $ items
+    where
+        scoper = scopeModuleItem
+            checkDecl checkModuleItem checkGenItem checkStmt
+
+        checkDecl :: Decl -> Scoper () Decl
+        checkDecl decl = do
+            case decl of
+                Variable  _ _ x _ _ -> insertElem x ()
+                Net   _ _ _ _ x _ _ -> insertElem x ()
+                Param     _ _ x _   -> insertElem x ()
+                ParamType _   x _   -> insertElem x ()
+                CommentDecl{} -> return ()
+            traverseDeclExprsM checkExpr decl
+
+        checkModuleItem :: ModuleItem -> Scoper () ModuleItem
+        checkModuleItem item@(Instance _ _ x _ _) =
+            insertElem x () >> traverseExprsM checkExpr item
+        checkModuleItem item =
+            traverseExprsM checkExpr item >>=
+            traverseLHSsM  checkLHS
+
+        checkGenItem :: GenItem -> Scoper () GenItem
+        checkGenItem = traverseGenItemExprsM checkExpr
+
+        checkStmt :: Stmt -> Scoper () Stmt
+        checkStmt =
+            traverseStmtExprsM checkExpr >=>
+            traverseStmtLHSsM  checkLHS
+
+        checkExpr :: Expr -> Scoper () Expr
+        checkExpr = embedScopes checkExprResolutionId
+
+        checkLHS :: LHS -> Scoper () LHS
+        checkLHS = embedScopes checkLHSResolutionId
+
+        checkLHSResolutionId :: Scopes () -> LHS -> LHS
+        checkLHSResolutionId local lhs = checkExprResolution local expr lhs
+            where expr = lhsToExpr lhs
+
+        checkExprResolutionId :: Scopes () -> Expr -> Expr
+        checkExprResolutionId local expr = checkExprResolution local expr expr
+
+        -- error if the given expression resolves globally but not locally
+        checkExprResolution :: Scopes () -> Expr -> a -> a
+        checkExprResolution local expr =
+            if exprResolves global expr && not (anyPrefixResolves local expr)
+                then scopedError local $ checkErrMsg $ show expr
+                else id
+
+        -- check if hierarchical prefix of an expr exists in the given scope
+        anyPrefixResolves :: Scopes () -> Expr -> Bool
+        anyPrefixResolves local expr =
+            exprResolves local expr ||
+            case expr of
+                Dot inner _ -> anyPrefixResolves local inner
+                Bit inner _ -> anyPrefixResolves local inner
+                _ -> False
+
+        -- check if expr exists in the given scope
+        exprResolves :: Scopes a -> Expr -> Bool
+        exprResolves local (Ident x) =
+            isJust (lookupElem local x) || isLoopVar local x
+        exprResolves local expr =
+            isJust (lookupElem local expr)

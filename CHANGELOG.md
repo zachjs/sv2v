@@ -37,6 +37,7 @@
 * Fixed signed `struct` fields being converted to unsigned expressions when
   accessed directly
 * Fixed conversion of casts using structs containing multi-dimensional fields
+* Fixed incorrect name resolution conflicts raised during interface inlining
 
 ## v0.0.9
 
