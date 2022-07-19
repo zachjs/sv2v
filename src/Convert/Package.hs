@@ -123,8 +123,21 @@ convertPackages files =
 -- injected package items
 collectIdentConflicts :: Idents -> AST -> Writer Idents ()
 collectIdentConflicts prefixes =
-    mapM_ $ collectModuleItemsM $ collectify traverseIdentsM $
-    collectIdent prefixes
+    mapM_ $ collectModuleItemsM collectModuleItem
+    where
+        collectModuleItem =
+            evalScoperT . scoper >=>
+            collectify traverseIdentsM ident
+        scoper = scopeModuleItem collectDecl return return return
+        collectDecl decl = do
+            case decl of
+                Variable _ _ x _ _ -> lift $ ident x
+                Net  _ _ _ _ x _ _ -> lift $ ident x
+                Param    _ _ x   _ -> lift $ ident x
+                ParamType  _ x   _ -> lift $ ident x
+                CommentDecl{} -> return ()
+            return decl
+        ident = collectIdent prefixes
 
 -- write down identifiers that have a package name as a prefix
 collectIdent :: Idents -> Identifier -> Writer Idents ()
