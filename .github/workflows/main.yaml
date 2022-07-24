@@ -17,7 +17,7 @@ jobs:
       matrix:
         os:
           - ubuntu-20.04
-          - macOS-10.15
+          - macOS-11
           - windows-2019
     steps:
       - uses: actions/checkout@v1
@@ -38,7 +38,7 @@ jobs:
       matrix:
         os:
           - ubuntu-20.04
-          - macOS-10.15
+          - macOS-11
     needs: build
     env:
       IVERILOG_REF: 7c5694e5163e905b7ba85096ae67e5f28862db48
