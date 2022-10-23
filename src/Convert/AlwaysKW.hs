@@ -130,6 +130,7 @@ asConst scopes expr =
 asConstRaw :: Scopes Kind -> Expr -> Writer Any Expr
 asConstRaw scopes expr =
     case lookupElem scopes expr of
+        Just (accesses@[_, _], _, Const{}) -> return $ accessesToExpr accesses
         Just (_, _, Const Nil) -> recurse
         Just (_, _, Const expr') -> asConstRaw scopes expr'
         Just{} -> tell (Any True) >> return Nil

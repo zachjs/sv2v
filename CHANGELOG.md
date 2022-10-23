@@ -1,3 +1,11 @@
+## Unreleased
+
+### Bug Fixes
+
+* Fixed module-level localparams being needlessly inlined when forming longest
+  static prefixes, which could cause deep recursion and run out of memory on
+  some designs
+
 ## v0.0.10
 
 ### Breaking Changes
