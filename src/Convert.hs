@@ -48,6 +48,7 @@ import qualified Convert.Simplify
 import qualified Convert.Stream
 import qualified Convert.StringParam
 import qualified Convert.Struct
+import qualified Convert.StructConst
 import qualified Convert.TFBlock
 import qualified Convert.Typedef
 import qualified Convert.TypeOf
@@ -114,6 +115,7 @@ initialPhases selectExclude =
     , selectExclude Job.Assert Convert.Assertion.convert
     , selectExclude Job.Always Convert.AlwaysKW.convert
     , Convert.Package.convert
+    , Convert.StructConst.convert
     , Convert.PortDecl.convert
     , Convert.ParamNoDefault.convert
     , Convert.ResolveBindings.convert

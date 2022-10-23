@@ -6,6 +6,11 @@
   static prefixes, which could cause deep recursion and run out of memory on
   some designs
 
+### Other Enhancements
+
+* Added elaboration for accesses to fields of struct constants, which can
+  substantially improve performance on some designs
+
 ## v0.0.10
 
 ### Breaking Changes

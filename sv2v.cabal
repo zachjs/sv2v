@@ -101,6 +101,7 @@ executable sv2v
     Convert.Stream
     Convert.StringParam
     Convert.Struct
+    Convert.StructConst
     Convert.TFBlock
     Convert.Traverse
     Convert.Typedef
