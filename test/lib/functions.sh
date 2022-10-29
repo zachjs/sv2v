@@ -45,6 +45,24 @@ assertConverts() {
     ac_tmpa=$SHUNIT_TMPDIR/ac-conv-tmpa.v
     convert "1st conversion of $ac_file" $ac_tmpa $ac_file
 
+    # check for un/expected output in the converted result
+    ac_pats=$ac_file.pat
+    if [ -f $ac_pats ]; then
+        while read line; do
+            rule=${line:0:6}
+            pattern=${line:7}
+            grep -G "$pattern" < $ac_tmpa > /dev/null
+            matches=$?
+            if [ $rule == "affirm" ]; then
+                assertTrue "conversion of $ac_file does not contain $pattern" $matches
+            elif [ $rule == "reject" ]; then
+                assertFalse "conversion of $ac_file contains $pattern" $matches
+            else
+                fail "unknown rule type: '$rule'"
+            fi
+        done < $ac_pats
+    fi
+
     ac_tmpb=$SHUNIT_TMPDIR/ac-conv-tmpb.v
     convert "2nd conversion of $ac_file" $ac_tmpb $ac_tmpa
 

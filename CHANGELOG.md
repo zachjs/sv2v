@@ -5,6 +5,7 @@
 * Fixed module-level localparams being needlessly inlined when forming longest
   static prefixes, which could cause deep recursion and run out of memory on
   some designs
+* Fixed unneeded scoping of constant function calls used in type lookups
 
 ### Other Enhancements
 

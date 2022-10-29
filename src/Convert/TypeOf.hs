@@ -122,6 +122,11 @@ traverseExprM (Cast (Right size) expr) = do
     expr' <- traverseExprM expr
     size' <- traverseExprM size
     elaborateSizeCast size' expr'
+traverseExprM orig@(Dot (Ident x) f) = do
+    unneeded <- unneededModuleScope x f
+    return $ if unneeded
+        then Ident f
+        else orig
 traverseExprM other =
     traverseSinglyNestedExprsM traverseExprM other
     >>= traverseExprTypesM traverseTypeM
@@ -149,6 +154,21 @@ isStringParam (Ident x) = do
         Nothing -> False
         Just (_, _, typ) -> typ == TypeOf (Ident x)
 isStringParam _ = return False
+
+-- checks if referring to part.wire is needlessly explicit
+unneededModuleScope :: Identifier -> Identifier -> ST Bool
+unneededModuleScope part wire = do
+    accessesLocal <- localAccessesM wire
+    if accessesLocal == accessesTop then
+        return True
+    else if head accessesLocal == head accessesTop then do
+        details <- lookupElemM wire
+        return $ case details of
+            Just (accessesFound, _, _) -> accessesTop == accessesFound
+            _ -> False
+    else
+        return False
+    where accessesTop = [Access part Nil, Access wire Nil]
 
 -- convert TypeOf in a Type
 traverseTypeM :: Type -> ST Type
