@@ -53,7 +53,7 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get install -y shunit2 flex bison autoconf gperf
       - name: Cache iverilog
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ~/.local
           key: ${{ runner.OS }}-${{ env.IVERILOG_REF }}
