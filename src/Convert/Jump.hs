@@ -41,7 +41,9 @@ convertModuleItem :: ModuleItem -> ModuleItem
 convertModuleItem (MIPackageItem (Function ml t f decls stmtsOrig)) =
     MIPackageItem $ Function ml t f decls' stmts''
     where
-        stmts = map (traverseNestedStmts convertReturn) stmtsOrig
+        stmts = if t == Void
+                then stmtsOrig
+                else map (traverseNestedStmts convertReturn) stmtsOrig
         convertReturn :: Stmt -> Stmt
         convertReturn (Return Nil) = Return Nil
         convertReturn (Return e) =
@@ -223,11 +225,12 @@ convertStmt (Break) = do
     assertMsg jumpAllowed "encountered break inside fork-join"
     modify $ \s -> s { sHasJump = True }
     return $ asgn jumpState jsBreak
-convertStmt (Return Nil) = do
+convertStmt (Return e) = do
     jumpAllowed <- gets sJumpAllowed
     returnAllowed <- gets sReturnAllowed
     assertMsg jumpAllowed "encountered return inside fork-join"
     assertMsg returnAllowed "encountered return outside of task or function"
+    assertMsg (e == Nil) "non-void return inside task or void function"
     modify $ \s -> s { sHasJump = True }
     return $ asgn jumpState jsReturn
 
@@ -253,8 +256,6 @@ convertStmt (Timing timing stmt) =
 convertStmt (StmtAttr attr stmt) =
     convertStmt stmt >>= return . StmtAttr attr
 
-convertStmt (Return{}) = return $
-    error "non-void return should have been elaborated already"
 convertStmt (Foreach{}) = return $
     error "foreach should have been elaborated already"
 
