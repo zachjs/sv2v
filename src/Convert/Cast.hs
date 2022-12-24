@@ -99,7 +99,7 @@ traverseStmtM stmt = do
 
 traverseExprM :: Expr -> SC Expr
 traverseExprM (Cast (Left (IntegerVector kw sg rs)) value) | kw /= TBit = do
-    value' <- traverseExprM value
+    value' <- fmap simplify $ traverseExprM value
     size' <- traverseExprM size
     convertCastM size' value' signed
     where
@@ -121,8 +121,9 @@ convertCastM (Number size) (Number value) signed =
     return $ Number $
         numberCast signed (fromIntegral size') value
     where Just size' = numberToInteger size
+convertCastM size@Number{} (String str) signed =
+    convertCastM size (stringToNumber str) signed
 convertCastM size value signed = do
-    value' <- traverseExprM value
     sizeUsesLocalVars <- embedScopes usesLocalVars size
     inProcedure <- withinProcedureM
     if not sizeUsesLocalVars || not inProcedure then do
@@ -135,12 +136,12 @@ convertCastM size value signed = do
             else do
                 details <- lookupElemM name
                 when (details == Nothing) (injectTopItem item)
-        return $ Call (Ident name) (Args [value'] [])
+        return $ Call (Ident name) (Args [value] [])
     else do
         name <- castDeclName 0
         insertElem name ()
         useVar <- withinStmt
-        injectDecl $ castDecl useVar name value' size signed
+        injectDecl $ castDecl useVar name value size signed
         return $ Ident name
 
 -- checks if a cast size references any vars not defined at the top level scope

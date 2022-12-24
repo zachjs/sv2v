@@ -11,6 +11,7 @@
 
 * Added elaboration for accesses to fields of struct constants, which can
   substantially improve performance on some designs
+* Added constant folding for comparisons involving string literals
 
 ## v0.0.10
 

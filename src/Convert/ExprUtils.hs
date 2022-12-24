@@ -13,9 +13,11 @@ module Convert.ExprUtils
     , endianCondExpr
     , endianCondRange
     , dimensionsSize
+    , stringToNumber
     ) where
 
-import Data.Bits (shiftL, shiftR)
+import Data.Bits ((.&.), (.|.), shiftL, shiftR)
+import Data.Char (ord)
 
 import Convert.Traverse
 import Language.SystemVerilog.AST
@@ -36,18 +38,13 @@ simplifyStep (UniOp LogNot (BinOp Ne a b)) = BinOp Eq a b
 simplifyStep (UniOp UniSub (UniOp UniSub e)) = e
 simplifyStep (UniOp UniSub (BinOp Sub e1 e2)) = BinOp Sub e2 e1
 
-simplifyStep (Concat (Number n1 : Number n2 : rest)) =
-    simplifyStep $ Concat $ Number n : rest
-    where n = n1 <> n2
-
 simplifyStep (Concat [Number (Decimal size _ value)]) =
     Number $ Decimal size False value
 simplifyStep (Concat [Number (Based size _ base value kinds)]) =
     Number $ Based size False base value kinds
 simplifyStep (Concat [e@Stream{}]) = e
-simplifyStep (Concat [e@Concat{}]) = e
 simplifyStep (Concat [e@Repeat{}]) = e
-simplifyStep (Concat es) = Concat $ filter (/= Concat []) es
+simplifyStep (Concat es) = Concat $ flattenConcat es
 simplifyStep (Repeat (Dec 0) _) = Concat []
 simplifyStep (Repeat (Dec 1) es) = Concat es
 simplifyStep (Mux (Number n) e1 e2) =
@@ -72,6 +69,16 @@ simplifyStep e@(BinOp _ (BinOp _ Number{} Number{}) Number{}) = e
 
 simplifyStep (BinOp op e1 e2) = simplifyBinOp op e1 e2
 simplifyStep other = other
+
+-- flatten and coalesce concatenations
+flattenConcat :: [Expr] -> [Expr]
+flattenConcat (Number n1 : Number n2 : es) =
+    flattenConcat $ Number (n1 <> n2) : es
+flattenConcat (Concat es1 : es2) =
+    flattenConcat $ es1 ++ es2
+flattenConcat (e : es) =
+    e : flattenConcat es
+flattenConcat [] = []
 
 
 simplifyBinOp :: BinOp -> Expr -> Expr -> Expr
@@ -107,10 +114,50 @@ simplifyBinOp Add (BinOp Sub n1@Number{} e) n2@Number{} =
     BinOp Sub (BinOp Add n1 n2) e
 simplifyBinOp Ge (BinOp Sub e (Dec 1)) (Dec 0) = BinOp Ge e (toDec 1)
 
-simplifyBinOp ShiftAL (Dec x) (Dec y) = toDec $ shiftL x (fromIntegral y)
-simplifyBinOp ShiftAR (Dec x) (Dec y) = toDec $ shiftR x (fromIntegral y)
-simplifyBinOp ShiftL  (Dec x) (Dec y) = toDec $ shiftL x (fromIntegral y)
-simplifyBinOp ShiftR  (Dec x) (Dec y) = toDec $ shiftR x (fromIntegral y)
+-- simplify bit shifts of decimal literals
+simplifyBinOp op (Dec x) (Number yRaw)
+    | ShiftAL <- op = decShift shiftL
+    | ShiftAR <- op = decShift shiftR
+    | ShiftL  <- op = decShift shiftL
+    | ShiftR  <- op = decShift shiftR
+    where
+        decShift shifter =
+            case numberToInteger yRaw of
+                Just y -> toDec $ shifter x (fromIntegral y)
+                Nothing -> constantFold undefined Div undefined 0
+
+-- simply comparisons with string literals
+simplifyBinOp op (Number n) (String s) | isCmpOp op =
+    simplifyBinOp op (Number n) (sizeStringAs s n)
+simplifyBinOp op (String s) (Number n) | isCmpOp op =
+    simplifyBinOp op (sizeStringAs s n) (Number n)
+simplifyBinOp op (String s1) (String s2) | isCmpOp op =
+    simplifyBinOp op (stringToNumber s1) (stringToNumber s2)
+
+-- simply basic arithmetic comparisons
+simplifyBinOp op (Number n1) (Number n2)
+    | Eq <- op = cmp (==)
+    | Ne <- op = cmp (/=)
+    | Lt <- op = cmp (<)
+    | Le <- op = cmp (<=)
+    | Gt <- op = cmp (>)
+    | Ge <- op = cmp (>=)
+    where
+        cmp :: (Integer -> Integer -> Bool) -> Expr
+        cmp folder =
+            case (numberToInteger n1', numberToInteger n2') of
+                (Just i1, Just i2) -> bool $ folder i1 i2
+                _ -> BinOp op (Number n1') (Number n2')
+        sg = numberIsSigned n1 && numberIsSigned n2
+        sz = fromIntegral $ max (numberBitLength n1) (numberBitLength n2)
+        n1' = numberCast sg sz n1
+        n2' = numberCast sg sz n2
+
+-- simply comparisons with unbased unsized literals
+simplifyBinOp op (Number n) (ConvertedUU sz v k) | isCmpOp op =
+    simplifyBinOp op (Number n) (uuExtend sz v k)
+simplifyBinOp op (ConvertedUU sz v k) (Number n) | isCmpOp op =
+    simplifyBinOp op (uuExtend sz v k) (Number n)
 
 simplifyBinOp op e1 e2 =
     case (e1, e2) of
@@ -142,6 +189,8 @@ constantFold _ Gt  x y = bool $ x >  y
 constantFold _ Ge  x y = bool $ x >= y
 constantFold _ Lt  x y = bool $ x <  y
 constantFold _ Le  x y = bool $ x <= y
+constantFold _ BitAnd x y = toDec $ x .&. y
+constantFold _ BitOr  x y = toDec $ x .|. y
 constantFold fallback _ _ _ = fallback
 
 
@@ -224,3 +273,49 @@ pattern SizedRange expr = (BinOp Sub expr (RawNum 1), RawNum 0)
 -- similar to the above pattern, we assume E >= 1 for any range like [0:E-1]
 pattern RevSzRange :: Expr -> Range
 pattern RevSzRange expr = (RawNum 0, BinOp Sub expr (RawNum 1))
+
+-- convert a string to decimal number
+stringToNumber :: String -> Expr
+stringToNumber str =
+    Number $ Decimal size False value
+    where
+        size = 8 * length str
+        value = stringToInteger str
+
+-- convert a string to big integer
+stringToInteger :: String -> Integer
+stringToInteger [] = 0
+stringToInteger (x : xs) =
+    fromIntegral (ord x) + (256 :: Integer) * stringToInteger xs
+
+-- cast string to number at least as big as the width of the given number
+sizeStringAs :: String -> Number -> Expr
+sizeStringAs str num =
+    Cast (Left typ) (stringToNumber str)
+    where
+        typ = IntegerVector TReg Unspecified [(RawNum size, RawNum 1)]
+        size = max strSize numSize
+        strSize = fromIntegral $ 8 * length str
+        numSize = numberBitLength num
+
+-- excludes wildcard and strict comparison operators
+isCmpOp :: BinOp -> Bool
+isCmpOp Eq = True
+isCmpOp Ne = True
+isCmpOp Lt = True
+isCmpOp Le = True
+isCmpOp Gt = True
+isCmpOp Ge = True
+isCmpOp _ = False
+
+-- sign extend a converted unbased unsized literal into a based number
+uuExtend :: Integer -> Integer -> Integer -> Expr
+uuExtend sz v k =
+    Number $
+    numberCast False (fromIntegral sz) $
+    Based 1 True Hex v k
+
+pattern ConvertedUU :: Integer -> Integer -> Integer -> Expr
+pattern ConvertedUU sz v k <- Repeat
+    (RawNum sz)
+    [Number (Based 1 True Binary v k)]
