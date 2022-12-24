@@ -454,7 +454,7 @@ instance Semigroup Number where
         where
             size = size1 + size2
             signed = False
-            base = selectBase (min base1 base2) values kinds
+            base = selectBase (max base1 base2) values kinds
             trim = flip mod . (2 ^)
             values = trim size2 values2 + shiftL (trim size1 values1) size2
             kinds = trim size2 kinds2 + shiftL (trim size1 kinds1) size2
