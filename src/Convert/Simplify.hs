@@ -42,6 +42,8 @@ traverseDeclM decl = do
             where t = IntegerVector TLogic sg rs
         Param Localparam t x e ->
             insertExpr x $ Cast (Left t) e
+        Variable _ _ x _ _ -> insertElem x Nil
+        Net  _ _ _ _ x _ _ -> insertElem x Nil
         _ -> return ()
     return decl'
 
@@ -66,6 +68,8 @@ isSimpleExpr (Cast Left{} e) = isSimpleExpr e
 isSimpleExpr _ = False
 
 traverseModuleItemM :: ModuleItem -> Scoper Expr ModuleItem
+traverseModuleItemM (Genvar x) =
+    insertElem x Nil >> return (Genvar x)
 traverseModuleItemM (Instance m p x rs l) = do
     p' <- mapM paramBindingMapper p
     traverseExprsM traverseExprM $ Instance m p' x rs l
@@ -147,8 +151,8 @@ substitute scopes expr =
         substitute' :: Expr -> Expr
         substitute' (Ident x) =
             case lookupElem scopes x of
-                Nothing -> Ident x
-                Just (_, _, e) -> e
+                Just (_, _, e) | e /= Nil -> e
+                _ -> Ident x
         substitute' other =
             traverseSinglyNestedExprs substitute' other
 
