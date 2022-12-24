@@ -22,6 +22,7 @@
 
 module Convert.TypeOf (convert) where
 
+import Control.Monad.State.Strict
 import Data.Tuple (swap)
 
 import Convert.ExprUtils (dimensionsSize, endianCondRange, simplify)
@@ -71,7 +72,8 @@ traverseDeclM decl = do
 -- rewrite and store a non-genvar data declaration's type information
 insertType :: Identifier -> Type -> ST ()
 insertType ident typ = do
-    typ' <- scopeType typ
+    -- hack to make this evaluation lazy
+    typ' <- gets $ evalState $ scopeType typ
     insertElem ident typ'
 
 -- convert TypeOf in a ModuleItem
