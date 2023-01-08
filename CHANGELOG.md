@@ -7,6 +7,10 @@
   some designs
 * Fixed unneeded scoping of constant function calls used in type lookups
 
+### New Features
+
+* `string` data type is now dropped from parameters and localparams
+
 ### Other Enhancements
 
 * Added elaboration for accesses to fields of struct constants, which can

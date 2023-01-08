@@ -47,6 +47,7 @@ import qualified Convert.ResolveBindings
 import qualified Convert.Simplify
 import qualified Convert.Stream
 import qualified Convert.StringParam
+import qualified Convert.StringType
 import qualified Convert.Struct
 import qualified Convert.StructConst
 import qualified Convert.TFBlock
@@ -71,6 +72,7 @@ finalPhases _ =
     , Convert.EmptyArgs.convert
     , Convert.FuncRet.convert
     , Convert.TFBlock.convert
+    , Convert.StringType.convert
     ]
 
 mainPhases :: Selector -> [Phase]
