@@ -2,6 +2,8 @@
 
 ### Bug Fixes
 
+* Fixed crash when converting multi-dimensional arrays or arrays of structs or
+  unions used in certain expressions involving unbased unsized literals
 * Fixed module-level localparams being needlessly inlined when forming longest
   static prefixes, which could cause deep recursion and run out of memory on
   some designs

@@ -153,7 +153,14 @@ traverseLHSM = traverseNestedLHSsM traverseLHSSingleM
             return lhs'
 
 convertExprM :: Expr -> Scoper TypeInfo Expr
-convertExprM = embedScopes convertExpr
+convertExprM =
+    traverseExprTypesM convertTypeM >=>
+    embedScopes convertExpr
+
+convertTypeM :: Type -> Scoper TypeInfo Type
+convertTypeM =
+    traverseNestedTypesM $ traverseTypeExprsM $
+    traverseNestedExprsM convertExprM
 
 convertExpr :: Scopes TypeInfo -> Expr -> Expr
 convertExpr scopes =
