@@ -545,7 +545,10 @@ preprocessInput = do
     macroStack <- getMacroStack
     case str of
         '/' : '/' : _ -> removeThrough "\n"
-        '/' : '*' : _ -> removeThrough "*/"
+        '/' : '*' : _ ->
+            -- prevent treating `/*/` as self-closing
+            takeChar >> takeChar >>
+            removeThrough "*/"
         '`' : '"' : _ -> handleBacktickString
         '"' : _ -> handleString
         '/' : '`' : '`' : '*' : _ ->
