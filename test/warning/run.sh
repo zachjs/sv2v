@@ -3,9 +3,10 @@
 NO_FILES_WARNING="Warning: No input files specified (try \`sv2v --help\`)"
 PACKAGE_WARNING="Warning: Source includes packages but no modules. Please convert packages alongside the modules that use them."
 INTERFACE_WARNING="Warning: Source includes an interface but output is empty because there is no top-level module which has no ports which are interfaces."
+PORT_CONN_ATTR_WARNING="attr.sv:6:11: Warning: Ignored port connection attributes (* foo *)(* bar *)."
 
 test_default() {
-    runAndCapture *.sv
+    runAndCapture interface.sv module.sv package.sv
     assertTrue "default conversion should succeed" $result
     assertNotNull "stdout should not be empty" "$stdout"
     assertNull "stderr should be empty" "$stderr"
@@ -16,6 +17,13 @@ test_no_files() {
     assertTrue "conversion should succeed" $result
     assertNull "stdout should be empty" "$stdout"
     assertEquals "stderr should should have warning" "$NO_FILES_WARNING" "$stderr"
+}
+
+test_port_conn_attr() {
+    runAndCapture attr.sv
+    assertTrue "conversion should succeed" $result
+    assertNotNull "stdout should not be empty" "$stdout"
+    assertEquals "stderr should should have warning" "$PORT_CONN_ATTR_WARNING" "$stderr"
 }
 
 test_only_package() {

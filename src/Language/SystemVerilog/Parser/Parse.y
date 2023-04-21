@@ -820,6 +820,8 @@ AttributeInstances :: { [Attr] }
   | AttributeInstance AttributeInstances { $1 : $2 }
 AttributeInstance :: { Attr }
   : AttributeInstanceP { snd $1 }
+AttributeInstancesP :: { (Position, [Attr]) }
+  : AttributeInstanceP AttributeInstances { (fst $1, snd $1 : $2) }
 AttributeInstanceP :: { (Position, Attr) }
   : "(*" AttrSpecs "*)" { withPos $1 $ Attr $2 }
 AttrSpecs :: { [AttrSpec] }
@@ -1068,6 +1070,7 @@ PortBindingsInside :: { [PortBinding] }
 OptPortBinding :: { PortBinding }
   : {- empty -} { ("", Nil) }
   | PortBinding { $1 }
+  | AttributeInstancesP PortBinding {% portBindingAttrs $1 >> return $2 }
 
 PortBinding :: { PortBinding }
   : "." Identifier "(" ExprOrNil ")" { ($2, $4) }
@@ -1752,9 +1755,14 @@ readNumber :: Position -> String -> ParseState Number
 readNumber pos str = do
   oversizedNumbers <- gets pOversizedNumbers
   let (num, msg) = parseNumber oversizedNumbers str
-  when (not $ null msg) $ lift $ lift $
-    hPutStrLn stderr $ show pos ++ ": Warning: " ++ msg
+  when (not $ null msg) $
+    parseWarning pos msg
   return num
+
+parseWarning :: Position -> String -> ParseState ()
+parseWarning pos msg =
+  lift $ lift $ hPutStrLn stderr $
+    show pos ++ ": Warning: " ++ msg
 
 expectZeroDelay :: Token -> a -> ParseState a
 expectZeroDelay tok a = do
@@ -1812,5 +1820,10 @@ makeIncrExprAsgn True (pos, op) expr = do
   expr' <- makeIncrExprAsgn False (pos, op) expr
   return $ BinOp op expr' minusOne
   where minusOne = Number $ Decimal 1 True 1
+
+portBindingAttrs :: (Position, [Attr]) -> ParseState ()
+portBindingAttrs (pos, attrs) = parseWarning pos msg
+  where msg = "Ignored port connection attributes "
+          ++ concatMap show attrs ++ "."
 
 }
