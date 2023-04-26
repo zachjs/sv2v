@@ -102,12 +102,13 @@ type Binding t = (Identifier, t)
 -- give a set of bindings explicit names
 resolveBindings :: String -> [Identifier] -> [Binding t] -> [Binding t]
 resolveBindings _ _ [] = []
-resolveBindings location available bindings =
+resolveBindings location available bindings@(("", _) : _) =
     if length available < length bindings then
         error $ "too many bindings specified for " ++ location
-    else if null $ fst $ head bindings then
+    else
         zip available $ map snd bindings
-    else if not $ null unknowns then
+resolveBindings location available bindings =
+    if not $ null unknowns then
         error $ "unknown binding" ++ unknownsPlural ++ " "
             ++ unknownsStr ++ " specified for " ++ location
     else

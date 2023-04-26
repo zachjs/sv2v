@@ -23,6 +23,7 @@
 * Added constant folding for comparisons involving string literals
 * Port connection attributes (e.g., [pulp_soc.sv]) are now ignored with a
   warning rather than failing to parse
+* Improved error message when specifying an extraneous named port connection
 
 [pulp_soc.sv]: https://github.com/pulp-platform/pulp_soc/blob/0573a85c/rtl/pulp_soc/pulp_soc.sv#L733
 
