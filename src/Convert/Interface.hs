@@ -10,6 +10,7 @@ module Convert.Interface (convert) where
 import Data.List (intercalate, (\\))
 import Data.Maybe (isJust, isNothing, mapMaybe)
 import Control.Monad.Writer.Strict
+import Text.Read (readMaybe)
 import qualified Data.Map.Strict as Map
 
 import Convert.ExprUtils (endianCondExpr)
@@ -70,12 +71,25 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
         traverseDeclM :: Decl -> Scoper [ModportDecl] Decl
         traverseDeclM decl = do
             case decl of
-                Variable  _ _ x _ _ -> insertElem x DeclVal
-                Net   _ _ _ _ x _ _ -> insertElem x DeclVal
-                Param     _ _ x _   -> insertElem x DeclVal
+                Variable  _ t x _ _ -> checkDeclType t x $ insertElem x DeclVal
+                Net   _ _ _ t x _ _ -> checkDeclType t x $ insertElem x DeclVal
+                Param     _ t x _   -> checkDeclType t x $ insertElem x DeclVal
                 ParamType _   x _   -> insertElem x DeclVal
                 CommentDecl{} -> return ()
             return decl
+
+        -- check for module or interface names used as type names
+        checkDeclType :: Type -> Identifier -> Scoper a b -> Scoper a b
+        checkDeclType (Alias typeName _) declName continue
+            | isNothing (readMaybe declName :: Maybe Int) = do
+            maybeType <- lookupElemM typeName
+            case (maybePart, maybeType) of
+                (Just part, Nothing{}) -> scopedErrorM $ "declaration " ++
+                    declName ++ " uses " ++ show (pKind part) ++ " name " ++
+                    typeName ++ " where a type name is expected"
+                _ -> continue
+            where maybePart = Map.lookup typeName parts
+        checkDeclType _ _ other = other
 
         lookupIntfElem :: Scopes [ModportDecl] -> Expr -> LookupResult [ModportDecl]
         lookupIntfElem modports expr =
@@ -285,6 +299,7 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                     else if elem x (pPorts partInfo) then
                         tell [(x, info)] >> return decl
                     else
+                        -- TODO: This does not handle shadowed typenames.
                         scopedErrorM $
                             "Modport not in port list: " ++ show t ++ " " ++ x
                             ++ ". Is this an interface missing a port list?"
