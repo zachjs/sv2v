@@ -13,11 +13,11 @@ convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions $ traverseModuleItems convertModuleItem
 
 convertModuleItem :: ModuleItem -> ModuleItem
-convertModuleItem (AssertionItem item) =
-    Generate $
-    map (GenModuleItem . MIPackageItem . Decl . CommentDecl) $
-        "removed an assertion item" :
-        (lines $ show $ AssertionItem item)
+convertModuleItem item@AssertionItem{} =
+    Generate $ map toItem comments
+    where
+        toItem = GenModuleItem . MIPackageItem . Decl . CommentDecl
+        comments = "removed an assertion item" : (lines $ show item)
 convertModuleItem other =
     traverseStmts (traverseNestedStmts convertStmt) other
 

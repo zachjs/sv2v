@@ -60,4 +60,12 @@ module top;
     integer x;
     // TODO: The assignment below should only be allowed in a property decleration.
     assert property (@(posedge clk) first_match(1, x++, $display("a", clk), $display("b", clk)));
+
+    sequence some_sequence;
+        1 and 1;
+    endsequence
+    property some_property;
+        @(edge clk) some_sequence iff 1;
+    endproperty
+    assert property (some_property);
 endmodule

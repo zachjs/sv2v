@@ -17,7 +17,6 @@ module Language.SystemVerilog.AST.Stmt
     , PropExpr     (..)
     , SeqMatchItem (..)
     , SeqExpr      (..)
-    , AssertionItem
     , Assertion    (..)
     , AssertionKind(..)
     , Deferral     (..)
@@ -265,8 +264,6 @@ showCycleDelayRange :: Range -> String
 showCycleDelayRange (Nil, e) = printf "(%s)" (show e)
 showCycleDelayRange (e, Nil) = printf "[%s:$]" (show e)
 showCycleDelayRange r = showRange r
-
-type AssertionItem = (Identifier, Assertion)
 
 data Assertion
     = Assert AssertionKind ActionBlock

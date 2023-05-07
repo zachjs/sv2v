@@ -726,6 +726,14 @@ AssignOption :: { AssignOption }
 AssertionItem :: { AssertionItem }
   : ConcurrentAssertionItem        { $1 }
   | DeferredImmediateAssertionItem { $1 }
+  | SequenceDecl                   { $1 }
+  | PropertyDecl                   { $1 }
+
+SequenceDecl :: { AssertionItem }
+  : "sequence" Identifier ";" SeqExpr opt(";") "endsequence" StrTag {% checkTag $2 $7 $ SequenceDecl $2 $4 }
+
+PropertyDecl :: { AssertionItem }
+  : "property" Identifier ";" PropertySpec opt(";") "endproperty" StrTag {% checkTag $2 $7 $ PropertyDecl $2 $4 }
 
 -- for Stmt, for now
 ProceduralAssertionStatement :: { Assertion }
@@ -737,12 +745,12 @@ ImmediateAssertionStatement :: { Assertion }
   | DeferredImmediateAssertionStatement { $1 }
 
 DeferredImmediateAssertionItem :: { AssertionItem }
-  : Identifier ":" DeferredImmediateAssertionStatement { ($1, $3) }
-  |                DeferredImmediateAssertionStatement { ("", $1) }
+  : Identifier ":" DeferredImmediateAssertionStatement { MIAssertion $1 $3 }
+  |                DeferredImmediateAssertionStatement { MIAssertion "" $1 }
 
 ConcurrentAssertionItem :: { AssertionItem }
-  : Identifier ":" ConcurrentAssertionStatement { ($1, $3) }
-  |                ConcurrentAssertionStatement { ("", $1) }
+  : Identifier ":" ConcurrentAssertionStatement { MIAssertion $1 $3 }
+  |                ConcurrentAssertionStatement { MIAssertion "" $1 }
 
 ConcurrentAssertionStatement :: { Assertion }
   : "assert" "property" "(" PropertySpec ")" ActionBlock { Assert (Concurrent $4) $6 }

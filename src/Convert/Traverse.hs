@@ -282,75 +282,89 @@ traverseAssertionStmtsM mapper = assertionMapper
         assertionMapper (Cover e stmt) =
             mapper stmt >>= return . Cover e
 
+traverseSeqExprExprsM :: Monad m => MapperM m Expr -> MapperM m SeqExpr
+traverseSeqExprExprsM mapper (SeqExpr e) =
+    mapper e >>= return . SeqExpr
+traverseSeqExprExprsM mapper (SeqExprAnd s1 s2) =
+    seqExprHelper mapper SeqExprAnd s1 s2
+traverseSeqExprExprsM mapper (SeqExprOr s1 s2) =
+    seqExprHelper mapper SeqExprOr s1 s2
+traverseSeqExprExprsM mapper (SeqExprIntersect s1 s2) =
+    seqExprHelper mapper SeqExprIntersect s1 s2
+traverseSeqExprExprsM mapper (SeqExprWithin s1 s2) =
+    seqExprHelper mapper SeqExprWithin s1 s2
+traverseSeqExprExprsM mapper (SeqExprThroughout e s) = do
+    e' <- mapper e
+    s' <- traverseSeqExprExprsM mapper s
+    return $ SeqExprThroughout e' s'
+traverseSeqExprExprsM mapper (SeqExprDelay ms r s) = do
+    ms' <- case ms of
+        Nothing -> return Nothing
+        Just x -> traverseSeqExprExprsM mapper x >>= return . Just
+    r' <- mapBothM mapper r
+    s' <- traverseSeqExprExprsM mapper s
+    return $ SeqExprDelay ms' r' s'
+traverseSeqExprExprsM mapper (SeqExprFirstMatch s items) = do
+    s' <- traverseSeqExprExprsM mapper s
+    items' <- mapM (traverseSeqMatchItemExprsM mapper) items
+    return $ SeqExprFirstMatch s' items'
+
+traverseSeqMatchItemExprsM :: Monad m => MapperM m Expr -> MapperM m SeqMatchItem
+traverseSeqMatchItemExprsM mapper (SeqMatchAsgn (a, b, c)) = do
+    c' <- mapper c
+    return $ SeqMatchAsgn (a, b, c')
+traverseSeqMatchItemExprsM mapper (SeqMatchCall x (Args l p)) = do
+    l' <- mapM mapper l
+    pes <- mapM mapper $ map snd p
+    let p' = zip (map fst p) pes
+    return $ SeqMatchCall x (Args l' p')
+
+traversePropertySpecExprsM :: Monad m => MapperM m Expr -> MapperM m PropertySpec
+traversePropertySpecExprsM mapper (PropertySpec mv e pe) = do
+    mv' <- mapM (traverseEventExprsM mapper) mv
+    e' <- mapper e
+    pe' <- traversePropExprExprsM mapper pe
+    return $ PropertySpec mv' e' pe'
+
+traversePropExprExprsM :: Monad m => MapperM m Expr -> MapperM m PropExpr
+traversePropExprExprsM mapper (PropExpr se) =
+    traverseSeqExprExprsM mapper se >>= return . PropExpr
+traversePropExprExprsM mapper (PropExprImpliesO se pe) =
+    propExprHelper mapper PropExprImpliesO se pe
+traversePropExprExprsM mapper (PropExprImpliesNO se pe) =
+    propExprHelper mapper PropExprImpliesNO se pe
+traversePropExprExprsM mapper (PropExprFollowsO se pe) =
+    propExprHelper mapper PropExprFollowsO se pe
+traversePropExprExprsM mapper (PropExprFollowsNO se pe) =
+    propExprHelper mapper PropExprFollowsNO se pe
+traversePropExprExprsM mapper (PropExprIff p1 p2) = do
+    p1' <- traversePropExprExprsM mapper p1
+    p2' <- traversePropExprExprsM mapper p2
+    return $ PropExprIff p1' p2'
+
+seqExprHelper :: Monad m => MapperM m Expr
+    -> (SeqExpr -> SeqExpr -> SeqExpr)
+    -> SeqExpr -> SeqExpr -> m SeqExpr
+seqExprHelper mapper constructor s1 s2 = do
+    s1' <- traverseSeqExprExprsM mapper s1
+    s2' <- traverseSeqExprExprsM mapper s2
+    return $ constructor s1' s2'
+
+propExprHelper :: Monad m => MapperM m Expr
+    -> (SeqExpr -> PropExpr -> PropExpr)
+    -> SeqExpr -> PropExpr -> m PropExpr
+propExprHelper mapper constructor se pe = do
+    se' <- traverseSeqExprExprsM mapper se
+    pe' <- traversePropExprExprsM mapper pe
+    return $ constructor se' pe'
+
 -- Note that this does not include the expressions without the statements of the
 -- actions associated with the assertions.
 traverseAssertionExprsM :: Monad m => MapperM m Expr -> MapperM m Assertion
 traverseAssertionExprsM mapper = assertionMapper
     where
-        seqExprMapper (SeqExpr e) =
-            mapper e >>= return . SeqExpr
-        seqExprMapper (SeqExprAnd        s1 s2) =
-            ssMapper   SeqExprAnd        s1 s2
-        seqExprMapper (SeqExprOr         s1 s2) =
-            ssMapper   SeqExprOr         s1 s2
-        seqExprMapper (SeqExprIntersect  s1 s2) =
-            ssMapper   SeqExprIntersect  s1 s2
-        seqExprMapper (SeqExprWithin     s1 s2) =
-            ssMapper   SeqExprWithin     s1 s2
-        seqExprMapper (SeqExprThroughout e s) = do
-            e' <- mapper e
-            s' <- seqExprMapper s
-            return $ SeqExprThroughout e' s'
-        seqExprMapper (SeqExprDelay ms r s) = do
-            ms' <- case ms of
-                Nothing -> return Nothing
-                Just x -> seqExprMapper x >>= return . Just
-            r' <- mapBothM mapper r
-            s' <- seqExprMapper s
-            return $ SeqExprDelay ms' r' s'
-        seqExprMapper (SeqExprFirstMatch s items) = do
-            s' <- seqExprMapper s
-            items' <- mapM seqMatchItemMapper items
-            return $ SeqExprFirstMatch s' items'
-        seqMatchItemMapper (SeqMatchAsgn (a, b, c)) = do
-            c' <- mapper c
-            return $ SeqMatchAsgn (a, b, c')
-        seqMatchItemMapper (SeqMatchCall x (Args l p)) = do
-            l' <- mapM mapper l
-            pes <- mapM mapper $ map snd p
-            let p' = zip (map fst p) pes
-            return $ SeqMatchCall x (Args l' p')
-        ppMapper constructor p1 p2 = do
-            p1' <- propExprMapper p1
-            p2' <- propExprMapper p2
-            return $ constructor p1' p2'
-        ssMapper constructor s1 s2 = do
-            s1' <- seqExprMapper s1
-            s2' <- seqExprMapper s2
-            return $ constructor s1' s2'
-        spMapper constructor se pe = do
-            se' <- seqExprMapper se
-            pe' <- propExprMapper pe
-            return $ constructor se' pe'
-        propExprMapper (PropExpr se) =
-            seqExprMapper se >>= return . PropExpr
-        propExprMapper (PropExprImpliesO se pe) =
-            spMapper PropExprImpliesO se pe
-        propExprMapper (PropExprImpliesNO se pe) =
-            spMapper PropExprImpliesNO se pe
-        propExprMapper (PropExprFollowsO se pe) =
-            spMapper PropExprFollowsO se pe
-        propExprMapper (PropExprFollowsNO se pe) =
-            spMapper PropExprFollowsNO se pe
-        propExprMapper (PropExprIff p1 p2) =
-            ppMapper PropExprIff p1 p2
-        propSpecMapper (PropertySpec mv e pe) = do
-            mv' <- mapM (traverseEventExprsM mapper) mv
-            e' <- mapper e
-            pe' <- propExprMapper pe
-            return $ PropertySpec mv' e' pe'
         assertionExprMapper (Concurrent e) =
-            propSpecMapper e >>= return . Concurrent
+            traversePropertySpecExprsM mapper e >>= return . Concurrent
         assertionExprMapper (Immediate d e) =
             mapper e >>= return . Immediate d
         assertionMapper (Assert e ab) = do
@@ -604,15 +618,22 @@ traverseNodesM exprMapper declMapper typeMapper lhsMapper stmtMapper =
         return $ MIPackageItem item'
     moduleItemMapper (MIPackageItem (DPIExport spec alias kw name)) =
         return $ MIPackageItem $ DPIExport spec alias kw name
-    moduleItemMapper (AssertionItem (mx, a)) = do
-        a' <- traverseAssertionStmtsM stmtMapper a
-        a'' <- traverseAssertionExprsM exprMapper a'
-        return $ AssertionItem (mx, a'')
+    moduleItemMapper (AssertionItem item) =
+        assertionItemMapper item >>= return . AssertionItem
     moduleItemMapper (ElabTask severity (Args pnArgs kwArgs)) = do
         pnArgs' <- mapM exprMapper pnArgs
         kwArgs' <- fmap (zip kwNames) $ mapM exprMapper kwExprs
         return $ ElabTask severity $ Args pnArgs' kwArgs'
         where (kwNames, kwExprs) = unzip kwArgs
+
+    assertionItemMapper (MIAssertion mx a) = do
+        a' <- traverseAssertionStmtsM stmtMapper a
+        a'' <- traverseAssertionExprsM exprMapper a'
+        return $ MIAssertion mx a''
+    assertionItemMapper (PropertyDecl x p) =
+        traversePropertySpecExprsM exprMapper p >>= return . PropertyDecl x
+    assertionItemMapper (SequenceDecl x e) =
+        traverseSeqExprExprsM exprMapper e >>= return . SequenceDecl x
 
     genItemMapper = traverseGenItemExprsM exprMapper
 
@@ -736,11 +757,11 @@ traverseLHSsM mapper =
         traverseModuleItemLHSsM (NInputGate  kw d x lhs exprs) = do
             lhs' <- mapper lhs
             return $ NInputGate kw d x lhs' exprs
-        traverseModuleItemLHSsM (AssertionItem (mx, a)) = do
+        traverseModuleItemLHSsM (AssertionItem (MIAssertion mx a)) = do
             converted <-
                 traverseNestedStmtsM (traverseStmtLHSsM mapper) (Assertion a)
             return $ case converted of
-                Assertion a' -> AssertionItem (mx, a')
+                Assertion a' -> AssertionItem $ MIAssertion mx a'
                 _ -> error $ "redirected AssertionItem traverse failed: "
                         ++ show converted
         traverseModuleItemLHSsM (Generate items) = do

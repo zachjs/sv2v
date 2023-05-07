@@ -15,6 +15,7 @@
 ### New Features
 
 * `string` data type is now dropped from parameters and localparams
+* Added support for passing through `sequence` and `property` declarations
 
 ### Other Enhancements
 

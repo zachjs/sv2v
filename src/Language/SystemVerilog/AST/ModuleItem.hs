@@ -15,6 +15,7 @@ module Language.SystemVerilog.AST.ModuleItem
     , NOutputGateKW (..)
     , AssignOption  (..)
     , Severity      (..)
+    , AssertionItem (..)
     ) where
 
 import Data.List (intercalate)
@@ -28,7 +29,7 @@ import Language.SystemVerilog.AST.Description (PackageItem)
 import Language.SystemVerilog.AST.Expr (Expr(Nil), pattern Ident, Range, showRanges, ParamBinding, showParams, Args)
 import Language.SystemVerilog.AST.GenItem (GenItem)
 import Language.SystemVerilog.AST.LHS (LHS)
-import Language.SystemVerilog.AST.Stmt (Stmt, AssertionItem, Timing(Delay))
+import Language.SystemVerilog.AST.Stmt (Stmt, Assertion, Timing(Delay), PropertySpec, SeqExpr)
 import Language.SystemVerilog.AST.Type (Identifier, Strength0, Strength1)
 
 data ModuleItem
@@ -65,10 +66,7 @@ instance Show ModuleItem where
         showGate kw d x $ show lhs : map show exprs
     show (NOutputGate kw d x lhss expr) =
         showGate kw d x $ (map show lhss) ++ [show expr]
-    show (AssertionItem (x, a)) =
-        if null x
-            then show a
-            else printf "%s : %s" x (show a)
+    show (AssertionItem i) = show i
     show (Instance   m params i rs ports) =
         if null params
             then printf "%s %s%s%s;"     m                     i rsStr (showPorts ports)
@@ -164,3 +162,16 @@ instance Show Severity where
     show SeverityWarning = "$warning"
     show SeverityError   = "$error"
     show SeverityFatal   = "$fatal"
+
+data AssertionItem
+    = MIAssertion  Identifier Assertion
+    | PropertyDecl Identifier PropertySpec
+    | SequenceDecl Identifier SeqExpr
+    deriving Eq
+
+instance Show AssertionItem where
+    show (MIAssertion x a)
+        | null x = show a
+        | otherwise = printf "%s : %s" x (show a)
+    show (PropertyDecl  x p) = printf "property %s;\n%s\nendproperty" x (indent $ show p)
+    show (SequenceDecl  x e) = printf "sequence %s;\n%s\nendsequence" x (indent $ show e)
