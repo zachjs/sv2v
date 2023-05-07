@@ -12,11 +12,11 @@ conversion already exist, they generally either rely on commercial tools, or are
 limited in scope.
 
 This project was originally developed to target [Yosys], and so allows for
-disabling the conversion of (passing through) those [SystemVerilog features
-which Yosys supports].
+disabling the conversion of (passing through) those [SystemVerilog features that
+Yosys supports].
 
-[Yosys]: http://www.clifford.at/yosys/
-[SystemVerilog features which Yosys supports]: https://github.com/YosysHQ/yosys#supported-features-from-systemverilog
+[Yosys]: https://yosyshq.net/yosys/
+[SystemVerilog features that Yosys supports]: https://github.com/YosysHQ/yosys#supported-features-from-systemverilog
 
 The idea for this project was shared with me while I was an undergraduate at
 Carnegie Mellon University as part of a joint Computer Science and Electrical
@@ -36,7 +36,8 @@ All of sv2v's dependencies are free and open-source.
     * [Haskell Stack](https://www.haskellstack.org/) - Haskell build system
     * Haskell dependencies are managed in `sv2v.cabal`
 * Test Dependencies
-    * [Icarus Verilog](http://iverilog.icarus.com) - for Verilog simulation
+    * [Icarus Verilog](https://steveicarus.github.io/iverilog/) - for Verilog
+      simulation
     * [shUnit2](https://github.com/kward/shunit2) - test framework
     * Python (any version) - for generating certain test cases
 
@@ -72,16 +73,18 @@ running `stack install`, or copy over the executable manually.
 
 ## Usage
 
-sv2v takes in a list of files and prints the converted Verilog to `stdout`.
-Using `--write=adjacent` will create a converted `.v` for every `.sv` input file
-rather than printing to `stdout`. `--write`/`-w` can also be used to specify a
-path to a `.v` output file.
+sv2v takes in a list of files and prints the converted Verilog to `stdout` by
+default. Users should typically pass all of their SystemVerilog source files to
+sv2v at once so it can properly resolve packages, interfaces, type parameters,
+etc., across files. Using `--write=adjacent` will create a converted `.v` for
+every `.sv` input file rather than printing to `stdout`. `--write`/`-w` can also
+be used to specify a path to a `.v` output file.
 
 Users may specify `include` search paths, define macros during preprocessing,
 and exclude some of the conversions. Specifying `-` as an input file will read
 from `stdin`.
 
-Below is the current usage printout. This interface is subject to change.
+Below is the current usage printout.
 
 ```
 sv2v [OPTIONS] [FILES]
@@ -119,7 +122,7 @@ usages of parameterized classes, and the `bind` keyword. Assertions are also
 supported, but are simply dropped during conversion.
 
 If you find a bug or have a feature request, please [create an issue].
-Preference will be given to issues which include examples or test cases.
+Preference will be given to issues that include examples or test cases.
 
 [create an issue]: https://github.com/zachjs/sv2v/issues/new
 
@@ -144,7 +147,7 @@ There is also a [SystemVerilog compliance suite] being created to test
 open-source tools' SystemVerilog support. Although not every test in the suite
 is applicable, it has been a valuable asset in finding edge cases.
 
-[SystemVerilog compliance suite]: https://github.com/SymbiFlow/sv-tests
+[SystemVerilog compliance suite]: https://github.com/chipsalliance/sv-tests
 
 
 ## Acknowledgements
@@ -156,12 +159,11 @@ standard, his project was a great starting point.
 [Tom Hawkin's Verilog parser]: https://github.com/tomahawkins/verilog
 
 Reid Long was invaluable in developing this tool, providing significant tests
-and advice, and isolating many bugs. His projects can be found
-[here](https://bitbucket.org/ReidLong/).
+and advice, and isolating many bugs.
 
 Edric Kusuma helped me with the ins and outs of SystemVerilog, with which I had
 no prior experience, and has also helped with test cases.
 
-Since sv2v's public release, several people have taken the time to file detailed
+Since sv2v's public release, many people have taken the time to file detailed
 bug reports and feature requests. I greatly appreciate their help in furthering
 the project.
