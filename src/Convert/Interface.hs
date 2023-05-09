@@ -71,25 +71,23 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
         traverseDeclM :: Decl -> Scoper [ModportDecl] Decl
         traverseDeclM decl = do
             case decl of
-                Variable  _ t x _ _ -> checkDeclType t x $ insertElem x DeclVal
-                Net   _ _ _ t x _ _ -> checkDeclType t x $ insertElem x DeclVal
-                Param     _ t x _   -> checkDeclType t x $ insertElem x DeclVal
+                Variable  _ t x _ _ -> checkDeclType t x >> insertElem x DeclVal
+                Net   _ _ _ t x _ _ -> checkDeclType t x >> insertElem x DeclVal
+                Param     _ t x _   -> checkDeclType t x >> insertElem x DeclVal
                 ParamType _   x _   -> insertElem x DeclVal
                 CommentDecl{} -> return ()
             return decl
 
         -- check for module or interface names used as type names
-        checkDeclType :: Type -> Identifier -> Scoper a b -> Scoper a b
-        checkDeclType (Alias typeName _) declName continue
-            | isNothing (readMaybe declName :: Maybe Int) = do
-            maybeType <- lookupElemM typeName
-            case (maybePart, maybeType) of
-                (Just part, Nothing{}) -> scopedErrorM $ "declaration " ++
-                    declName ++ " uses " ++ show (pKind part) ++ " name " ++
-                    typeName ++ " where a type name is expected"
-                _ -> continue
-            where maybePart = Map.lookup typeName parts
-        checkDeclType _ _ other = other
+        checkDeclType :: Type -> Identifier -> Scoper a ()
+        checkDeclType (Alias typeName _) declName
+            | isNothing (readMaybe declName :: Maybe Int)
+            , Just part <- Map.lookup typeName parts = do
+                maybeType <- lookupElemM typeName
+                when (isNothing maybeType) $ scopedErrorM $
+                    "declaration " ++ declName ++ " uses " ++ show (pKind part)
+                    ++ " name " ++ typeName ++ " where a type name is expected"
+        checkDeclType _ _ = return ()
 
         lookupIntfElem :: Scopes [ModportDecl] -> Expr -> LookupResult [ModportDecl]
         lookupIntfElem modports expr =
