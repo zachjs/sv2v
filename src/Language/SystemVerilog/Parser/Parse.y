@@ -1672,12 +1672,20 @@ missingToken expected = do
   parseErrorM p $ "missing expected `" ++ expected ++ "`"
 
 checkPortBindings :: [PortBinding] -> ParseState [PortBinding]
-checkPortBindings [] = return []
+-- empty port bindings should stay empty
+checkPortBindings [("", Nil)] = return []
+-- drop the trailing comma in named port bindings
+checkPortBindings bindings
+  | (_ : _, _) <- head bindings
+  , ("", Nil) <- last bindings
+  = checkPortBindings' $ init bindings
+-- a trailing comma is indistinguishable from an explicit unconnected positional
+-- binding, so this is passed-through cleanly and resolved downstream
 checkPortBindings bindings =
-  checkBindings "port connections" $
-  if last bindings == ("", Nil)
-    then init bindings
-    else bindings
+  checkPortBindings' bindings
+
+checkPortBindings' :: [PortBinding] -> ParseState [PortBinding]
+checkPortBindings' = checkBindings "port connections"
 
 checkParamBindings :: [ParamBinding] -> ParseState [ParamBinding]
 checkParamBindings = checkBindings "parameter overrides"

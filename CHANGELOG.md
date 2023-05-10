@@ -7,6 +7,7 @@
 * Fixed module-level localparams being needlessly inlined when forming longest
   static prefixes, which could cause deep recursion and run out of memory on
   some designs
+* Fixed overzealous removal of explicitly unconnected ports (e.g., `.a()`)
 * Fixed unneeded scoping of constant function calls used in type lookups
 * `/*/` is no longer interpreted as a self-closing block comment, e.g.,
   `$display("a"/*/,"b"/* */);` previously printed "ab", but now prints "a"

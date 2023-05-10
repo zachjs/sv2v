@@ -62,9 +62,13 @@ mapInstance parts (Instance m paramBindings x rs portBindings) =
 
         paramBindings' = map checkParam $
             resolveBindings (msg "parameter overrides") paramNames paramBindings
-        portBindings' = filter ((/= Nil) . snd) $
-            resolveBindings (msg "port connections") portNames $
-            concatMap expandStar portBindings
+        portBindings' = resolveBindings (msg "port connections") portNames $
+            concatMap expandStar $
+            -- drop the trailing comma in positional port bindings
+            if length portNames + 1 == length portBindings
+                && last portBindings == ("", Nil)
+                then init portBindings
+                else portBindings
 
         expandStar :: PortBinding -> [PortBinding]
         expandStar ("*", Nil) =
