@@ -1,7 +1,10 @@
 package pkg;
-    typedef struct packed {
-        integer unsigned a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z;
-    } T;
+    `define STRUCT \
+        struct packed { \
+            integer unsigned a, b, c, d, e, f, g, h, i, j, k, l, m, \
+                n, o, p, q, r, s, t, u, v, w, x, y, z; \
+        }
+    typedef `STRUCT T;
 
     `define step(b, o, f) f: o.f == "inv" ? b.f : o.f
     `define extend(_b, _o) '{ \
@@ -36,11 +39,14 @@ package pkg;
     localparam X = 1'd0;
     localparam Y = 1'd1;
 
-    localparam T a_cfg = '{a: X, b: X, c: X, d: X, e: X, f: X, default: Y};
+    localparam T a1_cfg = '{a: X, b: X, c: X, d: X, e: X, f: X, default: Y};
+    localparam `STRUCT a2_cfg = a1_cfg;
 
     `define expand(let_a, let_b) \
-        localparam T let_a``_ext = '{let_a: Y, default: "inv"}; \
-        localparam T let_b``_cfg = `extend(let_a``_cfg, let_a``_ext);
+        localparam T let_a``1_ext = '{let_a: Y, default: "inv"}; \
+        localparam T let_b``1_cfg = `extend(let_a``1_cfg, let_a``1_ext); \
+        localparam `STRUCT let_a``2_ext = '{let_a: Y, default: "inv"}; \
+        localparam `STRUCT let_b``2_cfg = `extend(let_a``2_cfg, let_a``2_ext);
 
     `expand(a, b)
     `expand(b, c)
@@ -68,9 +74,11 @@ package pkg;
     `expand(x, y)
     `expand(y, z)
 
-    localparam P = z_cfg.z;
+    localparam P = z1_cfg.z;
+    localparam Q = 3 * z2_cfg.z;
+    localparam `STRUCT R = '0;
 endpackage
 
 module top;
-    initial $display(pkg::P);
+    initial $display(pkg::P, pkg::Q, pkg::R);
 endmodule

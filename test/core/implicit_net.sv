@@ -20,15 +20,18 @@ module top;
     and (o1, foo, bar);
     not (o2, o3, foo);
     not (u1, u2, u3);
+    and (o4, foo, baz);
 
     Example e (a, b, c);
 
     initial begin
         `DISPLAY(foo)
         `DISPLAY(bar)
+        `DISPLAY(baz)
         `DISPLAY(o1)
         `DISPLAY(o2)
         `DISPLAY(o3)
+        `DISPLAY(o4)
         `DISPLAY(u1)
         `DISPLAY(u2)
         `DISPLAY(u3)

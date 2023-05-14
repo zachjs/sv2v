@@ -18,11 +18,13 @@ module top;
     wor bar;
     assign bar = 1;
 
-    wor o1, o2, o3;
+    wor o1, o2, o3, o4;
     wor u1, u2, u3;
+    wor baz;
     and (o1, foo, bar);
     not (o2, o3, foo);
     not (u1, u2, u3);
+    and (o4, foo, baz);
 
     wor a, b, c;
     Example e (a, b, c);
@@ -30,9 +32,11 @@ module top;
     initial begin
         `DISPLAY(foo)
         `DISPLAY(bar)
+        `DISPLAY(baz)
         `DISPLAY(o1)
         `DISPLAY(o2)
         `DISPLAY(o3)
+        `DISPLAY(o4)
         `DISPLAY(u1)
         `DISPLAY(u2)
         `DISPLAY(u3)
