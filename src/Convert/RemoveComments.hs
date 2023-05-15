@@ -61,4 +61,6 @@ convertDecls = filter (not . isCommentDecl)
         isCommentDecl _ = False
 
 convertStmts :: [Stmt] -> [Stmt]
-convertStmts = map $ traverseNestedStmts convertStmt
+convertStmts =
+    filter (/= Null) .
+    map (traverseNestedStmts convertStmt)

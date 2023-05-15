@@ -47,11 +47,6 @@ flattenOuterBlocks (Block Seq "" declsA [stmt]) =
         then (declsA ++ declsB, stmtsB)
         else (declsA, [stmt])
     where (declsB, stmtsB) = flattenOuterBlocks stmt
-flattenOuterBlocks (Block Seq "" declsA (Block Seq name declsB stmtsA : stmtsB)) =
-    if canCombine declsA declsB
-        then flattenOuterBlocks $
-                Block Seq name (declsA ++ declsB) (stmtsA ++ stmtsB)
-        else (declsA, Block Seq name declsB stmtsA : stmtsB)
 flattenOuterBlocks (Block Seq name decls stmts)
     | null name = (decls, stmts)
     | otherwise = ([], [Block Seq name decls stmts])
