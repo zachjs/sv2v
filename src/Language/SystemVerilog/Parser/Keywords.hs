@@ -33,12 +33,12 @@ newKeywords = [
     KW_trireg, KW_vectored, KW_wait, KW_wand, KW_weak0, KW_weak1, KW_while,
     KW_wire, KW_wor, KW_xnor, KW_xor]),
 
-    ("1364-2001-noconfig", [KW_cell, KW_config, KW_design, KW_endconfig,
-    KW_incdir, KW_include, KW_instance, KW_liblist, KW_library, KW_use]),
-
-    ("1364-2001", [KW_automatic, KW_endgenerate, KW_generate, KW_genvar,
-    KW_localparam, KW_noshowcancelled, KW_pulsestyle_ondetect,
+    ("1364-2001-noconfig", [KW_automatic, KW_endgenerate, KW_generate,
+    KW_genvar, KW_localparam, KW_noshowcancelled, KW_pulsestyle_ondetect,
     KW_pulsestyle_onevent, KW_showcancelled, KW_signed, KW_unsigned]),
+
+    ("1364-2001", [KW_cell, KW_config, KW_design, KW_endconfig, KW_incdir,
+    KW_include, KW_instance, KW_liblist, KW_library, KW_use]),
 
     ("1364-2005", [KW_uwire]),
 

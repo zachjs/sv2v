@@ -1,0 +1,10 @@
+cell
+config
+design
+endconfig
+incdir
+include
+instance
+liblist
+library
+use

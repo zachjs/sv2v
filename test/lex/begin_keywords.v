@@ -13,6 +13,14 @@ module top;
             $display(y * y);
         end
     endtask
+    task baz;
+        integer w;
+        begin
+            w = 3;
+            $display(w ** w);
+        end
+    endtask
     initial foo;
     initial bar;
+    initial baz;
 endmodule

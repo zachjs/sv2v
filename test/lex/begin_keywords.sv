@@ -1,4 +1,4 @@
-`begin_keywords "1364-2001-noconfig"
+`begin_keywords "1364-1995"
 task foo;
     integer automatic = 2;
     $display(automatic * automatic);
@@ -10,7 +10,14 @@ task automatic bar;
 endtask
 `end_keywords
 `end_keywords
+`begin_keywords "1364-2001-noconfig"
+task baz;
+    integer cell = 3;
+    $display(cell ** cell);
+endtask
+`end_keywords
 module top;
     initial foo;
     initial bar;
+    initial baz;
 endmodule

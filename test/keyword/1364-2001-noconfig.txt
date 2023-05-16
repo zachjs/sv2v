@@ -1,0 +1,11 @@
+automatic
+endgenerate
+generate
+genvar
+localparam
+noshowcancelled
+pulsestyle_ondetect
+pulsestyle_onevent
+showcancelled
+signed
+unsigned
