@@ -20,6 +20,9 @@ module Language.SystemVerilog.AST.Expr
     , ParamBinding
     , showParams
     , pattern RawNum
+    , pattern BinOp
+    , pattern UniOp
+    , pattern Mux
     ) where
 
 import Data.List (intercalate)
@@ -29,6 +32,7 @@ import Language.SystemVerilog.AST.Number (Number(..))
 import Language.SystemVerilog.AST.Op
 import Language.SystemVerilog.AST.ShowHelp
 import {-# SOURCE #-} Language.SystemVerilog.AST.Type
+import {-# SOURCE #-} Language.SystemVerilog.AST.Attr
 
 type Range = (Expr, Expr)
 
@@ -36,6 +40,12 @@ type TypeOrExpr = Either Type Expr
 
 pattern RawNum :: Integer -> Expr
 pattern RawNum n = Number (Decimal (-32) True n)
+pattern BinOp :: BinOp -> Expr -> Expr -> Expr
+pattern BinOp op l r = BinOpA op [] l r
+pattern UniOp :: UniOp -> Expr -> Expr
+pattern UniOp op e = UniOpA op [] e
+pattern Mux :: Expr -> Expr -> Expr -> Expr
+pattern Mux c t f = MuxA [] c t f
 
 data Expr
     = String  String
@@ -51,9 +61,9 @@ data Expr
     | Concat  [Expr]
     | Stream  StreamOp Expr [Expr]
     | Call    Expr Args
-    | UniOp   UniOp Expr
-    | BinOp   BinOp Expr Expr
-    | Mux     Expr Expr Expr
+    | UniOpA  UniOp [Attr] Expr
+    | BinOpA  BinOp [Attr] Expr Expr
+    | MuxA    [Attr] Expr Expr Expr
     | Cast    TypeOrExpr Expr
     | DimsFn  DimsFn TypeOrExpr
     | DimFn   DimFn  TypeOrExpr Expr
@@ -94,32 +104,35 @@ instance Show Expr where
                 where tStr = if null (show t) then "default" else show t
     show (MinTypMax a b c) = printf "(%s : %s : %s)" (show a) (show b) (show c)
     show (ExprAsgn l r) = printf "(%s = %s)" (show l) (show r)
-    show e@UniOp{} = showsPrec 0 e ""
-    show e@BinOp{} = showsPrec 0 e ""
-    show e@Dot  {} = showsPrec 0 e ""
-    show e@Mux  {} = showsPrec 0 e ""
-    show e@Call {} = showsPrec 0 e ""
+    show e@UniOpA{} = showsPrec 0 e ""
+    show e@BinOpA{} = showsPrec 0 e ""
+    show e@Dot   {} = showsPrec 0 e ""
+    show e@MuxA  {} = showsPrec 0 e ""
+    show e@Call  {} = showsPrec 0 e ""
 
-    showsPrec _ (UniOp   o e  ) =
+    showsPrec _ (UniOpA  o a e  ) =
         shows o .
+        (if null a then id else showChar ' ' . shows a) .
         showUniOpPrec e
-    showsPrec _ (BinOp   o a b) =
-        showBinOpPrec a .
+    showsPrec _ (BinOpA  o a l r) =
+        showBinOpPrec l .
         showChar ' ' .
         shows o .
         showChar ' ' .
-        showBinOpPrec b
+        shows a .
+        showBinOpPrec r
     showsPrec _ (Dot     e n  ) =
         shows e .
         showChar '.' .
         showString n
-    showsPrec _ (Mux     c a b) =
+    showsPrec _ (MuxA  a c t f) =
         showChar '(' .
         shows c .
         showString " ? " .
         shows a .
+        shows t .
         showString " : " .
-        shows b .
+        shows f .
         showChar ')'
     showsPrec _ (Call    e l  ) =
         shows e .

@@ -114,27 +114,27 @@ convertExpr info (Call (Ident "$clog2") (Args [e] [])) =
         e' = convertExpr info $ substitute info e
         val = Call (Ident "$clog2") (Args [e'] [])
         val' = simplifyStep val
-convertExpr info (Mux cc aa bb) =
+convertExpr info (MuxA a cc aa bb) =
     if before == after
-        then simplifyStep $ Mux cc' aa' bb'
-        else simplifyStep $ Mux after aa' bb'
+        then simplifyStep $ MuxA a cc' aa' bb'
+        else simplifyStep $ MuxA a after aa' bb'
     where
         before = substitute info cc'
         after = convertExpr info before
         aa' = convertExpr info aa
         bb' = convertExpr info bb
         cc' = convertExpr info cc
-convertExpr info (BinOp op e1 e2) =
-    case simplifyStep $ BinOp op e1'Sub e2'Sub of
+convertExpr info (BinOpA op a e1 e2) =
+    case simplifyStep $ BinOpA op a e1'Sub e2'Sub of
         Number n -> Number n
-        _ -> simplifyStep $ BinOp op e1' e2'
+        _ -> simplifyStep $ BinOpA op a e1' e2'
     where
         e1' = convertExpr info e1
         e2' = convertExpr info e2
         e1'Sub = substituteIdent info e1'
         e2'Sub = substituteIdent info e2'
-convertExpr info (UniOp op expr) =
-    simplifyStep $ UniOp op $ convertExpr info expr
+convertExpr info (UniOpA op a expr) =
+    simplifyStep $ UniOpA op a $ convertExpr info expr
 convertExpr info (Repeat expr exprs) =
     simplifyStep $ Repeat
         (convertExpr info expr)

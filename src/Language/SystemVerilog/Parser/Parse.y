@@ -1344,7 +1344,7 @@ Expr :: { Expr }
   | Expr "[" Expr "]"           { Bit   $1 $3 }
   | "{" Expr Concat "}"         { Repeat $2 $3 }
   | Concat                      { Concat $1 }
-  | Expr "?" Expr ":" Expr      { Mux $1 $3 $5 }
+  | Expr "?" AttributeInstances Expr ":" Expr { MuxA $3 $1 $4 $6 }
   | Expr "." Identifier         { Dot $1 $3 }
   | "'" "{" PatternItems "}"    { Pattern $3 }
   | Expr "'" "{" PatternItems "}"{ Cast (Right $1) (Pattern $4) }
@@ -1358,47 +1358,47 @@ Expr :: { Expr }
   | Identifier               "::" Identifier { PSIdent $1    $3 }
   | Identifier ParamBindings "::" Identifier { CSIdent $1 $2 $4 }
   -- binary expressions
-  | Expr "||"  Expr { BinOp LogOr  $1 $3 }
-  | Expr "&&"  Expr { BinOp LogAnd $1 $3 }
-  | Expr "->"  Expr { BinOp LogImp $1 $3 }
-  | Expr "<->" Expr { BinOp LogEq  $1 $3 }
-  | Expr "|"   Expr { BinOp BitOr  $1 $3 }
-  | Expr "^"   Expr { BinOp BitXor $1 $3 }
-  | Expr "&"   Expr { BinOp BitAnd $1 $3 }
-  | Expr "~^"  Expr { BinOp BitXnor $1 $3 }
-  | Expr "^~"  Expr { BinOp BitXnor $1 $3 }
-  | Expr "+"   Expr { BinOp Add $1 $3 }
-  | Expr "-"   Expr { BinOp Sub $1 $3 }
-  | Expr "*"   Expr { BinOp Mul $1 $3 }
-  | Expr "/"   Expr { BinOp Div $1 $3 }
-  | Expr "%"   Expr { BinOp Mod $1 $3 }
-  | Expr "**"  Expr { BinOp Pow $1 $3 }
-  | Expr "=="  Expr { BinOp Eq $1 $3 }
-  | Expr "!="  Expr { BinOp Ne $1 $3 }
-  | Expr "<"   Expr { BinOp Lt $1 $3 }
-  | Expr "<="  Expr { BinOp Le $1 $3 }
-  | Expr ">"   Expr { BinOp Gt $1 $3 }
-  | Expr ">="  Expr { BinOp Ge $1 $3 }
-  | Expr "===" Expr { BinOp TEq $1 $3 }
-  | Expr "!==" Expr { BinOp TNe $1 $3 }
-  | Expr "==?" Expr { BinOp WEq $1 $3 }
-  | Expr "!=?" Expr { BinOp WNe $1 $3 }
-  | Expr "<<"  Expr { BinOp ShiftL $1 $3 }
-  | Expr ">>"  Expr { BinOp ShiftR $1 $3 }
-  | Expr "<<<" Expr { BinOp ShiftAL $1 $3 }
-  | Expr ">>>" Expr { BinOp ShiftAR $1 $3 }
+  | Expr "||"  AttributeInstances Expr { BinOpA LogOr  $3 $1 $4 }
+  | Expr "&&"  AttributeInstances Expr { BinOpA LogAnd $3 $1 $4 }
+  | Expr "->"  AttributeInstances Expr { BinOpA LogImp $3 $1 $4 }
+  | Expr "<->" AttributeInstances Expr { BinOpA LogEq  $3 $1 $4 }
+  | Expr "|"   AttributeInstances Expr { BinOpA BitOr  $3 $1 $4 }
+  | Expr "^"   AttributeInstances Expr { BinOpA BitXor $3 $1 $4 }
+  | Expr "&"   AttributeInstances Expr { BinOpA BitAnd $3 $1 $4 }
+  | Expr "~^"  AttributeInstances Expr { BinOpA BitXnor $3 $1 $4 }
+  | Expr "^~"  AttributeInstances Expr { BinOpA BitXnor $3 $1 $4 }
+  | Expr "+"   AttributeInstances Expr { BinOpA Add $3 $1 $4 }
+  | Expr "-"   AttributeInstances Expr { BinOpA Sub $3 $1 $4 }
+  | Expr "*"   AttributeInstances Expr { BinOpA Mul $3 $1 $4 }
+  | Expr "/"   AttributeInstances Expr { BinOpA Div $3 $1 $4 }
+  | Expr "%"   AttributeInstances Expr { BinOpA Mod $3 $1 $4 }
+  | Expr "**"  AttributeInstances Expr { BinOpA Pow $3 $1 $4 }
+  | Expr "=="  AttributeInstances Expr { BinOpA Eq $3 $1 $4 }
+  | Expr "!="  AttributeInstances Expr { BinOpA Ne $3 $1 $4 }
+  | Expr "<"   AttributeInstances Expr { BinOpA Lt $3 $1 $4 }
+  | Expr "<="  AttributeInstances Expr { BinOpA Le $3 $1 $4 }
+  | Expr ">"   AttributeInstances Expr { BinOpA Gt $3 $1 $4 }
+  | Expr ">="  AttributeInstances Expr { BinOpA Ge $3 $1 $4 }
+  | Expr "===" AttributeInstances Expr { BinOpA TEq $3 $1 $4 }
+  | Expr "!==" AttributeInstances Expr { BinOpA TNe $3 $1 $4 }
+  | Expr "==?" AttributeInstances Expr { BinOpA WEq $3 $1 $4 }
+  | Expr "!=?" AttributeInstances Expr { BinOpA WNe $3 $1 $4 }
+  | Expr "<<"  AttributeInstances Expr { BinOpA ShiftL $3 $1 $4 }
+  | Expr ">>"  AttributeInstances Expr { BinOpA ShiftR $3 $1 $4 }
+  | Expr "<<<" AttributeInstances Expr { BinOpA ShiftAL $3 $1 $4 }
+  | Expr ">>>" AttributeInstances Expr { BinOpA ShiftAR $3 $1 $4 }
   -- unary expressions
-  | "!"  Expr                 { UniOp LogNot $2 }
-  | "~"  Expr                 { UniOp BitNot $2 }
-  | "+"  Expr %prec REDUCE_OP { UniOp UniAdd $2 }
-  | "-"  Expr %prec REDUCE_OP { UniOp UniSub $2 }
-  | "&"  Expr %prec REDUCE_OP { UniOp RedAnd  $2 }
-  | "~&" Expr %prec REDUCE_OP { UniOp RedNand $2 }
-  | "|"  Expr %prec REDUCE_OP { UniOp RedOr   $2 }
-  | "~|" Expr %prec REDUCE_OP { UniOp RedNor  $2 }
-  | "^"  Expr %prec REDUCE_OP { UniOp RedXor  $2 }
-  | "~^" Expr %prec REDUCE_OP { UniOp RedXnor $2 }
-  | "^~" Expr %prec REDUCE_OP { UniOp RedXnor $2 }
+  | "!"  AttributeInstances Expr                 { UniOpA LogNot $2 $3 }
+  | "~"  AttributeInstances Expr                 { UniOpA BitNot $2 $3 }
+  | "+"  AttributeInstances Expr %prec REDUCE_OP { UniOpA UniAdd $2 $3 }
+  | "-"  AttributeInstances Expr %prec REDUCE_OP { UniOpA UniSub $2 $3 }
+  | "&"  AttributeInstances Expr %prec REDUCE_OP { UniOpA RedAnd  $2 $3 }
+  | "~&" AttributeInstances Expr %prec REDUCE_OP { UniOpA RedNand $2 $3 }
+  | "|"  AttributeInstances Expr %prec REDUCE_OP { UniOpA RedOr   $2 $3 }
+  | "~|" AttributeInstances Expr %prec REDUCE_OP { UniOpA RedNor  $2 $3 }
+  | "^"  AttributeInstances Expr %prec REDUCE_OP { UniOpA RedXor  $2 $3 }
+  | "~^" AttributeInstances Expr %prec REDUCE_OP { UniOpA RedXnor $2 $3 }
+  | "^~" AttributeInstances Expr %prec REDUCE_OP { UniOpA RedXnor $2 $3 }
   -- assignments within expressions
   | "(" Expr "="        Expr ")" {% makeExprAsgn (tokenPosition $3, AsgnOpEq) $2 $4 }
   | "(" Expr AsgnBinOpP Expr ")" {% makeExprAsgn $3                           $2 $4 }
