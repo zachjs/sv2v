@@ -198,6 +198,8 @@ traverseModuleItem item@(MIPackageItem (Function _ _ x decls _)) = do
 traverseModuleItem item@(MIPackageItem (Task _ x decls _)) = do
     insertElem x $ Proc [] (ports decls)
     return item
+traverseModuleItem (MIAttr attr item) =
+    MIAttr attr <$> traverseModuleItem item
 traverseModuleItem other = return other
 
 toEvent :: (Bool, [Expr]) -> Event
