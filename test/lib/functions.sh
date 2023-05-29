@@ -36,7 +36,7 @@ simulate() {
     $sim_prog > $sim_log
     assertTrue "simulating $1 failed" $?
     # remove the date from the VCD
-    sed -e "1,3d" < $sim_vcd_tmp > $sim_vcd
+    sed -e "1,3d" < $sim_vcd_tmp | $SCRIPT_DIR/clean_vcd.py > $sim_vcd
 }
 
 assertConverts() {

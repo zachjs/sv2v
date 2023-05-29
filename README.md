@@ -39,7 +39,7 @@ All of sv2v's dependencies are free and open-source.
     * [Icarus Verilog](https://steveicarus.github.io/iverilog/) - for Verilog
       simulation
     * [shUnit2](https://github.com/kward/shunit2) - test framework
-    * Python (any version) - for generating certain test cases
+    * Python 3.x - for evaluating certain test cases
 
 
 ## Installation
