@@ -91,7 +91,7 @@ assertConverts() {
 }
 
 extractFlag() {
-    raw_line=`grep -m1 "^\/\/ $1: " $2`
+    raw_line=`grep -m1 "^// $1: " $2`
     to_drop=$((${#1}+5))
     flag="${raw_line:to_drop}"
 }
