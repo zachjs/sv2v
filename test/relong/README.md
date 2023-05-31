@@ -1,24 +1,14 @@
-# relong Tests
+# Reid Long's tests
 
-These tests are borrowed from Reid Long's [HDL Examples
-repository](https://bitbucket.org/ReidLong/hdl-examples). That repository was
-intended to provide examples for how the conversions in this project could be
-done. sv2v does not necessarily convert code as demonstrated in the examples.
-Notably, sv2v does not create `generate` blocks when converted vectors with
-multiple packed dimensions, uses `localparam`s rather than macros for `enum`
-conversion, and converts `struct` literals to concatenations, rather than
-multiple statements.
+These tests are borrowed from Reid Long's [HDL Examples repository]. Early in
+sv2v's development, Reid produced these examples to demonstrate how sv2v might
+perform its conversions. sv2v does not necessarily convert code in the same way,
+but its output should behave equivalently. Notably, sv2v does not create
+`generate` blocks when flattening vectors with multiple packed dimensions, uses
+`localparam`s rather than macros to convert `enum`s, and converts `struct`
+pattern literals as concatenations, rather than multiple statements.
 
-Each test case (say, "foo") is comprised of the following files:
-
-1. `foo.sv`: original SystemVerilog
-2. `foo.v`: hand-converted Verilog
-3. `foo_tb.v`: basic testbench exercising the given modules
-
-The SystemVerilog source file is converted to Verilog using sv2v, and then both
-the converted file and the reference Verilog are simulated using Icarus Verilog.
-This produces VCD files for each which are expected to match exactly, except for
-the timestamp.
+[HDL Examples repository]: https://bitbucket.org/ReidLong/hdl-examples
 
 ## Modifications
 
@@ -29,7 +19,7 @@ corresponding versions in the source repository.
    Though some tools allow for stray semicolons, `iverilog` does not.
 2. `array.v` previously had a custom implementation of `$clog2`, which was
    removed.
-3. `cache_request.sv` was modified to include a plain decimal literal to ensure
+3. `cache_request.sv` was modified to include a plain decimal literal to provide
    coverage beyond the unbased-unsized literals.
 4. The `cache_request2` test is omitted. It was only an example for debugging a
    VCS-specific issue encountered with `cache_request`.

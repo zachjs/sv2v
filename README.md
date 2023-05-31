@@ -140,12 +140,17 @@ front end if there is significant interest.
 
 ## Testing
 
-Once the [test dependencies](#dependencies) are installed, tests can be run with
-`make test`. GitHub Actions is used to automatically test commits.
+Once the [test dependencies] are installed, tests can be run with `make test`.
+GitHub Actions is used to [automatically test] commits. Please review the [test
+documentation] for guidance on adding, debugging, and interpreting tests.
 
-There is also a [SystemVerilog compliance suite] being created to test
-open-source tools' SystemVerilog support. Although not every test in the suite
-is applicable, it has been a valuable asset in finding edge cases.
+[test dependencies]: #dependencies
+[test documentation]: test/README.md
+[automatically test]: https://github.com/zachjs/sv2v/actions
+
+There is also a [SystemVerilog compliance suite] that tests open-source tools'
+SystemVerilog support. Although not every test in the suite is applicable, it
+has been a valuable asset in finding edge cases.
 
 [SystemVerilog compliance suite]: https://github.com/chipsalliance/sv-tests
 
