@@ -1,43 +1,52 @@
-`define TESTA(n, X) \
-	always @* \
-		if (a[n]) \
-			X if (b[n]) \
-				c[n] = 1; \
-			else \
-				c[n] = 0;
-`define TESTC(n, X) \
-	always @* \
-		if (a[n]) begin \
-			X if (b[n]) \
-				c[n] = 1; \
-		end else \
-			c[n] = 0;
+`define TEST(id, ctrl) \
+    always @* #(2 * id) \
+        if (a) \
+            ctrl if (b) \
+                $display("%0d A 1", id); \
+            else \
+                $display("%0d A 2", id); \
+    always @* #(2 * id + 1) \
+        if (a) begin \
+            ctrl if (b) \
+                $display("%0d B 1", id); \
+        end else \
+            $display("%0d B 2", id);
+
 `define NOTHING
 `define ATTRIBUTE (* test *)
 `define FOR for (i = 0; i < 1; i = i + 1)
 `define WHILE while (i < 1)
-`define REPEAT repeat (i)
-`define FOREACH foreach (a[j])
+`define REPEAT repeat (b)
 `define FOREVER forever #10
 `define TIMING #10
-module top();
-	wire [15:0] a, b;
-	reg [15:0] c;
-	integer i;
-	`TESTA(0, `NOTHING)
-	`TESTC(1, `NOTHING)
-	`TESTA(2, `ATTRIBUTE)
-	`TESTC(3, `ATTRIBUTE)
-	`TESTA(4, `FOR)
-	`TESTC(5, `FOR)
-	`TESTA(6, `WHILE)
-	`TESTC(7, `WHILE)
-	`TESTA(8, `REPEAT)
-	`TESTC(9, `REPEAT)
-	`TESTA(10, `FOREACH)
-	`TESTC(11, `FOREACH)
-	`TESTA(12, `FOREVER)
-	`TESTC(13, `FOREVER)
-	`TESTA(14, `TIMING)
-	`TESTC(15, `TIMING)
+
+// The other tested constructs are supported in Verilog-2005.
+`ifdef REF
+    `define FOREACH repeat ($bits(i))
+`else
+    `define FOREACH foreach (i[j])
+`endif
+
+module top;
+    reg a, b;
+    integer i;
+
+    `TEST(0, `NOTHING)
+    `TEST(1, `ATTRIBUTE)
+    `TEST(2, `FOR)
+    `TEST(3, `WHILE)
+    `TEST(4, `REPEAT)
+    `TEST(5, `FOREACH)
+    `TEST(6, `FOREVER)
+    `TEST(7, `TIMING)
+
+    initial begin
+        repeat (2) begin
+            #50 a = 0; b = 0;
+            #50 a = 0; b = 1;
+            #50 a = 1; b = 0;
+            #50 a = 1; b = 1;
+        end
+        $finish(0);
+    end
 endmodule
