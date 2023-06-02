@@ -87,8 +87,9 @@ instance Show Stmt where
         where aStr = if a == Args [] [] then "" else show a
     show (Asgn  o t v e) = printf "%s %s %s%s;" (show v) (show o) tStr (show e)
         where tStr = maybe "" showPad t
-    -- print the true branch inside a block to avoid dangling else issues
-    show (If u c s1 s2 ) = printf "%sif (%s)%s%s" (showPad u) (show c) (showBlockedBranch s1) (showElseBranch s2)
+    show (If u c s1 s2) =
+        -- print the then branch inside a block to avoid dangling else issues
+        printf "%sif (%s)%s%s" (showPad u) (show c) (showBlockedBranch s1) (showElseBranch s2)
     show (While     e s) = printf  "while (%s) %s" (show e) (show s)
     show (RepeatL   e s) = printf "repeat (%s) %s" (show e) (show s)
     show (DoWhile   e s) = printf "do %s while (%s);" (show s) (show e)
@@ -119,26 +120,27 @@ showBranch (Block Seq "" [] stmts@[CommentStmt{}, _]) =
 showBranch block@Block{} = ' ' : show block
 showBranch stmt = '\n' : (indent $ show stmt)
 
--- Adds a block arround the true branch of an if statement when a dangling else is possible
--- to avoid printing ambiguous verilog (even if it would be parsed correctly)
+-- add a block around the true branch of an if statement when a dangling else is
+-- possible to avoid any potential ambiguity downstream
 showBlockedBranch :: Stmt -> String
 showBlockedBranch stmt =
     showBranch $
     if danglingElse stmt
         then Block Seq "" [] [stmt]
         else stmt
-    where
-        danglingElse s = case s of
-            If{} -> True
-            For _ _ _ subStmt -> danglingElse subStmt
-            While _ subStmt -> danglingElse subStmt
-            RepeatL _ subStmt -> danglingElse subStmt
-            Forever subStmt -> danglingElse subStmt
-            Foreach _ _ subStmt -> danglingElse subStmt
-            Timing _ subStmt -> danglingElse subStmt
-            Block Seq "" [] [CommentStmt{}, subStmt] -> danglingElse subStmt
-            StmtAttr _ subStmt -> danglingElse subStmt
-            _ -> False
+
+danglingElse :: Stmt -> Bool
+danglingElse s = case s of
+    If{} -> True
+    For   _ _ _ subStmt -> danglingElse subStmt
+    While   _   subStmt -> danglingElse subStmt
+    RepeatL _   subStmt -> danglingElse subStmt
+    Forever     subStmt -> danglingElse subStmt
+    Foreach _ _ subStmt -> danglingElse subStmt
+    Timing  _   subStmt -> danglingElse subStmt
+    StmtAttr  _ subStmt -> danglingElse subStmt
+    Block Seq "" [] [CommentStmt{}, subStmt] -> danglingElse subStmt
+    _ -> False
 
 showElseBranch :: Stmt -> String
 showElseBranch Null = ""
