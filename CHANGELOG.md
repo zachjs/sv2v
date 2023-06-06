@@ -13,6 +13,8 @@
 * Fixed unneeded scoping of constant function calls used in type lookups
 * `/*/` is no longer interpreted as a self-closing block comment, e.g.,
   `$display("a"/*/,"b"/* */);` previously printed "ab", but now prints "a"
+* Fixed missing `begin`/`end` when disambiguating procedural branches tagged
+  with an attribute
 * Fixed keywords included in the "1364-2001" and "1364-2001-noconfig"
   `begin_keywords` version specifiers
 
