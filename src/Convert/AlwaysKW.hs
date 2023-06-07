@@ -37,7 +37,6 @@ data Kind
     = Const Expr
     | Var
     | Proc [Expr] [PortDir]
-    deriving Eq
 
 scoper :: ModuleItem -> SC ModuleItem
 scoper = scopeModuleItem traverseDecl return traverseGenItem traverseStmt
