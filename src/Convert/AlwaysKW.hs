@@ -212,7 +212,6 @@ ports = filter ((/= Local) . snd) . map port
 
 port :: Decl -> PortDir
 port (Variable d _ x _ _) = (x, d)
-port (Net  d _ _ _ x _ _) = (x, d)
 port _ = ("", Local)
 
 -- get a list of non-local variables referenced within a module item, and

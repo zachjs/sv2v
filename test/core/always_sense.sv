@@ -1,6 +1,7 @@
+`include "always_sense.vh"
 module mod(
-    input wire inp1, inp2,
-    output reg out1, out2, out3, out4, out5, out6, out7, out8, out9, outA, outB
+    input wire `INPUTS,
+    output reg `OUTPUTS
 );
     localparam ZERO = 0;
 
@@ -75,4 +76,10 @@ module mod(
     endfunction
     always_comb
         outB = h(ZERO);
+    function automatic i;
+        input reg x; // ignored
+        i = s[ONE];
+    endfunction
+    always_comb
+        asgn(.i(i(ZERO)), .o(outC));
 endmodule

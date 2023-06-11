@@ -1,10 +1,10 @@
+`include "always_sense.vh"
 module top;
-    reg inp1, inp2;
-    wire out1, out2, out3, out4, out5, out6, out7, out8, out9, outA, outB;
-    mod m(inp1, inp2, out1, out2, out3, out4, out5, out6, out7, out8, out9, outA, outB);
+    reg `INPUTS;
+    wire `OUTPUTS;
+    mod m(`INPUTS, `OUTPUTS);
     initial begin
-        $monitor(inp1, inp2,
-            out1, out2, out3, out4, out5, out6, out7, out8, out9, outA, outB);
+        $monitor(`INPUTS, `OUTPUTS);
         repeat (2) begin
             #1 inp1 = 0;
             #1 inp2 = 0;
