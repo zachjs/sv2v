@@ -20,6 +20,7 @@ import Control.Monad.Except
 import Control.Monad.State.Strict
 import Data.Maybe (catMaybes, fromMaybe)
 import System.IO (hPutStrLn, stderr)
+import qualified Data.Set as Set
 import Language.SystemVerilog.AST
 import Language.SystemVerilog.Parser.ParseDecl
 import Language.SystemVerilog.Parser.Tokens
@@ -554,7 +555,7 @@ Part(begin, end) :: { Description }
 
 PartHeader :: { [Attr] -> Bool -> PartKW -> [ModuleItem] -> Identifier -> ParseState Description }
   : Lifetime Identifier PackageImportDeclarations Params PortDecls ";"
-    { \attrs extern kw items label -> checkTag $2 label $ Part attrs extern kw $1 $2 (fst $5) ($3 ++ $4 ++ (snd $5) ++ items) }
+    {% recordPartHave $2 >> return \attrs extern kw items label -> checkTag $2 label $ Part attrs extern kw $1 $2 (fst $5) ($3 ++ $4 ++ (snd $5) ++ items) }
 
 ModuleKW :: { PartKW }
   : "module" { Module }
@@ -701,7 +702,7 @@ ModuleItem :: { [ModuleItem] }
   | "generate" GenItems endgenerate { [Generate $2] }
 NonGenerateModuleItem :: { [ModuleItem] }
   -- This item covers module instantiations and all declarations
-  : ModuleDeclTokens(";")                { parseDTsAsModuleItems $1 }
+  : ModuleDeclTokens(";")                {% mapM recordPartUsed $ parseDTsAsModuleItems $1 }
   | ParameterDecl(";")                   { map (MIPackageItem . Decl) $1 }
   | "defparam" LHSAsgns ";"              { map (uncurry Defparam) $2 }
   | "assign" AssignOption LHSAsgns ";"   { map (uncurry $ Assign $2) $3 }
@@ -1549,25 +1550,29 @@ data ParseData = ParseData
   { pPosition :: Position
   , pTokens :: [Token]
   , pOversizedNumbers :: Bool
+  , pPartsUsed :: Strings
+  , pPartsHave :: Strings
   }
 
 type ParseState = StateT ParseData (ExceptT String IO)
+type Strings = Set.Set String
 
-parse :: Bool -> [Token] -> ExceptT String IO AST
-parse _ [] = return []
-parse oversizedNumbers tokens =
-  evalStateT parseMain initialState
+parse :: Bool -> [Token] -> ExceptT String IO (AST, Strings, Strings)
+parse _ [] = return mempty
+parse oversizedNumbers tokens = do
+  (ast, finalState) <- runStateT parseMain initialState
+  return (ast, pPartsUsed finalState, pPartsHave finalState)
   where
     position = tokenPosition $ head tokens
-    initialState = ParseData position tokens oversizedNumbers
+    initialState = ParseData position tokens oversizedNumbers mempty mempty
 
 positionKeep :: (Token -> ParseState a) -> ParseState a
 positionKeep cont = do
-  ParseData _ tokens oversizedNumbers <- get
+  tokens <- gets pTokens
   case tokens of
     [] -> cont TokenEOF
     tok : toks -> do
-      put $ ParseData (tokenPosition tok) toks oversizedNumbers
+      modify' $ \s -> s { pPosition = tokenPosition tok, pTokens = toks }
       cont tok
 
 parseErrorTok :: Token -> ParseState a
@@ -1841,5 +1846,20 @@ portBindingAttrs :: (Position, [Attr]) -> ParseState ()
 portBindingAttrs (pos, attrs) = parseWarning pos msg
   where msg = "Ignored port connection attributes "
           ++ concatMap show attrs ++ "."
+
+recordPartUsed :: ModuleItem -> ParseState ModuleItem
+recordPartUsed item@(Instance partName _ _ _ _) = do
+  partsUsed <- gets pPartsUsed
+  when (Set.notMember partName partsUsed) $ do
+    let partsUsed' = Set.insert partName partsUsed
+    modify' $ \s -> s { pPartsUsed = partsUsed' }
+  return item
+recordPartUsed item = return item
+
+recordPartHave :: Identifier -> ParseState ()
+recordPartHave partName = do
+  partsHave <- gets pPartsHave
+  let partsHave' = Set.insert partName partsHave
+  modify' $ \s -> s { pPartsHave = partsHave' }
 
 }

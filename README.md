@@ -78,7 +78,9 @@ default. Users should typically pass all of their SystemVerilog source files to
 sv2v at once so it can properly resolve packages, interfaces, type parameters,
 etc., across files. Using `--write=adjacent` will create a converted `.v` for
 every `.sv` input file rather than printing to `stdout`. `--write`/`-w` can also
-be used to specify a path to a `.v` output file.
+be used to specify a path to a `.v` output file. Undefined modules and
+interfaces can be automatically loaded from library directories using
+`--libdir`/`-y`.
 
 Users may specify `include` search paths, define macros during preprocessing,
 and exclude some of the conversions. Specifying `-` as an input file will read
@@ -91,6 +93,8 @@ sv2v [OPTIONS] [FILES]
 
 Preprocessing:
   -I --incdir=DIR           Add directory to include search path
+  -y --libdir=DIR           Add a directory to the library search path used
+                            when looking for undefined modules and interfaces
   -D --define=NAME[=VALUE]  Define a macro for preprocessing
      --siloed               Lex input files separately, so macros from
                             earlier files are not defined in later files

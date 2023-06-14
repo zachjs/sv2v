@@ -1,5 +1,13 @@
 ## Unreleased
 
+### New Features
+
+* Added `-y`/`--libdir` for specifying library directories from which to
+  automatically load modules and interfaces used in the design that are not
+  found in the provided input files
+* The `string` data type is now dropped from parameters and localparams
+* Added support for passing through `sequence` and `property` declarations
+
 ### Bug Fixes
 
 * Fixed crash when converting multi-dimensional arrays or arrays of structs or
@@ -17,11 +25,6 @@
   with an attribute
 * Fixed keywords included in the "1364-2001" and "1364-2001-noconfig"
   `begin_keywords` version specifiers
-
-### New Features
-
-* `string` data type is now dropped from parameters and localparams
-* Added support for passing through `sequence` and `property` declarations
 
 ### Other Enhancements
 

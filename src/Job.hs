@@ -36,6 +36,7 @@ data Write
 data Job = Job
     { files :: [FilePath]
     , incdir :: [FilePath]
+    , libdir :: [FilePath]
     , define :: [String]
     , siloed :: Bool
     , skipPreprocessor :: Bool
@@ -58,6 +59,9 @@ defaultJob = Job
     , incdir = nam_ "I" &= name "incdir" &= typDir
         &= help "Add directory to include search path"
         &= groupname "Preprocessing"
+    , libdir = nam_ "y" &= name "libdir" &= typDir
+        &= help ("Add a directory to the library search path used when looking"
+            ++ " for undefined modules and interfaces")
     , define = nam_ "D" &= name "define" &= typ "NAME[=VALUE]"
         &= help "Define a macro for preprocessing"
     , siloed = nam_ "siloed" &= help ("Lex input files separately, so"

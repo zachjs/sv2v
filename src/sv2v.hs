@@ -13,7 +13,7 @@ import Control.Monad.Except (runExceptT)
 import Convert (convert)
 import Job (readJob, Job(..), Write(..))
 import Language.SystemVerilog.AST
-import Language.SystemVerilog.Parser (initialEnv, parseFiles, Config(..))
+import Language.SystemVerilog.Parser (parseFiles, Config(..))
 
 isInterface :: Description -> Bool
 isInterface (Part _ _ Interface _ _ _ _ ) = True
@@ -69,8 +69,9 @@ main = do
     job <- readJob
     -- parse the input files
     let config = Config
-            { cfEnv              = initialEnv (define job)
+            { cfDefines          = define job
             , cfIncludePaths     = incdir job
+            , cfLibraryPaths     = libdir job
             , cfSiloed           = siloed job
             , cfSkipPreprocessor = skipPreprocessor job
             , cfOversizedNumbers = oversizedNumbers job
@@ -80,12 +81,13 @@ main = do
         Left msg -> do
             hPutStrLn stderr msg
             exitFailure
-        Right asts -> do
+        Right inputs -> do
+            let (inPaths, asts) = unzip inputs
             -- convert the files if requested
             asts' <- if passThrough job
                         then return asts
                         else convert (dumpPrefix job) (exclude job) asts
             emptyWarnings (concat asts) (concat asts')
             -- write the converted files out
-            writeOutput (write job) (files job) asts'
+            writeOutput (write job) inPaths asts'
             exitSuccess

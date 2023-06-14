@@ -73,6 +73,7 @@ Many of these suites test a particular feature of the sv2v CLI.
 * `help` ensures the `--help` output in the README is up to date
 * `keyword` tests `begin_keywords` version specifiers
 * `number` generates and tests short number literals
+* `search` tests `-y`/`--libdir`
 * `siloed` tests `--siloed` and default compilation unit behavior
 * `truncate` tests number literal truncation and `--oversized-numbers`
 * `warning` tests conversion warnings
