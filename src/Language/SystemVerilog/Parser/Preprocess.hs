@@ -39,10 +39,17 @@ data PP = PP
     , ppPosition     :: Position -- current file position
     , ppFilePath     :: FilePath -- currently active filename
     , ppEnv          :: Env -- active macro definitions
-    , ppCondStack    :: [Cond] -- if-else cascade state
+    , ppCondStack    :: [Level] -- if-else cascade state
     , ppIncludePaths :: [FilePath] -- folders to search for includes
     , ppMacroStack   :: [[(String, String)]] -- arguments for in-progress macro expansions
     , ppIncludeStack :: [(FilePath, Env)] -- in-progress includes for loop detection
+    }
+
+-- if-else cascade level state and error information
+data Level = Level
+    { cfDesc :: String -- text of the directive, e.g., "ifdef FOO"
+    , cfPos :: Position -- location where this level started
+    , cfCond :: Cond -- whether or not this level is as has been satisfied
     }
 
 -- keeps track of the state of an if-else cascade level
@@ -86,13 +93,18 @@ preprocess includePaths env path = do
             , ppMacroStack   = []
             , ppIncludeStack = [(path, env)]
             }
-    finalState <- execStateT preprocessInput initialState
-    when (not $ null $ ppCondStack finalState) $
-        throwError $ path ++ ": unfinished conditional directives: " ++
-            (show $ length $ ppCondStack finalState)
+    finalState <- execStateT (preprocessInput >> checkConds) initialState
     let env' = ppEnv finalState
     let output = reverse $ ppOutput finalState
     return (env', output)
+
+checkConds :: PPS ()
+checkConds = do
+    condStack <- getCondStack
+    when (not $ null condStack) $ do
+        let level = head condStack
+        lexicalError $ "unfinished conditional directive `" ++ cfDesc level ++
+            " started at " ++ show (cfPos level)
 
 -- position annotator entrypoint used for files that don't need any
 -- preprocessing
@@ -162,9 +174,9 @@ getEnv = gets ppEnv
 setEnv :: Env -> PPS ()
 setEnv x = modify $ \s -> s { ppEnv = x }
 -- cond stack accessors
-getCondStack :: PPS [Cond]
+getCondStack :: PPS [Level]
 getCondStack = gets ppCondStack
-setCondStack :: [Cond] -> PPS ()
+setCondStack :: [Level] -> PPS ()
 setCondStack x = modify $ \s -> s { ppCondStack = x }
 -- macro stack accessors
 getMacroStack :: PPS [[(String, String)]]
@@ -204,11 +216,15 @@ popIncludeStack = do
     modify $ \s -> s { ppIncludeStack = stack' }
 
 -- Push a condition onto the top of the preprocessor condition stack
-pushCondStack :: Cond -> PPS ()
-pushCondStack c = getCondStack >>= setCondStack . (c :)
+pushCondStack :: String -> String -> Position -> Cond -> PPS ()
+pushCondStack typ name pos cond =
+    getCondStack >>= setCondStack . (level :)
+    where
+        level = Level { cfDesc = desc, cfPos = pos, cfCond = cond }
+        desc = typ ++ if null name then "" else " " ++ name
 
 -- Pop the top from the preprocessor condition stack
-popCondStack :: String -> PPS Cond
+popCondStack :: String -> PPS Level
 popCondStack directive = do
     cs <- getCondStack
     case cs of
@@ -566,7 +582,7 @@ preprocessInput = do
                     return ()
         '`' : _ -> handleDirective False
         _ : _ -> do
-            condStack <- getCondStack
+            condStack <- map cfCond <$> getCondStack
             if null macroStack && all (== CurrentlyTrue) condStack
                 then consumeMany
                 else consumeWithSubstitution
@@ -727,7 +743,7 @@ handleDirective macrosOnly = do
             pushChars directive directivePos
 
     env <- getEnv
-    condStack <- getCondStack
+    condStack <- map cfCond <$> getCondStack
     if any (/= CurrentlyTrue) condStack
         && not (elem directive unskippableDirectives) then
         return ()
@@ -795,19 +811,22 @@ handleDirective macrosOnly = do
         "ifdef" -> do
             dropSpaces
             name <- takeIdentifier
-            pushCondStack $ ifCond $ Map.member name env
+            pushCondStack "ifdef" name directivePos $
+                ifCond $ Map.member name env
         "ifndef" -> do
             dropSpaces
             name <- takeIdentifier
-            pushCondStack $ ifCond $ Map.notMember name env
+            pushCondStack "ifndef" name directivePos $
+                ifCond $ Map.notMember name env
         "else" -> do
-            c <- popCondStack "else"
-            pushCondStack $ elseCond c
+            c <- cfCond <$> popCondStack "else"
+            pushCondStack "else" "" directivePos (elseCond c)
         "elsif" -> do
             dropSpaces
             name <- takeIdentifier
-            c <- popCondStack "elsif"
-            pushCondStack $ elsifCond (Map.member name env) c
+            c <- cfCond <$> popCondStack "elsif"
+            pushCondStack "elsif" name directivePos $
+                elsifCond (Map.member name env) c
         "endif" -> do
             _ <- popCondStack "endif"
             return ()
@@ -930,7 +949,7 @@ advance (Position f l c) _    = Position f l (c + 1)
 -- adds a character (and its position) to the output state
 pushChar :: Char -> Position -> PPS ()
 pushChar c p = do
-    condStack <- getCondStack
+    condStack <- map cfCond <$> getCondStack
     when (all (== CurrentlyTrue) condStack) $ do
         output <- getOutput
         setOutput $ (c, p) : output

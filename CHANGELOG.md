@@ -34,6 +34,8 @@
 * Port connection attributes (e.g., [pulp_soc.sv]) are now ignored with a
   warning rather than failing to parse
 * Improved error message when specifying an extraneous named port connection
+* Improved error message for an unfinished conditional directive, e.g., an
+  `ifdef` with no `endif`
 * Added checks for accidental usage of interface or module names as type names
 
 [pulp_soc.sv]: https://github.com/pulp-platform/pulp_soc/blob/0573a85c/rtl/pulp_soc/pulp_soc.sv#L733
