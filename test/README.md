@@ -75,6 +75,7 @@ Many of these suites test a particular feature of the sv2v CLI.
 * `number` generates and tests short number literals
 * `search` tests `-y`/`--libdir`
 * `siloed` tests `--siloed` and default compilation unit behavior
+* `top` tests `--top`
 * `truncate` tests number literal truncation and `--oversized-numbers`
 * `warning` tests conversion warnings
 * `write` tests `-w`/`--write`

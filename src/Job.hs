@@ -45,6 +45,7 @@ data Job = Job
     , verbose :: Bool
     , write :: Write
     , writeRaw :: String
+    , top :: [String]
     , oversizedNumbers :: Bool
     , dumpPrefix :: FilePath
     } deriving (Typeable, Data)
@@ -78,6 +79,9 @@ defaultJob = Job
         &= help ("How to write output; default is 'stdout'; use 'adjacent' to"
             ++ " create a .v file next to each input; use a path ending in .v"
             ++ " to write to a file")
+    , top = def &= name "top" &= explicit &= typ "NAME"
+        &= help ("Remove uninstantiated modules except the given top module;"
+            ++ " can be used multiple times")
     , oversizedNumbers = nam_ "oversized-numbers"
         &= help ("Disable standard-imposed 32-bit limit on unsized number"
             ++ " literals (e.g., 'h1_ffff_ffff, 4294967296)")

@@ -23,21 +23,32 @@ import Language.SystemVerilog.AST
 
 type Parts = Map.Map Identifier [(Identifier, Bool)]
 
-convert :: [AST] -> [AST]
-convert files =
+convert :: [Identifier] -> [AST] -> [AST]
+convert tops files =
+    flip (foldr $ ensureTopExists parts) tops $
     map convertFile files'
     where
         (files', parts) = runWriter $
-            mapM (traverseDescriptionsM traverseDescriptionM) files
+            mapM (traverseDescriptionsM $ traverseDescriptionM tops) files
         convertFile = traverseDescriptions $ traverseModuleItems $
             traverseModuleItem parts
 
-traverseDescriptionM :: Description -> Writer Parts Description
-traverseDescriptionM (Part attrs extern kw lifetime name ports items) = do
+ensureTopExists :: Parts -> Identifier -> a -> a
+ensureTopExists parts top =
+    if Map.member top parts
+        then id
+        else error $ "Could not find top module " ++ top
+
+traverseDescriptionM :: [Identifier] -> Description -> Writer Parts Description
+traverseDescriptionM tops (Part attrs extern kw lifetime name ports items) = do
     let (items', params) = runWriter $ mapM traverseModuleItemM items
     tell $ Map.singleton name params
+    let missing = map fst $ filter snd params
+    when (not (null tops) && elem name tops && not (null missing)) $
+        error $ "Specified top module " ++ name ++ " is missing default "
+            ++ "parameter value(s) for " ++ intercalate ", " missing
     return $ Part attrs extern kw lifetime name ports items'
-traverseDescriptionM other = return other
+traverseDescriptionM _ other = return other
 
 traverseModuleItemM :: ModuleItem -> Writer [(Identifier, Bool)] ModuleItem
 traverseModuleItemM (MIAttr attr item) =

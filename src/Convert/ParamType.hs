@@ -26,8 +26,8 @@ type IdentSet = Set.Set Identifier
 type DeclMap = Map.Map Identifier Decl
 type UsageMap = [(Identifier, Set.Set Identifier)]
 
-convert :: [AST] -> [AST]
-convert files =
+convert :: [Identifier] -> [AST] -> [AST]
+convert tops files =
     files'''
     where
         modules = execWriter $
@@ -74,10 +74,11 @@ convert files =
         keepDescription :: Description -> Bool
         keepDescription (Part _ _ _ _ name _ _) =
             isNewModule
-            || isntTyped
+            || isntTyped && (isTopOrNoTop || isInstantiated)
             || isUsedAsUntyped
             || isUsedAsTyped && isInstantiatedViaNonTyped
             || allTypesHaveDefaults && notInstantiated && isntTemplateTagged
+                && isTopOrNoTop
             where
                 maybeTypeMap = Map.lookup name modules
                 Just typeMap = maybeTypeMap
@@ -88,7 +89,9 @@ convert files =
                 isInstantiatedViaNonTyped = untypedUsageSearch $ Set.singleton name
                 allTypesHaveDefaults = all (/= UnknownType) (Map.elems typeMap)
                 notInstantiated = lookup name instances == Nothing
+                isInstantiated = not notInstantiated
                 isntTemplateTagged = not $ isTemplateTagged name
+                isTopOrNoTop = null tops || elem name tops
         keepDescription _ = True
 
         -- instantiate the type parameters if this is a used default instance

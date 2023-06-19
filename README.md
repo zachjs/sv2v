@@ -107,6 +107,8 @@ Conversion:
   -w --write=MODE/FILE      How to write output; default is 'stdout'; use
                             'adjacent' to create a .v file next to each input;
                             use a path ending in .v to write to a file
+     --top=NAME             Remove uninstantiated modules except the given
+                            top module; can be used multiple times
 Other:
      --oversized-numbers    Disable standard-imposed 32-bit limit on unsized
                             number literals (e.g., 'h1_ffff_ffff, 4294967296)

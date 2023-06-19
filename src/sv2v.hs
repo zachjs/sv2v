@@ -84,9 +84,12 @@ main = do
         Right inputs -> do
             let (inPaths, asts) = unzip inputs
             -- convert the files if requested
-            asts' <- if passThrough job
-                        then return asts
-                        else convert (dumpPrefix job) (exclude job) asts
+            let converter = convert (top job) (dumpPrefix job) (exclude job)
+            asts' <-
+                if passThrough job then
+                    return asts
+                else
+                    converter asts
             emptyWarnings (concat asts) (concat asts')
             -- write the converted files out
             writeOutput (write job) inPaths asts'

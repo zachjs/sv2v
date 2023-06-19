@@ -29,13 +29,13 @@ type ModportInstances = [(Identifier, (Identifier, Identifier))]
 type ModportBinding = (Identifier, (Substitutions, Expr))
 type Substitutions = [(Expr, Expr)]
 
-convert :: [AST] -> [AST]
-convert files =
+convert :: [Identifier] -> [AST] -> [AST]
+convert tops files =
     if needsFlattening
         then files
         else traverseFiles
             (collectDescriptionsM collectPart)
-            (map . convertDescription)
+            (map . convertDescription tops)
             files
     where
         -- we can only collect/map non-extern interfaces and modules
@@ -55,12 +55,22 @@ convert files =
         checkItem (Instance _ _ _ rs _) = when (length rs > 1) $ tell $ Any True
         checkItem _ = return ()
 
-convertDescription :: PartInfos -> Description -> Description
-convertDescription _ (Part _ _ Interface _ name _ _) =
-    PackageItem $ Decl $ CommentDecl $ "removed interface: " ++ name
-convertDescription parts (Part attrs extern Module lifetime name ports items) =
+topInterfaceError :: String -> String -> a
+topInterfaceError name issue = error $
+    "Specified top module " ++ name ++ " " ++ issue ++ ". Please " ++
+    "instantiate it somewhere and use that as your top module instead."
+
+convertDescription :: [Identifier] -> PartInfos -> Description -> Description
+convertDescription tops _ (Part _ _ Interface _ name _ _)
+    | elem name tops =
+        topInterfaceError name "is an interface"
+    | otherwise =
+        PackageItem $ Decl $ CommentDecl $ "removed interface: " ++ name
+convertDescription tops parts (Part att ext Module lif name ports items) =
     if null $ extractModportInstances name $ PartInfo Module ports items then
-        Part attrs extern Module lifetime name ports items'
+        Part att ext Module lif name ports items'
+    else if elem name tops then
+        topInterfaceError name "has interface ports"
     else
         PackageItem $ Decl $ CommentDecl $
             "removed module with interface ports: " ++ name
@@ -324,7 +334,7 @@ convertDescription parts (Part attrs extern Module lifetime name ports items) =
                 Nothing -> False
                 Just info -> pKind info == Interface
 
-convertDescription _ other = other
+convertDescription _ _ other = other
 
 isDecl :: ModuleItem -> Bool
 isDecl (MIPackageItem Decl{}) = True

@@ -75,8 +75,8 @@ finalPhases _ =
     , Convert.StringType.convert
     ]
 
-mainPhases :: Selector -> [Phase]
-mainPhases selectExclude =
+mainPhases :: [String] -> Selector -> [Phase]
+mainPhases tops selectExclude =
     [ Convert.BlockDecl.convert
     , selectExclude Job.Logic Convert.Logic.convert
     , Convert.ImplicitNet.convert
@@ -85,7 +85,7 @@ mainPhases selectExclude =
     , Convert.MultiplePacked.convert
     , selectExclude Job.UnbasedUnsized Convert.UnbasedUnsized.convert
     , Convert.Cast.convert
-    , Convert.ParamType.convert
+    , Convert.ParamType.convert tops
     , Convert.HierConst.convert
     , Convert.TypeOf.convert
     , Convert.DimensionQuery.convert
@@ -98,12 +98,12 @@ mainPhases selectExclude =
     , Convert.Wildcard.convert
     , Convert.Enum.convert
     , Convert.StringParam.convert
-    , selectExclude Job.Interface Convert.Interface.convert
+    , selectExclude Job.Interface $ Convert.Interface.convert tops
     , selectExclude Job.Succinct Convert.RemoveComments.convert
     ]
 
-initialPhases :: Selector -> [Phase]
-initialPhases selectExclude =
+initialPhases :: [String] -> Selector -> [Phase]
+initialPhases tops selectExclude =
     [ Convert.ForAsgn.convert
     , Convert.Jump.convert
     , Convert.ExprAsgn.convert
@@ -119,21 +119,21 @@ initialPhases selectExclude =
     , Convert.Package.convert
     , Convert.StructConst.convert
     , Convert.PortDecl.convert
-    , Convert.ParamNoDefault.convert
+    , Convert.ParamNoDefault.convert tops
     , Convert.ResolveBindings.convert
     , Convert.UnnamedGenBlock.convert
     ]
 
-convert :: FilePath -> [Job.Exclude] -> IOPhase
-convert dumpPrefix excludes =
+convert :: [String] -> FilePath -> [Job.Exclude] -> IOPhase
+convert tops dumpPrefix excludes =
     step "parse"   id      >=>
     step "initial" initial >=>
     loop 1 "main"  main    >=>
     step "final"   final
     where
         final = combine $ finalPhases selectExclude
-        main = combine $ mainPhases selectExclude
-        initial = combine $ initialPhases selectExclude
+        main = combine $ mainPhases tops selectExclude
+        initial = combine $ initialPhases tops selectExclude
         combine = foldr1 (.)
 
         selectExclude :: Selector

@@ -5,6 +5,7 @@
 * Added `-y`/`--libdir` for specifying library directories from which to
   automatically load modules and interfaces used in the design that are not
   found in the provided input files
+* Added `--top` for pruning unneeded modules during conversion
 * The `string` data type is now dropped from parameters and localparams
 * Added support for passing through `sequence` and `property` declarations
 
