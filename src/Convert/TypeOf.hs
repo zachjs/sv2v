@@ -214,18 +214,20 @@ typeof (Number n) =
 typeof (Call (Ident x) args) = typeofCall x args
 typeof orig@(Bit e _) = do
     t <- typeof e
-    let t' = popRange t
     case t of
-        TypeOf{} -> lookupTypeOf orig
+        TypeOf{} -> return $ TypeOf orig
         Alias{} -> return $ TypeOf orig
-        _ -> return $ typeSignednessOverride t' Unsigned t'
+        _ -> do
+            t' <- popRange orig t
+            return $ typeSignednessOverride t' Unsigned t'
 typeof orig@(Range e NonIndexed r) = do
     t <- typeof e
-    let t' = replaceRange r t
-    return $ case t of
-        TypeOf{} -> TypeOf orig
-        Alias{} -> TypeOf orig
-        _ -> typeSignednessOverride t' Unsigned t'
+    case t of
+        TypeOf{} -> return $ TypeOf orig
+        Alias{} -> return $ TypeOf orig
+        _ -> do
+            t' <- replaceRange orig r t
+            return $ typeSignednessOverride t' Unsigned t'
 typeof (Range expr mode (base, len)) =
     typeof $ Range expr NonIndexed $
         endianCondRange index (base, end) (end, base)
@@ -398,23 +400,31 @@ injectRanges (UnpackedType t rs) unpacked = UnpackedType t $ unpacked ++ rs
 injectRanges t unpacked = UnpackedType t unpacked
 
 -- removes the most significant range of the given type
-popRange :: Type -> Type
-popRange (UnpackedType t [_]) = t
-popRange (IntegerAtom TInteger sg) =
-    IntegerVector TLogic sg []
-popRange t =
-    tf rs
-    where (tf, _ : rs) = typeRanges t
+popRange :: Expr -> Type -> ST Type
+popRange _ (UnpackedType t [_]) = return t
+popRange _ (IntegerAtom TInteger sg) =
+    return $ IntegerVector TLogic sg []
+popRange e t =
+    case typeRanges t of
+        (tf, _ : rs) -> return $ tf rs
+        _ -> indexedAtomError e t
 
 -- replaces the most significant range of the given type
-replaceRange :: Range -> Type -> Type
-replaceRange r (UnpackedType t (_ : rs)) =
-    UnpackedType t (r : rs)
-replaceRange r (IntegerAtom TInteger sg) =
-    IntegerVector TLogic sg [r]
-replaceRange r t =
-    tf (r : rs)
-    where (tf, _ : rs) = typeRanges t
+replaceRange :: Expr -> Range -> Type -> ST Type
+replaceRange _ r (UnpackedType t (_ : rs)) =
+    return $ UnpackedType t (r : rs)
+replaceRange _ r (IntegerAtom TInteger sg) =
+    return $ IntegerVector TLogic sg [r]
+replaceRange e r t =
+    case typeRanges t of
+        (tf, _ : rs) -> return $ tf (r : rs)
+        _ -> indexedAtomError e t
+
+-- readable error message when looking up the type of a portion of an atom
+indexedAtomError :: Expr -> Type -> ST a
+indexedAtomError e t =
+    scopedErrorM $ "can't determine the type of " ++ show e ++ " because the"
+        ++ " inner type " ++ show t ++ " can't be indexed"
 
 -- checks for a cast type which already trivially matches the expression type
 typeCastUnneeded :: Type -> Type -> Bool
