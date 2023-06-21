@@ -8,6 +8,7 @@
 
 module Job where
 
+import Control.Monad (when)
 import Data.Char (toLower)
 import Data.List (isPrefixOf, isSuffixOf)
 import Data.Version (showVersion)
@@ -15,6 +16,7 @@ import GitHash (giDescribe, tGitInfoCwdTry)
 import qualified Paths_sv2v (version)
 import System.IO (stderr, hPutStr)
 import System.Console.CmdArgs
+import System.Directory (doesDirectoryExist)
 import System.Environment (getArgs, withArgs)
 import System.Exit (exitFailure)
 
@@ -31,6 +33,7 @@ data Write
     = Stdout
     | Adjacent
     | File FilePath
+    | Directory FilePath
     deriving (Typeable, Data)
 
 data Job = Job
@@ -75,10 +78,12 @@ defaultJob = Job
             ++ " Logic, or UnbasedUnsized)")
     , verbose = nam "verbose" &= help "Retain certain conversion artifacts"
     , write = Stdout &= ignore -- parsed from the flexible flag below
-    , writeRaw = "s" &= name "write" &= name "w" &= explicit &= typ "MODE/FILE"
+    , writeRaw = "s" &= name "write" &= name "w" &= explicit
+        &= typ "MODE/FILE/DIR"
         &= help ("How to write output; default is 'stdout'; use 'adjacent' to"
             ++ " create a .v file next to each input; use a path ending in .v"
-            ++ " to write to a file")
+            ++ " to write to a file; use a path to an existing directory to"
+            ++ " create a .v within for each converted module")
     , top = def &= name "top" &= explicit &= typ "NAME"
         &= help ("Remove uninstantiated modules except the given top module;"
             ++ " can be used multiple times")
@@ -108,9 +113,13 @@ parseWrite w | w `matches` "stdout" = return Stdout
 parseWrite w | w `matches` "adjacent" = return Adjacent
 parseWrite w | ".v" `isSuffixOf` w = return $ File w
 parseWrite w | otherwise = do
-    hPutStr stderr $ "invalid --write " ++ show w
-        ++ ", expected stdout, adjacent, or a path ending in .v"
-    exitFailure
+    isDir <- doesDirectoryExist w
+    when (not isDir) $ do
+        hPutStr stderr $ "invalid --write " ++ show w ++ ", expected stdout,"
+            ++ " adjacent, a path ending in .v, or a path to an existing"
+            ++ " directory"
+        exitFailure
+    return $ Directory w
 
 matches :: String -> String -> Bool
 matches = isPrefixOf . map toLower
@@ -142,11 +151,16 @@ readJob = do
         >>= flagRename "-e" "-E"
     withArgs strs' $ cmdArgs defaultJob
         >>= setWrite . setSuccinct
-    where
-        setWrite :: Job -> IO Job
-        setWrite job = do
-            w <- parseWrite $ writeRaw job
-            return $ job { write = w }
-        setSuccinct :: Job -> Job
-        setSuccinct job | verbose job = job { exclude = Succinct : exclude job }
-        setSuccinct job | otherwise = job
+
+setWrite :: Job -> IO Job
+setWrite job = do
+    w <- parseWrite $ writeRaw job
+    case (w, passThrough job) of
+        (Directory{}, True) -> do
+            hPutStr stderr "can't use --pass-through when writing to a dir"
+            exitFailure
+        _ -> return $ job { write = w }
+
+setSuccinct :: Job -> Job
+setSuccinct job | verbose job = job { exclude = Succinct : exclude job }
+setSuccinct job | otherwise = job

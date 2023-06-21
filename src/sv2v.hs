@@ -6,6 +6,7 @@
 
 import System.IO (hPrint, hPutStrLn, stderr, stdout)
 import System.Exit (exitFailure, exitSuccess)
+import System.FilePath (combine, splitExtension)
 
 import Control.Monad (when, zipWithM_)
 import Control.Monad.Except (runExceptT)
@@ -50,7 +51,18 @@ rewritePath path = do
     return $ base ++ ".v"
     where
         ext = ".sv"
-        (base, end) = splitAt (length path - length ext) path
+        (base, end) = splitExtension path
+
+splitModules :: FilePath -> AST -> [(FilePath, String)]
+splitModules dir (PackageItem (Decl CommentDecl{}) : ast) =
+    splitModules dir ast
+splitModules dir (description : ast) =
+    (path, output) : splitModules dir ast
+    where
+        Part _ _ Module _ name _ _ = description
+        path = combine dir $ name ++ ".v"
+        output = show description ++ "\n"
+splitModules _ [] = []
 
 writeOutput :: Write -> [FilePath] -> [AST] -> IO ()
 writeOutput _ [] [] =
@@ -63,6 +75,9 @@ writeOutput Adjacent inPaths asts = do
     outPaths <- mapM rewritePath inPaths
     let results = map (++ "\n") $ map show asts
     zipWithM_ writeFile outPaths results
+writeOutput (Directory d) _ asts = do
+    let (outPaths, outputs) = unzip $ splitModules d $ concat asts
+    zipWithM_ writeFile outPaths outputs
 
 main :: IO ()
 main = do

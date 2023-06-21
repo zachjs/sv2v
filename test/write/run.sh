@@ -2,6 +2,7 @@
 
 clearArtifacts() {
     rm -f one.v two.v
+    rm -rf dirout
 }
 
 createArtifacts() {
@@ -81,12 +82,40 @@ test_file() {
     clearArtifacts
 }
 
+test_directory() {
+    runAndCapture *.sv
+    expected="$stdout"
+
+    rm -f dirout/*
+    mkdir -p dirout
+
+    runAndCapture --pass-through --write dirout *.sv
+    assertFalse "directory conversion should succeed" $result
+    assertNull "stdout should be empty" "$stdout"
+    assertEquals "stderr should have expected message" \
+        "can't use --pass-through when writing to a dir" \
+        "$stderr"
+
+    runAndCapture --write dirout *.sv
+    assertTrue "directory conversion should succeed" $result
+    assertNull "stdout should be empty" "$stdout"
+    assertNull "stderr should be empty" "$stderr"
+
+    assertTrue "one.v should exist" "[ -f dirout/one.v ]"
+    assertTrue "two.v should exist" "[ -f dirout/two.v ]"
+    assertTrue "three.v should exist" "[ -f dirout/three.v ]"
+
+    actual=`cat dirout/*.v`
+    assertEquals "directory output should match combined" "$expected" "$actual"
+    clearArtifacts
+}
+
 test_unknown() {
     runAndCapture --write=unknown *.sv
     assertFalse "unknown write mode should fail" $result
     assertNull "stdout should be empty" "$stdout"
     assertEquals "stderr should list valid write modes" \
-        "invalid --write \"unknown\", expected stdout, adjacent, or a path ending in .v" \
+        "invalid --write \"unknown\", expected stdout, adjacent, a path ending in .v, or a path to an existing directory" \
         "$stderr"
 }
 

@@ -6,6 +6,8 @@
   automatically load modules and interfaces used in the design that are not
   found in the provided input files
 * Added `--top` for pruning unneeded modules during conversion
+* Added `--write path/to/dir/` for creating an output `.v` in the specified
+  preexisting directory for each module in the converted result
 * The `string` data type is now dropped from parameters and localparams
 * Added support for passing through `sequence` and `property` declarations
 

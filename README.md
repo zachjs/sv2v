@@ -104,9 +104,11 @@ Conversion:
   -E --exclude=CONV         Exclude a particular conversion (Always, Assert,
                             Interface, Logic, or UnbasedUnsized)
   -v --verbose              Retain certain conversion artifacts
-  -w --write=MODE/FILE      How to write output; default is 'stdout'; use
+  -w --write=MODE/FILE/DIR  How to write output; default is 'stdout'; use
                             'adjacent' to create a .v file next to each input;
-                            use a path ending in .v to write to a file
+                            use a path ending in .v to write to a file; use a
+                            path to an existing directory to create a .v within
+                            for each converted module
      --top=NAME             Remove uninstantiated modules except the given
                             top module; can be used multiple times
 Other:
