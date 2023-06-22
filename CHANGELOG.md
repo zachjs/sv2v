@@ -32,7 +32,7 @@
 ### Other Enhancements
 
 * Added elaboration for accesses to fields of struct constants, which can
-  substantially improve performance on some designs
+  substantially improve conversion speed on some designs
 * Added constant folding for comparisons involving string literals
 * Port connection attributes (e.g., [pulp_soc.sv]) are now ignored with a
   warning rather than failing to parse
