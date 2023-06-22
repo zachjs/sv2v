@@ -61,7 +61,7 @@ defaultJob :: Job
 defaultJob = Job
     { files = def &= args &= typ "FILES"
     , incdir = nam_ "I" &= name "incdir" &= typDir
-        &= help "Add directory to include search path"
+        &= help "Add a directory to the include search path"
         &= groupname "Preprocessing"
     , libdir = nam_ "y" &= name "libdir" &= typDir
         &= help ("Add a directory to the library search path used when looking"
@@ -70,7 +70,8 @@ defaultJob = Job
         &= help "Define a macro for preprocessing"
     , siloed = nam_ "siloed" &= help ("Lex input files separately, so"
         ++ " macros from earlier files are not defined in later files")
-    , skipPreprocessor = nam_ "skip-preprocessor" &= help "Disable preprocessor"
+    , skipPreprocessor = nam_ "skip-preprocessor"
+        &= help "Disable preprocessing of macros, comments, etc."
     , passThrough = nam_ "pass-through" &= help "Dump input without converting"
         &= groupname "Conversion"
     , exclude = nam_ "exclude" &= name "E" &= typ "CONV"
@@ -100,7 +101,7 @@ defaultJob = Job
     &= details [ "sv2v converts SystemVerilog to Verilog."
                , "More info: https://github.com/zachjs/sv2v"
                , "(C) 2019-2023 Zachary Snow, 2011-2015 Tom Hawkins" ]
-    &= helpArg [explicit, name "help"]
+    &= helpArg [explicit, name "help", help "Display this help message"]
     &= versionArg [explicit, name "version"]
     &= verbosityArgs [ignore] [ignore]
     where

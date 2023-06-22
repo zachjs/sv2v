@@ -92,13 +92,13 @@ Below is the current usage printout.
 sv2v [OPTIONS] [FILES]
 
 Preprocessing:
-  -I --incdir=DIR           Add directory to include search path
+  -I --incdir=DIR           Add a directory to the include search path
   -y --libdir=DIR           Add a directory to the library search path used
                             when looking for undefined modules and interfaces
   -D --define=NAME[=VALUE]  Define a macro for preprocessing
      --siloed               Lex input files separately, so macros from
                             earlier files are not defined in later files
-     --skip-preprocessor    Disable preprocessor
+     --skip-preprocessor    Disable preprocessing of macros, comments, etc.
 Conversion:
      --pass-through         Dump input without converting
   -E --exclude=CONV         Exclude a particular conversion (Always, Assert,
@@ -116,7 +116,7 @@ Other:
                             number literals (e.g., 'h1_ffff_ffff, 4294967296)
      --dump-prefix=PATH     Create intermediate output files with the given
                             path prefix; used for internal debugging
-     --help                 Display help message
+     --help                 Display this help message
      --version              Print version information
      --numeric-version      Print just the version number
 ```
