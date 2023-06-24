@@ -12,7 +12,7 @@ import Control.Monad (when)
 import Data.Char (toLower)
 import Data.List (isPrefixOf, isSuffixOf)
 import Data.Version (showVersion)
-import GitHash (giDescribe, tGitInfoCwdTry)
+import GitHash (giTag, tGitInfoCwdTry)
 import qualified Paths_sv2v (version)
 import System.IO (stderr, hPutStr)
 import System.Console.CmdArgs
@@ -54,7 +54,7 @@ data Job = Job
     } deriving (Typeable, Data)
 
 version :: String
-version = either (const backup) giDescribe $$tGitInfoCwdTry
+version = either (const backup) giTag $$tGitInfoCwdTry
     where backup = showVersion Paths_sv2v.version
 
 defaultJob :: Job
