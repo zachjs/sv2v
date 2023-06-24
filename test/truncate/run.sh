@@ -32,8 +32,8 @@ testNumber() {
 
     # simulate and compare in strict mode
     EXPECT_IVERILOG_WARNINGS=`[ $mode = trunc_ivl_warns ]; echo $?` \
-    simulate /dev/null $ve_log top $ve
-    simulate /dev/null $cs_log top $cs
+    simulate /dev/null $ve_log $ve
+    simulate /dev/null $cs_log $cs
     output=`diff $ve_log $cs_log`
     assertTrue "number literals differ:\n$output" $?
 
@@ -56,8 +56,8 @@ testNumber() {
 
     # simulate and compare in lax mode
     EXPECT_IVERILOG_WARNINGS=`[[ "$number" =~ .\' ]] && [ $mode = trunc_ivl_warns ]; echo $?` \
-    simulate /dev/null $ve_log top -gno-strict-expr-width $ve
-    simulate /dev/null $cs_log top -gno-strict-expr-width $cs
+    simulate /dev/null $ve_log -gno-strict-expr-width $ve
+    simulate /dev/null $cs_log -gno-strict-expr-width $cs
     output=`diff $ve_log $cs_log`
     assertTrue "number literals differ:\n$output" $?
 }

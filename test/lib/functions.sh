@@ -3,13 +3,12 @@
 SCRIPT_DIR=`dirname "${BASH_SOURCE[0]}"`
 SV2V="$SCRIPT_DIR/../../bin/sv2v +RTS -N1 -RTS"
 
-# USAGE: simulate <vcd-file> <log-file> <top-module> <file> [<file> ...]
+# USAGE: simulate <vcd-file> <log-file> <file> [<file> ...]
 simulate() {
     # arguments
     sim_vcd=$1
     sim_log=$2
-    sim_top=$3
-    shift 3
+    shift 2
     # compile the files
     sim_vcd_tmp=$SHUNIT_TMPDIR/simvcdtmp
     sim_prog=$SHUNIT_TMPDIR/simprog.exe
@@ -19,8 +18,7 @@ simulate() {
         -o $sim_prog \
         -g2005 \
         -gstrict-expr-width \
-        -DTEST_VCD="\"$sim_vcd_tmp\"" \
-        -DTEST_TOP=$sim_top \
+        -DTEST_VCD=\"$sim_vcd_tmp\" \
         "$@" \
         $SCRIPT_DIR/tb_dumper.v \
         2>&1`
@@ -33,10 +31,14 @@ simulate() {
         assertNotNull "iverilog on $1 did not emit any warnings" "$iv_output"
     fi
     # run the simulation
-    $sim_prog > $sim_log
+    $sim_prog -no-date > $sim_log
     assertTrue "simulating $1 failed" $?
-    # remove the date from the VCD
-    sed -e "1,3d" < $sim_vcd_tmp | $SCRIPT_DIR/clean_vcd.py > $sim_vcd
+    # remove parameters from the VCD if present
+    if grep "var parameter" $sim_vcd_tmp > /dev/null; then
+        $SCRIPT_DIR/clean_vcd.py < $sim_vcd_tmp > $sim_vcd
+    elif [ $sim_vcd != "/dev/null" ]; then
+        mv -f $sim_vcd_tmp $sim_vcd
+    fi
 }
 
 assertConverts() {
@@ -167,9 +169,9 @@ simulateAndCompare() {
     cvv_log=$SHUNIT_TMPDIR/cvv.log
 
     # simulate the three files
-    simulate $ref_vcd $ref_log top $ve $tb
-    simulate $cvs_vcd $cvs_log top $cs $tb
-    simulate $cvv_vcd $cvv_log top $cv $tb
+    simulate $ref_vcd $ref_log $ve $tb
+    simulate $cvs_vcd $cvs_log $cs $tb
+    simulate $cvv_vcd $cvv_log $cv $tb
 
     # compare reference verilog to converted succinct
     output=`diff $ref_vcd $cvs_vcd`

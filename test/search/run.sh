@@ -4,7 +4,7 @@ evaluate() {
     design_v=$SHUNIT_TMPDIR/search_design.v
     output_log=$SHUNIT_TMPDIR/search.log
     touch $output_log
-    simulate /dev/null $output_log top <(echo "$1") /dev/null
+    simulate /dev/null $output_log <(echo "$1") /dev/null
     tail -n1 $output_log
 }
 
