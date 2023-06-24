@@ -17,7 +17,6 @@ import qualified Paths_sv2v (version)
 import System.IO (stderr, hPutStr)
 import System.Console.CmdArgs
 import System.Directory (doesDirectoryExist)
-import System.Environment (getArgs, withArgs)
 import System.Exit (exitFailure)
 
 data Exclude
@@ -125,32 +124,9 @@ parseWrite w | otherwise = do
 matches :: String -> String -> Bool
 matches = isPrefixOf . map toLower
 
-type DeprecationPhase = [String] -> IO [String]
-
-flagRename :: String -> String -> DeprecationPhase
-flagRename before after strs = do
-    let strs' = map rename strs
-    if strs == strs'
-        then return strs
-        else do
-            hPutStr stderr $ "Deprecation warning: " ++ before ++
-                " has been renamed to " ++ after ++ "\n"
-            return strs'
-    where
-        rename :: String -> String
-        rename arg =
-            if before == take (length before) arg
-                then after ++ drop (length before) arg
-                else arg
-
 readJob :: IO Job
-readJob = do
-    strs <- getArgs
-    strs' <- return strs
-        >>= flagRename "-i" "-I"
-        >>= flagRename "-d" "-D"
-        >>= flagRename "-e" "-E"
-    withArgs strs' $ cmdArgs defaultJob
+readJob =
+    cmdArgs defaultJob
         >>= setWrite . setSuccinct
 
 setWrite :: Job -> IO Job

@@ -1,3 +1,10 @@
+## Unreleased
+
+### Breaking Changes
+
+* Removed deprecated CLI flags `-d`/`-e`/`-i`, which have been aliased to
+  `-D`/`-E`/`-I` with a warning since late 2019
+
 ## v0.0.11
 
 ### New Features
