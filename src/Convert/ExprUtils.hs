@@ -34,11 +34,11 @@ simplifyStep (UniOpA LogNot a (Number n)) =
         Just 0 -> bool True
         Just _ -> bool False
         Nothing -> UniOpA LogNot a $ Number n
-simplifyStep (UniOpA LogNot a (BinOpA Eq a' l r)) = BinOpA Ne (a <> a') l r
-simplifyStep (UniOpA LogNot a (BinOpA Ne a' l r)) = BinOpA Eq (a <> a') l r
+simplifyStep (UniOp LogNot (BinOp Eq l r)) = BinOp Ne l r
+simplifyStep (UniOp LogNot (BinOp Ne l r)) = BinOp Eq l r
 
 simplifyStep (UniOpA UniSub _ (UniOpA UniSub _ e)) = e
-simplifyStep (UniOpA UniSub a (BinOpA Sub a' e1 e2)) = BinOpA Sub (a <> a') e2 e1
+simplifyStep (UniOp UniSub (BinOp Sub e1 e2)) = BinOp Sub e2 e1
 
 simplifyStep (Concat [Number (Decimal size _ value)]) =
     Number $ Decimal size False value
@@ -91,30 +91,30 @@ simplifyBinOp Mul _ (Dec 0) _ = toDec 0
 simplifyBinOp Mul _ _ (Dec 0) = toDec 0
 simplifyBinOp Mod _ _ (Dec 1) = toDec 0
 
-simplifyBinOp Add a e1 (UniOpA UniSub a' e2) = BinOpA Sub (a <> a') e1 e2
-simplifyBinOp Add a (UniOpA UniSub a' e1) e2 = BinOpA Sub (a <> a') e2 e1
-simplifyBinOp Sub a e1 (UniOpA UniSub a' e2) = BinOpA Add (a <> a') e1 e2
-simplifyBinOp Sub a (UniOpA UniSub a' e1) e2 = UniOpA UniSub (a <> a') $ BinOpA Add a e1 e2
+simplifyBinOp Add [] e1 (UniOp UniSub e2) = BinOp Sub e1 e2
+simplifyBinOp Add [] (UniOp UniSub e1) e2 = BinOp Sub e2 e1
+simplifyBinOp Sub [] e1 (UniOp UniSub e2) = BinOp Add e1 e2
+simplifyBinOp Sub [] (UniOp UniSub e1) e2 = UniOp UniSub $ BinOp Add e1 e2
 
-simplifyBinOp Add a (BinOpA Add a' e n1@Number{}) n2@Number{} =
-    BinOpA Add a' e (BinOpA Add a n1 n2)
-simplifyBinOp Sub a n1@Number{} (BinOpA Sub a' n2@Number{} e) =
-    BinOpA Add a' (BinOpA Sub a n1 n2) e
-simplifyBinOp Sub a n1@Number{} (BinOpA Sub a' e n2@Number{}) =
-    BinOpA Sub a' (BinOpA Add a n1 n2) e
-simplifyBinOp Sub a (BinOpA Add a' e n1@Number{}) n2@Number{} =
-    BinOpA Add a' e (BinOpA Sub a n1 n2)
-simplifyBinOp Add a n1@Number{} (BinOpA Add a' n2@Number{} e) =
-    BinOpA Add a' (BinOpA Add a n1 n2) e
-simplifyBinOp Add a n1@Number{} (BinOpA Sub a' e n2@Number{}) =
-    BinOpA Add a' e (BinOpA Sub a n1 n2)
-simplifyBinOp Sub a (BinOpA Sub a' e n1@Number{}) n2@Number{} =
-    BinOpA Sub a' e (BinOpA Add a n1 n2)
-simplifyBinOp Add a (BinOpA Sub a' e n1@Number{}) n2@Number{} =
-    BinOpA Sub a' e (BinOpA Sub a n1 n2)
-simplifyBinOp Add a (BinOpA Sub a' n1@Number{} e) n2@Number{} =
-    BinOpA Sub a' (BinOpA Add a n1 n2) e
-simplifyBinOp Ge a (BinOpA Sub a' e (Dec 1)) (Dec 0) = BinOpA Ge (a <> a') e (toDec 1)
+simplifyBinOp Add [] (BinOp Add e n1@Number{}) n2@Number{} =
+    BinOp Add e (BinOp Add n1 n2)
+simplifyBinOp Sub [] n1@Number{} (BinOp Sub n2@Number{} e) =
+    BinOp Add (BinOp Sub n1 n2) e
+simplifyBinOp Sub [] n1@Number{} (BinOp Sub e n2@Number{}) =
+    BinOp Sub (BinOp Add n1 n2) e
+simplifyBinOp Sub [] (BinOp Add e n1@Number{}) n2@Number{} =
+    BinOp Add e (BinOp Sub n1 n2)
+simplifyBinOp Add [] n1@Number{} (BinOp Add n2@Number{} e) =
+    BinOp Add (BinOp Add n1 n2) e
+simplifyBinOp Add [] n1@Number{} (BinOp Sub e n2@Number{}) =
+    BinOp Add e (BinOp Sub n1 n2)
+simplifyBinOp Sub [] (BinOp Sub e n1@Number{}) n2@Number{} =
+    BinOp Sub e (BinOp Add n1 n2)
+simplifyBinOp Add [] (BinOp Sub e n1@Number{}) n2@Number{} =
+    BinOp Sub e (BinOp Sub n1 n2)
+simplifyBinOp Add [] (BinOp Sub n1@Number{} e) n2@Number{} =
+    BinOp Sub (BinOp Add n1 n2) e
+simplifyBinOp Ge [] (BinOp Sub e (Dec 1)) (Dec 0) = BinOp Ge e (toDec 1)
 
 -- simplify bit shifts of decimal literals
 simplifyBinOp op _ (Dec x) (Number yRaw)

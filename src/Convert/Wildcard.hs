@@ -71,33 +71,33 @@ lookupPattern scopes e =
         Just (_, _, n) -> Just n
 
 convertExpr :: Scopes Number -> Expr -> Expr
-convertExpr scopes (BinOpA WEq a l r) =
+convertExpr scopes (BinOp WEq l r) =
     if maybePattern == Nothing then
-        BinOpA BitAnd a couldMatch $
-        BinOpA BitOr  a noExtraXZs $
+        BinOp BitAnd couldMatch $
+        BinOp BitOr  noExtraXZs $
         Number (Based 1 False Binary 0 1)
     else if numberToInteger pattern /= Nothing then
-        BinOpA Eq a l r
+        BinOp Eq l r
     else
-        BinOpA Eq a (BinOpA BitOr a l mask) pattern'
+        BinOp Eq (BinOp BitOr l mask) pattern'
     where
-        lxl = BinOpA BitXor a l l
-        rxr = BinOpA BitXor a r r
+        lxl = BinOp BitXor l l
+        rxr = BinOp BitXor r r
         -- Step #1: definitive mismatch
-        couldMatch = BinOpA TEq a rxlxl lxrxr
-        rxlxl = BinOpA BitXor a r lxl
-        lxrxr = BinOpA BitXor a l rxr
+        couldMatch = BinOp TEq rxlxl lxrxr
+        rxlxl = BinOp BitXor r lxl
+        lxrxr = BinOp BitXor l rxr
         -- Step #2: extra X or Z
-        noExtraXZs = BinOpA TEq a lxlxrxr rxr
-        lxlxrxr = BinOpA BitXor a lxl rxr
+        noExtraXZs = BinOp TEq lxlxrxr rxr
+        lxlxrxr = BinOp BitXor lxl rxr
         -- For wildcard patterns we can find, use masking
         maybePattern = lookupPattern scopes r
         Just pattern = maybePattern
         Based size signed base vals knds = pattern
         mask = Number $ Based size signed base knds 0
         pattern' = Number $ Based size signed base (vals .|. knds) 0
-convertExpr scopes (BinOpA WNe a l r) =
-    UniOpA LogNot a $
+convertExpr scopes (BinOp WNe l r) =
+    UniOp LogNot $
     convertExpr scopes $
-    BinOpA WEq a l r
+    BinOp WEq l r
 convertExpr _ other = other

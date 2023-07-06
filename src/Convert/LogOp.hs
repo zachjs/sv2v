@@ -21,8 +21,8 @@ convert =
     traverseExprs $ traverseNestedExprs convertExpr
 
 convertExpr :: Expr -> Expr
-convertExpr (BinOpA LogEq a l r) =
-    BinOpA Eq a (UniOpA LogNot a l) (UniOpA LogNot a r)
-convertExpr (BinOpA LogImp a l r) =
-    BinOpA LogOr a (UniOpA LogNot a l) r
+convertExpr (BinOp LogEq l r) =
+    BinOp Eq (UniOp LogNot l) (UniOp LogNot r)
+convertExpr (BinOp LogImp l r) =
+    BinOp LogOr (UniOp LogNot l) r
 convertExpr other = other

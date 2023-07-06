@@ -112,14 +112,15 @@ instance Show Expr where
 
     showsPrec _ (UniOpA  o a e  ) =
         shows o .
-        (if null a then id else showChar ' ' . shows a) .
+        (if null a then id else showChar ' ') .
+        showsAttrs a .
         showUniOpPrec e
     showsPrec _ (BinOpA  o a l r) =
         showBinOpPrec l .
         showChar ' ' .
         shows o .
         showChar ' ' .
-        shows a .
+        showsAttrs a .
         showBinOpPrec r
     showsPrec _ (Dot     e n  ) =
         shows e .
@@ -129,7 +130,7 @@ instance Show Expr where
         showChar '(' .
         shows c .
         showString " ? " .
-        shows a .
+        showsAttrs a .
         shows t .
         showString " : " .
         shows f .
