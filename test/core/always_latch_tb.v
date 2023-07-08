@@ -8,7 +8,7 @@ module top;
         forever #1 en = ~en;
     end
 
-    test m(.a, .b, .en);
+    test m(a, b, en);
 
     initial begin
         $monitor($time, a, b, en);

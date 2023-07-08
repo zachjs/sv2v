@@ -39,7 +39,7 @@ module top;
         genvar j;
         for (j = 0; j < N - 1; j = j + 1) begin : clients
             ClientTick #(j, j + 1) client(
-                .clock,
+                .clock(clock),
                 .client_req(intf.req[j + 1])
             );
         end
