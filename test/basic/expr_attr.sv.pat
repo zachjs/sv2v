@@ -1,3 +1,3 @@
-affirm unary
-affirm binary
-affirm ternary
+affirm (* unary *)
+affirm (* binary *)
+affirm (* ternary *)

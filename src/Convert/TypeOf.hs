@@ -255,8 +255,8 @@ typeof orig@(Dot e x) = do
                 Just typ -> typ
                 Nothing -> TypeOf orig
 typeof (Cast (Left t) _) = traverseTypeM t
-typeof (UniOpA op _ expr) = typeofUniOp op expr
-typeof (BinOpA op _ l r) = typeofBinOp op l r
+typeof (UniOpA op _  expr) = typeofUniOp op expr
+typeof (BinOpA op _   a b) = typeofBinOp op a b
 typeof (MuxA      _ _ a b) = largerSizeType a b
 typeof (Concat      exprs) = return $ typeOfSize Unsigned $ concatSize exprs
 typeof (Stream _ _  exprs) = return $ typeOfSize Unsigned $ concatSize exprs

@@ -121,13 +121,14 @@ module top;
     end
 
     reg pick;
-    logic [8:0] w0, w1, w2, w3;
+    logic [8:0] w0, w1, w2, w3, w4;
     assign w0 = pick ? '1 : $unsigned(4'd0);
     assign w1 = pick ? '1 : unsigned'(5'd0);
     assign w2 = pick ? '1 : $signed(6'd0);
     assign w3 = pick ? '1 : signed'(7'd0);
+    assign w4 = pick ? (* foo *) (* bar *) 'z : 3'(~w3);
     initial begin
-        $monitor("%0d %b %b %b %b %b", $time, pick, w0, w1, w2, w3);
+        $monitor("%0d %b %b %b %b %b %b", $time, pick, w0, w1, w2, w3, w4);
         #1 pick = 0;
         #1 pick = 1;
         #1 pick = 0;

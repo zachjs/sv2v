@@ -53,7 +53,7 @@ assertConverts() {
         while read line; do
             rule=${line:0:6}
             pattern=${line:7}
-            grep -G "$pattern" < $ac_tmpa > /dev/null
+            grep -F "$pattern" < $ac_tmpa > /dev/null
             matches=$?
             if [ $rule == "affirm" ]; then
                 assertTrue "conversion of $ac_file does not contain $pattern" $matches

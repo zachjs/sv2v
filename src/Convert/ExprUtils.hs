@@ -34,8 +34,8 @@ simplifyStep (UniOpA LogNot a (Number n)) =
         Just 0 -> bool True
         Just _ -> bool False
         Nothing -> UniOpA LogNot a $ Number n
-simplifyStep (UniOp LogNot (BinOp Eq l r)) = BinOp Ne l r
-simplifyStep (UniOp LogNot (BinOp Ne l r)) = BinOp Eq l r
+simplifyStep (UniOp LogNot (BinOp Eq a b)) = BinOp Ne a b
+simplifyStep (UniOp LogNot (BinOp Ne a b)) = BinOp Eq a b
 
 simplifyStep (UniOpA UniSub _ (UniOpA UniSub _ e)) = e
 simplifyStep (UniOp UniSub (BinOp Sub e1 e2)) = BinOp Sub e2 e1
@@ -67,9 +67,9 @@ simplifyStep (Call (Ident "$clog2") (Args [Dec k] [])) =
 
 -- TODO: add full constant evaluation for all number literals to avoid the
 -- anti-loop hack below
-simplifyStep e@(BinOpA _ _ (BinOpA _ _ Number{} Number{}) Number{}) = e
+simplifyStep e@(BinOp _ (BinOp _ Number{} Number{}) Number{}) = e
 
-simplifyStep (BinOpA op a e1 e2) = simplifyBinOp op a e1 e2
+simplifyStep (BinOp op e1 e2) = simplifyBinOp op e1 e2
 simplifyStep other = other
 
 -- flatten and coalesce concatenations
@@ -83,41 +83,41 @@ flattenConcat (e : es) =
 flattenConcat [] = []
 
 
-simplifyBinOp :: BinOp -> [Attr] -> Expr -> Expr -> Expr
+simplifyBinOp :: BinOp -> Expr -> Expr -> Expr
 
-simplifyBinOp Sub _ e (Dec 0) = e
-simplifyBinOp Sub a (Dec 0) e = UniOpA UniSub a e
-simplifyBinOp Mul _ (Dec 0) _ = toDec 0
-simplifyBinOp Mul _ _ (Dec 0) = toDec 0
-simplifyBinOp Mod _ _ (Dec 1) = toDec 0
+simplifyBinOp Sub e (Dec 0) = e
+simplifyBinOp Sub (Dec 0) e = UniOp UniSub e
+simplifyBinOp Mul (Dec 0) _ = toDec 0
+simplifyBinOp Mul _ (Dec 0) = toDec 0
+simplifyBinOp Mod _ (Dec 1) = toDec 0
 
-simplifyBinOp Add [] e1 (UniOp UniSub e2) = BinOp Sub e1 e2
-simplifyBinOp Add [] (UniOp UniSub e1) e2 = BinOp Sub e2 e1
-simplifyBinOp Sub [] e1 (UniOp UniSub e2) = BinOp Add e1 e2
-simplifyBinOp Sub [] (UniOp UniSub e1) e2 = UniOp UniSub $ BinOp Add e1 e2
+simplifyBinOp Add e1 (UniOp UniSub e2) = BinOp Sub e1 e2
+simplifyBinOp Add (UniOp UniSub e1) e2 = BinOp Sub e2 e1
+simplifyBinOp Sub e1 (UniOp UniSub e2) = BinOp Add e1 e2
+simplifyBinOp Sub (UniOp UniSub e1) e2 = UniOp UniSub $ BinOp Add e1 e2
 
-simplifyBinOp Add [] (BinOp Add e n1@Number{}) n2@Number{} =
+simplifyBinOp Add (BinOp Add e n1@Number{}) n2@Number{} =
     BinOp Add e (BinOp Add n1 n2)
-simplifyBinOp Sub [] n1@Number{} (BinOp Sub n2@Number{} e) =
+simplifyBinOp Sub n1@Number{} (BinOp Sub n2@Number{} e) =
     BinOp Add (BinOp Sub n1 n2) e
-simplifyBinOp Sub [] n1@Number{} (BinOp Sub e n2@Number{}) =
+simplifyBinOp Sub n1@Number{} (BinOp Sub e n2@Number{}) =
     BinOp Sub (BinOp Add n1 n2) e
-simplifyBinOp Sub [] (BinOp Add e n1@Number{}) n2@Number{} =
+simplifyBinOp Sub (BinOp Add e n1@Number{}) n2@Number{} =
     BinOp Add e (BinOp Sub n1 n2)
-simplifyBinOp Add [] n1@Number{} (BinOp Add n2@Number{} e) =
+simplifyBinOp Add n1@Number{} (BinOp Add n2@Number{} e) =
     BinOp Add (BinOp Add n1 n2) e
-simplifyBinOp Add [] n1@Number{} (BinOp Sub e n2@Number{}) =
+simplifyBinOp Add n1@Number{} (BinOp Sub e n2@Number{}) =
     BinOp Add e (BinOp Sub n1 n2)
-simplifyBinOp Sub [] (BinOp Sub e n1@Number{}) n2@Number{} =
+simplifyBinOp Sub (BinOp Sub e n1@Number{}) n2@Number{} =
     BinOp Sub e (BinOp Add n1 n2)
-simplifyBinOp Add [] (BinOp Sub e n1@Number{}) n2@Number{} =
+simplifyBinOp Add (BinOp Sub e n1@Number{}) n2@Number{} =
     BinOp Sub e (BinOp Sub n1 n2)
-simplifyBinOp Add [] (BinOp Sub n1@Number{} e) n2@Number{} =
+simplifyBinOp Add (BinOp Sub n1@Number{} e) n2@Number{} =
     BinOp Sub (BinOp Add n1 n2) e
-simplifyBinOp Ge [] (BinOp Sub e (Dec 1)) (Dec 0) = BinOp Ge e (toDec 1)
+simplifyBinOp Ge (BinOp Sub e (Dec 1)) (Dec 0) = BinOp Ge e (toDec 1)
 
 -- simplify bit shifts of decimal literals
-simplifyBinOp op _ (Dec x) (Number yRaw)
+simplifyBinOp op (Dec x) (Number yRaw)
     | ShiftAL <- op = decShift shiftL
     | ShiftAR <- op = decShift shiftR
     | ShiftL  <- op = decShift shiftL
@@ -129,15 +129,15 @@ simplifyBinOp op _ (Dec x) (Number yRaw)
                 Nothing -> constantFold undefined Div undefined 0
 
 -- simply comparisons with string literals
-simplifyBinOp op a (Number n) (String s) | isCmpOp op =
-    simplifyBinOp op a (Number n) (sizeStringAs s n)
-simplifyBinOp op a (String s) (Number n) | isCmpOp op =
-    simplifyBinOp op a (sizeStringAs s n) (Number n)
-simplifyBinOp op a (String s1) (String s2) | isCmpOp op =
-    simplifyBinOp op a (stringToNumber s1) (stringToNumber s2)
+simplifyBinOp op (Number n) (String s) | isCmpOp op =
+    simplifyBinOp op (Number n) (sizeStringAs s n)
+simplifyBinOp op (String s) (Number n) | isCmpOp op =
+    simplifyBinOp op (sizeStringAs s n) (Number n)
+simplifyBinOp op (String s1) (String s2) | isCmpOp op =
+    simplifyBinOp op (stringToNumber s1) (stringToNumber s2)
 
 -- simply basic arithmetic comparisons
-simplifyBinOp op a (Number n1) (Number n2)
+simplifyBinOp op (Number n1) (Number n2)
     | Eq <- op = cmp (==)
     | Ne <- op = cmp (/=)
     | Lt <- op = cmp (<)
@@ -149,19 +149,19 @@ simplifyBinOp op a (Number n1) (Number n2)
         cmp folder =
             case (numberToInteger n1', numberToInteger n2') of
                 (Just i1, Just i2) -> bool $ folder i1 i2
-                _ -> BinOpA op a (Number n1') (Number n2')
+                _ -> BinOp op (Number n1') (Number n2')
         sg = numberIsSigned n1 && numberIsSigned n2
         sz = fromIntegral $ max (numberBitLength n1) (numberBitLength n2)
         n1' = numberCast sg sz n1
         n2' = numberCast sg sz n2
 
 -- simply comparisons with unbased unsized literals
-simplifyBinOp op a (Number n) (ConvertedUU sz v k) | isCmpOp op =
-    simplifyBinOp op a (Number n) (uuExtend sz v k)
-simplifyBinOp op a (ConvertedUU sz v k) (Number n) | isCmpOp op =
-    simplifyBinOp op a (uuExtend sz v k) (Number n)
+simplifyBinOp op (Number n) (ConvertedUU sz v k) | isCmpOp op =
+    simplifyBinOp op (Number n) (uuExtend sz v k)
+simplifyBinOp op (ConvertedUU sz v k) (Number n) | isCmpOp op =
+    simplifyBinOp op (uuExtend sz v k) (Number n)
 
-simplifyBinOp op a e1 e2 =
+simplifyBinOp op e1 e2 =
     case (e1, e2) of
         (Dec    x, Dec    y) -> constantFold orig op   x    y
         (SizDec x, Dec    y) -> constantFold orig op   x    y
@@ -172,7 +172,7 @@ simplifyBinOp op a e1 e2 =
         (Dec    x, NegDec y) -> constantFold orig op   x  (-y)
         (NegDec x, NegDec y) -> constantFold orig op (-x) (-y)
         _ -> orig
-    where orig = BinOpA op a e1 e2
+    where orig = BinOp op e1 e2
 
 
 -- attempt to constant fold a binary operation on integers

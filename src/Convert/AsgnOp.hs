@@ -37,6 +37,6 @@ convertStmt (Asgn (AsgnOp op) mt lhs expr) =
 convertStmt other = other
 
 elabBinOp :: BinOp -> Expr -> Expr -> Expr
-elabBinOp Add e1 (UniOpA UniSub a e2) = BinOpA Sub a e1 e2
-elabBinOp Sub e1 (UniOpA UniSub a e2) = BinOpA Add a e1 e2
+elabBinOp Add e1 (UniOp UniSub e2) = BinOp Sub e1 e2
+elabBinOp Sub e1 (UniOp UniSub e2) = BinOp Add e1 e2
 elabBinOp op e1 e2 = BinOp op e1 e2

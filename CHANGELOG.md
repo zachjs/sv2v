@@ -7,7 +7,7 @@
 
 ### New Features
 
-* Added support for attributes in unary, binary and ternary expressions
+* Added support for attributes in unary, binary, and ternary expressions
 
 ### Bug Fixes
 

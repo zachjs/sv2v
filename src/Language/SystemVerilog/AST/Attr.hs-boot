@@ -5,6 +5,5 @@ module Language.SystemVerilog.AST.Attr
 
 data Attr
 instance Eq Attr
-instance Show Attr
 
 showsAttrs :: [Attr] -> ShowS

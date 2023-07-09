@@ -1,0 +1,1 @@
+affirm ? (* foo *) (* bar *)

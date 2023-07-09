@@ -507,12 +507,12 @@ convertSubExpr scopes (Pattern items) =
         items' = map mapItem items
         mapItem (x, e) = (x, e')
             where (_, e') = convertSubExpr scopes e
-convertSubExpr scopes (MuxA a c t f) =
-    (ty, MuxA a c' t' f')
+convertSubExpr scopes (MuxA r a b c) =
+    (t, MuxA r a' b' c')
     where
+        (_, a') = convertSubExpr scopes a
+        (t, b') = convertSubExpr scopes b
         (_, c') = convertSubExpr scopes c
-        (ty, t') = convertSubExpr scopes t
-        (_, f') = convertSubExpr scopes f
 convertSubExpr scopes (Ident x) =
     fallbackType scopes (Ident x)
 convertSubExpr scopes e =

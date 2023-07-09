@@ -20,8 +20,8 @@ module Language.SystemVerilog.AST.Expr
     , ParamBinding
     , showParams
     , pattern RawNum
-    , pattern BinOp
     , pattern UniOp
+    , pattern BinOp
     , pattern Mux
     ) where
 
@@ -31,8 +31,8 @@ import Text.Printf (printf)
 import Language.SystemVerilog.AST.Number (Number(..))
 import Language.SystemVerilog.AST.Op
 import Language.SystemVerilog.AST.ShowHelp
-import {-# SOURCE #-} Language.SystemVerilog.AST.Type
 import {-# SOURCE #-} Language.SystemVerilog.AST.Attr
+import {-# SOURCE #-} Language.SystemVerilog.AST.Type
 
 type Range = (Expr, Expr)
 
@@ -40,10 +40,11 @@ type TypeOrExpr = Either Type Expr
 
 pattern RawNum :: Integer -> Expr
 pattern RawNum n = Number (Decimal (-32) True n)
-pattern BinOp :: BinOp -> Expr -> Expr -> Expr
-pattern BinOp op l r = BinOpA op [] l r
+
 pattern UniOp :: UniOp -> Expr -> Expr
 pattern UniOp op e = UniOpA op [] e
+pattern BinOp :: BinOp -> Expr -> Expr -> Expr
+pattern BinOp op l r = BinOpA op [] l r
 pattern Mux :: Expr -> Expr -> Expr -> Expr
 pattern Mux c t f = MuxA [] c t f
 
@@ -110,23 +111,23 @@ instance Show Expr where
     show e@MuxA  {} = showsPrec 0 e ""
     show e@Call  {} = showsPrec 0 e ""
 
-    showsPrec _ (UniOpA  o a e  ) =
+    showsPrec _ (UniOpA o a e  ) =
         shows o .
         (if null a then id else showChar ' ') .
         showsAttrs a .
         showUniOpPrec e
-    showsPrec _ (BinOpA  o a l r) =
+    showsPrec _ (BinOpA o a l r) =
         showBinOpPrec l .
         showChar ' ' .
         shows o .
         showChar ' ' .
         showsAttrs a .
         showBinOpPrec r
-    showsPrec _ (Dot     e n  ) =
+    showsPrec _ (Dot      e n  ) =
         shows e .
         showChar '.' .
         showString n
-    showsPrec _ (MuxA  a c t f) =
+    showsPrec _ (MuxA   a c t f) =
         showChar '(' .
         shows c .
         showString " ? " .
@@ -135,7 +136,7 @@ instance Show Expr where
         showString " : " .
         shows f .
         showChar ')'
-    showsPrec _ (Call    e l  ) =
+    showsPrec _ (Call     e l  ) =
         shows e .
         shows l
     showsPrec _ e = \s -> show e ++ s
