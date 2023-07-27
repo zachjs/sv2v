@@ -1604,9 +1604,8 @@ combineDeclsAndStmts (a1, b1) (a2, b2) =
     else return (a1 ++ a2, b1 ++ b2)
 
 makeInput :: Decl -> Decl
-makeInput (Variable Local t x a e) = Variable Input t x a e
-makeInput (Variable Input t x a e) = Variable Input t x a e
-makeInput (Variable Output t x a e) = Variable Output t x a e
+makeInput (Variable d t x a e) = Variable d' t x a e
+  where d' = if d == Local then Input else d
 makeInput (CommentDecl c) = CommentDecl c
 makeInput other =
   error $ "unexpected non-var or non-port function decl: " ++ (show other)
