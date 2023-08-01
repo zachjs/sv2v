@@ -694,15 +694,16 @@ ModuleItems :: { [ModuleItem] }
   : {- empty -}                    { [] }
   | ";" ModuleItems                { $2 }
   | MITrace ModuleItem ModuleItems { addMITrace $1 ($2 ++ $3) }
+
 ModuleItem :: { [ModuleItem] }
-  : NonGenerateModuleItem           { $1 }
+  : NonGenerateModuleItem { $1 }
   | AttributeInstance ModuleItem    { map (addMIAttr $1) $2 }
   | "generate" GenItems endgenerate { [Generate $2] }
 NonGenerateModuleItemA :: { [ModuleItem] }
   : NonGenerateModuleItem                    { $1 }
   | AttributeInstance NonGenerateModuleItemA { map (addMIAttr $1) $2 }
--- This item covers module instantiations and all declarations
 NonGenerateModuleItem :: { [ModuleItem] }
+  -- This item covers module instantiations and all declarations
   : ModuleDeclTokens(";")                {% mapM recordPartUsed $ parseDTsAsModuleItems $1 }
   | ParameterDecl(";")                   { map (MIPackageItem . Decl) $1 }
   | "defparam" LHSAsgns ";"              { map (uncurry Defparam) $2 }
@@ -1450,7 +1451,7 @@ GenItems :: { [GenItem] }
   | GenItems GenItem { $1 ++ [$2] }
 
 GenItem :: { GenItem }
-  : MITrace GenBlock               { uncurry GenBlock $2 }
+  : MITrace GenBlock              { uncurry GenBlock $2 }
   | MITrace NonGenerateModuleItemA { genItemsToGenItem $ map GenModuleItem $ addMITrace $1 $2 }
 ConditionalGenerateConstruct :: { GenItem }
   : "if" "(" Expr ")" GenItemOrNull "else" GenItemOrNull { GenIf $3 $5 $7      }
