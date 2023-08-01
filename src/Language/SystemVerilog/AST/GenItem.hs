@@ -17,7 +17,7 @@ import Language.SystemVerilog.AST.ShowHelp
 import Language.SystemVerilog.AST.Expr (Expr)
 import Language.SystemVerilog.AST.Op (AsgnOp)
 import Language.SystemVerilog.AST.Type (Identifier)
-import {-# SOURCE #-} Language.SystemVerilog.AST.ModuleItem (ModuleItem)
+import {-# SOURCE #-} Language.SystemVerilog.AST.ModuleItem (ModuleItem, showGenModuleItem)
 
 data GenItem
     = GenBlock Identifier [GenItem]
@@ -45,7 +45,7 @@ instance Show GenItem where
             x2 (show o2) (show e2)
             (showBlockedBranch s) -- Verilog 2001 requires this to be a block
     show (GenNull) = ""
-    show (GenModuleItem item) = show item
+    show (GenModuleItem item) = showGenModuleItem item
 
 showBareBlock :: GenItem -> String
 showBareBlock (GenBlock x i) =
