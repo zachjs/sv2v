@@ -34,9 +34,9 @@ traverseDescription other = other
 
 convertPackageItem :: PackageItem -> PackageItem
 convertPackageItem (Function l t x decls stmts) =
-   Function l t x (convertTFDecls decls) stmts
+    Function l t x (convertTFDecls decls) stmts
 convertPackageItem (Task l x decls stmts) =
-   Task l x (convertTFDecls decls) stmts
+    Task l x (convertTFDecls decls) stmts
 convertPackageItem other = other
 
 convertPorts :: Identifier -> [Identifier] -> [ModuleItem] -> [ModuleItem]
