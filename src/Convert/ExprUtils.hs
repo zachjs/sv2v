@@ -14,6 +14,8 @@ module Convert.ExprUtils
     , endianCondRange
     , dimensionsSize
     , stringToNumber
+    , simplifyRange
+    , simplifyDimensions
     ) where
 
 import Data.Bits ((.&.), (.|.), shiftL, shiftR)
@@ -319,3 +321,9 @@ pattern ConvertedUU :: Integer -> Integer -> Integer -> Expr
 pattern ConvertedUU sz v k <- Repeat
     (RawNum sz)
     [Number (Based 1 True Binary v k)]
+
+simplifyRange :: Range -> Range
+simplifyRange (e1, e2) = (simplify e1, simplify e2)
+
+simplifyDimensions :: [Range] -> [Range]
+simplifyDimensions = map simplifyRange

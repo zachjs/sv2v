@@ -18,6 +18,7 @@ module Convert.PortDecl (convert) where
 import Data.List (intercalate, (\\))
 import Data.Maybe (mapMaybe)
 
+import Convert.ExprUtils (simplifyDimensions)
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
@@ -102,9 +103,9 @@ combineDecls :: Decl -> Decl -> Decl
 combineDecls portDecl dataDecl
     | eP /= Nil =
         mismatch "invalid initialization at port declaration"
-    | aP /= aD =
+    | simplifyDimensions aP /= simplifyDimensions aD =
         mismatch "different unpacked dimensions"
-    | rsP /= rsD =
+    | simplifyDimensions rsP /= simplifyDimensions rsD =
         mismatch "different packed dimensions"
     | otherwise =
         base (tf rsD) ident aD Nil

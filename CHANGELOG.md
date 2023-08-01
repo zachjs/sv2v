@@ -8,6 +8,8 @@
 ### Bug Fixes
 
 * Fixed an issue that prevented parsing tasks and functions with `inout` ports
+* Fixed certain non-ANSI style port declarations being incorrectly reported as
+  incompatible
 
 ## v0.0.11
 
