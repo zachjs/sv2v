@@ -255,9 +255,9 @@ typeof orig@(Dot e x) = do
                 Just typ -> typ
                 Nothing -> TypeOf orig
 typeof (Cast (Left t) _) = traverseTypeM t
-typeof (UniOp op expr) = typeofUniOp op expr
-typeof (BinOp op a b) = typeofBinOp op a b
-typeof (Mux   _       a b) = largerSizeType a b
+typeof (UniOpA op _  expr) = typeofUniOp op expr
+typeof (BinOpA op _   a b) = typeofBinOp op a b
+typeof (MuxA      _ _ a b) = largerSizeType a b
 typeof (Concat      exprs) = return $ typeOfSize Unsigned $ concatSize exprs
 typeof (Stream _ _  exprs) = return $ typeOfSize Unsigned $ concatSize exprs
 typeof (Repeat reps exprs) = return $ typeOfSize Unsigned size
@@ -378,7 +378,7 @@ concatSize exprs =
 -- returns the size of an expression, with the short-circuiting
 sizeof :: Expr -> Expr
 sizeof (Number n) = RawNum $ numberBitLength n
-sizeof (Mux _ a b) = largerSizeOf a b
+sizeof (MuxA _ _ a b) = largerSizeOf a b
 sizeof expr = DimsFn FnBits $ Left $ TypeOf expr
 
 -- returns the maximum size of the two given expressions
@@ -446,8 +446,8 @@ typeCastUnneeded t1 t2 =
 makeExplicit :: Expr -> Expr
 makeExplicit (Number n) =
     Number $ numberCast (numberIsSigned n) (fromIntegral $ numberBitLength n) n
-makeExplicit (BinOp op e1 e2) =
-    BinOp op (makeExplicit e1) (makeExplicit e2)
-makeExplicit (UniOp op e) =
-    UniOp op $ makeExplicit e
+makeExplicit (BinOpA op a e1 e2) =
+    BinOpA op a (makeExplicit e1) (makeExplicit e2)
+makeExplicit (UniOpA op a e) =
+    UniOpA op a $ makeExplicit e
 makeExplicit other = other

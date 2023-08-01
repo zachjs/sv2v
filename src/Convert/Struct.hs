@@ -198,8 +198,8 @@ structIsntReady = (Nothing ==) . convertStruct
 -- try expression conversion by looking at the *outermost* type first
 convertExpr :: Scopes a -> Type -> Expr -> Expr
 convertExpr _ _ Nil = Nil
-convertExpr scopes t (Mux c e1 e2) =
-    Mux c e1' e2'
+convertExpr scopes t (MuxA a c e1 e2) =
+    MuxA a c e1' e2'
     where
         e1' = convertExpr scopes t e1
         e2' = convertExpr scopes t e2
@@ -319,8 +319,8 @@ convertExpr scopes t@IntegerVector{} (Concat exprs) =
         t' = dropInnerTypeRange t
         isUnsizedNumber :: Expr -> Bool
         isUnsizedNumber (Number n) = not $ numberIsSized n
-        isUnsizedNumber (UniOp _ e) = isUnsizedNumber e
-        isUnsizedNumber (BinOp _ e1 e2) =
+        isUnsizedNumber (UniOpA _ _ e) = isUnsizedNumber e
+        isUnsizedNumber (BinOpA _ _ e1 e2) =
             isUnsizedNumber e1 || isUnsizedNumber e2
         isUnsizedNumber _ = False
 
@@ -507,8 +507,8 @@ convertSubExpr scopes (Pattern items) =
         items' = map mapItem items
         mapItem (x, e) = (x, e')
             where (_, e') = convertSubExpr scopes e
-convertSubExpr scopes (Mux a b c) =
-    (t, Mux a' b' c')
+convertSubExpr scopes (MuxA r a b c) =
+    (t, MuxA r a' b' c')
     where
         (_, a') = convertSubExpr scopes a
         (t, b') = convertSubExpr scopes b

@@ -448,17 +448,17 @@ traverseSinglyNestedExprsM exprMapper = em
             pes <- mapM exprMapper $ map snd p
             let p' = zip (map fst p) pes
             return $ Call e' (Args l' p')
-        em (UniOp      o e) =
-            exprMapper e >>= return . UniOp o
-        em (BinOp      o e1 e2) = do
+        em (UniOpA   o a e) =
+            exprMapper e >>= return . UniOpA o a
+        em (BinOpA   o a e1 e2) = do
             e1' <- exprMapper e1
             e2' <- exprMapper e2
-            return $ BinOp o e1' e2'
-        em (Mux        e1 e2 e3) = do
+            return $ BinOpA o a e1' e2'
+        em (MuxA    a e1 e2 e3) = do
             e1' <- exprMapper e1
             e2' <- exprMapper e2
             e3' <- exprMapper e3
-            return $ Mux e1' e2' e3'
+            return $ MuxA a e1' e2' e3'
         em (Cast tore e) = do
             tore' <- typeOrExprMapper tore
             e' <- exprMapper e

@@ -89,4 +89,15 @@ module top;
         $display("%b %d %d %d", tY, tY, $left(tY), $right(tY));
         $display("%b %d %d %d", tZ, tZ, $left(tZ), $right(tZ));
     end
+
+    initial begin
+        type(~(*hi*)X) w = '1;
+        type(X+(*hi*)Y) x = '1;
+        type(X?(*hi*)Y:Z) y = '1;
+        type(!y?(*hi*)Y:Z) z = '1;
+        $display("%b %d %d %d", w, w, $left(w), $right(w));
+        $display("%b %d %d %d", x, x, $left(x), $right(x));
+        $display("%b %d %d %d", y, y, $left(y), $right(y));
+        $display("%b %d %d %d", z, z, $left(z), $right(z));
+    end
 endmodule

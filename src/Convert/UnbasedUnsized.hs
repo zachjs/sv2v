@@ -218,48 +218,48 @@ convertExpr _ (Call expr (Args pnArgs [])) =
     where pnArgs' = map (convertExpr SelfDetermined) pnArgs
 convertExpr _ (Repeat count exprs) =
     Repeat count $ map (convertExpr SelfDetermined) exprs
-convertExpr SelfDetermined (Mux cond e1@UU{} e2@UU{}) =
-    Mux
+convertExpr SelfDetermined (MuxA a cond e1@UU{} e2@UU{}) =
+    MuxA a
     (convertExpr SelfDetermined cond)
     (convertExpr SelfDetermined e1)
     (convertExpr SelfDetermined e2)
-convertExpr SelfDetermined (Mux cond e1 e2) =
-    Mux
+convertExpr SelfDetermined (MuxA a cond e1 e2) =
+    MuxA a
     (convertExpr SelfDetermined cond)
     (convertExpr (ContextDetermined e2) e1)
     (convertExpr (ContextDetermined e1) e2)
-convertExpr (ContextDetermined expr) (Mux cond e1 e2) =
-    Mux
+convertExpr (ContextDetermined expr) (MuxA a cond e1 e2) =
+    MuxA a
     (convertExpr SelfDetermined cond)
     (convertExpr context e1)
     (convertExpr context e2)
     where context = ContextDetermined expr
-convertExpr SelfDetermined (BinOp op e1 e2) =
+convertExpr SelfDetermined (BinOpA op a e1 e2) =
     if isPeerSizedBinOp op || isParentSizedBinOp op
-        then BinOp op
+        then BinOpA op a
             (convertExpr (ContextDetermined e2) e1)
             (convertExpr (ContextDetermined e1) e2)
-        else BinOp op
+        else BinOpA op a
             (convertExpr SelfDetermined e1)
             (convertExpr SelfDetermined e2)
-convertExpr (ContextDetermined expr) (BinOp op e1 e2) =
+convertExpr (ContextDetermined expr) (BinOpA op a e1 e2) =
     if isPeerSizedBinOp op then
-        BinOp op
+        BinOpA op a
             (convertExpr (ContextDetermined e2) e1)
             (convertExpr (ContextDetermined e1) e2)
     else if isParentSizedBinOp op then
-        BinOp op
+        BinOpA op a
             (convertExpr context e1)
             (convertExpr context e2)
     else
-        BinOp op
+        BinOpA op a
             (convertExpr SelfDetermined e1)
             (convertExpr SelfDetermined e2)
     where context = ContextDetermined expr
-convertExpr context (UniOp op expr) =
+convertExpr context (UniOpA op a expr) =
     if isSizedUniOp op
-        then UniOp op (convertExpr context expr)
-        else UniOp op (convertExpr SelfDetermined expr)
+        then UniOpA op a (convertExpr context expr)
+        else UniOpA op a (convertExpr SelfDetermined expr)
 convertExpr SelfDetermined (UU bit) =
     literalFor bit
 convertExpr (ContextDetermined expr) (UU bit) =

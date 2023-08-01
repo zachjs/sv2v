@@ -8,6 +8,7 @@
 module Language.SystemVerilog.AST.Attr
     ( Attr (..)
     , AttrSpec
+    , showsAttrs
     ) where
 
 import Text.Printf (printf)
@@ -24,6 +25,9 @@ type AttrSpec = (Identifier, Expr)
 
 instance Show Attr where
     show (Attr specs) = printf "(* %s *)" $ commas $ map showSpec specs
+
+showsAttrs :: [Attr] -> ShowS
+showsAttrs = foldr (\a f -> shows a . showChar ' ' . f) id
 
 showSpec :: AttrSpec -> String
 showSpec (x, e) = x ++ showAssignment e

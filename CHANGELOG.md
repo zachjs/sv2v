@@ -5,6 +5,10 @@
 * Removed deprecated CLI flags `-d`/`-e`/`-i`, which have been aliased to
   `-D`/`-E`/`-I` with a warning since late 2019
 
+### New Features
+
+* Added support for attributes in unary, binary, and ternary expressions
+
 ### Bug Fixes
 
 * Fixed an issue that prevented parsing tasks and functions with `inout` ports

@@ -109,4 +109,19 @@ module top;
         $display("%b %d %d %d", tY, tY, 5, 0);
         $display("%b %d %d %d", tZ, tZ, 7, 0);
     end
+
+    initial begin : block6
+        reg [4:0] w;
+        reg [5:0] x;
+        reg [7:0] y;
+        reg [7:0] z;
+        w = 1'sb1;
+        x = 1'sb1;
+        y = 1'sb1;
+        z = 1'sb1;
+        $display("%b %d %d %d", w, w, 4, 0);
+        $display("%b %d %d %d", x, x, 5, 0);
+        $display("%b %d %d %d", y, y, 7, 0);
+        $display("%b %d %d %d", z, z, 7, 0);
+    end
 endmodule

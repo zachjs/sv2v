@@ -29,15 +29,15 @@ simplify = simplifyStep . traverseSinglyNestedExprs simplify . simplifyStep
 
 simplifyStep :: Expr -> Expr
 
-simplifyStep (UniOp LogNot (Number n)) =
+simplifyStep (UniOpA LogNot a (Number n)) =
     case numberToInteger n of
         Just 0 -> bool True
         Just _ -> bool False
-        Nothing -> UniOp LogNot $ Number n
+        Nothing -> UniOpA LogNot a $ Number n
 simplifyStep (UniOp LogNot (BinOp Eq a b)) = BinOp Ne a b
 simplifyStep (UniOp LogNot (BinOp Ne a b)) = BinOp Eq a b
 
-simplifyStep (UniOp UniSub (UniOp UniSub e)) = e
+simplifyStep (UniOpA UniSub _ (UniOpA UniSub _ e)) = e
 simplifyStep (UniOp UniSub (BinOp Sub e1 e2)) = BinOp Sub e2 e1
 
 simplifyStep (Concat [Number (Decimal size _ value)]) =
@@ -49,11 +49,11 @@ simplifyStep (Concat [e@Repeat{}]) = e
 simplifyStep (Concat es) = Concat $ flattenConcat es
 simplifyStep (Repeat (Dec 0) _) = Concat []
 simplifyStep (Repeat (Dec 1) es) = Concat es
-simplifyStep (Mux (Number n) e1 e2) =
+simplifyStep (MuxA a (Number n) e1 e2) =
     case numberToInteger n of
         Just 0 -> e2
         Just _ -> e1
-        Nothing -> Mux (Number n) e1 e2
+        Nothing -> MuxA a (Number n) e1 e2
 
 simplifyStep (Call (Ident "$clog2") (Args [SizDec k] [])) =
     simplifyStep $ Call (Ident "$clog2") (Args [RawNum k] [])

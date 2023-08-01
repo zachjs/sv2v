@@ -116,13 +116,14 @@ module top;
     end
 
     reg pick;
-    wire [8:0] w0, w1, w2, w3;
+    wire [8:0] w0, w1, w2, w3, w4;
     assign w0 = pick ? 9'h1FF : 9'h000;
     assign w1 = pick ? 9'h1FF : 9'h000;
     assign w2 = pick ? 9'h1FF : 9'h000;
     assign w3 = pick ? 9'h1FF : 9'h000;
+    assign w4 = pick ? 9'hZZZ : 9'h007;
     initial begin
-        $monitor("%0d %b %b %b %b %b", $time, pick, w0, w1, w2, w3);
+        $monitor("%0d %b %b %b %b %b %b", $time, pick, w0, w1, w2, w3, w4);
         #1 pick = 0;
         #1 pick = 1;
         #1 pick = 0;

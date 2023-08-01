@@ -120,7 +120,7 @@ instance Key Expr where
     unbit (Range e _ _) = (e', n)
         where (e', n) = unbit e
     unbit e = (e, 0)
-    split (Mux _ a b) = Just (a, b)
+    split (MuxA _ _ a b) = Just (a, b)
     split _ = Nothing
 
 instance Key LHS where
