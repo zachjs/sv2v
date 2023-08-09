@@ -15,6 +15,10 @@
 * Fixed certain non-ANSI style port declarations being incorrectly reported as
   incompatible
 
+### Other Enhancements
+
+* Added constant folding for `||` and `&&`
+
 ## v0.0.11
 
 ### New Features

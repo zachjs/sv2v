@@ -161,6 +161,9 @@ simplifyBinOp op (Number n) (ConvertedUU sz v k) | isCmpOp op =
 simplifyBinOp op (ConvertedUU sz v k) (Number n) | isCmpOp op =
     simplifyBinOp op (uuExtend sz v k) (Number n)
 
+simplifyBinOp op (Number n) e | op == LogAnd || op == LogOr =
+    simplifyLogAndOr op n e
+
 simplifyBinOp op e1 e2 =
     case (e1, e2) of
         (Dec    x, Dec    y) -> constantFold orig op   x    y
@@ -327,3 +330,22 @@ simplifyRange (e1, e2) = (simplify e1, simplify e2)
 
 simplifyDimensions :: [Range] -> [Range]
 simplifyDimensions = map simplifyRange
+
+-- TODO: extend this to other logical binary operators
+simplifyLogAndOr :: BinOp -> Number -> Expr -> Expr
+simplifyLogAndOr op n1 (Number n2) =
+    case (numberToInteger n1, numberToInteger n2) of
+        (Just v, _) | (v /= 0) == isOr -> bool isOr
+        (_, Just v) | (v /= 0) == isOr -> bool isOr
+        (Nothing, _) -> boolUnknown
+        (_, Nothing) -> boolUnknown
+        _ -> bool $ not isOr
+    where
+        isOr = op == LogOr
+        boolUnknown = Number $ Based 1 False Binary 0 1
+simplifyLogAndOr op n e =
+    case numberToInteger n of
+        Just v | (v /= 0) == isOr -> bool isOr
+        Just _ -> UniOp LogNot $ UniOp LogNot e
+        Nothing -> BinOp op (Number n) e
+    where isOr = op == LogOr
