@@ -17,8 +17,6 @@
 
 module Convert.Simplify (convert) where
 
-import Control.Monad (when)
-
 import Convert.ExprUtils
 import Convert.Scoper
 import Convert.Traverse
@@ -53,13 +51,14 @@ pattern SimpleVector sg l r <- IntegerVector _ sg [(RawNum l, RawNum r)]
 insertExpr :: Identifier -> Expr -> Scoper Expr ()
 insertExpr ident expr = do
     expr' <- substituteExprM expr
-    case expr' of
+    insertElem ident $ case expr' of
         Cast (Left (SimpleVector sg l r)) (Number n) ->
-            insertElem ident $ Number $ numberCast signed size n
+            Number $ numberCast signed size n
             where
                 signed = sg == Signed
                 size = fromIntegral $ abs $ l - r + 1
-        _ -> when (isSimpleExpr expr') $ insertElem ident expr'
+        _ | isSimpleExpr expr' -> expr'
+        _ -> Nil
 
 isSimpleExpr :: Expr -> Bool
 isSimpleExpr Number{}  = True
@@ -84,7 +83,7 @@ traverseGenItemM :: GenItem -> Scoper Expr GenItem
 traverseGenItemM = traverseGenItemExprsM traverseExprM
 
 traverseStmtM :: Stmt -> Scoper Expr Stmt
-traverseStmtM stmt = traverseStmtExprsM traverseExprM stmt
+traverseStmtM = traverseStmtExprsM traverseExprM
 
 traverseExprM :: Expr -> Scoper Expr Expr
 traverseExprM = embedScopes convertExpr

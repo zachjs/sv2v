@@ -12,6 +12,7 @@
 ### Bug Fixes
 
 * Fixed an issue that prevented parsing tasks and functions with `inout` ports
+* Fixed errant constant folding of shadowed non-trivial localparams
 * Fixed certain non-ANSI style port declarations being incorrectly reported as
   incompatible
 
