@@ -5,7 +5,7 @@
  - Conversion for interfaces
  -}
 
-module Convert.Interface (convert) where
+module Convert.Interface (convert, disambiguate) where
 
 import Data.List (intercalate, (\\))
 import Data.Maybe (isJust, isNothing, mapMaybe)
@@ -38,11 +38,6 @@ convert tops files =
             (map . convertDescription tops)
             files
     where
-        -- we can only collect/map non-extern interfaces and modules
-        collectPart :: Description -> Writer PartInfos ()
-        collectPart (Part _ False kw _ name ports items) =
-            tell $ Map.singleton name $ PartInfo kw ports items
-        collectPart _ = return ()
         -- multidimensional instances need to be flattened before this
         -- conversion can proceed
         needsFlattening =
@@ -54,6 +49,67 @@ convert tops files =
         checkItem :: ModuleItem -> Writer Any ()
         checkItem (Instance _ _ _ rs _) = when (length rs > 1) $ tell $ Any True
         checkItem _ = return ()
+
+-- we can only collect/map non-extern interfaces and modules
+collectPart :: Description -> Writer PartInfos ()
+collectPart (Part _ False kw _ name ports items) =
+    tell $ Map.singleton name $ PartInfo kw ports items
+collectPart _ = return ()
+
+-- disambiguate typenames from interface names
+disambiguate :: [AST] -> [AST]
+disambiguate = traverseFiles
+    (collectDescriptionsM collectPart)
+    (map . disambiguateDescription)
+
+-- disambiguate any typenames within a description
+disambiguateDescription :: PartInfos -> Description -> Description
+disambiguateDescription parts (Part att ext kw lif name ports items) =
+    Part att ext kw lif name ports $ map traverseModuleItem items
+    where
+        typeNames = getTypeNames items
+
+        traverseModuleItem :: ModuleItem -> ModuleItem
+        traverseModuleItem (MIAttr attr item) =
+            MIAttr attr $ traverseModuleItem item
+        traverseModuleItem (MIPackageItem (Decl (Variable d t x a e))) =
+            MIPackageItem $ Decl $ Variable d (traverseType t) x a e
+        traverseModuleItem other = other
+
+        traverseType :: Type -> Type
+        traverseType (Alias interfaceName rs) =
+            if isInterface interfaceName && not (elem interfaceName typeNames)
+                then InterfaceT interfaceName "" rs
+                else Alias interfaceName rs
+        traverseType orig@(InterfaceT interfaceName _ _) =
+            if null interfaceName || isInterface interfaceName
+                then orig
+                else error $ "declaration type " ++ show orig ++ " appears to "
+                    ++ "refer to an interface that isn't defined"
+        traverseType other = other
+
+        isInterface :: Identifier -> Bool
+        isInterface partName =
+            fmap pKind (Map.lookup partName parts) == Just Interface
+
+disambiguateDescription _ other = other
+
+-- get all of the typenames declared anywhere in the top-level module items
+getTypeNames :: [ModuleItem] -> [Identifier]
+getTypeNames (MIAttr _ item : rest) = getTypeNames $ item : rest
+getTypeNames (Generate genItems : rest) =
+    getTypeNames $ genModuleItems genItems ++ rest
+getTypeNames (MIPackageItem (Decl (ParamType _ name _)) : rest) =
+    name : getTypeNames rest
+getTypeNames (_ : rest) = getTypeNames rest
+getTypeNames [] = []
+
+-- get the top-level (i.e., un-scoped) module items within a generate block
+genModuleItems :: [GenItem] -> [ModuleItem]
+genModuleItems (GenModuleItem item : rest) =
+    item : genModuleItems rest
+genModuleItems (_ : rest) = genModuleItems rest
+genModuleItems [] = []
 
 topInterfaceError :: String -> String -> a
 topInterfaceError name issue = error $
@@ -307,7 +363,6 @@ convertDescription tops parts (Part att ext Module lif name ports items) =
                     else if elem x (pPorts partInfo) then
                         tell [(x, info)] >> return decl
                     else
-                        -- TODO: This does not handle shadowed typenames.
                         scopedErrorM $
                             "Modport not in port list: " ++ show t ++ " " ++ x
                             ++ ". Is this an interface missing a port list?"
@@ -317,22 +372,9 @@ convertDescription tops parts (Part att ext Module lif name ports items) =
                 checkDecl decl = return decl
 
         extractModportInfo :: Type -> Maybe (Identifier, Identifier)
-        extractModportInfo (InterfaceT "" "" _) = Just ("", "")
         extractModportInfo (InterfaceT interfaceName modportName _) =
-            if isInterface interfaceName
-                then Just (interfaceName, modportName)
-                else Nothing
-        extractModportInfo (Alias interfaceName _) =
-            if isInterface interfaceName
-                then Just (interfaceName, "")
-                else Nothing
+            Just (interfaceName, modportName)
         extractModportInfo _ = Nothing
-
-        isInterface :: Identifier -> Bool
-        isInterface partName =
-            case Map.lookup partName parts of
-                Nothing -> False
-                Just info -> pKind info == Interface
 
 convertDescription _ _ other = other
 

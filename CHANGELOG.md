@@ -8,6 +8,7 @@
 ### New Features
 
 * Added support for attributes in unary, binary, and ternary expressions
+* Added support for shadowing interface names with local typenames
 
 ### Bug Fixes
 

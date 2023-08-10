@@ -116,6 +116,7 @@ initialPhases tops selectExclude =
     , Convert.FuncRoutine.convert
     , selectExclude Job.Assert Convert.Assertion.convert
     , selectExclude Job.Always Convert.AlwaysKW.convert
+    , Convert.Interface.disambiguate
     , Convert.Package.convert
     , Convert.StructConst.convert
     , Convert.PortDecl.convert
