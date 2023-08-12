@@ -13,6 +13,8 @@
 ### Bug Fixes
 
 * Fixed an issue that prevented parsing tasks and functions with `inout` ports
+* Fixed conflicting genvar names when inlining interfaces and modules that use
+  them; all genvars are now given a design-wide unique name
 * Fixed errant constant folding of shadowed non-trivial localparams
 * Fixed certain non-ANSI style port declarations being incorrectly reported as
   incompatible

@@ -27,6 +27,7 @@ import qualified Convert.ForAsgn
 import qualified Convert.Foreach
 import qualified Convert.FuncRet
 import qualified Convert.FuncRoutine
+import qualified Convert.GenvarName
 import qualified Convert.HierConst
 import qualified Convert.ImplicitNet
 import qualified Convert.Inside
@@ -114,6 +115,7 @@ initialPhases tops selectExclude =
     , Convert.DoWhile.convert
     , Convert.Foreach.convert
     , Convert.FuncRoutine.convert
+    , Convert.GenvarName.convert
     , selectExclude Job.Assert Convert.Assertion.convert
     , selectExclude Job.Always Convert.AlwaysKW.convert
     , Convert.Interface.disambiguate
