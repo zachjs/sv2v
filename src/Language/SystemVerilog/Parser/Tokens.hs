@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
 {- sv2v
  - Author: Tom Hawkins <tomahawkins@gmail.com>
  - Modified by: Zachary Snow <zach@zachjs.com>

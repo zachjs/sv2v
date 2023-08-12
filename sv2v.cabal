@@ -120,6 +120,8 @@ executable sv2v
   autogen-modules:
     Paths_sv2v
   ghc-options:
+    -XPatternSynonyms
+    -XTupleSections
     -O3
     -threaded
     -rtsopts

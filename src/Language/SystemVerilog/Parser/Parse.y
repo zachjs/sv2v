@@ -13,7 +13,6 @@
  -}
 {
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE TupleSections #-}
 module Language.SystemVerilog.Parser.Parse (parse) where
 
 import Control.Monad.Except

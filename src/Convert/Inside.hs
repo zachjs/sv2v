@@ -43,8 +43,8 @@ convertExpr (Inside expr valueRanges) =
             BinOp LogAnd
                 (BinOp Le lo expr)
                 (BinOp Ge hi expr)
-        toCheck pattern =
-            BinOp WEq expr pattern
+        toCheck pat =
+            BinOp WEq expr pat
 convertExpr other = other
 
 convertStmt :: Stmt -> Stmt

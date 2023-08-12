@@ -961,19 +961,19 @@ pushChars s p = mapM_ (flip pushChar p) s
 -- search for a pattern in the input and remove remove characters up to and
 -- including the first occurrence of the pattern
 removeThrough :: String -> PPS ()
-removeThrough pattern = do
+removeThrough pat = do
     str <- getInput
-    case findIndex (isPrefixOf pattern) (tails str) of
+    case findIndex (isPrefixOf pat) (tails str) of
         Nothing ->
-            if pattern == "\n"
+            if pat == "\n"
                 then setInput ""
                 else lexicalError $ "Reached EOF while looking for: "
-                        ++ show pattern
+                        ++ show pat
         Just patternIdx -> do
-            let chars = patternIdx + length pattern
+            let chars = patternIdx + length pat
             let (dropped, rest) = splitAt chars str
             advancePositions dropped
-            when (pattern == "\n") $ do
+            when (pat == "\n") $ do
                 pos <- getPosition
                 pushChar '\n' pos
             setInput rest

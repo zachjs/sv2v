@@ -76,10 +76,10 @@ convertExpr scopes (BinOp WEq l r) =
         BinOp BitAnd couldMatch $
         BinOp BitOr  noExtraXZs $
         Number (Based 1 False Binary 0 1)
-    else if numberToInteger pattern /= Nothing then
+    else if numberToInteger pat /= Nothing then
         BinOp Eq l r
     else
-        BinOp Eq (BinOp BitOr l mask) pattern'
+        BinOp Eq (BinOp BitOr l mask) pat'
     where
         lxl = BinOp BitXor l l
         rxr = BinOp BitXor r r
@@ -92,10 +92,10 @@ convertExpr scopes (BinOp WEq l r) =
         lxlxrxr = BinOp BitXor lxl rxr
         -- For wildcard patterns we can find, use masking
         maybePattern = lookupPattern scopes r
-        Just pattern = maybePattern
-        Based size signed base vals knds = pattern
+        Just pat = maybePattern
+        Based size signed base vals knds = pat
         mask = Number $ Based size signed base knds 0
-        pattern' = Number $ Based size signed base (vals .|. knds) 0
+        pat' = Number $ Based size signed base (vals .|. knds) 0
 convertExpr scopes (BinOp WNe l r) =
     UniOp LogNot $
     convertExpr scopes $
