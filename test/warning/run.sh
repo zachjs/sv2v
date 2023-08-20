@@ -1,12 +1,14 @@
 #!/bin/bash
 
 NO_FILES_WARNING="Warning: No input files specified (try \`sv2v --help\`)"
-PACKAGE_WARNING="Warning: Source includes packages but no modules. Please convert packages alongside the modules that use them."
-INTERFACE_WARNING="Warning: Source includes an interface but output is empty because there is no top-level module which has no ports which are interfaces."
+INTERFACE_WARNING="Warning: Source includes an interface but the output is empty because there are no modules without any interface ports. Please convert interfaces alongside the modules that instantiate them."
 PORT_CONN_ATTR_WARNING="attr.sv:6:11: Warning: Ignored port connection attributes (* foo *)(* bar *)."
 
 test_default() {
-    runAndCapture interface.sv module.sv package.sv
+    runAndCapture \
+        interface.sv module.sv \
+        package.sv class.sv \
+        localparam.sv task.sv function.sv
     assertTrue "default conversion should succeed" $result
     assertNotNull "stdout should not be empty" "$stdout"
     assertNull "stderr should be empty" "$stderr"
@@ -26,46 +28,49 @@ test_port_conn_attr() {
     assertEquals "stderr should should have warning" "$PORT_CONN_ATTR_WARNING" "$stderr"
 }
 
-test_only_package() {
-    runAndCapture package.sv
+no_modules_test() {
+    file=$1
+    warning="$2"
+
+    runAndCapture $file
     assertTrue "conversion should succeed" $result
     assertNull "stdout should be empty" "$stdout"
-    assertEquals "stderr should have warning" "$PACKAGE_WARNING" "$stderr"
-}
+    assertEquals "stderr should have warning" "$warning" "$stderr"
 
-test_only_package_verbose() {
-    runAndCapture -v package.sv
+    runAndCapture -v $file
     assertTrue "conversion should succeed" $result
     assertNotNull "stdout should not be empty" "$stdout"
-    assertEquals "stderr should have warning" "$PACKAGE_WARNING" "$stderr"
+    assertEquals "stderr should have warning" "$warning" "$stderr"
 }
 
 test_only_interface() {
-    runAndCapture interface.sv
-    assertTrue "conversion should succeed" $result
-    assertNull "stdout should be empty" "$stdout"
-    assertEquals "stderr should have warning" "$INTERFACE_WARNING" "$stderr"
+    no_modules_test interface.sv "$INTERFACE_WARNING"
 }
 
-test_only_interface_verbose() {
-    runAndCapture -v interface.sv
-    assertTrue "conversion should succeed" $result
-    assertNotNull "stdout should not be empty" "$stdout"
-    assertEquals "stderr should have warning" "$INTERFACE_WARNING" "$stderr"
+basic_no_modules_test() {
+    kind=$1
+    warning="Warning: Source includes a $kind but no modules. Such elements are elaborated into the modules that use them. Please convert all sources in one invocation."
+    no_modules_test $kind.sv "$warning"
+}
+
+test_only_package() {
+    basic_no_modules_test package
+}
+
+test_only_class() {
+    basic_no_modules_test class
+}
+
+test_only_function() {
+    basic_no_modules_test function
+}
+
+test_only_task() {
+    basic_no_modules_test task
 }
 
 test_only_localparam() {
-    runAndCapture localparam.sv
-    assertTrue "conversion should succeed" $result
-    assertNull "stdout should be empty" "$stdout"
-    assertNull "stderr should be empty" "$stderr"
-}
-
-test_only_localparam_verbose() {
-    runAndCapture -v localparam.sv
-    assertTrue "conversion should succeed" $result
-    assertNotNull "stdout should not be empty" "$stdout"
-    assertNull "stderr should be empty" "$stderr"
+    basic_no_modules_test localparam
 }
 
 source ../lib/functions.sh

@@ -10,37 +10,44 @@ import System.FilePath (combine, splitExtension)
 
 import Control.Monad (when, zipWithM_)
 import Control.Monad.Except (runExceptT)
+import Data.List (nub)
 
 import Convert (convert)
 import Job (readJob, Job(..), Write(..))
 import Language.SystemVerilog.AST
 import Language.SystemVerilog.Parser (parseFiles, Config(..))
 
-isInterface :: Description -> Bool
-isInterface (Part _ _ Interface _ _ _ _ ) = True
-isInterface _ = False
-
-isPackage :: Description -> Bool
-isPackage Package{} = True
-isPackage _ = False
-
 isComment :: Description -> Bool
 isComment (PackageItem (Decl CommentDecl{})) = True
 isComment _ = False
 
+droppedKind :: Description -> Identifier
+droppedKind description =
+    case description of
+        Part _ _ Interface _ _ _ _ -> "interface"
+        Package{} -> "package"
+        Class{}   -> "class"
+        PackageItem Function{}     -> "function"
+        PackageItem Task    {}     -> "task"
+        PackageItem (Decl Param{}) -> "localparam"
+        _ -> ""
+
 emptyWarnings :: AST -> AST -> IO ()
 emptyWarnings before after =
-    if all isComment before || not (all isComment after) then
+    if all isComment before || not (all isComment after) || null kinds then
         return ()
-    else if any isInterface before then
-        hPutStrLn stderr $ "Warning: Source includes an interface but output is"
-            ++ " empty because there is no top-level module which has no ports"
-            ++ " which are interfaces."
-    else if any isPackage before then
-        hPutStrLn stderr $ "Warning: Source includes packages but no modules."
-            ++ " Please convert packages alongside the modules that use them."
+    else if elem "interface" kinds then
+        hPutStrLn stderr $ "Warning: Source includes an interface but the"
+            ++ " output is empty because there are no modules without any"
+            ++ " interface ports. Please convert interfaces alongside the"
+            ++ " modules that instantiate them."
     else
-        return ()
+        hPutStrLn stderr $ "Warning: Source includes a " ++ kind ++ " but no"
+            ++ " modules. Such elements are elaborated into the modules that"
+            ++ " use them. Please convert all sources in one invocation."
+    where
+        kinds = nub $ filter (not . null) $ map droppedKind before
+        kind = head kinds
 
 rewritePath :: FilePath -> IO FilePath
 rewritePath path = do
