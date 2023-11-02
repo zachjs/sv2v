@@ -786,8 +786,6 @@ traverseExprIdentsM :: Monad m => MapperM m Identifier -> MapperM m Expr
 traverseExprIdentsM identMapper = fullMapper
     where
         fullMapper = exprMapper >=> traverseSinglyNestedExprsM fullMapper
-        exprMapper (Call (Ident x) args) =
-            identMapper x >>= \x' -> return $ Call (Ident x') args
         exprMapper (Ident x) = identMapper x >>= return . Ident
         exprMapper other = return other
 
@@ -813,14 +811,9 @@ traverseLHSIdentsM identMapper = fullMapper
 
 -- visits all identifiers in a statement
 traverseStmtIdentsM :: Monad m => MapperM m Identifier -> MapperM m Stmt
-traverseStmtIdentsM identMapper = fullMapper
-    where
-        fullMapper = stmtMapper
-            >=> traverseStmtExprsM (traverseExprIdentsM identMapper)
-            >=> traverseStmtLHSsM  (traverseLHSIdentsM  identMapper)
-        stmtMapper (Subroutine (Ident x) args) =
-            identMapper x >>= \x' -> return $ Subroutine (Ident x') args
-        stmtMapper other = return other
+traverseStmtIdentsM identMapper =
+    traverseStmtExprsM (traverseExprIdentsM identMapper) >=>
+    traverseStmtLHSsM  (traverseLHSIdentsM  identMapper)
 
 -- visits all identifiers in a declaration
 traverseDeclIdentsM :: Monad m => MapperM m Identifier -> MapperM m Decl
