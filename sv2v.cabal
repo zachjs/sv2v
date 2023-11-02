@@ -119,9 +119,10 @@ executable sv2v
     Paths_sv2v
   autogen-modules:
     Paths_sv2v
+  extensions:
+    PatternSynonyms
+    TupleSections
   ghc-options:
-    -XPatternSynonyms
-    -XTupleSections
     -O3
     -threaded
     -rtsopts
