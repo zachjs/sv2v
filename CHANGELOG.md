@@ -18,6 +18,7 @@
 * Fixed failure to resolve typenames suffixed with dimensions in contexts
   permitting both types and expressions, e.g., `$bits(T[W-1:0])`
 * Fixed errant constant folding of shadowed non-trivial localparams
+* Fixed conversion of function calls with no arguments passed to other functions
 * Fixed certain non-ANSI style port declarations being incorrectly reported as
   incompatible
 

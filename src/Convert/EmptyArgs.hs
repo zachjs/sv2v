@@ -64,7 +64,8 @@ traverseStmt = traverseStmtExprsM traverseExpr
 traverseExpr :: Expr -> SC Expr
 traverseExpr (Call func (Args args [])) = do
     details <- lookupElemM $ Dot func dummyIdent
-    let args' = if details /= Nothing
+    args' <- mapM traverseExpr $
+                if details /= Nothing
                     then RawNum 0 : args
                     else args
     return $ Call func (Args args' [])
