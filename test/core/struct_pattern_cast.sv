@@ -29,4 +29,20 @@ module top;
         $display("$bits(a.z.x) = %0d", $bits(a.z.x));
         $display("$bits(a.z.y) = %0d", $bits(a.z.y));
     end
+
+    typedef struct packed {
+        logic x;
+    } U;
+    initial begin
+        case (U'(0))
+            U'(0): $display("1");
+        endcase
+        if (U'(1))
+            $display("2");
+        case (U'{x: 0})
+            U'{x: 0}: $display("3");
+        endcase
+        if (U'{x: 1})
+            $display("4");
+    end
 endmodule

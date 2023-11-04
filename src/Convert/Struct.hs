@@ -495,8 +495,11 @@ convertSubExpr scopes (Call e args) =
         (retType, _) = fallbackType scopes e
         args' = convertCall scopes e args
 convertSubExpr scopes (Cast (Left t) e) =
-    (t, Cast (Left t) e')
-    where (_, e') = convertSubExpr scopes e
+    (t', Cast (Left t') e')
+    where
+        e' = convertExpr scopes t $ snd $ convertSubExpr scopes e
+        t' = convertType t
+
 convertSubExpr scopes (Pattern items) =
     if all (== Right Nil) $ map fst items'
         then (UnknownType, Concat $ map snd items')

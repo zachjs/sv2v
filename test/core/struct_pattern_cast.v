@@ -17,4 +17,11 @@ module top;
         $display("$bits(a.z.x) = %0d", 32);
         $display("$bits(a.z.y) = %0d", 8);
     end
+
+    initial begin
+        $display("1");
+        $display("2");
+        $display("3");
+        $display("4");
+    end
 endmodule
