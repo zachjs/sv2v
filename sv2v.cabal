@@ -119,7 +119,7 @@ executable sv2v
     Paths_sv2v
   autogen-modules:
     Paths_sv2v
-  extensions:
+  default-extensions:
     PatternSynonyms
     TupleSections
   ghc-options:
