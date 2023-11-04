@@ -15,6 +15,8 @@
 * Fixed an issue that prevented parsing tasks and functions with `inout` ports
 * Fixed conflicting genvar names when inlining interfaces and modules that use
   them; all genvars are now given a design-wide unique name
+* Fixed non-typenames (e.g., from packages or subsequent declarations)
+  improperly shadowing the names of `struct` pattern fields
 * Fixed failure to resolve typenames suffixed with dimensions in contexts
   permitting both types and expressions, e.g., `$bits(T[W-1:0])`
 * Fixed errant constant folding of shadowed non-trivial localparams

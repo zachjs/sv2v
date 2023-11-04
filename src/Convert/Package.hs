@@ -25,6 +25,7 @@ module Convert.Package
 
 import Control.Monad.State.Strict
 import Control.Monad.Writer.Strict
+import Data.Functor ((<&>))
 import Data.List (insert, intercalate, isPrefixOf)
 import Data.Maybe (mapMaybe)
 import qualified Data.Map.Strict as Map
@@ -261,6 +262,9 @@ explicitImport pkg ident = do
                             ++ " conflicts with prior import of "
                             ++ otherPkg ++ "::" ++ ident
 
+pattern PatternTag :: Char
+pattern PatternTag = '*'
+
 -- main logic responsible for translating packages, resolving imports and
 -- exports, and rewriting identifiers referring to package declarations
 processItems :: Identifier -> Identifier -> [ModuleItem]
@@ -366,7 +370,10 @@ processItems topName packageName moduleItems = do
                 Variable d t x a e -> declHelp x $ \x' -> Variable d t x' a e
                 Net  d n s t x a e -> declHelp x $ \x' -> Net  d n s t x' a e
                 Param    p t x   e -> declHelp x $ \x' -> Param    p t x'   e
-                ParamType  p x   t -> declHelp x $ \x' -> ParamType  p x'   t
+                ParamType  p x   t ->
+                    -- make this typename available for use in patterns
+                    prefixIdent (PatternTag : x) >>
+                    declHelp x (\x' -> ParamType p x' t)
                 CommentDecl c -> return $ CommentDecl c
             where declHelp x f = prefixIdent x >>= return . f
 
@@ -409,9 +416,24 @@ processItems topName packageName moduleItems = do
             x' <- resolvePSIdent' p x
             return $ Ident x'
         traverseExprM (Ident x) = resolveIdent x >>= return . Ident
+        traverseExprM (Pattern items) = do
+            keys' <- mapM keyMapper keys
+            vals' <- mapM traverseExprM vals
+            return $ Pattern $ zip keys' vals'
+            where (keys, vals) = unzip items
         traverseExprM other =
             traverseSinglyNestedExprsM traverseExprM other
             >>= traverseExprTypesM traverseTypeM
+
+        -- equivalent to the special case in traverseExprIdentsM
+        keyMapper (Left t) =
+            traverseTypeM t <&> Left
+        keyMapper (Right (Ident x)) = do
+            tagged' <- traverseExprM $ Ident $ PatternTag : x
+            let Ident x' = tagged'
+            return $ Right $ Ident $ filter (/= PatternTag) x'
+        keyMapper (Right e) =
+            traverseExprM e <&> Right
 
         traverseLHSM :: LHS -> Scope LHS
         traverseLHSM (LHSIdent x) = resolveIdent x >>= return . LHSIdent
@@ -783,11 +805,28 @@ traverseIdentsM identMapper = traverseNodesM
 
 -- visits all identifiers in an expression
 traverseExprIdentsM :: Monad m => MapperM m Identifier -> MapperM m Expr
-traverseExprIdentsM identMapper = fullMapper
+traverseExprIdentsM identMapper = exprMapper
     where
-        fullMapper = exprMapper >=> traverseSinglyNestedExprsM fullMapper
         exprMapper (Ident x) = identMapper x >>= return . Ident
-        exprMapper other = return other
+        exprMapper (Pattern items) = do
+            keys' <- mapM keyMapper keys
+            vals' <- mapM exprMapper vals
+            return $ Pattern $ zip keys' vals'
+            where (keys, vals) = unzip items
+        exprMapper other =
+            traverseExprTypesM (traverseTypeIdentsM identMapper) other >>=
+            traverseSinglyNestedExprsM exprMapper
+
+        -- Don't reorder or inject a pattern key unless it refers to a known
+        -- typename. TODO: This prevents referring to expressions in packages in
+        -- pattern keys, though this probably isn't common.
+        keyMapper (Left t) =
+            traverseTypeIdentsM identMapper t <&> Left
+        keyMapper (Right (Ident x)) =
+            identMapper (PatternTag : x)
+                <&> filter (/= PatternTag) <&> Ident <&> Right
+        keyMapper (Right e) =
+            exprMapper e <&> Right
 
 -- visits all identifiers in a type
 traverseTypeIdentsM :: Monad m => MapperM m Identifier -> MapperM m Type
@@ -830,7 +869,7 @@ piNames (Task     _   ident _ _) = [ident]
 piNames (Decl (Variable _ _ ident _ _)) = [ident]
 piNames (Decl (Net  _ _ _ _ ident _ _)) = [ident]
 piNames (Decl (Param    _ _ ident   _)) = [ident]
-piNames (Decl (ParamType  _ ident   _)) = [ident]
+piNames (Decl (ParamType  _ ident   _)) = [ident, PatternTag : ident]
 piNames (Decl (CommentDecl          _)) = []
 piNames item@DPIImport{} = [show item]
 piNames item@DPIExport{} = [show item]
