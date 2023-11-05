@@ -50,21 +50,22 @@ convertDescription other = other
 -- collects and converts declarations with multiple packed dimensions
 traverseDeclM :: Decl -> Scoper TypeInfo Decl
 traverseDeclM (Variable dir t ident a e) = do
-    t' <- traverseTypeM t a ident
+    recordTypeM t a ident
     traverseDeclExprsM traverseExprM $ Variable dir t' ident a e
+    where t' = flattenType t
 traverseDeclM net@Net{} =
     traverseNetAsVarM traverseDeclM net
 traverseDeclM (Param s t ident e) = do
-    t' <- traverseTypeM t [] ident
+    recordTypeM t [] ident
     traverseDeclExprsM traverseExprM $ Param s t' ident e
+    where t' = flattenType t
 traverseDeclM other = traverseDeclExprsM traverseExprM other
 
--- write down the given declaration and then flatten it
-traverseTypeM :: Type -> [Range] -> Identifier -> Scoper TypeInfo Type
-traverseTypeM t a ident = do
+-- write down the given declaration
+recordTypeM :: Type -> [Range] -> Identifier -> Scoper TypeInfo ()
+recordTypeM t a ident = do
     tScoped <- scopeType t
     insertElem ident (tScoped, a)
-    return $ flattenType t
 
 -- flatten the innermost dimension of the given type, and any types it contains
 flattenType :: Type -> Type
@@ -132,7 +133,20 @@ traverseStmtM =
     traverseStmtExprsM traverseExprM
 
 traverseExprM :: Expr -> Scoper TypeInfo Expr
-traverseExprM = traverseNestedExprsM convertExprM
+traverseExprM =
+    embedScopes convertExpr >=>
+    traverseExprTypesM traverseTypeM >=>
+    traverseSinglyNestedExprsM traverseExprM
+
+traverseTypeM :: Type -> Scoper TypeInfo Type
+traverseTypeM typ =
+    traverseTypeExprsM traverseExprM >=>
+    traverseSinglyNestedTypesM traverseTypeM $
+    case typ of
+        Struct{} -> typ'
+        Union {} -> typ'
+        _ -> typ
+    where typ' = traverseSinglyNestedTypes flattenType typ
 
 traverseGenItemM :: GenItem -> Scoper TypeInfo GenItem
 traverseGenItemM = traverseGenItemExprsM traverseExprM
@@ -147,19 +161,9 @@ traverseLHSM = traverseNestedLHSsM traverseLHSSingleM
         traverseLHSSingleM :: LHS -> Scoper TypeInfo LHS
         traverseLHSSingleM lhs = do
             let expr = lhsToExpr lhs
-            expr' <- convertExprM expr
+            expr' <- embedScopes convertExpr expr
             let Just lhs' = exprToLHS expr'
             return lhs'
-
-convertExprM :: Expr -> Scoper TypeInfo Expr
-convertExprM =
-    traverseExprTypesM convertTypeM >=>
-    embedScopes convertExpr
-
-convertTypeM :: Type -> Scoper TypeInfo Type
-convertTypeM =
-    traverseNestedTypesM $ traverseTypeExprsM $
-    traverseNestedExprsM convertExprM
 
 convertExpr :: Scopes TypeInfo -> Expr -> Expr
 convertExpr scopes =
