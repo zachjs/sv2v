@@ -168,8 +168,16 @@ rewriteDeclM locations (Variable d (IntegerVector TLogic sg rs) x a e) = do
             let t' = Implicit sg rs
             insertElem accesses t'
             return $ Net d TWire DefaultStrength t' x a e
-rewriteDeclM _ decl@(Variable _ t x _ _) =
-    insertElem x t >> return decl
+rewriteDeclM locations decl@(Variable d t x a e) = do
+    inProcedure <- withinProcedureM
+    case (d, t, inProcedure) of
+        -- Reinterpret `input reg` module ports as `input logic`. We still don't
+        -- treat `logic` and `reg` as the same keyword, as specifying `reg`
+        -- explicitly is typically expected to flow downstream.
+        (Input, IntegerVector TReg sg rs, False) ->
+            rewriteDeclM locations $ Variable Input t' x a e
+            where t' = IntegerVector TLogic sg rs
+        _ -> insertElem x t >> return decl
 rewriteDeclM _ (Net d n s (IntegerVector _ sg rs) x a e) =
     insertElem x t >> return (Net d n s t x a e)
     where t = Implicit sg rs

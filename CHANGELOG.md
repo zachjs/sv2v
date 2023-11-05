@@ -30,6 +30,7 @@
 
 * Added error checking for unresolved typenames
 * Added constant folding for `||` and `&&`
+* `input reg` module ports are now converted to `input wire`
 
 ## v0.0.11
 
