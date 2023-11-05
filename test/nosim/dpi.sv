@@ -1,5 +1,7 @@
 module top;
 
+export "DPI-C" task t;
+
 /* From IEEE 1800-2017 Section 35.4 */
 
 export "DPI-C" f_plus = function \f+ ; // "f+" exported as "f_plus"

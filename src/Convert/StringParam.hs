@@ -52,7 +52,7 @@ traverseDescriptionM other = return other
 
 -- utility pattern for candidate string parameter items
 pattern StringParam :: Identifier -> String -> ModuleItem
-pattern StringParam x s =
+pattern StringParam x s <-
     MIPackageItem (Decl (Param Parameter UnknownType x (String s)))
 
 -- write down which parameters may be variable-length strings
