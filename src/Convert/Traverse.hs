@@ -256,6 +256,7 @@ traverseSinglyNestedStmtsM fullMapper = cs
         cs (Subroutine expr exprs) = return $ Subroutine expr exprs
         cs (Trigger blocks x) = return $ Trigger blocks x
         cs stmt@Force{} = return stmt
+        cs (Wait e stmt) = fullMapper stmt >>= return . Wait e
         cs (Assertion a) =
             traverseAssertionStmtsM fullMapper a >>= return . Assertion
         cs (Continue) = return Continue
@@ -710,6 +711,8 @@ traverseStmtExprsM exprMapper = flatStmtMapper
         l' <- lhsMapper l
         e' <- exprMapper e
         return $ Force kw l' e'
+    flatStmtMapper (Wait e stmt) =
+        exprMapper e >>= \e' -> return $ Wait e' stmt
     flatStmtMapper (Assertion a) =
         traverseAssertionExprsM exprMapper a >>= return . Assertion
     flatStmtMapper (Continue) = return Continue

@@ -9,6 +9,7 @@
 
 * Added support for attributes in unary, binary, and ternary expressions
 * Added support for shadowing interface names with local typenames
+* Added support for passing through `wait` statements
 
 ### Bug Fixes
 

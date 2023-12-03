@@ -1149,6 +1149,7 @@ StmtNonBlock :: { Stmt }
   | "deassign" LHS          ";"                { Force False $2 Nil }
   | "force"    LHS "=" Expr ";"                { Force True  $2  $4 }
   | "release"  LHS          ";"                { Force True  $2 Nil }
+  | "wait" "(" Expr ")" Stmt                   { Wait $3 $5 }
 
 OptDelayOrEvent :: { Maybe Timing }
   : DelayOrEvent { Just $1 }

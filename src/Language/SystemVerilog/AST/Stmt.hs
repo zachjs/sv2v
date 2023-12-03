@@ -53,6 +53,7 @@ data Stmt
     | Trigger Bool Identifier
     | Assertion Assertion
     | Force Bool LHS Expr
+    | Wait Expr Stmt
     | Continue
     | Break
     | Null
@@ -106,6 +107,7 @@ instance Show Stmt where
                 (True , False) -> "release"
                 (False, True ) -> "assign"
                 (False, False) -> "deassign"
+    show (Wait      e s) = printf "wait (%s)%s" (show e) (showShortBranch s)
     show (Continue     ) = "continue;"
     show (Break        ) = "break;"
     show (Null         ) = ";"
