@@ -288,9 +288,7 @@ stringToNumber str =
 
 -- convert a string to big integer
 stringToInteger :: String -> Integer
-stringToInteger [] = 0
-stringToInteger (x : xs) =
-    fromIntegral (ord x) + (256 :: Integer) * stringToInteger xs
+stringToInteger = foldl ((+) . (256 *)) 0 . map (fromIntegral . ord)
 
 -- cast string to number at least as big as the width of the given number
 sizeStringAs :: String -> Number -> Expr

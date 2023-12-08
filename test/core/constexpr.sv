@@ -1,8 +1,12 @@
 // This verifies that sv2v can evaluate certain constant expressions by
 // producing iverilog-incompatible code if the expression cannot be simplified
 // or is evaluated incorrectly.
-`define ASSERT_TRUE(expr) if (expr) begin end else begin shortreal x; end
-`define ASSERT_FALSE(expr) if (expr) begin shortreal x; end
+`define ASSERT_FALSE(expr) \
+    if (expr) begin \
+        initial $display("fail"); \
+        shortreal x; \
+    end
+`define ASSERT_TRUE(expr) `ASSERT_FALSE(!(expr))
 
 module top;
     `ASSERT_TRUE(1)
@@ -19,8 +23,8 @@ module top;
     `ASSERT_TRUE("invv" != "inv")
     `ASSERT_TRUE("0inv" != "inv")
 
-    `ASSERT_TRUE(24'("inv0") == "inv")
-    `ASSERT_TRUE(24'("0inv") != "inv")
+    `ASSERT_TRUE(24'("inv0") != "inv")
+    `ASSERT_TRUE(24'("0inv") == "inv")
     `ASSERT_FALSE("inv" == 0)
     `ASSERT_FALSE("inv" == '0)
     `ASSERT_FALSE('0 == "inv")

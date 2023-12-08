@@ -16,6 +16,7 @@
 * Fixed an issue that prevented parsing tasks and functions with `inout` ports
 * Fixed conflicting genvar names when inlining interfaces and modules that use
   them; all genvars are now given a design-wide unique name
+* Fixed byte order of strings in size casts
 * Fixed unconverted structs within explicit type casts
 * Fixed unconverted multidimensional struct fields within dimension queries
 * Fixed non-typenames (e.g., from packages or subsequent declarations)
