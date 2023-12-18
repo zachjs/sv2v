@@ -141,4 +141,23 @@ module top;
         #1 in = 24'h12E3B8;
     end
 
+    function automatic [31:0] reverse;
+        input [31:0] inp;
+        integer i;
+        for (i = 0; i < 32; i = i + 1)
+            reverse[i] = inp[31 - i];
+    endfunction
+
+    wire [31:0] mux1, mux2, mux3;
+    reg [31:0] mux4, mux5, mux6;
+    initial $monitor("%b %b %b %b %b %b", mux1, mux2, mux3, mux4, mux5, mux6);
+    assign mux1 = i ? reverse(in) : 32'b0;
+    assign mux2 = i ? in << 8 : reverse(in);
+    assign mux3 = i ? reverse(in) : reverse(m);
+    always @* begin
+        mux4 = i ? reverse(in) : 32'b0;
+        mux5 = i ? in << 8 : reverse(in);
+        mux6 = i ? reverse(in) : reverse(m);
+    end
+
 endmodule

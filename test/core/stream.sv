@@ -124,4 +124,15 @@ module top;
         #1 in = 24'h12E3B8;
     end
 
+    logic [31:0] mux1, mux2, mux3, mux4, mux5, mux6;
+    initial $monitor("%b %b %b %b %b %b", mux1, mux2, mux3, mux4, mux5, mux6);
+    assign mux1 = i ? {<<1 {in}} : 32'b0;
+    assign mux2 = i ? {>>1 {in}} : {<<1 {in}};
+    assign mux3 = i ? {<<1 {in}} : {<<1 {m}};
+    always @* begin
+        mux4 = i ? {<<1 {in}} : 32'b0;
+        mux5 = i ? {>>1 {in}} : {<<1 {in}};
+        mux6 = i ? {<<1 {in}} : {<<1 {m}};
+    end
+
 endmodule

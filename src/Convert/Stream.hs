@@ -47,7 +47,7 @@ traverseModuleItemM :: ModuleItem -> Scoper () ModuleItem
 traverseModuleItemM (Assign opt lhs (Stream StreamL chunk exprs)) =
     injectItem (MIPackageItem func) >> return (Assign opt lhs expr')
     where
-        fnName = streamerFuncName $ shortHash lhs
+        fnName = streamerFuncName $ shortHash (lhs, chunk, exprs)
         t = TypeOf $ lhsToExpr lhs
         arg = Concat exprs
         func = streamerFunc fnName chunk (TypeOf arg) t
@@ -56,11 +56,24 @@ traverseModuleItemM (Assign opt (LHSStream StreamL chunk lhss) expr) =
     traverseModuleItemM $
         Assign opt (LHSConcat lhss)
         (Stream StreamL chunk [expr])
+traverseModuleItemM (Assign opt lhs (Mux cond expr@Stream{} other)) = do
+    (lhs', expr') <- indirectAssign lhs expr
+    return $ Assign opt lhs' $ Mux cond expr' other
+traverseModuleItemM (Assign opt lhs (Mux cond other expr@Stream{})) = do
+    (lhs', expr') <- indirectAssign lhs expr
+    return $ Assign opt lhs' $ Mux cond other expr'
 traverseModuleItemM (Assign opt lhs expr) =
     traverseExprM expr' >>= return . Assign opt lhs'
     where Asgn AsgnOpEq Nothing lhs' expr' =
             traverseAsgn (lhs, expr) (Asgn AsgnOpEq Nothing)
 traverseModuleItemM item = return item
+
+indirectAssign :: LHS -> Expr -> Scoper () (LHS, Expr)
+indirectAssign lhs expr = do
+    let item = Assign AssignOptionNone lhs expr
+    item' <- traverseModuleItemM item
+    let Assign AssignOptionNone lhs' expr' = item'
+    return (lhs', expr')
 
 traverseStmtM :: Stmt -> Scoper () Stmt
 traverseStmtM (Subroutine fn (Args args [])) = do
@@ -190,6 +203,12 @@ traverseAsgn (LHSStream StreamL chunk lhss, expr) constructor =
         lhs = LHSConcat lhss
         lhsSize = sizeof $ lhsToExpr lhs
         exprSize = sizeof expr
+traverseAsgn (lhs, Mux cond e1@Stream{} e2) constructor =
+    traverseAsgn (lhs, e1) constructor'
+    where constructor' lhs' e1' = constructor lhs' $ Mux cond e1' e2
+traverseAsgn (lhs, Mux cond e1 e2@Stream{}) constructor =
+    traverseAsgn (lhs, e2) constructor'
+    where constructor' lhs' e2' = constructor lhs' $ Mux cond e1 e2'
 traverseAsgn (lhs, expr) constructor =
     constructor lhs expr
 
