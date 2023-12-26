@@ -4,6 +4,7 @@ module mod(
 );
     localparam Y = 2;
     localparam X = 10000;
+    reg start;
 
 `define TEST(expr, trigger, extra) \
     if (1) begin \
@@ -40,4 +41,6 @@ parameter FOUR = 4;
     `TEST(data[THREE], data[3], )
     `TEST(data[ignored], data, )
     `TEST(data[THREE], data[0] or data[3], & data[0])
+
+    initial start = 0;
 endmodule

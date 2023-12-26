@@ -39,6 +39,8 @@ module mod(
         o = i;
     endtask
 
+    logic start;
+
     always_comb
         t(out1);
     always_comb
@@ -82,4 +84,6 @@ module mod(
     endfunction
     always_comb
         asgn(.i(i(ZERO)), .o(outC));
+
+    initial start = 0;
 endmodule

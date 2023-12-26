@@ -34,7 +34,7 @@ simulate() {
     $sim_prog -no-date > $sim_log
     assertTrue "simulating $1 failed" $?
     # remove parameters from the VCD if present
-    if grep "var parameter" $sim_vcd_tmp > /dev/null; then
+    if grep -E "var parameter| _sv2v_0 " $sim_vcd_tmp > /dev/null; then
         $SCRIPT_DIR/clean_vcd.py < $sim_vcd_tmp > $sim_vcd
     elif [ $sim_vcd != "/dev/null" ]; then
         mv -f $sim_vcd_tmp $sim_vcd

@@ -5,9 +5,9 @@
  -
  - `always_comb` and `always_latch` become `always @*`, or produce an explicit
  - sensitivity list if they need to pick up sensitivities from the functions
- - they call. `always_ff` simply becomes `always`.
- -
- - TODO: `always_comb` blocks do not run at time zero
+ - they call. These blocks are triggered at time zero by adding a no-op
+ - statement reading from `_sv2v_0`, which is injected and updated in an
+ - `initial` block. `always_ff` simply becomes `always`.
  -}
 
 module Convert.AlwaysKW (convert) where
@@ -24,9 +24,15 @@ convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions traverseDescription
 
 traverseDescription :: Description -> Description
-traverseDescription description@Part{} =
-    evalState (evalScoperT $ scopePart op description) mempty
-    where op = traverseModuleItem >=> scoper
+traverseDescription (Part att ext kw lif name pts items) =
+    Part att ext kw lif name pts $
+    if getAny anys && not (elem triggerDecl items')
+        then triggerDecl : items' ++ [triggerFire]
+        else items'
+    where
+        op = traverseModuleItem >=> scoper
+        (items', (anys, _)) = flip runState mempty $ evalScoperT $
+            insertElem triggerIdent Var >> scopeModuleItems op name items
 traverseDescription description = description
 
 type SC = ScoperT Kind (State (Any, [Expr]))
@@ -182,12 +188,13 @@ push x = lift $ modify' (x <>)
 -- custom traversal which converts SystemVerilog `always` keywords and tracks
 -- information about task and functions
 traverseModuleItem :: ModuleItem -> SC ModuleItem
-traverseModuleItem (AlwaysC AlwaysLatch stmt) = do
-    e <- fmap toEvent $ findNonLocals $ Initial stmt
-    return $ AlwaysC Always $ Timing (Event e) stmt
+traverseModuleItem (AlwaysC AlwaysLatch stmt) =
+    traverseModuleItem $ AlwaysC AlwaysComb stmt
 traverseModuleItem (AlwaysC AlwaysComb stmt) = do
-    e <- fmap toEvent $ findNonLocals $ Initial stmt
-    return $ AlwaysC Always $ Timing (Event e) stmt
+    push (Any True, [])
+    e <- fmap toEvent $ findNonLocals $ Initial stmt'
+    return $ AlwaysC Always $ Timing (Event e) stmt'
+    where stmt' = addTriggerStmt stmt
 traverseModuleItem (AlwaysC AlwaysFF stmt) =
     return $ AlwaysC Always stmt
 traverseModuleItem item@(MIPackageItem (Function _ _ x decls _)) = do
@@ -220,8 +227,28 @@ port _ = ("", Local)
 findNonLocals :: ModuleItem -> SC (Bool, [Expr])
 findNonLocals item = do
     scopes <- get
+    prev <- lift get
     lift $ put mempty
     _ <- scoper item
     (anys, exprs) <- lift get
+    lift $ put prev
     let nonLocals = mapMaybe (longestStaticPrefix scopes) exprs
     return (getAny anys, nonLocals)
+
+triggerIdent :: Identifier
+triggerIdent = "_sv2v_0"
+
+triggerDecl :: ModuleItem
+triggerDecl = MIPackageItem $ Decl $ Variable Local t triggerIdent [] Nil
+    where t = IntegerVector TReg Unspecified []
+
+triggerFire :: ModuleItem
+triggerFire = Initial $ Asgn AsgnOpEq Nothing (LHSIdent triggerIdent) (RawNum 0)
+
+triggerStmt :: Stmt
+triggerStmt = If NoCheck (Ident triggerIdent) Null Null
+
+addTriggerStmt :: Stmt -> Stmt
+addTriggerStmt (Block Seq name decls stmts) =
+    Block Seq name decls $ triggerStmt : stmts
+addTriggerStmt stmt = Block Seq "" [] [triggerStmt, stmt]

@@ -31,6 +31,7 @@
 
 ### Other Enhancements
 
+* `always_comb` and `always_latch` now reliably execute at time zero
 * Added error checking for unresolved typenames
 * Added constant folding for `||` and `&&`
 * `input reg` module ports are now converted to `input wire`

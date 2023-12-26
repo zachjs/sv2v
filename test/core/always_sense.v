@@ -39,17 +39,19 @@ module mod(
         o = i;
     endtask
 
+    reg start;
+
     always @*
         t(out1);
     always @(inp2)
         out2 = f(ZERO);
-    always @(inp1, inp2)
+    always @(start, inp1, inp2)
         out3 = f(ZERO) & inp1;
-    always @(inp1, inp2)
+    always @(start, inp1, inp2)
         out4 = g(ZERO);
     always @*
         out5 = flip(inp1);
-    always @(inp1, inp2) begin : blk
+    always @(start, inp1, inp2) begin : blk
         reg x;
         x = g(ZERO);
         out6 = x;
@@ -58,11 +60,11 @@ module mod(
         u(out7);
     parameter ONE = 1;
     if (ONE)
-        always @(inp1, inp2) begin
+        always @(start, inp1, inp2) begin
             asgn(out8, flip(inp1));
             out9 = f(ZERO);
         end
-    always @(inp1, inp2)
+    always @(start, inp1, inp2)
         if (inp1)
             outA = f(ZERO);
 
@@ -80,4 +82,6 @@ module mod(
     endfunction
     always @(s[1])
         asgn(outC, i(ZERO));
+
+    initial start = 0;
 endmodule

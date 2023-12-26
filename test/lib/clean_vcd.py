@@ -13,7 +13,7 @@ if __name__ == "__main__":
         # Find and drop dumped parameters.
         if line.startswith("$var "):
             parts = line.split()
-            should_drop = parts[1] == "parameter"
+            should_drop = parts[1] == "parameter" or parts[4] == "_sv2v_0"
             if not should_drop and not pending:
                 print(line, end="")
                 continue

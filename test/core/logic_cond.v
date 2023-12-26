@@ -4,8 +4,11 @@ module Example(inp, out);
     input wire inp;
     output reg out;
     generate
-        if (ENABLED)
-            always @* out = inp;
+        if (ENABLED) begin
+            reg start;
+            always @(inp, start) out = inp;
+            initial start = 0;
+        end
         else
             initial out = DEFAULT;
     endgenerate
