@@ -1,0 +1,4 @@
+affirm | (|
+affirm & (&
+reject | |
+reject & &

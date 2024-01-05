@@ -121,7 +121,10 @@ instance Show Expr where
         shows o .
         showChar ' ' .
         showsAttrs a .
-        showBinOpPrec r
+        case (o, r) of
+            (BitAnd, UniOp RedAnd _) -> showExprWrapped r
+            (BitOr , UniOp RedOr  _) -> showExprWrapped r
+            _ -> showBinOpPrec r
     showsPrec _ (Dot      e n  ) =
         shows e .
         showChar '.' .
@@ -202,13 +205,16 @@ showRange :: Range -> String
 showRange (h, l) = '[' : show h ++ ':' : show l ++ "]"
 
 showUniOpPrec :: Expr -> ShowS
-showUniOpPrec e@UniOp{} = (showParen True . shows) e
-showUniOpPrec e@BinOp{} = (showParen True . shows) e
+showUniOpPrec e@UniOp{} = showExprWrapped e
+showUniOpPrec e@BinOp{} = showExprWrapped e
 showUniOpPrec e = shows e
 
 showBinOpPrec :: Expr -> ShowS
-showBinOpPrec e@BinOp{} = (showParen True . shows) e
+showBinOpPrec e@BinOp{} = showExprWrapped e
 showBinOpPrec e = shows e
+
+showExprWrapped :: Expr -> ShowS
+showExprWrapped = showParen True . shows
 
 type ParamBinding = (Identifier, TypeOrExpr)
 

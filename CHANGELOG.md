@@ -35,6 +35,7 @@
 * Added error checking for unresolved typenames
 * Added constant folding for `||` and `&&`
 * `input reg` module ports are now converted to `input wire`
+* `x | |y` and `x & &y` are now output as `x | (|y)` and `x & (&y)`
 
 ## v0.0.11
 
