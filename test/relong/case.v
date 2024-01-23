@@ -23,6 +23,7 @@ module UniqueCase(
     always @* begin
         data = 4'b0;
         // Unique keyword doesn't exist in Verilog
+        (* synthesis, parallel_case *)
         case(select)
             2'd0: data = 4'ha;
             2'd1: data = 4'h6;
@@ -41,6 +42,7 @@ module WildcardCase(
         data = 4'b0;
         // Unique keyword doesn't exist in Verilog
         // casez doesn't exist in VTR, so manually elaborating it
+        (* synthesis, parallel_case *)
         case(select) // casez
             2'b00: data = 4'h3;
             // 2'b1?: data = 4'hd;

@@ -18,6 +18,7 @@ module FSM(
 
     always @* begin
         nextState = currentState;
+        (* synthesis, parallel_case *)
         case(currentState)
             S_A: nextState = a ? S_B : S_C;
             S_B: nextState = a ? S_A : S_B;
@@ -27,6 +28,7 @@ module FSM(
 
     always @* begin
         x = 1'b0;
+        (* synthesis, parallel_case *)
         case(currentState)
             S_A: x = ~a;
             S_B: x = 1'b1;

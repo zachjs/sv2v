@@ -21,6 +21,23 @@ convert =
 convertStmt :: Stmt -> Stmt
 convertStmt (If _ cc s1 s2) =
     If NoCheck cc s1 s2
+
+convertStmt (Case Priority kw expr cases) =
+    StmtAttr caseAttr caseStmt
+    where
+        caseAttr = Attr [("synthesis", Nil), ("full_case", Nil)]
+        caseStmt = Case NoCheck kw expr cases
+
+convertStmt (Case Unique kw expr cases) =
+    StmtAttr caseAttr caseStmt
+    where
+        caseAttr = Attr [("synthesis", Nil), ("parallel_case", Nil)]
+        caseStmt = Case NoCheck kw expr cases
+
+convertStmt (Case Unique0 kw expr cases) =
+    convertStmt (Case Unique kw expr cases)
+
 convertStmt (Case _ kw expr cases) =
     Case NoCheck kw expr cases
+
 convertStmt other = other
