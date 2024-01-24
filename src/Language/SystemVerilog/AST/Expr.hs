@@ -138,6 +138,8 @@ instance Show Expr where
         showString " : " .
         shows f .
         showChar ')'
+    showsPrec _ (Call     e (Args [] [])) =
+        shows e
     showsPrec _ (Call     e l  ) =
         shows e .
         shows l
