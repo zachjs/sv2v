@@ -12,10 +12,12 @@ module top;
 		$display;
 		$write("[%0t] Error: ", $time);
 		$display("%b", 3);
+		$display("[%0t] Fatal:", $time);
+		$finish;
 		$write("[%0t] Fatal: ", $time);
 		$display;
-		$finish;
-		$write("Fatal:");
+		$finish(0);
+		$write("[%0t] Fatal: ", $time);
 		$display("%b", 4);
 		$finish(0);
 	end
