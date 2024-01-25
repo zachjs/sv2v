@@ -24,7 +24,7 @@ module Language.SystemVerilog.AST.Expr
     , pattern Mux
     ) where
 
-import Data.List (intercalate)
+import Data.List (intercalate, isPrefixOf)
 import Text.Printf (printf)
 
 import Language.SystemVerilog.AST.Number (Number(..))
@@ -138,8 +138,8 @@ instance Show Expr where
         showString " : " .
         shows f .
         showChar ')'
-    showsPrec _ (Call     e (Args [] [])) =
-        shows e
+    showsPrec _ (Call (Ident e) (Args [] [])) | "$" `isPrefixOf` e =
+        shows (Ident e)
     showsPrec _ (Call     e l  ) =
         shows e .
         shows l
