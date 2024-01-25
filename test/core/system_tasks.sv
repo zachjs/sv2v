@@ -7,6 +7,7 @@ module top;
         $error;
         $error("%b", 3);
         $fatal;
+        $fatal(0);
         $fatal(0, "%b", 4);
     end
 endmodule
