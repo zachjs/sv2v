@@ -6,5 +6,6 @@ module top;
     $error;
     $error("%b", 3);
     $fatal;
-    $fatal("%b", 4);
+    $fatal(0);
+    $fatal(0, "%b", 4);
 endmodule
