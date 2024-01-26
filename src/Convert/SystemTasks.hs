@@ -10,9 +10,43 @@ import Convert.Traverse
 import Language.SystemVerilog.AST
 
 convert :: [AST] -> [AST]
-convert =
-    map $ traverseDescriptions $ traverseModuleItems $
-    traverseStmts $ traverseNestedStmts convertStmt
+convert = map $ traverseDescriptions $ traverseModuleItems convertModuleItem
+
+convertModuleItem :: ModuleItem -> ModuleItem
+
+convertModuleItem (ElabTask SeverityInfo args) =
+    Initial (Block Seq "" [] [
+        (Subroutine (Ident "$write") (Args [(String "Elaboration Info: ")] [])),
+        (Subroutine (Ident "$display") args)
+    ])
+
+convertModuleItem (ElabTask SeverityWarning args) =
+    Initial (Block Seq "" [] [
+        (Subroutine (Ident "$write") (Args [(String "Elaboration Warning: ")] [])),
+        (Subroutine (Ident "$display") args)
+    ])
+
+convertModuleItem (ElabTask SeverityError args) =
+    Initial (Block Seq "" [] [
+        (Subroutine (Ident "$write") (Args [(String "Elaboration Error: ")] [])),
+        (Subroutine (Ident "$display") args)
+    ])
+
+convertModuleItem (ElabTask SeverityFatal (Args [] [])) =
+    Initial (Block Seq "" [] [
+        (Subroutine (Ident "$display") (Args [(String "Elaboration Fatal:")] [])),
+        (Subroutine (Ident "$finish") (Args [] []))
+    ])
+
+convertModuleItem (ElabTask SeverityFatal (Args (finishArgs:displayArgs) _)) =
+    Initial (Block Seq "" [] [
+        (Subroutine (Ident "$write") (Args [(String "Elaboration Fatal: ")] [])),
+        (Subroutine (Ident "$display") (Args displayArgs [])),
+        (Subroutine (Ident "$finish") (Args [finishArgs] []))
+    ])
+
+convertModuleItem other =
+    traverseStmts (traverseNestedStmts convertStmt) other
 
 timeCall :: Expr
 timeCall = Call (Ident "$time") (Args [] [])
