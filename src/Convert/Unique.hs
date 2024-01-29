@@ -4,7 +4,7 @@
  - Conversion for `unique`, `unique0`, and `priority` (verification checks)
  -
  - This conversion adds full_case and parallel_case synthesis attributes
- - for priority and unique respectively.
+ - for priority and unique modifiers on case statements.
  -}
 
 module Convert.Unique (convert) where
@@ -28,8 +28,11 @@ convertStmt (Case Priority kw expr cases) =
 convertStmt (Case Unique kw expr cases) =
     StmtAttr caseAttr caseStmt
     where
-        caseAttr = Attr [("synthesis", Nil), ("parallel_case", Nil)]
+        caseAttr = Attr [("synthesis", Nil), ("full_case", Nil), ("parallel_case", Nil)]
         caseStmt = Case NoCheck kw expr cases
 convertStmt (Case Unique0 kw expr cases) =
-    convertStmt (Case Unique kw expr cases)
+    StmtAttr caseAttr caseStmt
+    where
+        caseAttr = Attr [("synthesis", Nil), ("parallel_case", Nil)]
+        caseStmt = Case NoCheck kw expr cases
 convertStmt other = other
