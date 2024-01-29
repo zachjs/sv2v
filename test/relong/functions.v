@@ -24,7 +24,6 @@ module Example(
     // you expect a C function to do. Sadly VTR doesn't support the automatic
     // keyword.
     function [31:0] swapState(input [31:0] state);
-        (* synthesis, parallel_case *)
         case(state)
             // To return from a function assign the function name with a variable
             FOO: swapState =  BAR;
