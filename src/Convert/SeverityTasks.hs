@@ -1,10 +1,17 @@
 {- sv2v
-- Author: Ethan Sifferman <ethan@sifferman.dev>
--
-- Conversion of SystemVerilog System Tasks to Verilog.
--}
+ - Author: Ethan Sifferman <ethan@sifferman.dev>
+ -
+ - Conversion of standard and elaboration severity tasks `$info`, `$warning`,
+ - `$error`, and `$fatal` (20.10 and 20.11).
+ -
+ -  * Severity task messages are converted into `$display` tasks.
+ -  * Standard `$fatal` tasks run `$finish` directly after running `$display`.
+ -  * Elaboration `$fatal` tasks set `_sv2v_elaboration_fatal` to a
+ -    non-negative value, causing the simulation to exit once all elaboration
+ -    severity task messages have been printed.
+ -}
 
-module Convert.SystemTasks (convert) where
+module Convert.SeverityTasks (convert) where
 
 import Convert.Traverse
 import Language.SystemVerilog.AST

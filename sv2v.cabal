@@ -104,7 +104,7 @@ executable sv2v
     Convert.StringType
     Convert.Struct
     Convert.StructConst
-    Convert.SystemTasks
+    Convert.SeverityTasks
     Convert.TFBlock
     Convert.Traverse
     Convert.Typedef
