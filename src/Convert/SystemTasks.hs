@@ -46,35 +46,31 @@ traverseDescription description = traverseModuleItems convertModuleItem descript
 
 convertModuleItem :: ModuleItem -> ModuleItem
 
-convertModuleItem (ElabTask SeverityInfo args) =
+convertModuleItem (ElabTask SeverityInfo (Args args [])) =
     Initial (Block Seq "" [] [
-        (Subroutine (Ident "$write") (Args [(String "Elaboration Info: ")] [])),
-        (Subroutine (Ident "$display") args)
+        (Subroutine (Ident "$display") (Args ([(String "Elaboration Info: ")] ++ args) []))
     ])
 
-convertModuleItem (ElabTask SeverityWarning args) =
+convertModuleItem (ElabTask SeverityWarning (Args args [])) =
     Initial (Block Seq "" [] [
-        (Subroutine (Ident "$write") (Args [(String "Elaboration Warning: ")] [])),
-        (Subroutine (Ident "$display") args)
+        (Subroutine (Ident "$display") (Args ([(String "Elaboration Warning: ")] ++ args) []))
     ])
 
-convertModuleItem (ElabTask SeverityError args) =
+convertModuleItem (ElabTask SeverityError (Args args [])) =
     Initial (Block Seq "" [] [
-        (Subroutine (Ident "$write") (Args [(String "Elaboration Error: ")] [])),
-        (Subroutine (Ident "$display") args)
+        (Subroutine (Ident "$display") (Args ([(String "Elaboration Error: ")] ++ args) []))
     ])
 
 convertModuleItem (ElabTask SeverityFatal (Args [] [])) =
     Initial (Block Seq "" [] [
-        (Subroutine (Ident "$display") (Args [(String "Elaboration Fatal:")] [])),
-        (Subroutine (Ident "$finish") (Args [] []))
+        (Subroutine (Ident "$display") (Args [(String "Elaboration Fatal: ")] [])),
+        (Asgn AsgnOpEq Nothing (LHSIdent elaborationFatalIdent) (RawNum 0))
     ])
 
 convertModuleItem (ElabTask SeverityFatal (Args (finishArgs:displayArgs) _)) =
     Initial (Block Seq "" [] [
-        (Subroutine (Ident "$write") (Args [(String "Elaboration Fatal: ")] [])),
-        (Subroutine (Ident "$display") (Args displayArgs [])),
-        (Subroutine (Ident "$finish") (Args [finishArgs] []))
+        (Subroutine (Ident "$display") (Args ([(String "Elaboration Fatal: ")] ++ displayArgs) [])),
+        (Asgn AsgnOpEq Nothing (LHSIdent elaborationFatalIdent) finishArgs)
     ])
 
 convertModuleItem other =
@@ -84,33 +80,29 @@ timeCall :: Expr
 timeCall = Call (Ident "$time") (Args [] [])
 
 convertStmt :: Stmt -> Stmt
-convertStmt (Subroutine (Ident "$info") args) =
+convertStmt (Subroutine (Ident "$info") (Args args [])) =
     Block Seq "" [] [
-        (Subroutine (Ident "$write") (Args [(String "[%0t] Info: "), timeCall] [])),
-        (Subroutine (Ident "$display") args)
+        (Subroutine (Ident "$display") (Args ([(String "[%0t] Info: "), timeCall] ++ args) []))
     ]
 
-convertStmt (Subroutine (Ident "$warning") args) =
+convertStmt (Subroutine (Ident "$warning") (Args args [])) =
     Block Seq "" [] [
-        (Subroutine (Ident "$write") (Args [(String "[%0t] Warning: "), timeCall] [])),
-        (Subroutine (Ident "$display") args)
+        (Subroutine (Ident "$display") (Args ([(String "[%0t] Warning: "), timeCall] ++ args) []))
     ]
 
-convertStmt (Subroutine (Ident "$error") args) =
+convertStmt (Subroutine (Ident "$error") (Args args [])) =
     Block Seq "" [] [
-        (Subroutine (Ident "$write") (Args [(String "[%0t] Error: "), timeCall] [])),
-        (Subroutine (Ident "$display") args)
+        (Subroutine (Ident "$display") (Args ([(String "[%0t] Error: "), timeCall] ++ args) []))
     ]
 
 convertStmt (Subroutine (Ident "$fatal") (Args [] [])) =
     Block Seq "" [] [
-        (Subroutine (Ident "$display") (Args [(String "[%0t] Fatal:"), timeCall] [])),
+        (Subroutine (Ident "$display") (Args [(String "[%0t] Fatal: "), timeCall] [])),
         (Subroutine (Ident "$finish") (Args [] []))
     ]
 convertStmt (Subroutine (Ident "$fatal") (Args (finishArgs:displayArgs) _)) =
     Block Seq "" [] [
-        (Subroutine (Ident "$write") (Args [(String "[%0t] Fatal: "), timeCall] [])),
-        (Subroutine (Ident "$display") (Args displayArgs [])),
+        (Subroutine (Ident "$display") (Args ([(String "[%0t] Fatal: "), timeCall] ++ displayArgs) [])),
         (Subroutine (Ident "$finish") (Args [finishArgs] []))
     ]
 
