@@ -322,7 +322,7 @@ numberBitLength (Based size _ _ _ _) =
         then max 32 $ negate size
         else size
 
--- get whether or not a number is signed
+-- get whether or not a number is sized
 numberIsSized :: Number -> Bool
 numberIsSized UnbasedUnsized{} = False
 numberIsSized (Decimal size _ _) = size > 0
@@ -359,9 +359,7 @@ instance Show Number where
     show (UnbasedUnsized bit) =
         '\'' : show bit
     show (Decimal (-32) True value) =
-        if value < 0
-            then error $ "illegal decimal: " ++ show value
-            else show value
+        show value
     show (Decimal size signed value) =
         if size == 0
             then error $ "illegal decimal literal: "
