@@ -126,9 +126,9 @@ module top;
 
     logic [31:0] mux1, mux2, mux3, mux4, mux5, mux6;
     initial $monitor("%b %b %b %b %b %b", mux1, mux2, mux3, mux4, mux5, mux6);
-    assign mux1 = i ? {<<1 {in}} : 32'b0;
-    assign mux2 = i ? {>>1 {in}} : {<<1 {in}};
-    assign mux3 = i ? {<<1 {in}} : {<<1 {m}};
+    assign #10 mux1 = i ? {<<1 {in}} : 32'b0;
+    assign #20 mux2 = i ? {>>1 {in}} : {<<1 {in}};
+    assign #30 mux3 = i ? {<<1 {in}} : {<<1 {m}};
     always @* begin
         mux4 = i ? {<<1 {in}} : 32'b0;
         mux5 = i ? {>>1 {in}} : {<<1 {in}};

@@ -9,10 +9,12 @@ module top;
     import foo_pkg::*;
     wire [2:0] test;
 
+    reg start;
     always_comb begin
         case (test)
             AccessAck: $display("Ack");
             default  : $display("default");
         endcase
     end
+    initial start = 0;
 endmodule

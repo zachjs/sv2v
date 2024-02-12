@@ -151,9 +151,9 @@ module top;
     wire [31:0] mux1, mux2, mux3;
     reg [31:0] mux4, mux5, mux6;
     initial $monitor("%b %b %b %b %b %b", mux1, mux2, mux3, mux4, mux5, mux6);
-    assign mux1 = i ? reverse(in) : 32'b0;
-    assign mux2 = i ? in << 8 : reverse(in);
-    assign mux3 = i ? reverse(in) : reverse(m);
+    assign #10 mux1 = i ? reverse(in) : 32'b0;
+    assign #20 mux2 = i ? in << 8 : reverse(in);
+    assign #30 mux3 = i ? reverse(in) : reverse(m);
     always @* begin
         mux4 = i ? reverse(in) : 32'b0;
         mux5 = i ? in << 8 : reverse(in);

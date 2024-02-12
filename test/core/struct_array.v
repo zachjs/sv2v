@@ -5,9 +5,7 @@ module Unpacker(in, select, a, b, c);
     output wire a;
     output wire [3:0] b;
     output wire [1:0] c;
-    wire [6:0] p;
-    assign p = in[select*7+:7];
-    assign a = p[6:6];
-    assign b = p[5:2];
-    assign c = p[1:0];
+    assign a = in[select*7+6];
+    assign b = in[select*7+5-:4];
+    assign c = in[select*7+1-:2];
 endmodule

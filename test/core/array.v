@@ -5,7 +5,12 @@ endmodule
 module top;
     reg [5:0] a;
     wire [5:0] b;
-    always @(*) a = b;
+    reg start;
+    always @(*) begin
+        if (start);
+        a = b;
+    end
+    initial start = 0;
 
     reg x;
     wire [5:0] c;
