@@ -1,3 +1,3 @@
-affirm (* synthesis, full_case, parallel_case *)
-affirm (* synthesis, parallel_case *)
-affirm (* synthesis, full_case *)
+affirm (* full_case, parallel_case *)
+affirm (* parallel_case *)
+affirm (* full_case *)

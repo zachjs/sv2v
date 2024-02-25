@@ -24,16 +24,16 @@ convertStmt (If _ cc s1 s2) =
 convertStmt (Case Priority kw expr cases) =
     StmtAttr caseAttr caseStmt
     where
-        caseAttr = Attr [("synthesis", Nil), ("full_case", Nil)]
+        caseAttr = Attr [("full_case", Nil)]
         caseStmt = Case NoCheck kw expr cases
 convertStmt (Case Unique kw expr cases) =
     StmtAttr caseAttr caseStmt
     where
-        caseAttr = Attr [("synthesis", Nil), ("full_case", Nil), ("parallel_case", Nil)]
+        caseAttr = Attr [("full_case", Nil), ("parallel_case", Nil)]
         caseStmt = Case NoCheck kw expr cases
 convertStmt (Case Unique0 kw expr cases) =
     StmtAttr caseAttr caseStmt
     where
-        caseAttr = Attr [("synthesis", Nil), ("parallel_case", Nil)]
+        caseAttr = Attr [("parallel_case", Nil)]
         caseStmt = Case NoCheck kw expr cases
 convertStmt other = other
