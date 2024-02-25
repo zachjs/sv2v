@@ -3,8 +3,9 @@
  -
  - Conversion for `unique`, `unique0`, and `priority` (verification checks)
  -
- - This conversion adds full_case and parallel_case synthesis attributes
- - for priority and unique modifiers on case statements.
+ - For `case`, these verification checks are replaced with equivalent
+ - `full_case` and `parallel_case` attributes. For `if`, they are simply
+ - dropped.
  -}
 
 module Convert.Unique (convert) where

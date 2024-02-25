@@ -1,19 +1,10 @@
-module top;
-    reg [1:0] select;
-    logic [3:0] data [2:0];
-    UniqueCase case0(.select, .data(data[0]));
-    Unique0Case case1(.select, .data(data[1]));
-    PriorityCase case2(.select, .data(data[2]));
-    initial begin end
-endmodule
-
 module UniqueCase(
     input logic [1:0] select,
     output logic [3:0] data
 );
     always_comb begin
         data = 4'b0;
-        unique case(select)
+        unique case (select)
             2'd0: data = 4'ha;
             2'd1: data = 4'h6;
             2'd2: data = 4'h3;
@@ -27,7 +18,7 @@ module Unique0Case(
 );
     always_comb begin
         data = 4'b0;
-        unique0 case(select)
+        unique0 case (select)
             2'd0: data = 4'ha;
             2'd1: data = 4'h6;
             2'd2: data = 4'h3;
@@ -41,7 +32,7 @@ module PriorityCase(
 );
     always_comb begin
         data = 4'b0;
-        priority case(select)
+        priority case (select)
             2'd0: data = 4'ha;
             2'd1: data = 4'h6;
             2'd2: data = 4'h3;
