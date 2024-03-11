@@ -7,6 +7,8 @@
 
 ### New Features
 
+* `unique`, `unique0`, and `priority` case statements now produce corresponding
+  `parallel_case` and `full_case` statement attributes
 * Added support for attributes in unary, binary, and ternary expressions
 * Added support for shadowing interface names with local typenames
 * Added support for streaming concatenations within ternary expressions

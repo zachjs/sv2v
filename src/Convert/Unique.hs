@@ -3,9 +3,9 @@
  -
  - Conversion for `unique`, `unique0`, and `priority` (verification checks)
  -
- - This conversion simply drops these keywords, as they are only used for
- - optimization and verification. There may be ways to communicate these
- - attributes to certain downstream toolchains.
+ - For `case`, these verification checks are replaced with equivalent
+ - `full_case` and `parallel_case` attributes. For `if`, they are simply
+ - dropped.
  -}
 
 module Convert.Unique (convert) where
@@ -21,6 +21,19 @@ convert =
 convertStmt :: Stmt -> Stmt
 convertStmt (If _ cc s1 s2) =
     If NoCheck cc s1 s2
-convertStmt (Case _ kw expr cases) =
-    Case NoCheck kw expr cases
+convertStmt (Case Priority kw expr cases) =
+    StmtAttr caseAttr caseStmt
+    where
+        caseAttr = Attr [("full_case", Nil)]
+        caseStmt = Case NoCheck kw expr cases
+convertStmt (Case Unique kw expr cases) =
+    StmtAttr caseAttr caseStmt
+    where
+        caseAttr = Attr [("full_case", Nil), ("parallel_case", Nil)]
+        caseStmt = Case NoCheck kw expr cases
+convertStmt (Case Unique0 kw expr cases) =
+    StmtAttr caseAttr caseStmt
+    where
+        caseAttr = Attr [("parallel_case", Nil)]
+        caseStmt = Case NoCheck kw expr cases
 convertStmt other = other
