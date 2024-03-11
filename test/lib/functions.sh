@@ -173,6 +173,11 @@ simulateAndCompare() {
     simulate $cvs_vcd $cvs_log $cs $tb
     simulate $cvv_vcd $cvv_log $cv $tb
 
+    # clean log files by removing filenames
+    sed -E 's#'$ve':[[:digit:]]+#'$ve'#g' $ref_log > $ref_log.tmp && mv $ref_log.tmp $ref_log
+    sed -E 's#'$cs':[[:digit:]]+#'$ve'#g' $cvs_log > $cvs_log.tmp && mv $cvs_log.tmp $cvs_log
+    sed -E 's#'$cv':[[:digit:]]+#'$ve'#g' $cvv_log > $cvv_log.tmp && mv $cvv_log.tmp $cvv_log
+
     # compare reference verilog to converted succinct
     output=`diff $ref_vcd $cvs_vcd`
     assertTrue "VE/CS VCDs are different:\n$output" $?

@@ -7,6 +7,7 @@
 
 ### New Features
 
+* Added conversion of of standard and elaboration severity tasks
 * `unique`, `unique0`, and `priority` case statements now produce corresponding
   `parallel_case` and `full_case` statement attributes
 * Added support for attributes in unary, binary, and ternary expressions
