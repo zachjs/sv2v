@@ -41,7 +41,7 @@ jobs:
           - macOS-11
     needs: build
     env:
-      IVERILOG_REF: 8ee1d56e1acbc130aa63da3c8ef0d535a551cf28
+      IVERILOG_REF: f31d0dcbc5ddcd97e1e2e6f7bc7eb0f5a547fe16
     steps:
       - uses: actions/checkout@v1
       - name: Install Dependencies (macOS)
