@@ -153,12 +153,17 @@ parseNormalized oversizedNumbers str =
 
         -- high-order X or Z is extended up to the size of the literal
         leadDigit = head digits
-        numDigits = length digits
+        numDigits = length digits + if isSignedUnsizedWithLeading1 then 1 else 0
         leadDigitIsXZ = elem leadDigit xzDigits
         digitsExtended =
             if leadDigitIsXZ
                 then replicate (sizeDigits - numDigits) leadDigit ++ digits
                 else digits
+        isSignedUnsizedWithLeading1 =
+            maybeBase /= Nothing &&
+            not leadDigitIsXZ &&
+            signed &&
+            digitToInt leadDigit >= div (baseSize base) 2
 
         -- determine the number of digits needed based on the size
         sizeDigits = ((abs size) `div` bitsPerDigit) + sizeExtraDigit

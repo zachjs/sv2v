@@ -17,6 +17,8 @@
 ### Bug Fixes
 
 * Fixed an issue that prevented parsing tasks and functions with `inout` ports
+* Fixed signed unsized literals with a leading 1 bit (e.g., `'sb1`, `'sh8f`)
+  incorrectly sign-extending in size and type casts
 * Fixed conflicting genvar names when inlining interfaces and modules that use
   them; all genvars are now given a design-wide unique name
 * Fixed byte order of strings in size casts
