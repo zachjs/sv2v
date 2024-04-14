@@ -1,5 +1,5 @@
 ================================================================================
-Dependency: alex-3.2.7.1
+Dependency: alex-3.3.0.0
 ================================================================================
 
   Copyright (c) 1995-2011, Chris Dornan and Simon Marlow
@@ -123,7 +123,7 @@ Dependency: array-0.5.4.0
 
 
 ================================================================================
-Dependency: base-4.14.3.0
+Dependency: base-4.17.2.1
 ================================================================================
 
   This library (libraries/base) is derived from code from several
@@ -211,7 +211,7 @@ Dependency: base-4.14.3.0
   -----------------------------------------------------------------------------
 
 ================================================================================
-Dependency: binary-0.8.8.0
+Dependency: binary-0.8.9.1
 ================================================================================
 
   Copyright (c) Lennart Kolmodin
@@ -246,13 +246,14 @@ Dependency: binary-0.8.8.0
   POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-Dependency: bytestring-0.10.12.0
+Dependency: bytestring-0.11.5.3
 ================================================================================
 
   Copyright (c) Don Stewart 2005-2009
             (c) Duncan Coutts 2006-2015
             (c) David Roundy 2003-2005
             (c) Simon Meier 2010-2011
+            (c) Koz Ross 2021
 
   All rights reserved.
 
@@ -281,10 +282,10 @@ Dependency: bytestring-0.10.12.0
   SUCH DAMAGE.
 
 ================================================================================
-Dependency: cmdargs-0.10.21
+Dependency: cmdargs-0.10.22
 ================================================================================
 
-  Copyright Neil Mitchell 2009-2021.
+  Copyright Neil Mitchell 2009-2023.
   All rights reserved.
 
   Redistribution and use in source and binary forms, with or without
@@ -316,7 +317,7 @@ Dependency: cmdargs-0.10.21
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-Dependency: containers-0.6.5.1
+Dependency: containers-0.6.7
 ================================================================================
 
   The Glasgow Haskell Compiler License
@@ -352,7 +353,7 @@ Dependency: containers-0.6.5.1
   DAMAGE.
 
 ================================================================================
-Dependency: deepseq-1.4.4.0
+Dependency: deepseq-1.4.8.0
 ================================================================================
 
   This library (deepseq) is derived from code from the GHC project which
@@ -396,7 +397,7 @@ Dependency: deepseq-1.4.4.0
   -----------------------------------------------------------------------------
 
 ================================================================================
-Dependency: directory-1.3.6.0
+Dependency: directory-1.3.7.1
 ================================================================================
 
   This library (libraries/base) is derived from code from two
@@ -464,10 +465,10 @@ Dependency: directory-1.3.6.0
   -----------------------------------------------------------------------------
 
 ================================================================================
-Dependency: filepath-1.4.2.1
+Dependency: filepath-1.4.2.2
 ================================================================================
 
-  Copyright Neil Mitchell 2005-2018.
+  Copyright Neil Mitchell 2005-2020.
   All rights reserved.
 
   Redistribution and use in source and binary forms, with or without
@@ -499,27 +500,12 @@ Dependency: filepath-1.4.2.1
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-Dependency: ghc-prim-0.6.1
+Dependency: ghc-bignum-1.3
 ================================================================================
-
-  This library (libraries/ghc-prim) is derived from code from several
-  sources:
-
-    * Code from the GHC project which is largely (c) The University of
-      Glasgow, and distributable under a BSD-style license (see below),
-
-    * Code from the Haskell 98 Report which is (c) Simon Peyton Jones
-      and freely redistributable (but see the full license for
-      restrictions).
-
-  The full text of these licenses is reproduced below.  All of the
-  licenses are BSD-style or compatible.
-
-  -----------------------------------------------------------------------------
 
   The Glasgow Haskell Compiler License
 
-  Copyright 2004, The University Court of the University of Glasgow.
+  Copyright 2020, The University Court of the University of Glasgow.
   All rights reserved.
 
   Redistribution and use in source and binary forms, with or without
@@ -549,24 +535,14 @@ Dependency: ghc-prim-0.6.1
   OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
   DAMAGE.
 
-  -----------------------------------------------------------------------------
+================================================================================
+Dependency: ghc-prim-0.9.1
+================================================================================
 
-  Code derived from the document "Report on the Programming Language
-  Haskell 98", is distributed under the following license:
-
-    Copyright (c) 2002 Simon Peyton Jones
-
-    The authors intend this Report to belong to the entire Haskell
-    community, and so we grant permission to copy and distribute it for
-    any purpose, provided that it is reproduced in its entirety,
-    including this Notice.  Modified versions of this Report may also be
-    copied and distributed for any purpose, provided that the modified
-    version is clearly presented as such, and that it does not claim to
-    be a definition of the Haskell 98 Language.
-
+  Package not found: No such package version for ghc-prim
 
 ================================================================================
-Dependency: githash-0.1.6.2
+Dependency: githash-0.1.7.0
 ================================================================================
 
   Copyright (c) 2018, Michael Snoyman, 2015, Adam C. Foltzer
@@ -598,7 +574,7 @@ Dependency: githash-0.1.6.2
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-Dependency: happy-1.20.0
+Dependency: happy-1.20.1.1
 ================================================================================
 
   The Happy License
@@ -633,7 +609,7 @@ Dependency: happy-1.20.0
   IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-Dependency: hashable-1.3.0.0
+Dependency: hashable-1.4.3.0
 ================================================================================
 
   Copyright Milan Straka 2010
@@ -652,41 +628,6 @@ Dependency: hashable-1.3.0.0
         with the distribution.
 
       * Neither the name of Milan Straka nor the names of other
-        contributors may be used to endorse or promote products derived
-        from this software without specific prior written permission.
-
-  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-================================================================================
-Dependency: integer-gmp-1.0.3.0
-================================================================================
-
-  Copyright (c) 2014, Herbert Valerio Riedel
-
-  All rights reserved.
-
-  Redistribution and use in source and binary forms, with or without
-  modification, are permitted provided that the following conditions are met:
-
-      * Redistributions of source code must retain the above copyright
-        notice, this list of conditions and the following disclaimer.
-
-      * Redistributions in binary form must reproduce the above
-        copyright notice, this list of conditions and the following
-        disclaimer in the documentation and/or other materials provided
-        with the distribution.
-
-      * Neither the name of Herbert Valerio Riedel nor the names of other
         contributors may be used to endorse or promote products derived
         from this software without specific prior written permission.
 
@@ -783,7 +724,7 @@ Dependency: pretty-1.1.3.6
   -----------------------------------------------------------------------------
 
 ================================================================================
-Dependency: primitive-0.7.3.0
+Dependency: primitive-0.8.0.0
 ================================================================================
 
   Copyright (c) 2008-2009, Roman Leshchinskiy
@@ -818,7 +759,7 @@ Dependency: primitive-0.7.3.0
 
 
 ================================================================================
-Dependency: process-1.6.13.2
+Dependency: process-1.6.18.0
 ================================================================================
 
   This library (libraries/process) is derived from code from two
@@ -886,7 +827,7 @@ Dependency: process-1.6.13.2
   -----------------------------------------------------------------------------
 
 ================================================================================
-Dependency: template-haskell-2.16.0.0
+Dependency: template-haskell-2.19.0.0
 ================================================================================
 
 
@@ -924,7 +865,7 @@ Dependency: template-haskell-2.16.0.0
 
 
 ================================================================================
-Dependency: text-1.2.4.1
+Dependency: text-2.0.2
 ================================================================================
 
   Copyright (c) 2008-2009, Tom Harper
@@ -955,7 +896,7 @@ Dependency: text-1.2.4.1
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-Dependency: th-compat-0.1.3
+Dependency: th-compat-0.1.4
 ================================================================================
 
   Copyright (c) 2020, Ryan Scott
@@ -990,10 +931,10 @@ Dependency: th-compat-0.1.3
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-Dependency: time-1.9.3
+Dependency: time-1.12.2
 ================================================================================
 
-  TimeLib is Copyright (c) Ashley Yakeley, 2004-2014. All rights reserved.
+  TimeLib is Copyright (c) Ashley Yakeley and contributors, 2004-2022. All rights reserved.
   Certain sections are Copyright 2004, The University Court of the University of Glasgow. All rights reserved.
 
   Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
@@ -1041,7 +982,7 @@ Dependency: transformers-0.5.6.2
   DAMAGE.
 
 ================================================================================
-Dependency: unix-2.7.2.2
+Dependency: unix-2.7.3
 ================================================================================
 
   The Glasgow Haskell Compiler License
@@ -1077,10 +1018,13 @@ Dependency: unix-2.7.2.2
   DAMAGE.
 
 ================================================================================
-Dependency: vector-0.12.3.1
+Dependency: vector-0.13.1.0
 ================================================================================
 
   Copyright (c) 2008-2012, Roman Leshchinskiy
+                2020-2022, Alexey Kuleshevich
+                2020-2022, Aleksey Khudyakov
+                2020-2022, Andrew Lelechenko
   All rights reserved.
 
   Redistribution and use in source and binary forms, with or without
@@ -1110,4 +1054,40 @@ Dependency: vector-0.12.3.1
   OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
   DAMAGE.
 
+================================================================================
+Dependency: vector-stream-0.1.0.0
+================================================================================
+
+  Copyright (c) 2008-2012, Roman Leshchinskiy
+                2020-2022, Alexey Kuleshevich
+                2020-2022, Aleksey Khudyakov
+                2020-2022, Andrew Lelechenko
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are met:
+
+  - Redistributions of source code must retain the above copyright notice,
+  this list of conditions and the following disclaimer.
+
+  - Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+  - Neither name of the University nor the names of its contributors may be
+  used to endorse or promote products derived from this software without
+  specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY COURT OF THE UNIVERSITY OF
+  GLASGOW AND THE CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+  FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+  UNIVERSITY COURT OF THE UNIVERSITY OF GLASGOW OR THE CONTRIBUTORS BE LIABLE
+  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+  OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+  DAMAGE.
 
