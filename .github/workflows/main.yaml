@@ -16,18 +16,21 @@ jobs:
     strategy:
       matrix:
         os:
-          - ubuntu-20.04
-          - macOS-11
-          - windows-2019
+          - ubuntu-22.04
+          - macOS-13
+          - windows-2022
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
+      - name: Install Dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install haskell-stack
       - name: Build
         run: make
       - name: Prepare Artifact
         shell: bash
         run: cp LICENSE NOTICE README.md CHANGELOG.md bin
       - name: Upload Artifact
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ runner.os }}
           path: bin
@@ -37,23 +40,23 @@ jobs:
     strategy:
       matrix:
         os:
-          - ubuntu-20.04
-          - macOS-11
+          - ubuntu-22.04
+          - macOS-13
     needs: build
     env:
       IVERILOG_REF: f31d0dcbc5ddcd97e1e2e6f7bc7eb0f5a547fe16
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
       - name: Install Dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install shunit2 bison autoconf
+          brew install bison autoconf
           echo "$(brew --prefix bison)/bin" >> $GITHUB_PATH
       - name: Install Dependencies (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get install -y shunit2 flex bison autoconf gperf
+        run: sudo apt-get install -y flex bison autoconf gperf
       - name: Cache iverilog
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.local
           key: ${{ runner.OS }}-${{ env.IVERILOG_REF }}
@@ -70,19 +73,21 @@ jobs:
             make install
             cd ..
           fi
+          curl -L https://raw.githubusercontent.com/kward/shunit2/v2.1.8/shunit2 > ~/.local/bin/shunit2
+          chmod +x ~/.local/bin/shunit2
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
       - name: Download Artifact
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v4
         with:
           name: ${{ runner.os }}
           path: bin
       - name: Test
         run: |
           chmod +x bin/sv2v
-          export PATH="$PATH:$HOME/.local/bin"
           make test
 
   release:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         name: [macOS, Linux, Windows]
@@ -90,7 +95,7 @@ jobs:
     if: github.event_name == 'release'
     steps:
       - name: Download Artifact
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v4
         with:
           name: ${{ matrix.name }}
           path: sv2v-${{ matrix.name }}
@@ -99,7 +104,7 @@ jobs:
       - name: Create ZIP
         run: zip -r sv2v-${{ matrix.name }} ./sv2v-${{ matrix.name }}
       - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1.0.1
+        uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
