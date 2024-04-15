@@ -1,5 +1,7 @@
 #!/bin/bash
 
+trap exit INT
+
 cd `dirname "${BASH_SOURCE[0]}"`
 
 failures=0
