@@ -9,8 +9,8 @@ module top;
             assign brr[0] = 1;
             initial $display("%b", brr);
             if (YES) begin : blk2
-                assign crr[0] = 1;
                 wire [19:0] crr;
+                assign crr[0] = 1;
                 initial $display("%b", crr);
             end
         end

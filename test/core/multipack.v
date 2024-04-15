@@ -1,12 +1,5 @@
 module Example;
 
-    initial
-        $monitor("%b %b %b %b %b %b %b %b %b",
-            arr1, arr2, arr3,
-            arr4, arr5, arr6,
-            arr7, arr8, arr9
-        );
-
     reg [14:0] arr1;
     reg [14:0] arr2;
     reg [14:0] arr3;
@@ -42,5 +35,12 @@ module Example;
         #1; arr9 = 'b100100111101010;
         #1; arr9[(4-1)*3+:3] = arr9[(4-2)*3+:3];
     end
+
+    initial
+        $monitor("%b %b %b %b %b %b %b %b %b",
+            arr1, arr2, arr3,
+            arr4, arr5, arr6,
+            arr7, arr8, arr9
+        );
 
 endmodule

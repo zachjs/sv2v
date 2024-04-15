@@ -1,9 +1,8 @@
-module evil_mdl (
-    output reg [evil_pkg_B-1:0] foo
-);
+module evil_mdl (foo);
     localparam evil_pkg_Z = 1;
     localparam evil_pkg_A = evil_pkg_Z;
     localparam evil_pkg_B = evil_pkg_Z;
+    output reg [evil_pkg_B-1:0] foo;
     initial foo = evil_pkg_A;
 endmodule
 
