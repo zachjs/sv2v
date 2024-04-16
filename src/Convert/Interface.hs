@@ -222,7 +222,10 @@ convertDescription tops parts (Part att ext Module lif name ports items) =
                 then Nothing
                 else Just (portName, modportBinding)
             where
-                modportBinding = (substitutions, replaceBit modportE)
+                modportBinding =
+                    ( substitutions
+                    , scopeExprWithScopes modports $ replaceBit modportE
+                    )
                 substitutions =
                     genSubstitutions modports base instanceE modportE
                 maybeInfo =

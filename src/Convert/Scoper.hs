@@ -38,6 +38,8 @@ module Convert.Scoper
     , replaceInExpr
     , scopeExpr
     , scopeType
+    , scopeExprWithScopes
+    , scopeTypeWithScopes
     , insertElem
     , removeElem
     , injectItem
@@ -208,6 +210,12 @@ scopeType = traverseNestedTypesM $ traverseTypeExprsM scopeExpr
 
 {-# INLINABLE scopeExpr #-}
 {-# INLINABLE scopeType #-}
+
+scopeExprWithScopes :: Scopes a -> Expr -> Expr
+scopeExprWithScopes scopes = flip evalState scopes . scopeExpr
+
+scopeTypeWithScopes :: Scopes a -> Type -> Type
+scopeTypeWithScopes scopes = flip evalState scopes . scopeType
 
 class ScopePath k where
     toTiers :: Scopes a -> k -> [Tier]

@@ -26,6 +26,7 @@
 * Fixed unconverted multidimensional struct fields within dimension queries
 * Fixed non-typenames (e.g., from packages or subsequent declarations)
   improperly shadowing the names of `struct` pattern fields
+* Fixed shadowing of interface array indices passed to port connections
 * Fixed failure to resolve typenames suffixed with dimensions in contexts
   permitting both types and expressions, e.g., `$bits(T[W-1:0])`
 * Fixed errant constant folding of shadowed non-trivial localparams
