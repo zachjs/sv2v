@@ -44,7 +44,7 @@ jobs:
           - macOS-13
     needs: build
     env:
-      IVERILOG_REF: f31d0dcbc5ddcd97e1e2e6f7bc7eb0f5a547fe16
+      IVERILOG_REF: ef7f0a8f38782dfc0872b1e352ccf32343c10bb8
     steps:
       - uses: actions/checkout@v4
       - name: Install Dependencies (macOS)
