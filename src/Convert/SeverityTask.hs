@@ -11,7 +11,7 @@
  -    severity task messages have been printed.
  -}
 
-module Convert.SeverityTasks (convert) where
+module Convert.SeverityTask (convert) where
 
 import Convert.Traverse
 import Language.SystemVerilog.AST

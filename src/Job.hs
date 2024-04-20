@@ -27,7 +27,7 @@ data Exclude
     | Assert
     | Interface
     | Logic
-    | SeverityTasks
+    | SeverityTask
     | Succinct
     | UnbasedUnsized
     deriving (Typeable, Data, Eq)
@@ -84,7 +84,7 @@ defaultJob = Job
         &= groupname "Conversion"
     , exclude = nam_ "exclude" &= name "E" &= typ "CONV"
         &= help ("Exclude a particular conversion (Always, Assert, Interface,"
-            ++ " Logic, SeverityTasks, or UnbasedUnsized)")
+            ++ " Logic, SeverityTask, or UnbasedUnsized)")
     , verbose = nam "verbose" &= help "Retain certain conversion artifacts"
     , write = Stdout &= ignore -- parsed from the flexible flag below
     , writeRaw = "s" &= name "write" &= name "w" &= explicit

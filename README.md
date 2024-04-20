@@ -102,7 +102,7 @@ Preprocessing:
 Conversion:
      --pass-through         Dump input without converting
   -E --exclude=CONV         Exclude a particular conversion (Always, Assert,
-                            Interface, Logic, SeverityTasks, or UnbasedUnsized)
+                            Interface, Logic, SeverityTask, or UnbasedUnsized)
   -v --verbose              Retain certain conversion artifacts
   -w --write=MODE/FILE/DIR  How to write output; default is 'stdout'; use
                             'adjacent' to create a .v file next to each input;
