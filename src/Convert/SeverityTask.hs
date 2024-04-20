@@ -23,7 +23,7 @@ convert = map $ traverseDescriptions traverseDescription
 elaborationFatalIdent :: Identifier
 elaborationFatalIdent = "_sv2v_elaboration_fatal"
 elaborationFatalCancelCode :: Expr
-elaborationFatalCancelCode = RawNum (-1)
+elaborationFatalCancelCode = UniOp UniSub $ RawNum 1
 
 -- Checker for fatal elaboration
 elaborationFatalDecl :: ModuleItem
