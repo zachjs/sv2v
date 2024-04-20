@@ -13,6 +13,8 @@
 
 module Convert.SeverityTask (convert) where
 
+import Data.Char (toUpper)
+
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
@@ -53,30 +55,26 @@ traverseDescription (Part att ext kw lif name pts items) =
 traverseDescription description = traverseModuleItems convertModuleItem description
 
 -- Convert Elaboration Severity Tasks
-severityElabTaskToString :: ModuleItem -> String
-severityElabTaskToString (ElabTask SeverityInfo _)     = "Info"
-severityElabTaskToString (ElabTask SeverityWarning _)  = "Warning"
-severityElabTaskToString (ElabTask SeverityError _)    = "Error"
-severityElabTaskToString (ElabTask SeverityFatal _)    = "Fatal"
-severityElabTaskToString _ = ""
+severityToString :: Severity -> String
+severityToString severity = toUpper ch : str
+    where '$' : ch : str = show severity
 
 severityElabTaskToDisplay :: ModuleItem -> [Stmt]
-severityElabTaskToDisplay task@(ElabTask severity (Args taskArgs [])) =
+severityElabTaskToDisplay (ElabTask severity taskArgs) =
     [Subroutine (Ident "$display") (Args (
-        [(String ("Elaboration "++(severityElabTaskToString task)++":"++(trailingSpace)))] ++ args
+        [(String ("Elaboration "++(severityToString severity)++":"++(trailingSpace)))] ++ args
     ) [])]
     where
-        args = parseTaskArgs severity taskArgs
-        parseTaskArgs _ [] = []
-        parseTaskArgs SeverityFatal (_:xs) = xs
-        parseTaskArgs _ x = x
+        args = if severity /= SeverityFatal || null taskArgs
+            then taskArgs
+            else tail taskArgs
         trailingSpace = if (length args) > 0 then " " else ""
 severityElabTaskToDisplay _ = []
 
 severityElabTaskToFinish :: ModuleItem -> [Stmt]
-severityElabTaskToFinish (ElabTask SeverityFatal (Args [] [])) =
+severityElabTaskToFinish (ElabTask SeverityFatal []) =
     [Asgn AsgnOpEq Nothing (LHSIdent elaborationFatalIdent) (RawNum 0)]
-severityElabTaskToFinish (ElabTask SeverityFatal (Args (finishArgs:_) [])) =
+severityElabTaskToFinish (ElabTask SeverityFatal (finishArgs : _)) =
     [Asgn AsgnOpEq Nothing (LHSIdent elaborationFatalIdent) finishArgs]
 severityElabTaskToFinish _ = []
 
@@ -87,44 +85,30 @@ convertModuleItem other =
     traverseStmts (traverseNestedStmts convertStmt) other
 
 -- Convert Standard Severity Tasks
-severityTaskToString :: Stmt -> String
-severityTaskToString (Subroutine (Ident "$info") _)    = severityElabTaskToString (ElabTask SeverityInfo (Args [] []))
-severityTaskToString (Subroutine (Ident "$warning") _) = severityElabTaskToString (ElabTask SeverityWarning (Args [] []))
-severityTaskToString (Subroutine (Ident "$error") _)   = severityElabTaskToString (ElabTask SeverityError (Args [] []))
-severityTaskToString (Subroutine (Ident "$fatal") _)   = severityElabTaskToString (ElabTask SeverityFatal (Args [] []))
-severityTaskToString _ = ""
 
 timeExpr :: Expr
 timeExpr = Ident "$time"
 
 severityTaskToDisplay :: Stmt -> [Stmt]
-severityTaskToDisplay task@(Subroutine severity (Args taskArgs [])) =
+severityTaskToDisplay (SeverityStmt severity taskArgs) =
     [Subroutine (Ident "$display") (Args (
-        [(String ("[%0t] "++(severityTaskToString task)++":"++(trailingSpace))), timeExpr] ++ args
+        [(String ("[%0t] "++(severityToString severity)++":"++(trailingSpace))), timeExpr] ++ args
     ) [])]
     where
-        args = parseTaskArgs severity taskArgs
-        parseTaskArgs _ [] = []
-        parseTaskArgs (Ident "$fatal") (_:xs) = xs
-        parseTaskArgs _ x = x
+        args = if severity /= SeverityFatal || null taskArgs
+            then taskArgs
+            else tail taskArgs
         trailingSpace = if (length args) > 0 then " " else ""
 severityTaskToDisplay _ = []
 
 severityTaskToFinish :: Stmt -> [Stmt]
-severityTaskToFinish (Subroutine (Ident "$fatal") (Args [] [])) =
+severityTaskToFinish (SeverityStmt SeverityFatal []) =
     [Subroutine (Ident "$finish") (Args [] [])]
-severityTaskToFinish (Subroutine (Ident "$fatal") (Args (finishArgs:_) [])) =
+severityTaskToFinish (SeverityStmt SeverityFatal (finishArgs : _)) =
     [Subroutine (Ident "$finish") (Args [finishArgs] [])]
 severityTaskToFinish _ = []
 
 convertStmt :: Stmt -> Stmt
-convertStmt task@(Subroutine (Ident "$info") _) =
-    Block Seq "" [] ((severityTaskToDisplay task) ++ (severityTaskToFinish task))
-convertStmt task@(Subroutine (Ident "$warning") _) =
-    Block Seq "" [] ((severityTaskToDisplay task) ++ (severityTaskToFinish task))
-convertStmt task@(Subroutine (Ident "$error") _) =
-    Block Seq "" [] ((severityTaskToDisplay task) ++ (severityTaskToFinish task))
-convertStmt task@(Subroutine (Ident "$fatal") _) =
-    Block Seq "" [] ((severityTaskToDisplay task) ++ (severityTaskToFinish task))
-
+convertStmt task@SeverityStmt{} =
+    Block Seq "" [] $ severityTaskToDisplay task ++ severityTaskToFinish task
 convertStmt other = other
