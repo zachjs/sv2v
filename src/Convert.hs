@@ -45,13 +45,13 @@ import qualified Convert.ParamType
 import qualified Convert.PortDecl
 import qualified Convert.RemoveComments
 import qualified Convert.ResolveBindings
+import qualified Convert.SeverityTask
 import qualified Convert.Simplify
 import qualified Convert.Stream
 import qualified Convert.StringParam
 import qualified Convert.StringType
 import qualified Convert.Struct
 import qualified Convert.StructConst
-import qualified Convert.SeverityTasks
 import qualified Convert.TFBlock
 import qualified Convert.Typedef
 import qualified Convert.TypeOf
@@ -122,9 +122,9 @@ initialPhases tops selectExclude =
     , Convert.Interface.disambiguate
     , Convert.Package.convert
     , Convert.StructConst.convert
-    , selectExclude Job.SeverityTasks Convert.SeverityTasks.convert
     , Convert.PortDecl.convert
     , Convert.ParamNoDefault.convert tops
+    , selectExclude Job.SeverityTask Convert.SeverityTask.convert
     , Convert.ResolveBindings.convert
     , Convert.UnnamedGenBlock.convert
     ]
