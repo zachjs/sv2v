@@ -94,13 +94,13 @@ severityTaskToString (Subroutine (Ident "$error") _)   = severityElabTaskToStrin
 severityTaskToString (Subroutine (Ident "$fatal") _)   = severityElabTaskToString (ElabTask SeverityFatal (Args [] []))
 severityTaskToString _ = ""
 
-timeCall :: Expr
-timeCall = Call (Ident "$time") (Args [] [])
+timeExpr :: Expr
+timeExpr = Ident "$time"
 
 severityTaskToDisplay :: Stmt -> [Stmt]
 severityTaskToDisplay task@(Subroutine severity (Args taskArgs [])) =
     [Subroutine (Ident "$display") (Args (
-        [(String ("[%0t] "++(severityTaskToString task)++":"++(trailingSpace))), timeCall] ++ args
+        [(String ("[%0t] "++(severityTaskToString task)++":"++(trailingSpace))), timeExpr] ++ args
     ) [])]
     where
         args = parseTaskArgs severity taskArgs
