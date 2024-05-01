@@ -20,6 +20,7 @@ import Control.Monad.Writer.Strict
 import Data.Either (isLeft)
 import Data.Maybe (isNothing, mapMaybe)
 import qualified Data.Map.Strict as Map
+import Data.Monoid (Any(Any), getAny)
 
 import Convert.Package (inject, prefixItems)
 import Convert.Traverse

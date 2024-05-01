@@ -21,6 +21,7 @@ import Language.SystemVerilog.AST
 
 import Control.Monad.Writer
 import Data.Maybe (fromMaybe)
+import Data.Monoid (Any(Any), getAny)
 
 convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions $ traverseModuleItems convertModuleItem

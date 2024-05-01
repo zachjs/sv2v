@@ -15,6 +15,7 @@
 {-# LANGUAGE BlockArguments #-}
 module Language.SystemVerilog.Parser.Parse (parse) where
 
+import Control.Monad (when)
 import Control.Monad.Except
 import Control.Monad.State.Strict
 import Data.Maybe (catMaybes, fromMaybe)

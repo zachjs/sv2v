@@ -27,9 +27,11 @@
 
 module Convert.Cast (convert) where
 
+import Control.Monad (when)
 import Control.Monad.Writer.Strict
 import Data.List (isPrefixOf)
 import Data.Maybe (isJust)
+import Data.Monoid (Any(Any), getAny)
 
 import Convert.ExprUtils
 import Convert.Scoper

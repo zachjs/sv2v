@@ -70,6 +70,7 @@ module Convert.Scoper
     , LookupResult
     ) where
 
+import Control.Monad (join, when)
 import Control.Monad.State.Strict
 import Data.List (findIndices, intercalate, isPrefixOf, partition)
 import Data.Maybe (isNothing)

@@ -14,6 +14,7 @@ module Language.SystemVerilog.Parser.Preprocess
     , Contents
     ) where
 
+import Control.Monad (when)
 import Control.Monad.Except
 import Control.Monad.State.Strict
 import Data.Char (ord)

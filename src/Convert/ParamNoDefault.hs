@@ -14,6 +14,7 @@
 
 module Convert.ParamNoDefault (convert) where
 
+import Control.Monad (when)
 import Control.Monad.Writer.Strict
 import Data.List (intercalate)
 import qualified Data.Map.Strict as Map

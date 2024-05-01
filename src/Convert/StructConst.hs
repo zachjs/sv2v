@@ -9,6 +9,7 @@
 
 module Convert.StructConst (convert) where
 
+import Control.Monad (join, mplus, when)
 import Control.Monad.State.Strict
 import Data.Maybe (fromMaybe)
 import Data.Tuple (swap)

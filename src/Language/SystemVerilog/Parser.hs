@@ -6,6 +6,8 @@ module Language.SystemVerilog.Parser
     , Config(..)
     ) where
 
+import Control.Monad (when)
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Except
 import Data.List (elemIndex)
 import Data.Maybe (catMaybes)

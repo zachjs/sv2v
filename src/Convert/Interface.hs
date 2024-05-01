@@ -8,6 +8,8 @@ module Convert.Interface (convert, disambiguate) where
 
 import Data.List (intercalate, (\\))
 import Data.Maybe (isJust, isNothing, mapMaybe)
+import Data.Monoid (Any(Any), getAny)
+import Control.Monad (when, (>=>))
 import Control.Monad.Writer.Strict
 import Text.Read (readMaybe)
 import qualified Data.Map.Strict as Map

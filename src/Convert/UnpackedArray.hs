@@ -11,6 +11,7 @@
 
 module Convert.UnpackedArray (convert) where
 
+import Control.Monad (when, (>=>))
 import Control.Monad.State.Strict
 import qualified Data.Map.Strict as Map
 
