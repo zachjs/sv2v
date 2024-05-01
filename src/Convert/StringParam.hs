@@ -11,6 +11,7 @@
 
 module Convert.StringParam (convert) where
 
+import Control.Monad (when)
 import Control.Monad.Writer.Strict
 import Data.Maybe (mapMaybe)
 import qualified Data.Set as Set

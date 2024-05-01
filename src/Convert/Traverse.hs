@@ -112,6 +112,7 @@ module Convert.Traverse
 
 import Data.Bitraversable (bimapM)
 import Data.Functor.Identity (Identity, runIdentity)
+import Control.Monad ((>=>))
 import Control.Monad.Writer.Strict
 import Language.SystemVerilog.AST
 

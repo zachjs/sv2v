@@ -25,6 +25,7 @@
 
 module Convert.Logic (convert) where
 
+import Control.Monad (when)
 import Control.Monad.Writer.Strict
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set

@@ -10,6 +10,7 @@ import Control.Monad.Writer.Strict
 import Data.Either (isRight, lefts)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import Data.Monoid (Any(Any), getAny)
 
 import Convert.Traverse
 import Language.SystemVerilog.AST

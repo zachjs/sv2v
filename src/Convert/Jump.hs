@@ -11,6 +11,7 @@ module Convert.Jump (convert) where
 
 import Control.Monad.State.Strict
 import Control.Monad.Writer.Strict
+import Data.Monoid (Any(Any), getAny)
 
 import Convert.Traverse
 import Language.SystemVerilog.AST

@@ -12,9 +12,11 @@
 
 module Convert.AlwaysKW (convert) where
 
+import Control.Monad (when, zipWithM, (>=>))
 import Control.Monad.State.Strict
 import Control.Monad.Writer.Strict
 import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Monoid (Any(Any), getAny)
 
 import Convert.Scoper
 import Convert.Traverse

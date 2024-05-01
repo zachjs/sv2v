@@ -7,6 +7,7 @@
 
 module Convert.GenvarName (convert) where
 
+import Control.Monad (when)
 import Control.Monad.State.Strict
 import Control.Monad.Writer.Strict
 import Data.Functor ((<&>))
