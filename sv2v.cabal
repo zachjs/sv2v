@@ -24,8 +24,8 @@ executable sv2v
   main-is: sv2v.hs
   hs-source-dirs: src
   build-tool-depends:
-    , alex:alex   >= 3.2.5 && < 4
-    , happy:happy >= 1.20  && < 2
+    , alex:alex >= 3.2 && < 4
+    , happy:happy >= 1.19 && < 2
   build-depends:
     , array
     , base

@@ -1,0 +1,31 @@
+name: Resolver
+on:
+  push:
+    branches:
+      - '*'
+  pull_request:
+  schedule:
+    - cron: '0 0 * * 0'
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        resolver:
+          - nightly
+          - lts-22
+          - lts-21
+          - lts-20
+          - lts-19
+          - lts-18
+          - lts-17
+          - lts-16
+          - lts-15
+          - lts-14
+          - lts-13
+    steps:
+      - uses: actions/checkout@v4
+      - run: stack build --resolver ${{ matrix.resolver }}
+      - run: stack exec sv2v --resolver ${{ matrix.resolver }} -- --help
+      - run: stack exec sv2v --resolver ${{ matrix.resolver }} -- test/basic/*.sv

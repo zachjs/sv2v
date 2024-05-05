@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE TemplateHaskell #-}
 {- sv2v
@@ -12,7 +13,9 @@ import Control.Monad (when)
 import Data.Char (toLower)
 import Data.List (isPrefixOf, isSuffixOf)
 import Data.Version (showVersion)
+#if MIN_VERSION_githash(0,1,5)
 import GitHash (giTag, tGitInfoCwdTry)
+#endif
 import qualified Paths_sv2v (version)
 import System.IO (stderr, hPutStr)
 import System.Console.CmdArgs
@@ -53,7 +56,11 @@ data Job = Job
     } deriving (Typeable, Data)
 
 version :: String
+#if MIN_VERSION_githash(0,1,5)
 version = either (const backup) giTag $$tGitInfoCwdTry
+#else
+version = backup
+#endif
     where backup = showVersion Paths_sv2v.version
 
 defaultJob :: Job
