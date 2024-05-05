@@ -14,6 +14,6 @@ for dependency in `echo "$dependencies"`; do
     echo "Dependency: $dependency"
     echo "================================================================================"
     echo ""
-    curl "$license_url" 2> /dev/null | sed -e "s/^/  /" -e "s/ *$//" -e "s/\r$//"
+    curl "$license_url" 2> /dev/null | sed -e "s/\r$//" -e "s/^/  /" -e "s/ *$//"
     echo ""
 done
