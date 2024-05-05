@@ -106,7 +106,7 @@ defaultJob = Job
     &= summary ("sv2v " ++ version)
     &= details [ "sv2v converts SystemVerilog to Verilog."
                , "More info: https://github.com/zachjs/sv2v"
-               , "(C) 2019-2023 Zachary Snow, 2011-2015 Tom Hawkins" ]
+               , "(C) 2019-2024 Zachary Snow, 2011-2015 Tom Hawkins" ]
     &= helpArg [explicit, name "help", help "Display this help message"]
     &= versionArg [explicit, name "version"]
     &= verbosityArgs [ignore] [ignore]
