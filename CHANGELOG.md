@@ -10,25 +10,25 @@
 * `unique`, `unique0`, and `priority` case statements now produce corresponding
   `parallel_case` and `full_case` statement attributes
 * Added support for attributes in unary, binary, and ternary expressions
-* Added support for shadowing interface names with local typenames
 * Added support for streaming concatenations within ternary expressions
+* Added support for shadowing interface names with local typenames
 * Added support for passing through `wait` statements
 
 ### Bug Fixes
 
-* Fixed an issue that prevented parsing tasks and functions with `inout` ports
 * Fixed signed unsized literals with a leading 1 bit (e.g., `'sb1`, `'sh8f`)
   incorrectly sign-extending in size and type casts
 * Fixed conflicting genvar names when inlining interfaces and modules that use
   them; all genvars are now given a design-wide unique name
-* Fixed byte order of strings in size casts
 * Fixed unconverted structs within explicit type casts
+* Fixed byte order of strings in size casts
 * Fixed unconverted multidimensional struct fields within dimension queries
 * Fixed non-typenames (e.g., from packages or subsequent declarations)
   improperly shadowing the names of `struct` pattern fields
 * Fixed shadowing of interface array indices passed to port connections
 * Fixed failure to resolve typenames suffixed with dimensions in contexts
   permitting both types and expressions, e.g., `$bits(T[W-1:0])`
+* Fixed an issue that prevented parsing tasks and functions with `inout` ports
 * Fixed errant constant folding of shadowed non-trivial localparams
 * Fixed conversion of function calls with no arguments passed to other functions
 * Fixed certain non-ANSI style port declarations being incorrectly reported as

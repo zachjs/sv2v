@@ -90,6 +90,8 @@ jobs:
           make test
 
   release:
+    permissions:
+      contents: write
     runs-on: ubuntu-22.04
     strategy:
       matrix:
@@ -107,11 +109,7 @@ jobs:
       - name: Create ZIP
         run: zip -r sv2v-${{ matrix.name }} ./sv2v-${{ matrix.name }}
       - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1.0.2
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./sv2v-${{ matrix.name }}.zip
-          asset_name: sv2v-${{ matrix.name }}.zip
-          asset_content_type: application/zip
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release upload ${{ github.event.release.tag_name }} sv2v-${{ matrix.name }}.zip
