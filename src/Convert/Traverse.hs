@@ -255,6 +255,7 @@ traverseSinglyNestedStmtsM fullMapper = cs
         cs (Timing event stmt) = fullMapper stmt >>= return . Timing event
         cs (Return expr) = return $ Return expr
         cs (Subroutine expr exprs) = return $ Subroutine expr exprs
+        cs (SeverityStmt severity exprs) = return $ SeverityStmt severity exprs
         cs (Trigger blocks x) = return $ Trigger blocks x
         cs stmt@Force{} = return stmt
         cs (Wait e stmt) = fullMapper stmt >>= return . Wait e
@@ -622,11 +623,8 @@ traverseNodesM exprMapper declMapper typeMapper lhsMapper stmtMapper =
         return $ MIPackageItem $ DPIExport spec alias kw name
     moduleItemMapper (AssertionItem item) =
         assertionItemMapper item >>= return . AssertionItem
-    moduleItemMapper (ElabTask severity (Args pnArgs kwArgs)) = do
-        pnArgs' <- mapM exprMapper pnArgs
-        kwArgs' <- fmap (zip kwNames) $ mapM exprMapper kwExprs
-        return $ ElabTask severity $ Args pnArgs' kwArgs'
-        where (kwNames, kwExprs) = unzip kwArgs
+    moduleItemMapper (ElabTask severity args) =
+        mapM exprMapper args >>= return . ElabTask severity
 
     assertionItemMapper (MIAssertion mx a) = do
         a' <- traverseAssertionStmtsM stmtMapper a
@@ -705,6 +703,8 @@ traverseStmtExprsM exprMapper = flatStmtMapper
         pes <- mapM exprMapper $ map snd p
         let p' = zip (map fst p) pes
         return $ Subroutine e' (Args l' p')
+    flatStmtMapper (SeverityStmt s l) =
+        mapM exprMapper l >>= return . SeverityStmt s
     flatStmtMapper (Return expr) =
         exprMapper expr >>= return . Return
     flatStmtMapper (Trigger blocks x) = return $ Trigger blocks x

@@ -45,6 +45,10 @@ import Language.SystemVerilog.Parser.Tokens
 "$high"                { Token KW_dollar_high                _ _ }
 "$increment"           { Token KW_dollar_increment           _ _ }
 "$size"                { Token KW_dollar_size                _ _ }
+"$info"                { Token KW_dollar_info                _ _ }
+"$warning"             { Token KW_dollar_warning             _ _ }
+"$error"               { Token KW_dollar_error               _ _ }
+"$fatal"               { Token KW_dollar_fatal               _ _ }
 
 "accept_on"        { Token KW_accept_on    _ _ }
 "alias"            { Token KW_alias        _ _ }
@@ -648,6 +652,7 @@ DeclToken :: { DeclToken }
   | NetTypeP Strength                  { uncurry DTNet $1 $2 }
   | PortBindingsP                      { uncurry DTPorts $1 }
   | SigningP                           { uncurry DTSigning $1 }
+  | SeverityP                          { uncurry DTSeverity $1 }
   | "[" Expr "]"                       { DTBit      (tokenPosition $1) $2 }
   | "." Identifier                     { DTDot      (tokenPosition $1) $2 }
   | "automatic"                        { DTLifetime (tokenPosition $1) Automatic }
@@ -1112,6 +1117,7 @@ StmtAsgn :: { Stmt }
   | LHS AsgnBinOp            Expr ";" { Asgn $2  Nothing $1 $3 }
   | LHS IncOrDecOperator ";" { Asgn (AsgnOp $2) Nothing $1 (RawNum 1) }
   | IncOrDecOperator LHS ";" { Asgn (AsgnOp $1) Nothing $2 (RawNum 1) }
+  | SeverityStmt ";" { $1 }
   | LHS          ";" { Subroutine (lhsToExpr $1) (Args [] []) }
   | LHS CallArgs ";" { Subroutine (lhsToExpr $1) $2 }
   | Identifier "::" Identifier          ";" { Subroutine (PSIdent $1 $3) (Args [] []) }
@@ -1155,6 +1161,11 @@ StmtNonBlock :: { Stmt }
 OptDelayOrEvent :: { Maybe Timing }
   : DelayOrEvent { Just $1 }
   | {- empty -}  { Nothing }
+
+SeverityStmt :: { Stmt }
+  : Severity               { SeverityStmt $1 [] }
+  | Severity "("       ")" { SeverityStmt $1 [] }
+  | Severity "(" Exprs ")" { SeverityStmt $1 $3 }
 
 CaseStmt :: { Stmt }
   : Unique CaseKW "(" Expr ")"          Cases       "endcase" { Case $1 $2                   $4 $ validateCases $5 $6 }
@@ -1519,6 +1530,14 @@ DimFn :: { DimFn }
   | "$high"                { FnHigh               }
   | "$increment"           { FnIncrement          }
   | "$size"                { FnSize               }
+
+Severity :: { Severity }
+  : SeverityP { snd $1 }
+SeverityP :: { (Position, Severity) }
+  : "$info"    { withPos $1 SeverityInfo    }
+  | "$warning" { withPos $1 SeverityWarning }
+  | "$error"   { withPos $1 SeverityError   }
+  | "$fatal"   { withPos $1 SeverityFatal   }
 
 MITrace :: { ModuleItem }
   : PITrace { MIPackageItem $1 }

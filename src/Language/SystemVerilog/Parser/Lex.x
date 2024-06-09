@@ -108,6 +108,10 @@ tokens :-
     "$high"                { tok KW_dollar_high                }
     "$increment"           { tok KW_dollar_increment           }
     "$size"                { tok KW_dollar_size                }
+    "$info"                { tok KW_dollar_info                }
+    "$warning"             { tok KW_dollar_warning             }
+    "$error"               { tok KW_dollar_error               }
+    "$fatal"               { tok KW_dollar_fatal               }
 
     "accept_on"        { tok KW_accept_on    }
     "alias"            { tok KW_alias        }

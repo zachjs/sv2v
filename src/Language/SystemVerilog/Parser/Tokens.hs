@@ -39,6 +39,10 @@ data TokenName
     | KW_dollar_high
     | KW_dollar_increment
     | KW_dollar_size
+    | KW_dollar_info
+    | KW_dollar_warning
+    | KW_dollar_error
+    | KW_dollar_fatal
     | KW_accept_on
     | KW_alias
     | KW_always

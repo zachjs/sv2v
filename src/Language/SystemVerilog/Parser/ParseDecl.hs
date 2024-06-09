@@ -77,6 +77,7 @@ data DeclToken
     | DTLHSBase  Position LHS
     | DTDot      Position Identifier
     | DTSigning  Position Signing
+    | DTSeverity Position Severity
     | DTLifetime Position Lifetime
     | DTAttr     Position Attr
     | DTEnd      Position Char
@@ -160,23 +161,17 @@ parseDTsAsModuleItems tokens =
 
 -- internal; attempt to parse an elaboration system task
 asElabTask :: [DeclToken] -> Maybe ModuleItem
-asElabTask tokens = do
-    DTIdent _ x@('$' : _) <- return $ head tokens
-    severity <- lookup x elabTasks
+asElabTask (DTSeverity _ severity : toks) =
     Just $ ElabTask severity args
     where
         args =
-            case tail tokens of
-                [DTEnd{}] -> Args [] []
-                [DTPorts _ ports, DTEnd{}] -> portsToArgs ports
+            case toks of
+                [DTEnd{}] -> []
+                [DTPorts _ ports, DTEnd{}] -> portsToExprs (head toks) ports
                 DTPorts{} : tok : _ -> parseError tok msg
-                toks -> parseError (head toks) msg
+                _ -> parseError (head toks) msg
         msg = "unexpected token after elaboration system task"
-
--- lookup table for elaboration system task severities
-elabTasks :: [(String, Severity)]
-elabTasks = map (\x -> (show x, x))
-    [SeverityInfo, SeverityWarning, SeverityError, SeverityFatal]
+asElabTask _ = Nothing
 
 -- internal; parser for module instantiations
 parseDTsAsIntantiations :: [DeclToken] -> [ModuleItem]
@@ -261,6 +256,13 @@ declLookahead l0 =
 
 -- internal; parser for leading statements in a procedural block
 parseDTsAsStmt :: [DeclToken] -> [Stmt]
+parseDTsAsStmt (tok@(DTSeverity _ severity) : toks) =
+    [traceStmt tok, SeverityStmt severity args]
+    where
+        args = case init toks of
+            [] -> []
+            [DTPorts _ ports] -> portsToExprs (head toks) ports
+            extraTok : _ -> parseError extraTok "unexpected severity task token"
 parseDTsAsStmt l0 =
     [traceStmt $ head l0, stmt]
     where
@@ -290,6 +292,13 @@ portsToArgs bindings =
         (pnBindings, kwBindings) = partition (null . fst) bindings
         pnArgs = map snd pnBindings
         kwArgs = kwBindings
+
+-- converts port bindings to a list of expressions
+portsToExprs :: DeclToken -> [PortBinding] -> [Expr]
+portsToExprs tok bindings =
+    case portsToArgs bindings of
+        Args args [] -> args
+        _ -> parseError tok "unexpected keyword argument"
 
 -- [PUBLIC]: parser for comma-separated declarations or assignment lists; this
 -- is only used for `for` loop initialization lists
@@ -669,6 +678,7 @@ tokPos (DTBit      p _) = p
 tokPos (DTLHSBase  p _) = p
 tokPos (DTDot      p _) = p
 tokPos (DTSigning  p _) = p
+tokPos (DTSeverity p _) = p
 tokPos (DTLifetime p _) = p
 tokPos (DTAttr     p _) = p
 tokPos (DTEnd      p _) = p

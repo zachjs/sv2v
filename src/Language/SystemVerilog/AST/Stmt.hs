@@ -23,6 +23,7 @@ module Language.SystemVerilog.AST.Stmt
     , PropertySpec (..)
     , ViolationCheck (..)
     , BlockKW (..)
+    , Severity      (..)
     ) where
 
 import Text.Printf (printf)
@@ -50,6 +51,7 @@ data Stmt
     | Timing  Timing Stmt
     | Return  Expr
     | Subroutine Expr Args
+    | SeverityStmt Severity [Expr]
     | Trigger Bool Identifier
     | Assertion Assertion
     | Force Bool LHS Expr
@@ -86,6 +88,7 @@ instance Show Stmt where
                 where showInit (l, e) = showAssign (l, AsgnOpEq, e)
     show (Subroutine e a) = printf "%s%s;" (show e) aStr
         where aStr = if a == Args [] [] then "" else show a
+    show (SeverityStmt s a) = printf "%s%s;" (show s) (show $ Args a [])
     show (Asgn  o t v e) = printf "%s %s %s%s;" (show v) (show o) tStr (show e)
         where tStr = maybe "" showPad t
     show (If u c s1 s2) =
@@ -339,3 +342,16 @@ instance Show BlockKW where
 blockEndToken :: BlockKW -> Identifier
 blockEndToken Seq = "end"
 blockEndToken Par = "join"
+
+data Severity
+    = SeverityInfo
+    | SeverityWarning
+    | SeverityError
+    | SeverityFatal
+    deriving Eq
+
+instance Show Severity where
+    show SeverityInfo    = "$info"
+    show SeverityWarning = "$warning"
+    show SeverityError   = "$error"
+    show SeverityFatal   = "$fatal"
