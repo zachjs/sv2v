@@ -8,5 +8,9 @@ module top;
         $display("[%0t] Error: ", $time, "%b", 3);
         $display("[%0t] Fatal:", $time);
         $finish;
+        $display("[%0t] Fatal:", $time);
+        $finish(0);
+        $display("[%0t] Fatal: ", $time, "%b", 4);
+        $finish(0);
     end
 endmodule
