@@ -27,9 +27,12 @@ traverseDescription defaultNetType (PackageItem (Directive str)) =
     where
         prefix = "`default_nettype "
         defaultNetType' =
-            if isPrefixOf prefix str
-                then parseDefaultNetType $ drop (length prefix) str
-                else defaultNetType
+            if isPrefixOf prefix str then
+                parseDefaultNetType $ drop (length prefix) str
+            else if str == "`resetall" then
+                Just TWire
+            else
+                defaultNetType
 traverseDescription defaultNetType description =
     (defaultNetType, partScoper traverseDeclM
         (traverseModuleItemM defaultNetType)

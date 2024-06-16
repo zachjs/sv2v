@@ -3,6 +3,7 @@
 ### Bug Fixes
 
 * Fixed `--write path/to/dir/` with directives like `` `default_nettype ``
+* Fixed `` `resetall `` not resetting the `` `default_nettype ``
 
 ### Other Enhancements
 
