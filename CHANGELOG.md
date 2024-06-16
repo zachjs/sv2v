@@ -1,5 +1,11 @@
 ## Unreleased
 
+### New Features
+
+* Added conversion of severity system tasks and elaboration system tasks (e.g.,
+  `$info`) into `$display` tasks including source file and scope information;
+  set `-E SeverityTask` to disable this new conversion
+
 ### Bug Fixes
 
 * Fixed `--write path/to/dir/` with directives like `` `default_nettype ``
@@ -18,7 +24,6 @@
 
 ### New Features
 
-* Added conversion of of standard and elaboration severity tasks
 * `unique`, `unique0`, and `priority` case statements now produce corresponding
   `parallel_case` and `full_case` statement attributes
 * Added support for attributes in unary, binary, and ternary expressions
