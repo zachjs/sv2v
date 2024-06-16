@@ -98,6 +98,7 @@ executable sv2v
     Convert.RemoveComments
     Convert.ResolveBindings
     Convert.Scoper
+    Convert.SeverityTask
     Convert.Simplify
     Convert.Stream
     Convert.StringParam
