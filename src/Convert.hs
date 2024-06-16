@@ -120,11 +120,11 @@ initialPhases tops selectExclude =
     , selectExclude Job.Assert Convert.Assertion.convert
     , selectExclude Job.Always Convert.AlwaysKW.convert
     , Convert.Interface.disambiguate
+    , selectExclude Job.SeverityTask Convert.SeverityTask.convert
     , Convert.Package.convert
     , Convert.StructConst.convert
     , Convert.PortDecl.convert
     , Convert.ParamNoDefault.convert tops
-    , selectExclude Job.SeverityTask Convert.SeverityTask.convert
     , Convert.ResolveBindings.convert
     , Convert.UnnamedGenBlock.convert
     ]

@@ -58,6 +58,10 @@ module Convert.Scoper
     , withinProcedureM
     , procedureLoc
     , procedureLocM
+    , sourceLocation
+    , sourceLocationM
+    , hierarchyPath
+    , hierarchyPathM
     , scopedError
     , scopedErrorM
     , isLoopVar
@@ -367,12 +371,25 @@ procedureLoc = sProcedureLoc
 debugLocation :: Scopes a -> String
 debugLocation s =
     hierarchy ++
-    if null latestTrace
+    if null location
         then " (use -v to get approximate source location)"
-        else ", near " ++ latestTrace
+        else ", near " ++ location
     where
-        hierarchy = intercalate "." $ map tierToStr $ sCurrent s
-        latestTrace = sLatestTrace s
+        hierarchy = hierarchyPath s
+        location = sourceLocation s
+
+sourceLocationM :: Monad m => ScoperT a m String
+sourceLocationM = gets sourceLocation
+
+sourceLocation :: Scopes a -> String
+sourceLocation = sLatestTrace
+
+hierarchyPathM :: Monad m => ScoperT a m String
+hierarchyPathM = gets hierarchyPath
+
+hierarchyPath :: Scopes a -> String
+hierarchyPath = intercalate "." . map tierToStr . sCurrent
+    where
         tierToStr :: Tier -> String
         tierToStr (Tier "" _) = "<unnamed_block>"
         tierToStr (Tier x "") = x
