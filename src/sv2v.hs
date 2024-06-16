@@ -16,6 +16,7 @@ import Convert (convert)
 import Job (readJob, Job(..), Write(..))
 import Language.SystemVerilog.AST
 import Language.SystemVerilog.Parser (parseFiles, Config(..))
+import Split (splitDescriptions)
 
 isComment :: Description -> Bool
 isComment (PackageItem (Decl CommentDecl{})) = True
@@ -60,17 +61,6 @@ rewritePath path = do
         ext = ".sv"
         (base, end) = splitExtension path
 
-splitModules :: FilePath -> AST -> [(FilePath, String)]
-splitModules dir (PackageItem (Decl CommentDecl{}) : ast) =
-    splitModules dir ast
-splitModules dir (description : ast) =
-    (path, output) : splitModules dir ast
-    where
-        Part _ _ Module _ name _ _ = description
-        path = combine dir $ name ++ ".v"
-        output = show description ++ "\n"
-splitModules _ [] = []
-
 writeOutput :: Write -> [FilePath] -> [AST] -> IO ()
 writeOutput _ [] [] =
     hPutStrLn stderr "Warning: No input files specified (try `sv2v --help`)"
@@ -82,9 +72,16 @@ writeOutput Adjacent inPaths asts = do
     outPaths <- mapM rewritePath inPaths
     let results = map (++ "\n") $ map show asts
     zipWithM_ writeFile outPaths results
-writeOutput (Directory d) _ asts = do
-    let (outPaths, outputs) = unzip $ splitModules d $ concat asts
+writeOutput (Directory d) _ asts =
     zipWithM_ writeFile outPaths outputs
+    where
+        (outPaths, outputs) =
+            unzip $ map prepare $ fst $ splitDescriptions (concat asts) []
+        prepare :: (String, AST) -> (FilePath, String)
+        prepare (name, ast) = (path, output)
+            where
+                path = combine d $ name ++ ".v"
+                output = concatMap (++ "\n") $ map show ast
 
 main :: IO ()
 main = do

@@ -1,3 +1,13 @@
+## Unreleased
+
+### Bug Fixes
+
+* Fixed `--write path/to/dir/` with directives like `` `default_nettype ``
+
+### Other Enhancements
+
+* `--write path/to/dir/` can now also be used with `--pass-through`
+
 ## v0.0.12
 
 ### Breaking Changes

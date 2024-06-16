@@ -139,11 +139,7 @@ readJob =
 setWrite :: Job -> IO Job
 setWrite job = do
     w <- parseWrite $ writeRaw job
-    case (w, passThrough job) of
-        (Directory{}, True) -> do
-            hPutStr stderr "can't use --pass-through when writing to a dir"
-            exitFailure
-        _ -> return $ job { write = w }
+    return $ job { write = w }
 
 setSuccinct :: Job -> Job
 setSuccinct job | verbose job = job { exclude = Succinct : exclude job }

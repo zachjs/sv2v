@@ -116,6 +116,7 @@ executable sv2v
     Convert.Wildcard
     -- sv2v CLI modules
     Job
+    Split
     Paths_sv2v
   autogen-modules:
     Paths_sv2v
