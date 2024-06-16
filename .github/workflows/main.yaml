@@ -9,6 +9,8 @@ on:
   release:
     types:
       - created
+  schedule:
+    - cron: '0 0 * * 0'
 jobs:
 
   build:
@@ -53,7 +55,7 @@ jobs:
       - name: Install Dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install bison autoconf
+          brew install bison
           echo "$(brew --prefix bison)/bin" >> $GITHUB_PATH
       - name: Install Dependencies (Linux)
         if: runner.os == 'Linux'
@@ -62,14 +64,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.local
-          key: ${{ runner.OS }}-${{ env.IVERILOG_REF }}
-          restore-keys: ${{ runner.OS }}-${{ env.IVERILOG_REF }}
+          key: ${{ runner.os }}-${{ env.IVERILOG_REF }}
+          restore-keys: ${{ runner.os }}-${{ env.IVERILOG_REF }}
       - name: Install iverilog
         run: |
           if [ ! -e "$HOME/.local/bin/iverilog" ]; then
             git clone https://github.com/steveicarus/iverilog.git
             cd iverilog
-            git checkout ${{ env.IVERILOG_REF }}
+            git checkout $IVERILOG_REF
             autoconf
             ./configure --prefix=$HOME/.local
             make -j2
@@ -87,7 +89,14 @@ jobs:
       - name: Test
         run: |
           chmod +x bin/sv2v
-          make test
+          # rebuild and upload a code coverage report on scheduled linux runs
+          make ${{ github.event_name == 'schedule' && runner.os == 'Linux' && 'coverage' || 'test' }}
+      - name: Upload Coverage
+        uses: actions/upload-artifact@v4
+        if: hashFiles('.hpc/*.html') != ''
+        with:
+          name: coverage
+          path: .hpc/*.html
 
   release:
     permissions:
