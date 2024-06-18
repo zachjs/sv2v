@@ -5,7 +5,7 @@ module top;
         f = x * 3;
         y = x * 5;
     endfunction
-    integer x, y;
+    logic signed [31:0] x, y;
     initial x = f(-1, y);
     initial $display(x, y);
 endmodule

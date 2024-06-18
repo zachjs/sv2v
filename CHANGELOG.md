@@ -8,6 +8,8 @@
 ### Bug Fixes
 
 * Fixed `--write path/to/dir/` with directives like `` `default_nettype ``
+* Fixed `logic` incorrectly converted to `wire` even when provided to a task or
+  function output port
 * Fixed `` `resetall `` not resetting the `` `default_nettype ``
 
 ### Other Enhancements

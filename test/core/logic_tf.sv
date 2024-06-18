@@ -40,4 +40,13 @@ module top;
         t2(1);
         $display("%b", t2l);
     end
+
+    logic l1, l2;
+    task io_task;
+        input inp;
+        output out;
+        out = ~inp;
+    endtask
+    assign l1 = 1;
+    always_comb io_task(l1, l2);
 endmodule

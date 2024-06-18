@@ -25,7 +25,7 @@
 
 module Convert.Logic (convert) where
 
-import Control.Monad (when)
+import Control.Monad (when, zipWithM)
 import Control.Monad.Writer.Strict
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -37,7 +37,8 @@ import Language.SystemVerilog.AST
 type Ports = Map.Map Identifier [(Identifier, Direction)]
 type Location = [Identifier]
 type Locations = Set.Set Location
-type ST = ScoperT Type (Writer Locations)
+type DT = (Direction, Type)
+type ST = ScoperT DT (Writer Locations)
 
 convert :: [AST] -> [AST]
 convert =
@@ -70,16 +71,17 @@ convertDescription ports description =
     where
         locations = execWriter $ evalScoperT $ scopePart locScoper description
         -- write down which vars are procedurally assigned
-        locScoper = scopeModuleItem traverseDeclM return return traverseStmtM
+        locScoper = scopeModuleItem
+            traverseDeclM traverseModuleItemM return traverseStmtM
         -- rewrite reg continuous assignments and output port connections
         conScoper = scopeModuleItem
-            (rewriteDeclM locations) (traverseModuleItemM ports) return return
+            (rewriteDeclM locations) (rewriteModuleItemM ports) return return
 
-traverseModuleItemM :: Ports -> ModuleItem -> Scoper Type ModuleItem
-traverseModuleItemM ports = embedScopes $ traverseModuleItem ports
+rewriteModuleItemM :: Ports -> ModuleItem -> Scoper DT ModuleItem
+rewriteModuleItemM ports = embedScopes $ rewriteModuleItem ports
 
-traverseModuleItem :: Ports -> Scopes Type -> ModuleItem -> ModuleItem
-traverseModuleItem ports scopes =
+rewriteModuleItem :: Ports -> Scopes DT -> ModuleItem -> ModuleItem
+rewriteModuleItem ports scopes =
     fixModuleItem
     where
         isReg :: LHS -> Bool
@@ -92,7 +94,7 @@ traverseModuleItem ports scopes =
                 isReg' :: LHS -> Writer [Bool] ()
                 isReg' lhs =
                     case lookupElem scopes lhs of
-                        Just (_, _, t) -> tell [isRegType t]
+                        Just (_, _, (_, t)) -> tell [isRegType t]
                         _ -> tell [False]
 
         always_comb = AlwaysC Always . Timing (Event EventStar)
@@ -146,14 +148,18 @@ traverseModuleItem ports scopes =
                 maybeModulePorts = Map.lookup moduleName ports
         fixModuleItem other = other
 
-traverseDeclM :: Decl -> ST Decl
-traverseDeclM decl@(Variable _ t x _ _) =
-    insertElem x t >> return decl
-traverseDeclM decl@(Net _ _ _ t x _ _) =
-    insertElem x t >> return decl
-traverseDeclM decl = return decl
+traverseModuleItemM :: ModuleItem -> ST ModuleItem
+traverseModuleItemM = traverseNodesM traverseExprM return return return return
 
-rewriteDeclM :: Locations -> Decl -> Scoper Type Decl
+traverseDeclM :: Decl -> ST Decl
+traverseDeclM decl = do
+    case decl of
+        Variable d t x _ _ -> insertElem x (d, t)
+        Net  d _ _ t x _ _ -> insertElem x (d, t)
+        _ -> return ()
+    traverseDeclNodesM return traverseExprM decl
+
+rewriteDeclM :: Locations -> Decl -> Scoper DT Decl
 rewriteDeclM locations (Variable d (IntegerVector TLogic sg rs) x a e) = do
     accesses <- localAccessesM x
     let location = map accessName accesses
@@ -163,11 +169,11 @@ rewriteDeclM locations (Variable d (IntegerVector TLogic sg rs) x a e) = do
         then do
             let d' = if d == Inout then Output else d
             let t' = IntegerVector TReg sg rs
-            insertElem accesses t'
+            insertElem accesses (d', t')
             return $ Variable d' t' x a e
         else do
             let t' = Implicit sg rs
-            insertElem accesses t'
+            insertElem accesses (d, t')
             return $ Net d TWire DefaultStrength t' x a e
 rewriteDeclM locations decl@(Variable d t x a e) = do
     inProcedure <- withinProcedureM
@@ -178,12 +184,12 @@ rewriteDeclM locations decl@(Variable d t x a e) = do
         (Input, IntegerVector TReg sg rs, False) ->
             rewriteDeclM locations $ Variable Input t' x a e
             where t' = IntegerVector TLogic sg rs
-        _ -> insertElem x t >> return decl
+        _ -> insertElem x (d, t) >> return decl
 rewriteDeclM _ (Net d n s (IntegerVector _ sg rs) x a e) =
-    insertElem x t >> return (Net d n s t x a e)
+    insertElem x (d, t) >> return (Net d n s t x a e)
     where t = Implicit sg rs
-rewriteDeclM _ decl@(Net _ _ _ t x _ _) =
-    insertElem x t >> return decl
+rewriteDeclM _ decl@(Net d _ _ t x _ _) =
+    insertElem x (d, t) >> return decl
 rewriteDeclM _ (Param s (IntegerVector _ sg []) x e) =
     return $ Param s (Implicit sg [(zero, zero)]) x e
     where zero = RawNum 0
@@ -195,12 +201,37 @@ traverseStmtM :: Stmt -> ST Stmt
 traverseStmtM (Asgn op Just{} lhs expr) =
     -- ignore the timing LHSs
     traverseStmtM $ Asgn op Nothing lhs expr
-traverseStmtM stmt@(Subroutine (Ident f) (Args (_ : Ident x : _) [])) =
-    when (f == "$readmemh" || f == "$readmemb") (collectLHSM $ LHSIdent x)
-        >> return stmt
+traverseStmtM stmt@(Subroutine (Ident f) (Args (_ : Ident x : _) []))
+    | f == "$readmemh" || f == "$readmemb" =
+        collectLHSM (LHSIdent x) >> return stmt
+traverseStmtM (Subroutine fn (Args args [])) = do
+    fn' <- traverseExprM fn
+    args' <- traverseCall fn' args
+    return $ Subroutine fn' $ Args args' []
 traverseStmtM stmt =
     collectStmtLHSsM (collectNestedLHSsM collectLHSM) stmt
-        >> return stmt
+        >> traverseStmtExprsM traverseExprM stmt
+
+traverseExprM :: Expr -> ST Expr
+traverseExprM (Call fn (Args args [])) = do
+    fn' <- traverseExprM fn
+    args' <- traverseCall fn' args
+    return $ Call fn' $ Args args' []
+traverseExprM other =
+    traverseSinglyNestedExprsM traverseExprM other
+
+traverseCall :: Expr -> [Expr] -> ST [Expr]
+traverseCall fn = zipWithM (traverseCallArg fn) [0..]
+
+-- task and function ports might be outputs, thus requiring a given logic to be
+-- a reg rather than a wire
+traverseCallArg :: Expr -> Int -> Expr -> ST Expr
+traverseCallArg fn idx arg = do
+    details <- lookupElemM $ Dot fn (show idx)
+    case (details, exprToLHS arg) of
+        (Just (_, _, (Output, _)), Just lhs) -> collectLHSM lhs
+        _ -> return ()
+    return arg -- no rewriting
 
 collectLHSM :: LHS -> ST ()
 collectLHSM lhs = do

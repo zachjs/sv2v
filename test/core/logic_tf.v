@@ -44,4 +44,10 @@ module top;
         t2(1);
         $display("%b", t2l);
     end
+
+    wire l1;
+    reg l2;
+    assign l1 = 1;
+    always @*
+        l2 = ~l1;
 endmodule
