@@ -235,6 +235,10 @@ data PropExpr
     | PropExprFollowsO  SeqExpr PropExpr
     | PropExprFollowsNO SeqExpr PropExpr
     | PropExprIff PropExpr PropExpr
+    | PropExprNeg    PropExpr
+    | PropExprStrong SeqExpr
+    | PropExprWeak   SeqExpr
+    | PropExprNextTime Bool Expr PropExpr
     deriving Eq
 instance Show PropExpr where
     show (PropExpr se) = show se
@@ -243,6 +247,14 @@ instance Show PropExpr where
     show (PropExprFollowsO  a b) = printf "(%s #-# %s)" (show a) (show b)
     show (PropExprFollowsNO a b) = printf "(%s #=# %s)" (show a) (show b)
     show (PropExprIff a b) = printf "(%s iff %s)" (show a) (show b)
+    show (PropExprNeg    pe) = printf    "not (%s)" (show pe)
+    show (PropExprStrong se) = printf "strong (%s)" (show se)
+    show (PropExprWeak   se) = printf   "weak (%s)" (show se)
+    show (PropExprNextTime strong index prop) =
+        printf "%s%s (%s)" kwStr indexStr (show prop)
+        where
+            kwStr = (if strong then "s_" else "") ++ "nexttime"
+            indexStr = if index == Nil then "" else printf " [%s]" (show index)
 data SeqMatchItem
     = SeqMatchAsgn (LHS, AsgnOp, Expr)
     | SeqMatchCall Identifier Args

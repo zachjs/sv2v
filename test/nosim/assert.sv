@@ -47,6 +47,11 @@ module top;
         (1 |-> (1 |=> (1 #-# (1 #=# (1 iff 1))))));
     assert property (@(posedge clk)
         1 and 1 or 1 intersect 1 throughout 1 within 1);
+    assert property (@(posedge clk) not (strong(1) iff weak(1)));
+    assert property (@(posedge clk) nexttime (1 iff 1));
+    assert property (@(posedge clk) nexttime [0] (1 iff 1));
+    assert property (@(posedge clk) s_nexttime (1 iff 1));
+    assert property (@(posedge clk) s_nexttime [0] (1 iff 1));
     assert property (@(posedge clk) 1 ##1 1);
     assert property (@(posedge clk) ##1 1);
     localparam C = 1;

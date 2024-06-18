@@ -413,6 +413,7 @@ time               { Token Lit_time        _ _ }
 %right "iff"
 %left "or" ","
 %left "and"
+%nonassoc "not" "nexttime" "s_nexttime"
 %left "intersect"
 %left "within"
 %right "throughout"
@@ -794,6 +795,13 @@ PropExprParens :: { PropExpr }
   | SeqExpr "#-#" PropExpr { PropExprFollowsO  $1 $3 }
   | SeqExpr "#=#" PropExpr { PropExprFollowsNO $1 $3 }
   | PropExpr "iff" PropExpr { PropExprIff $1 $3 }
+  | "not" PropExpr { PropExprNeg $2 }
+  | "strong" "(" SeqExpr ")" { PropExprStrong $3 }
+  | "weak"   "(" SeqExpr ")" { PropExprWeak   $3 }
+  | "nexttime"                PropExpr { PropExprNextTime False Nil $2 }
+  | "nexttime"   "[" Expr "]" PropExpr { PropExprNextTime False $3  $5 }
+  | "s_nexttime"              PropExpr { PropExprNextTime True  Nil $2 }
+  | "s_nexttime" "[" Expr "]" PropExpr { PropExprNextTime True  $3  $5 }
 SeqExpr :: { SeqExpr }
   : Expr { SeqExpr $1 }
   | SeqExprParens { $1 }

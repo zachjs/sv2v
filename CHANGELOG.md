@@ -1,5 +1,10 @@
 ## Unreleased
 
+### New Features
+
+* Added parsing support for `not`, `strong`, `weak`, `nexttime`, and
+  `s_nexttime` in assertion property expressions
+
 ### Bug Fixes
 
 * Fixed `--write path/to/dir/` with directives like `` `default_nettype ``

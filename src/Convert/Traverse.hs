@@ -111,6 +111,7 @@ module Convert.Traverse
 ) where
 
 import Data.Bitraversable (bimapM)
+import Data.Functor ((<&>))
 import Data.Functor.Identity (Identity, runIdentity)
 import Control.Monad ((>=>))
 import Control.Monad.Writer.Strict
@@ -344,6 +345,16 @@ traversePropExprExprsM mapper (PropExprIff p1 p2) = do
     p1' <- traversePropExprExprsM mapper p1
     p2' <- traversePropExprExprsM mapper p2
     return $ PropExprIff p1' p2'
+traversePropExprExprsM mapper (PropExprNeg pe) =
+    traversePropExprExprsM mapper pe <&> PropExprNeg
+traversePropExprExprsM mapper (PropExprStrong se) =
+    traverseSeqExprExprsM mapper se <&> PropExprStrong
+traversePropExprExprsM mapper (PropExprWeak se) =
+    traverseSeqExprExprsM mapper se <&> PropExprWeak
+traversePropExprExprsM mapper (PropExprNextTime strong index prop) = do
+    index' <- mapper index
+    prop' <- traversePropExprExprsM mapper prop
+    return $ PropExprNextTime strong index' prop'
 
 seqExprHelper :: Monad m => MapperM m Expr
     -> (SeqExpr -> SeqExpr -> SeqExpr)
