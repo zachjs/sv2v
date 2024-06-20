@@ -12,6 +12,7 @@ import Control.Monad (when, zipWithM_)
 import Control.Monad.Except (runExceptT)
 import Data.List (nub)
 
+import Bugpoint (runBugpoint)
 import Convert (convert)
 import Job (readJob, Job(..), Write(..))
 import Language.SystemVerilog.AST
@@ -107,6 +108,8 @@ main = do
             asts' <-
                 if passThrough job then
                     return asts
+                else if bugpoint job /= [] then
+                    runBugpoint (bugpoint job) converter asts
                 else
                     converter asts
             emptyWarnings (concat asts) (concat asts')

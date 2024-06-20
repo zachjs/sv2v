@@ -4,6 +4,7 @@
 
 * Added parsing support for `not`, `strong`, `weak`, `nexttime`, and
   `s_nexttime` in assertion property expressions
+* Added `--bugpoint` utility for minimizing test cases for issue submission
 
 ### Bug Fixes
 

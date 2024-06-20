@@ -116,6 +116,9 @@ Other:
                             number literals (e.g., 'h1_ffff_ffff, 4294967296)
      --dump-prefix=PATH     Create intermediate output files with the given
                             path prefix; used for internal debugging
+     --bugpoint=SUBSTR      Reduce the input by pruning modules, wires, etc.,
+                            that aren't needed to produce the given output or
+                            error substring when converted
      --help                 Display this help message
      --version              Print version information
      --numeric-version      Print just the version number

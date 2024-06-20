@@ -53,6 +53,7 @@ data Job = Job
     , top :: [String]
     , oversizedNumbers :: Bool
     , dumpPrefix :: FilePath
+    , bugpoint :: [String]
     } deriving (Typeable, Data)
 
 version :: String
@@ -101,6 +102,10 @@ defaultJob = Job
     , dumpPrefix = def &= name "dump-prefix" &= explicit &= typ "PATH"
         &= help ("Create intermediate output files with the given path prefix;"
             ++ " used for internal debugging")
+    , bugpoint = nam_ "bugpoint" &= typ "SUBSTR"
+        &= help ("Reduce the input by pruning modules, wires, etc., that"
+            ++ " aren't needed to produce the given output or error substring"
+            ++ " when converted")
     }
     &= program "sv2v"
     &= summary ("sv2v " ++ version)

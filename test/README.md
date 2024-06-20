@@ -68,6 +68,7 @@ The remaining test suites have a custom `run.sh` that defines a list of test
 procedures that may not correspond directly to the other files in the folder.
 Many of these suites test a particular feature of the sv2v CLI.
 
+* `bugpoint` tests `--bugpoint`
 * `define` tests `-D`/`--define`
 * `dump` tests `--dump-prefix`
 * `help` ensures the `--help` output in the README is up to date
