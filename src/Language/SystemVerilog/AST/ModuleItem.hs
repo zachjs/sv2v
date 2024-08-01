@@ -14,6 +14,7 @@ module Language.SystemVerilog.AST.ModuleItem
     , NOutputGateKW (..)
     , AssignOption  (..)
     , AssertionItem (..)
+    , showGenModuleItem
     ) where
 
 import Data.List (intercalate)
@@ -93,6 +94,10 @@ showModportDecl (dir, ident, e) =
     if e == Ident ident
         then printf "%s %s" (show dir) ident
         else printf "%s .%s(%s)" (show dir) ident (show e)
+
+showGenModuleItem :: ModuleItem -> String
+showGenModuleItem (Generate genItems) = show genItems
+showGenModuleItem item = show item
 
 type PortBinding = (Identifier, Expr)
 
