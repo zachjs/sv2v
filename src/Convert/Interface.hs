@@ -633,8 +633,7 @@ inlineInstance global ranges modportBindings items partName
         removeDeclDir (Variable _ t x a e) =
             Variable Local t' x a e
             where t' = case t of
-                    Implicit Unspecified rs ->
-                        IntegerVector TLogic Unspecified rs
+                    Implicit sg rs -> IntegerVector TLogic sg rs
                     _ -> t
         removeDeclDir decl@Net{} =
             traverseNetAsVar removeDeclDir decl
