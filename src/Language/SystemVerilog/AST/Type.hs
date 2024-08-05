@@ -57,6 +57,7 @@ instance Show Type where
     show (Alias         xx    rs) = printf "%s%s" xx (showRanges rs)
     show (PSAlias ps    xx    rs) = printf "%s::%s%s" ps xx (showRanges rs)
     show (CSAlias ps pm xx    rs) = printf "%s#%s::%s%s" ps (showParams pm) xx (showRanges rs)
+    show (Implicit         sg []) = show sg
     show (Implicit         sg rs) = printf "%s%s"             (showPad       sg) (dropWhile (== ' ') $ showRanges rs)
     show (IntegerVector kw sg rs) = printf "%s%s%s" (show kw) (showPadBefore sg) (showRanges rs)
     show (IntegerAtom   kw sg   ) = printf "%s%s"   (show kw) (showPadBefore sg)
