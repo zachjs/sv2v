@@ -49,7 +49,7 @@ jobs:
           - macOS-13
     needs: build
     env:
-      IVERILOG_REF: ef7f0a8f38782dfc0872b1e352ccf32343c10bb8
+      IVERILOG_REF: cbdaa865a10ce69d7c528cb2aa4c571641de0c62
     steps:
       - uses: actions/checkout@v4
         with:
