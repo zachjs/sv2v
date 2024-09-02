@@ -47,7 +47,7 @@ traverseModuleItemM (Genvar x) =
     insertElem x Nil >> return (Genvar x)
 traverseModuleItemM item =
     traverseNodesM traverseExprM return traverseTypeM traverseLHSM return item
-    where traverseLHSM = traverseLHSExprsM traverseExprM
+    where traverseLHSM = traverseNestedLHSsM $ traverseLHSExprsM traverseExprM
 
 traverseGenItemM :: GenItem -> SC GenItem
 traverseGenItemM = traverseGenItemExprsM traverseExprM

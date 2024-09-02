@@ -79,7 +79,7 @@ insertType ident typ = do
 traverseModuleItemM :: ModuleItem -> ST ModuleItem
 traverseModuleItemM =
     traverseNodesM traverseExprM return traverseTypeM traverseLHSM return
-    where traverseLHSM = traverseLHSExprsM traverseExprM
+    where traverseLHSM = traverseNestedLHSsM $ traverseLHSExprsM traverseExprM
 
 -- convert TypeOf in a GenItem
 traverseGenItemM :: GenItem -> ST GenItem

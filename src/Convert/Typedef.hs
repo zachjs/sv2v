@@ -88,7 +88,7 @@ traverseModuleItemM item = traverseModuleItemM' item
 traverseModuleItemM' :: ModuleItem -> SC ModuleItem
 traverseModuleItemM' =
     traverseNodesM traverseExprM return traverseTypeM traverseLHSM return
-    where traverseLHSM = traverseLHSExprsM traverseExprM
+    where traverseLHSM = traverseNestedLHSsM $ traverseLHSExprsM traverseExprM
 
 traverseGenItemM :: GenItem -> SC GenItem
 traverseGenItemM = traverseGenItemExprsM traverseExprM
