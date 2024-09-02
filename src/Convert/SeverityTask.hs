@@ -47,7 +47,8 @@ elab severity args prefixStr prefixArgs = do
     return $ Block Seq "" [] [stmtDisplay, stmtFinish]
     where
         msg scope file = severityToString severity ++ " [" ++ prefixStr ++ "] "
-            ++ file ++ " - " ++ scope ++ if null displayArgs then "" else " - "
+            ++ file ++ " - " ++ scope
+            ++ if null displayArgs then "" else "\\n msg: "
         displayArgs = if severity /= SeverityFatal || null args
             then args
             else tail args
