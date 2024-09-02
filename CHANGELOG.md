@@ -3,8 +3,8 @@
 ### New Features
 
 * Added conversion of severity system tasks and elaboration system tasks (e.g.,
-  `$info`) into `$display` tasks including source file and scope information;
-  set `-E SeverityTask` to disable this new conversion
+  `$info`) into `$display` tasks that include source file and scope information;
+  pass `-E SeverityTask` to disable this new conversion
 * Added parsing support for `not`, `strong`, `weak`, `nexttime`, and
   `s_nexttime` in assertion property expressions
 * Added `--bugpoint` utility for minimizing test cases for issue submission
