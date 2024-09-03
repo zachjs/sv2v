@@ -45,6 +45,7 @@ import qualified Convert.ParamType
 import qualified Convert.PortDecl
 import qualified Convert.RemoveComments
 import qualified Convert.ResolveBindings
+import qualified Convert.SeverityTask
 import qualified Convert.Simplify
 import qualified Convert.Stream
 import qualified Convert.StringParam
@@ -119,6 +120,7 @@ initialPhases tops selectExclude =
     , selectExclude Job.Assert Convert.Assertion.convert
     , selectExclude Job.Always Convert.AlwaysKW.convert
     , Convert.Interface.disambiguate
+    , selectExclude Job.SeverityTask Convert.SeverityTask.convert
     , Convert.Package.convert
     , Convert.StructConst.convert
     , Convert.PortDecl.convert

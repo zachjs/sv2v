@@ -77,6 +77,9 @@ assertConverts() {
     ac_tmpd=$SHUNIT_TMPDIR/ac-conv-tmpd.v
     convert "conversion of pass through of $ac_file" $ac_tmpd $ac_tmpc
 
+    # remove source locations when checking the --pass-through invariant
+    removeSourceLocation $ac_file $ac_tmpa
+    removeSourceLocation $ac_tmpc $ac_tmpd
     diff $ac_tmpa $ac_tmpd > /dev/null
     assertTrue "pass through then conversion differs for $ac_file" $?
 
@@ -173,6 +176,11 @@ simulateAndCompare() {
     simulate $cvs_vcd $cvs_log $cs $tb
     simulate $cvv_vcd $cvv_log $cv $tb
 
+    # clean log files by source locations
+    removeSourceLocation $ve $ref_log
+    removeSourceLocation $cs $cvs_log
+    removeSourceLocation $cv $cvv_log
+
     # compare reference verilog to converted succinct
     output=`diff $ref_vcd $cvs_vcd`
     assertTrue "VE/CS VCDs are different:\n$output" $?
@@ -198,4 +206,8 @@ runAndCapture() {
     result=$?
     stdout=`cat $SHUNIT_TMPDIR/stdout`
     stderr=`cat $SHUNIT_TMPDIR/stderr`
+}
+
+removeSourceLocation() {
+    sed -i.bak -E 's#'$1':[0-9]+(:[0-9]+)?#<removed_source_location>#g' $2
 }
