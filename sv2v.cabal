@@ -25,7 +25,7 @@ executable sv2v
   hs-source-dirs: src
   build-tool-depends:
     , alex:alex >= 3.2 && < 4
-    , happy:happy >= 1.19 && < 2
+    , happy:happy >= 1.19 && < 3
   build-depends:
     , array
     , base
