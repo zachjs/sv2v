@@ -18,6 +18,8 @@
   left-hand side of an assignment
 * Fixed `input signed` ports of interface-using modules producing invalid
   declarations after inlining
+* Fixed inlining of interfaces and interface-bound modules containing port
+  declarations tagged with an attribute
 * Fixed `` `resetall `` not resetting the `` `default_nettype ``
 
 ### Other Enhancements

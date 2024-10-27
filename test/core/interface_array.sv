@@ -1,5 +1,5 @@
 interface Interface(i);
-    input i;
+    (* test *) input i;
     logic v;
     logic o;
     task tick;

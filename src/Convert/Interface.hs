@@ -691,8 +691,8 @@ inlineInstance global ranges modportBindings items partName
                     then idn instanceName
                     else bit (idn instanceName) (Ident loopVar)
 
-        declDirs = execWriter $
-            mapM (collectDeclsM collectDeclDir) items
+        declDirs = execWriter $ mapM
+            (collectNestedModuleItemsM $ collectDeclsM collectDeclDir) items
         collectDeclDir :: Decl -> Writer (Map.Map Identifier Direction) ()
         collectDeclDir (Variable dir _ ident _ _) =
             when (dir /= Local) $
