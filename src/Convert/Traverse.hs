@@ -139,6 +139,8 @@ collectDescriptionsM = mapM_
 breakGenerate :: ModuleItem -> [ModuleItem] -> [ModuleItem]
 breakGenerate (Generate genItems) items =
     foldr breakGenerateStep items genItems
+breakGenerate (MIAttr _ (Generate genItems)) items =
+    foldr breakGenerateStep items genItems
 breakGenerate item items = item : items
 
 breakGenerateStep :: GenItem -> [ModuleItem] -> [ModuleItem]
@@ -1064,8 +1066,14 @@ traverseNestedGenItemsM mapper = fullMapper
 traverseNestedGenItems :: Mapper GenItem -> Mapper GenItem
 traverseNestedGenItems = unmonad traverseNestedGenItemsM
 
+innerGenItems :: ModuleItem -> Maybe [GenItem]
+innerGenItems (MIAttr _ item) = innerGenItems item
+innerGenItems (Generate items) = Just items
+innerGenItems _ = Nothing
+
 flattenGenBlocks :: GenItem -> [GenItem]
-flattenGenBlocks (GenModuleItem (Generate items)) = items
+flattenGenBlocks (GenModuleItem item)
+    | Just items <- innerGenItems item = items
 flattenGenBlocks (GenFor _ _ _ GenNull) = []
 flattenGenBlocks GenNull = []
 flattenGenBlocks other = [other]

@@ -76,6 +76,7 @@ module ModuleB(is);
         bn.tick;
     endtask
     initial $display("Hello I'm ModuleB %0d!", WIDTH);
+    (* this_attribute_is_ignored *)
     ModuleBNested #(WIDTH) bn(is);
 endmodule
 
@@ -96,6 +97,7 @@ endmodule
 module top;
     logic inp;
 
+    (* this_attribute_is_ignored *)
     Interface intfX[2:0](inp);
 
     ModuleA #(0) xa2(intfX[2]);

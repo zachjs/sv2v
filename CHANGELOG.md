@@ -20,6 +20,8 @@
   declarations after inlining
 * Fixed inlining of interfaces and interface-bound modules containing port
   declarations tagged with an attribute
+* Fixed stray attributes producing invalid nested output when attached to
+  inlined interfaces and interface-bounds modules
 * Fixed `` `resetall `` not resetting the `` `default_nettype ``
 
 ### Other Enhancements
