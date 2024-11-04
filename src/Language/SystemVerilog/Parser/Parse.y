@@ -705,7 +705,11 @@ ModuleItem :: { [ModuleItem] }
   : NonGenerateModuleItem { $1 }
   | ConditionalGenerateConstruct    { [Generate [$1]] }
   | LoopGenerateConstruct           { [Generate [$1]] }
+  | AttributeInstance ModuleItem    { map (addMIAttr $1) $2 }
   | "generate" GenItems endgenerate { [Generate $2] }
+NonGenerateModuleItemA :: { [ModuleItem] }
+  : NonGenerateModuleItem                    { $1 }
+  | AttributeInstance NonGenerateModuleItemA { map (addMIAttr $1) $2 }
 NonGenerateModuleItem :: { [ModuleItem] }
   -- This item covers module instantiations and all declarations
   : ModuleDeclTokens(";")                {% mapM recordPartUsed $ parseDTsAsModuleItems $1 }
@@ -721,7 +725,6 @@ NonGenerateModuleItem :: { [ModuleItem] }
   | TaskOrFunction                       { [MIPackageItem $1] }
   | NInputGateKW  NInputGates  ";"       { map (\(a, b, c, d) -> NInputGate  $1 a b c d) $2 }
   | NOutputGateKW NOutputGates ";"       { map (\(a, b, c, d) -> NOutputGate $1 a b c d) $2 }
-  | AttributeInstance ModuleItem         { map (addMIAttr $1) $2 }
   | AssertionItem                        { [AssertionItem $1] }
 
 AssignOption :: { AssignOption }
@@ -1469,8 +1472,7 @@ GenItems :: { [GenItem] }
 
 GenItem :: { GenItem }
   : MITrace GenBlock              { uncurry GenBlock $2 }
-  | MITrace NonGenerateModuleItem { genItemsToGenItem $ map GenModuleItem $ addMITrace $1 $2 }
-  | MITrace "generate" GenItems "endgenerate" { genItemsToGenItem $3 }
+  | MITrace NonGenerateModuleItemA { genItemsToGenItem $ map GenModuleItem $ addMITrace $1 $2 }
   | MITrace ConditionalGenerateConstruct { $2 }
   | MITrace LoopGenerateConstruct        { $2 }
 ConditionalGenerateConstruct :: { GenItem }
