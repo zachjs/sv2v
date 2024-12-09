@@ -380,7 +380,7 @@ convertLHS l = do
 -- try expression conversion by looking at the *innermost* type first
 convertSubExpr :: Scopes Type -> Expr -> (Type, Expr)
 convertSubExpr scopes (Dot e x) =
-    if isntStruct subExprType then
+    if isntStruct subExprType || isHier then
         fallbackType scopes $ Dot e' x
     else if structIsntReady subExprType then
         (fieldType, Dot e' x)
@@ -388,7 +388,7 @@ convertSubExpr scopes (Dot e x) =
         (fieldType, undottedWithSign)
     where
         (subExprType, e') = convertSubExpr scopes e
-        (fieldType, bounds, dims) = lookupFieldInfo scopes subExprType e' x
+        (isHier, fieldType, bounds, dims) = lookupFieldInfo scopes subExprType e' x
         base = fst bounds
         len = rangeSize bounds
         undotted = if null dims || rangeSize (head dims) == RawNum 1
@@ -403,7 +403,7 @@ convertSubExpr scopes (Dot e x) =
                 else undotted
 
 convertSubExpr scopes (Range (Dot e x) NonIndexed rOuter) =
-    if isntStruct subExprType then
+    if isntStruct subExprType || isHier then
         (UnknownType, orig')
     else if structIsntReady subExprType then
         (replaceInnerTypeRange NonIndexed rOuter' fieldType, orig')
@@ -420,7 +420,7 @@ convertSubExpr scopes (Range (Dot e x) NonIndexed rOuter) =
         (_, roRight') = convertSubExpr scopes roRight
         rOuter' = (roLeft', roRight')
         orig' = Range (Dot e' x) NonIndexed rOuter'
-        (fieldType, bounds, dims) = lookupFieldInfo scopes subExprType e' x
+        (isHier, fieldType, bounds, dims) = lookupFieldInfo scopes subExprType e' x
         [dim] = dims
         rangeLeft = ( BinOp Sub (fst bounds) $ BinOp Sub (fst dim) roLeft'
                     , BinOp Sub (fst bounds) $ BinOp Sub (fst dim) roRight' )
@@ -429,7 +429,7 @@ convertSubExpr scopes (Range (Dot e x) NonIndexed rOuter) =
         undotted = Range e' NonIndexed $
             endianCondRange dim rangeLeft rangeRight
 convertSubExpr scopes (Range (Dot e x) mode (baseO, lenO)) =
-    if isntStruct subExprType then
+    if isntStruct subExprType || isHier then
         (UnknownType, orig')
     else if structIsntReady subExprType then
         (replaceInnerTypeRange mode (baseO', lenO') fieldType, orig')
@@ -444,7 +444,7 @@ convertSubExpr scopes (Range (Dot e x) mode (baseO, lenO)) =
         (_, baseO') = convertSubExpr scopes baseO
         (_, lenO') = convertSubExpr scopes lenO
         orig' = Range (Dot e' x) mode (baseO', lenO')
-        (fieldType, bounds, dims) = lookupFieldInfo scopes subExprType e' x
+        (isHier, fieldType, bounds, dims) = lookupFieldInfo scopes subExprType e' x
         [dim] = dims
         baseLeft  = BinOp Sub (fst bounds) $ BinOp Sub (fst dim) baseO'
         baseRight = BinOp Add (snd bounds) $ BinOp Sub (snd dim) baseO'
@@ -463,7 +463,7 @@ convertSubExpr scopes (Range e mode (left, right)) =
         (_, right') = convertSubExpr scopes right
         r' = (left', right')
 convertSubExpr scopes (Bit (Dot e x) i) =
-    if isntStruct subExprType then
+    if isntStruct subExprType || isHier then
         (dropInnerTypeRange backupType, orig')
     else if structIsntReady subExprType then
         (dropInnerTypeRange fieldType, orig')
@@ -477,7 +477,7 @@ convertSubExpr scopes (Bit (Dot e x) i) =
         (_, i') = convertSubExpr scopes i
         (backupType, _) = fallbackType scopes $ Dot e' x
         orig' = Bit (Dot e' x) i'
-        (fieldType, bounds, dims) = lookupFieldInfo scopes subExprType e' x
+        (isHier, fieldType, bounds, dims) = lookupFieldInfo scopes subExprType e' x
         [dim] = dims
         left  = BinOp Sub (fst bounds) $ BinOp Sub (fst dim) i'
         right = BinOp Add (snd bounds) $ BinOp Sub (snd dim) i'
@@ -536,13 +536,11 @@ isntStruct = (== Nothing) . getFields
 
 -- get the field type, flattened bounds, and original type dimensions
 lookupFieldInfo :: Scopes Type -> Type -> Expr -> Identifier
-    -> (Type, Range, [Range])
+    -> (Bool, Type, Range, [Range])
 lookupFieldInfo scopes struct base fieldName =
     if maybeFieldType == Nothing
-        then scopedError scopes $ "field '" ++ fieldName ++ "' not found in "
-                ++ show struct ++ ", in expression "
-                ++ show (Dot base fieldName)
-        else (fieldType, bounds, dims)
+        then (isHier, err, err, err)
+        else (False, fieldType, bounds, dims)
     where
         Just fields = getFields struct
         maybeFieldType = lookup fieldName $ map swap fields
@@ -550,6 +548,10 @@ lookupFieldInfo scopes struct base fieldName =
         dims = snd $ typeRanges fieldType
         Just (_, unstructRanges) = convertStruct struct
         Just bounds = lookup fieldName unstructRanges
+        err = scopedError scopes $ "field '" ++ fieldName ++ "' not found in "
+                ++ show struct ++ ", in expression "
+                ++ show (Dot base fieldName)
+        isHier = lookupElem scopes (Dot base fieldName) /= Nothing
 
 -- attempts to convert based on the assignment-like contexts of TF arguments
 convertCall :: Scopes Type -> Expr -> Args -> Args

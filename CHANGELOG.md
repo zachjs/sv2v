@@ -22,6 +22,7 @@
   declarations tagged with an attribute
 * Fixed stray attributes producing invalid nested output when attached to
   inlined interfaces and interface-bounds modules
+* Fixed conversion of struct variables that shadow their module's name
 * Fixed `` `resetall `` not resetting the `` `default_nettype ``
 
 ### Other Enhancements

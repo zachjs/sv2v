@@ -159,8 +159,11 @@ isStringParam _ = return False
 -- checks if referring to part.wire is needlessly explicit
 unneededModuleScope :: Identifier -> Identifier -> ST Bool
 unneededModuleScope part wire = do
+    partDetails <- lookupElemM part
     accessesLocal <- localAccessesM wire
-    if accessesLocal == accessesTop then
+    if partDetails /= Nothing then
+        return False
+    else if accessesLocal == accessesTop then
         return True
     else if head accessesLocal == head accessesTop then do
         details <- lookupElemM wire
