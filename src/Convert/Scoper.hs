@@ -76,6 +76,7 @@ module Convert.Scoper
 
 import Control.Monad (join, when)
 import Control.Monad.State.Strict
+import Data.Functor ((<&>))
 import Data.List (findIndices, intercalate, isPrefixOf, partition)
 import Data.Maybe (isNothing)
 import qualified Data.Map.Strict as Map
@@ -204,17 +205,23 @@ replaceInExpr' replacements other =
 -- refer to currently visible declarations so it can be substituted elsewhere
 scopeExpr :: Monad m => Expr -> ScoperT a m Expr
 scopeExpr expr = do
-    expr' <- traverseSinglyNestedExprsM scopeExpr expr
-                >>= traverseExprTypesM scopeType
-    details <- lookupElemM expr'
+    details <- lookupElemM expr
     case details of
-        Just (accesses, _, _) -> return $ accessesToExpr accesses
-        _ -> return expr'
+        Just (accesses, replacements, _) ->
+            mapM (scopeResolvedAccess replacements) accesses <&> accessesToExpr
+        _ -> traverseSinglyNestedExprsM scopeExpr expr
+                >>= traverseExprTypesM scopeType
 scopeType :: Monad m => Type -> ScoperT a m Type
 scopeType = traverseNestedTypesM $ traverseTypeExprsM scopeExpr
 
 {-# INLINABLE scopeExpr #-}
 {-# INLINABLE scopeType #-}
+
+scopeResolvedAccess :: Monad m => Replacements -> Access -> ScoperT a m Access
+scopeResolvedAccess _ access@(Access _ Nil) = return access
+scopeResolvedAccess replacements access@(Access _ (Ident index))
+    | Map.member index replacements = return access
+scopeResolvedAccess _ (Access name expr) = scopeExpr expr <&> Access name
 
 scopeExprWithScopes :: Scopes a -> Expr -> Expr
 scopeExprWithScopes scopes = flip evalState scopes . scopeExpr

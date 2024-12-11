@@ -10,4 +10,6 @@ module top;
         $display("%b %b", x[1:0], top[1:0]);
         $display("%b %b", x[0+:1], top[0+:1]);
     end
+    wire [1:0] y;
+    assign y = 0;
 endmodule

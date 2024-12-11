@@ -16,4 +16,10 @@ module top;
         $display("%b %b", x[1:0], top.x[1:0]);
         $display("%b %b", x[0+:1], top.x[0+:1]);
     end
+    parameter int Q = 2;
+    typedef struct {
+        logic [Q-1:0] y;
+    } T;
+    T y;
+    assign y.y = 0;
 endmodule
