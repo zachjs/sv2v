@@ -1,7 +1,10 @@
 package P;
     localparam [31:0] L = 8;
+    function automatic integer F;
+        F = -1;
+    endfunction
     typedef struct packed {
-        logic [L + L[0] + L[1:0] + L[0+:1] - 1:0] x;
+        logic [L + L[0] + L[1:0] + L[0+:1] + F():0] x;
     } S;
 endpackage
 module top;
