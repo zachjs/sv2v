@@ -33,9 +33,9 @@ initialState = ([], 1)
 
 traverseModuleItemM :: ModuleItem -> S ModuleItem
 traverseModuleItemM item@(Genvar x) = declaration x item
-traverseModuleItemM item@(NInputGate  _ _ x _ _) = declaration x item
-traverseModuleItemM item@(NOutputGate _ _ x _ _) = declaration x item
-traverseModuleItemM item@(Instance    _ _ x _ _) = declaration x item
+traverseModuleItemM item@(NInputGate  _ _ x _ _ _) = declaration x item
+traverseModuleItemM item@(NOutputGate _ _ x _ _ _) = declaration x item
+traverseModuleItemM item@(Instance    _ _ x _   _) = declaration x item
 traverseModuleItemM (MIPackageItem (Decl decl)) =
     traverseDeclM decl >>= return . MIPackageItem . Decl
 traverseModuleItemM (MIAttr attr item) =

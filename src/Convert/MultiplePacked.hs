@@ -89,20 +89,32 @@ flattenType t =
 flattenFields :: [Field] -> [Field]
 flattenFields = map $ first flattenType
 
+traverseInstanceRanges :: Identifier -> [Range] -> Scoper TypeInfo [Range]
+traverseInstanceRanges x rs
+    | length rs <= 1 = return rs
+    | otherwise = do
+        let t = Implicit Unspecified rs
+        tScoped <- scopeType t
+        insertElem x (tScoped, [])
+        let r1 : r2 : rest = rs
+        return $ (combineRanges r1 r2) : rest
+
 traverseModuleItemM :: ModuleItem -> Scoper TypeInfo ModuleItem
 traverseModuleItemM (Instance m p x rs l) = do
     -- converts multi-dimensional instances
-    rs' <- if length rs <= 1
-        then return rs
-        else do
-            let t = Implicit Unspecified rs
-            tScoped <- scopeType t
-            insertElem x (tScoped, [])
-            let r1 : r2 : rest = rs
-            return $ (combineRanges r1 r2) : rest
+    rs' <- traverseInstanceRanges x rs
     traverseExprsM traverseExprM $ Instance m p x rs' l
-traverseModuleItemM item =
-    traverseLHSsM  traverseLHSM  item >>=
+traverseModuleItemM (NInputGate kw d x rs lhs exprs) = do
+    rs' <- traverseInstanceRanges x rs
+    traverseModuleItemM' $ NInputGate kw d x rs' lhs exprs
+traverseModuleItemM (NOutputGate kw d x rs lhss expr) = do
+    rs' <- traverseInstanceRanges x rs
+    traverseModuleItemM' $ NOutputGate kw d x rs' lhss expr
+traverseModuleItemM item = traverseModuleItemM' item
+
+traverseModuleItemM' :: ModuleItem -> Scoper TypeInfo ModuleItem
+traverseModuleItemM' =
+    traverseLHSsM traverseLHSM >=>
     traverseExprsM traverseExprM
 
 -- combines two ranges into one flattened range

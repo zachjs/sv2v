@@ -606,16 +606,18 @@ traverseNodesM exprMapper declMapper typeMapper lhsMapper stmtMapper =
         return $ Instance m p' x rs' l'
     moduleItemMapper (Modport x l) =
         mapM modportDeclMapper l >>= return . Modport x
-    moduleItemMapper (NInputGate  kw d x lhs exprs) = do
+    moduleItemMapper (NInputGate  kw d x rs lhs exprs) = do
         d' <- exprMapper d
         exprs' <- mapM exprMapper exprs
+        rs' <- mapM (mapBothM exprMapper) rs
         lhs' <- lhsMapper lhs
-        return $ NInputGate kw d' x lhs' exprs'
-    moduleItemMapper (NOutputGate kw d x lhss expr) = do
+        return $ NInputGate kw d' x rs' lhs' exprs'
+    moduleItemMapper (NOutputGate kw d x rs lhss expr) = do
         d' <- exprMapper d
+        rs' <- mapM (mapBothM exprMapper) rs
         lhss' <- mapM lhsMapper lhss
         expr' <- exprMapper expr
-        return $ NOutputGate kw d' x lhss' expr'
+        return $ NOutputGate kw d' x rs' lhss' expr'
     moduleItemMapper (Genvar   x) = return $ Genvar   x
     moduleItemMapper (Generate items) = do
         items' <- mapM (traverseNestedGenItemsM genItemMapper) items
@@ -768,12 +770,12 @@ traverseLHSsM mapper =
         traverseModuleItemLHSsM (Defparam lhs expr) = do
             lhs' <- mapper lhs
             return $ Defparam lhs' expr
-        traverseModuleItemLHSsM (NOutputGate kw d x lhss expr) = do
+        traverseModuleItemLHSsM (NOutputGate kw d x rs lhss expr) = do
             lhss' <- mapM mapper lhss
-            return $ NOutputGate kw d x lhss' expr
-        traverseModuleItemLHSsM (NInputGate  kw d x lhs exprs) = do
+            return $ NOutputGate kw d x rs lhss' expr
+        traverseModuleItemLHSsM (NInputGate  kw d x rs lhs exprs) = do
             lhs' <- mapper lhs
-            return $ NInputGate kw d x lhs' exprs
+            return $ NInputGate kw d x rs lhs' exprs
         traverseModuleItemLHSsM (AssertionItem (MIAssertion mx a)) = do
             converted <-
                 traverseNestedStmtsM (traverseStmtLHSsM mapper) (Assertion a)

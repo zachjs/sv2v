@@ -43,8 +43,8 @@ data ModuleItem
     | Final      Stmt
     | ElabTask   Severity [Expr]
     | MIPackageItem PackageItem
-    | NInputGate  NInputGateKW  Expr Identifier  LHS [Expr]
-    | NOutputGate NOutputGateKW Expr Identifier [LHS] Expr
+    | NInputGate  NInputGateKW  Expr Identifier [Range]  LHS [Expr]
+    | NOutputGate NOutputGateKW Expr Identifier [Range] [LHS] Expr
     | AssertionItem AssertionItem
     deriving Eq
 
@@ -60,10 +60,10 @@ instance Show ModuleItem where
     show (Initial     s  ) = printf "initial %s" (show s)
     show (Final       s  ) = printf   "final %s" (show s)
     show (ElabTask    s a) = printf "%s%s;" (show s) (show $ Args a [])
-    show (NInputGate  kw d x lhs exprs) =
-        showGate kw d x $ show lhs : map show exprs
-    show (NOutputGate kw d x lhss expr) =
-        showGate kw d x $ (map show lhss) ++ [show expr]
+    show (NInputGate  kw d x rs lhs exprs) =
+        showGate kw d x rs $ show lhs : map show exprs
+    show (NOutputGate kw d x rs lhss expr) =
+        showGate kw d x rs $ (map show lhss) ++ [show expr]
     show (AssertionItem i) = show i
     show (Instance   m params i rs ports) =
         if null params
@@ -81,12 +81,13 @@ showPort (i, arg) =
         then show arg
         else printf ".%s(%s)" i (show arg)
 
-showGate :: Show k => k -> Expr -> Identifier -> [String] -> String
-showGate kw d x args =
-    printf "%s %s%s(%s);" (show kw) delayStr nameStr (commas args)
+showGate :: Show k => k -> Expr -> Identifier -> [Range] -> [String] -> String
+showGate kw d x rs args =
+    printf "%s %s%s%s(%s);" (show kw) delayStr nameStr rsStr (commas args)
     where
         delayStr = if d == Nil then "" else showPad $ Delay d
         nameStr = showPad $ Ident x
+        rsStr = if null rs then "" else tail $ showRanges rs
 
 showModportDecl :: ModportDecl -> String
 showModportDecl (dir, ident, e) =

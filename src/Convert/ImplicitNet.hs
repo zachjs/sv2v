@@ -54,12 +54,12 @@ traverseModuleItemM _ (Genvar x) =
 traverseModuleItemM defaultNetType orig@(Assign _ x _) = do
     needsLHS defaultNetType x
     return orig
-traverseModuleItemM defaultNetType orig@(NInputGate _ _ x lhs exprs) = do
+traverseModuleItemM defaultNetType orig@(NInputGate _ _ x _ lhs exprs) = do
     insertElem x ()
     needsLHS defaultNetType lhs
     _ <- mapM (needsExpr defaultNetType) exprs
     return orig
-traverseModuleItemM defaultNetType orig@(NOutputGate _ _ x lhss expr) = do
+traverseModuleItemM defaultNetType orig@(NOutputGate _ _ x _ lhss expr) = do
     insertElem x ()
     _ <- mapM (needsLHS defaultNetType) lhss
     needsExpr defaultNetType expr

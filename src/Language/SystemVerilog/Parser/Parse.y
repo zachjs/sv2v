@@ -719,8 +719,8 @@ NonGenerateModuleItem :: { [ModuleItem] }
   | "modport" ModportItems ";"           { map (uncurry Modport) $2 }
   | NonDeclPackageItem                   { map MIPackageItem $1 }
   | TaskOrFunction                       { [MIPackageItem $1] }
-  | NInputGateKW  NInputGates  ";"       { map (\(a, b, c, d) -> NInputGate  $1 a b c d) $2 }
-  | NOutputGateKW NOutputGates ";"       { map (\(a, b, c, d) -> NOutputGate $1 a b c d) $2 }
+  | NInputGateKW  NInputGates  ";"       { map (\(a, b, c, d, e) -> NInputGate  $1 a b c d e) $2 }
+  | NOutputGateKW NOutputGates ";"       { map (\(a, b, c, d, e) -> NOutputGate $1 a b c d e) $2 }
   | AttributeInstance ModuleItem         { map (addMIAttr $1) $2 }
   | AssertionItem                        { [AssertionItem $1] }
 
@@ -852,23 +852,23 @@ AttrSpecs :: { [AttrSpec] }
 AttrSpec :: { AttrSpec }
   : Identifier OptAsgn { ($1, $2) }
 
-NInputGates :: { [(Expr, Identifier, LHS, [Expr])] }
+NInputGates :: { [(Expr, Identifier, [Range], LHS, [Expr])] }
   : NInputGate                 { [$1] }
   | NInputGates "," NInputGate { $1 ++ [$3]}
-NOutputGates :: { [(Expr, Identifier, [LHS], Expr)] }
+NOutputGates :: { [(Expr, Identifier, [Range], [LHS], Expr)] }
   : NOutputGate                  { [$1] }
   | NOutputGates "," NOutputGate { $1 ++ [$3]}
 
-NInputGate :: { (Expr, Identifier, LHS, [Expr]) }
-  : DelayControlOrNil OptIdentifier "(" LHS "," Exprs ")" { ($1, $2, $4, $6) }
-NOutputGate :: { (Expr, Identifier, [LHS], Expr) }
-  : DelayControlOrNil OptIdentifier "(" Exprs "," Expr ")" { ($1, $2, map toLHS $4, $6) }
+NInputGate :: { (Expr, Identifier, [Range], LHS, [Expr]) }
+  : DelayControlOrNil OptGateName "(" LHS "," Exprs ")" { ($1, fst $2, snd $2, $4, $6) }
+NOutputGate :: { (Expr, Identifier, [Range], [LHS], Expr) }
+  : DelayControlOrNil OptGateName "(" Exprs "," Expr ")" { ($1, fst $2, snd $2, map toLHS $4, $6) }
 DelayControlOrNil :: { Expr }
   : DelayControl { $1 }
   | {- empty -} { Nil }
-OptIdentifier :: { Identifier }
-  : Identifier  { $1 }
-  | {- empty -} { "" }
+OptGateName :: { (Identifier, [Range]) }
+  : Identifier Dimensions { ($1, $2) }
+  | {- empty -} { ("", []) }
 
 NInputGateKW :: { NInputGateKW }
   : "and"  { GateAnd  }
