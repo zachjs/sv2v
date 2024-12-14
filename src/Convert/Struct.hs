@@ -298,10 +298,6 @@ convertExpr scopes struct@(Struct _ fields []) (Pattern itemsOrig) =
                         Just value = numberToInteger n
                         Right (Number n) = item
 
-convertExpr scopes _ (Cast (Left t) expr) =
-    Cast (Left t') $ convertExpr scopes t expr
-    where t' = convertType t
-
 convertExpr scopes (Implicit _ []) expr =
     traverseSinglyNestedExprs (convertExpr scopes UnknownType) expr
 convertExpr scopes (Implicit sg rs) expr =
@@ -495,7 +491,7 @@ convertSubExpr scopes (Call e args) =
         (retType, _) = fallbackType scopes e
         args' = convertCall scopes e args
 convertSubExpr scopes (Cast (Left t) e) =
-    (t', Cast (Left t') e')
+    (t, Cast (Left t') e')
     where
         e' = convertExpr scopes t $ snd $ convertSubExpr scopes e
         t' = convertType t
