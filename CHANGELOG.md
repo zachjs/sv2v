@@ -30,6 +30,7 @@
 ### Other Enhancements
 
 * Improved error messages for invalid port or parameter bindings
+* Added warning for modules or interfaces defined more than once
 * `--write path/to/dir/` can now also be used with `--pass-through`
 
 ## v0.0.12

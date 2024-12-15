@@ -20,6 +20,7 @@ import Control.Monad.Except
 import Control.Monad.State.Strict
 import Data.Maybe (catMaybes, fromMaybe)
 import System.IO (hPutStrLn, stderr)
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Language.SystemVerilog.AST
 import Language.SystemVerilog.Parser.ParseDecl
@@ -1579,20 +1580,22 @@ data ParseData = ParseData
   , pTokens :: [Token]
   , pOversizedNumbers :: Bool
   , pPartsUsed :: Strings
-  , pPartsHave :: Strings
+  , pPartsHave :: Positions
   }
 
 type ParseState = StateT ParseData (ExceptT String IO)
 type Strings = Set.Set String
+type Positions = Map.Map String Position
 
-parse :: Bool -> [Token] -> ExceptT String IO (AST, Strings, Strings)
-parse _ [] = return mempty
-parse oversizedNumbers tokens = do
+parse :: Bool -> Positions -> [Token]
+  -> ExceptT String IO (AST, Strings, Positions)
+parse _ partsHave [] = return ([], Set.empty, partsHave)
+parse oversizedNumbers partsHave tokens = do
   (ast, finalState) <- runStateT parseMain initialState
   return (ast, pPartsUsed finalState, pPartsHave finalState)
   where
     position = tokenPosition $ head tokens
-    initialState = ParseData position tokens oversizedNumbers mempty mempty
+    initialState = ParseData position tokens oversizedNumbers mempty partsHave
 
 positionKeep :: (Token -> ParseState a) -> ParseState a
 positionKeep cont = do
@@ -1885,8 +1888,14 @@ recordPartUsed item = return item
 
 recordPartHave :: Identifier -> ParseState ()
 recordPartHave partName = do
+  currPos <- gets pPosition
   partsHave <- gets pPartsHave
-  let partsHave' = Set.insert partName partsHave
-  modify' $ \s -> s { pPartsHave = partsHave' }
+  case Map.lookup partName partsHave of
+    Nothing -> do
+      let partsHave' = Map.insert partName currPos partsHave
+      modify' $ \s -> s { pPartsHave = partsHave' }
+    Just prevPos ->
+      parseWarning currPos $ "Redefinition of " ++ show partName
+        ++ ". Previously defined at " ++ show prevPos ++ "."
 
 }

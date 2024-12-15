@@ -3,6 +3,7 @@
 NO_FILES_WARNING="Warning: No input files specified (try \`sv2v --help\`)"
 INTERFACE_WARNING="Warning: Source includes an interface but the output is empty because there are no modules without any interface ports. Please convert interfaces alongside the modules that instantiate them."
 PORT_CONN_ATTR_WARNING="attr.sv:6:11: Warning: Ignored port connection attributes (* foo *)(* bar *)."
+DUPLICATE_MODULE_WARNING="module_dupe_2.sv:2:5: Warning: Redefinition of \"top\". Previously defined at module_dupe_1.sv:2:5."
 
 test_default() {
     runAndCapture \
@@ -26,6 +27,13 @@ test_port_conn_attr() {
     assertTrue "conversion should succeed" $result
     assertNotNull "stdout should not be empty" "$stdout"
     assertEquals "stderr should should have warning" "$PORT_CONN_ATTR_WARNING" "$stderr"
+}
+
+test_duplicate_module() {
+    runAndCapture module_dupe_1.sv module_dupe_2.sv
+    assertTrue "conversion should succeed" $result
+    assertNotNull "stdout should not be empty" "$stdout"
+    assertEquals "stderr should should have warning" "$DUPLICATE_MODULE_WARNING" "$stderr"
 }
 
 no_modules_test() {

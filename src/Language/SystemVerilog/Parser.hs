@@ -19,9 +19,11 @@ import Language.SystemVerilog.AST (AST)
 import Language.SystemVerilog.Parser.Lex (lexStr)
 import Language.SystemVerilog.Parser.Parse (parse)
 import Language.SystemVerilog.Parser.Preprocess (preprocess, annotate, Env, Contents)
+import Language.SystemVerilog.Parser.Tokens (Position)
 
 type Output = (FilePath, AST)
 type Strings = Set.Set String
+type Positions = Map.Map String Position
 
 data Config = Config
     { cfDefines :: [String]
@@ -36,7 +38,7 @@ data Context = Context
     { ctConfig :: Config
     , ctEnv :: Env
     , ctUsed :: Strings
-    , ctHave :: Strings
+    , ctHave :: Positions
     }
 
 -- parse CLI macro definitions into the internal macro environment format
@@ -70,7 +72,8 @@ parseFiles' context []
             then return []
             else parseFiles' context possibleFiles
     where
-        missingParts = Set.toList $ ctUsed context Set.\\ ctHave context
+        missingParts = Set.toList $ ctUsed context Set.\\
+            (Map.keysSet $ ctHave context)
         libdirs = cfLibraryPaths $ ctConfig context
         lookupLibrary partName = ((partName, ) <$>) <$> lookupLibFile partName
         lookupLibFile = liftIO . findFile libdirs . (++ ".sv")
@@ -78,7 +81,7 @@ parseFiles' context []
 -- load the files, but complain if an expected part is missing
 parseFiles' context ((part, path) : files) = do
     (context', ast) <- parseFile context path
-    let misdirected = not $ null part || Set.member part (ctHave context')
+    let misdirected = not $ null part || Map.member part (ctHave context')
     when misdirected $ throwError $
         "Expected to find module or interface " ++ show part ++ " in file "
         ++ show path ++ " selected from the library path."
@@ -89,9 +92,10 @@ parseFile :: Context -> FilePath -> ExceptT String IO (Context, AST)
 parseFile context path = do
     (context', contents) <- preprocessFile context path
     tokens <- liftEither $ runExcept $ lexStr contents
-    (ast, used, have) <- parse (cfOversizedNumbers config) tokens
+    (ast, used, have') <-
+        parse (cfOversizedNumbers config) (ctHave context) tokens
     let context'' = context' { ctUsed = used <> ctUsed context
-                             , ctHave = have <> ctHave context }
+                             , ctHave = have' }
     return (context'', ast)
     where config = ctConfig context
 
