@@ -1,4 +1,4 @@
-// pattern: parameter "P" in instance "mod" of "Module" expects a type, but was given expression 1
+// pattern: parameter "P" in instance "mod" of module "Module" expects a type, but was given expression 1
 module Module;
     parameter type P;
     P x;

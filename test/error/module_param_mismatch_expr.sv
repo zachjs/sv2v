@@ -1,4 +1,4 @@
-// pattern: parameter "P" in instance "mod" of "Module" expects an expression, but was given type logic
+// pattern: parameter "P" in instance "mod" of module "Module" expects an expression, but was given type logic
 module Module;
     parameter P = 0;
     logic [P-1:0] x;

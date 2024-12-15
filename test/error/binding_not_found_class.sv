@@ -1,4 +1,4 @@
-// pattern: unknown binding "R" specified for parameters in class specialization of "example"
+// pattern: unknown binding "R" specified for parameters in class specialization of "example", 2 available \("P", "Q"\)
 class example #(
     parameter P = 1,
     parameter Q = 1

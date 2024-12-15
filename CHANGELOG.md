@@ -29,6 +29,7 @@
 
 ### Other Enhancements
 
+* Improved error messages for invalid port or parameter bindings
 * `--write path/to/dir/` can now also be used with `--pass-through`
 
 ## v0.0.12

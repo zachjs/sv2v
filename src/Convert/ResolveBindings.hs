@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 {- sv2v
  - Author: Zachary Snow <zach@zachjs.com>
  -
@@ -16,12 +17,14 @@ module Convert.ResolveBindings
 
 import Control.Monad.Writer.Strict
 import Data.List (intercalate, (\\))
+import Data.Maybe (isNothing)
 import qualified Data.Map.Strict as Map
 
 import Convert.Traverse
 import Language.SystemVerilog.AST
 
-type Parts = Map.Map Identifier ([(Identifier, Bool)], [Identifier])
+data PartInfo = PartInfo PartKW [(Identifier, Bool)] [Identifier]
+type Parts = Map.Map Identifier PartInfo
 
 convert :: [AST] -> [AST]
 convert =
@@ -30,8 +33,8 @@ convert =
         (traverseDescriptions . traverseModuleItems . mapInstance)
 
 collectPartsM :: Description -> Writer Parts ()
-collectPartsM (Part _ _ _ _ name ports items) =
-    tell $ Map.singleton name (params, ports)
+collectPartsM (Part _ _ kw _ name ports items) =
+    tell $ Map.singleton name $ PartInfo kw params ports
     where params = parameterInfos items
 collectPartsM _ = return ()
 
@@ -48,16 +51,17 @@ parameterInfos =
 mapInstance :: Parts -> ModuleItem -> ModuleItem
 mapInstance parts (Instance m paramBindings x rs portBindings) =
     -- if we can't find it, just skip :(
-    if maybePartInfo == Nothing
+    if isNothing maybePartInfo
         then Instance m paramBindings x rs portBindings
         else Instance m paramBindings' x rs portBindings'
     where
         maybePartInfo = Map.lookup m parts
-        Just (paramInfos, portNames) = maybePartInfo
+        Just (PartInfo kw paramInfos portNames) = maybePartInfo
         paramNames = map fst paramInfos
 
         msg :: String -> String
-        msg = flip (++) $ " in instance " ++ show x ++ " of " ++ show m
+        msg = flip (++) $ " in instance " ++ show x ++ " of " ++ show kw ++ " "
+            ++ show m
 
         paramBindings' = map checkParam $
             resolveBindings (msg "parameter overrides") paramNames paramBindings
@@ -101,22 +105,41 @@ mapInstance parts (Instance m paramBindings x rs portBindings) =
 
 mapInstance _ other = other
 
+class BindingArg k where
+    showBinding :: k -> String
+
+instance BindingArg TypeOrExpr where
+    showBinding = either show show
+
+instance BindingArg Expr where
+    showBinding = show
+
 type Binding t = (Identifier, t)
 -- give a set of bindings explicit names
-resolveBindings :: String -> [Identifier] -> [Binding t] -> [Binding t]
+resolveBindings
+    :: BindingArg t => String -> [Identifier] -> [Binding t] -> [Binding t]
 resolveBindings _ _ [] = []
 resolveBindings location available bindings@(("", _) : _) =
     if length available < length bindings then
-        error $ "too many bindings specified for " ++ location
+        error $ "too many bindings specified for " ++ location ++ ": "
+            ++ describeList "specified" (map (showBinding . snd) bindings)
+            ++ ", but only " ++ describeList "available" (map show available)
     else
         zip available $ map snd bindings
 resolveBindings location available bindings =
     if not $ null unknowns then
         error $ "unknown binding" ++ unknownsPlural ++ " "
-            ++ unknownsStr ++ " specified for " ++ location
+            ++ unknownsStr ++ " specified for " ++ location ++ ", "
+            ++ describeList "available" (map show available)
     else
         bindings
     where
         unknowns = map fst bindings \\ available
         unknownsPlural = if length unknowns == 1 then "" else "s"
         unknownsStr = intercalate ", " $ map show unknowns
+
+describeList :: String -> [String] -> String
+describeList desc [] = "0 " ++ desc
+describeList desc xs =
+    show (length xs) ++ " " ++ desc ++ " (" ++ xsStr ++ ")"
+    where xsStr = intercalate ", " xs

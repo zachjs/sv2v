@@ -1,4 +1,4 @@
-// pattern: unknown bindings "w", "z" specified for port connections in instance "e" of "example"
+// pattern: unknown bindings "w", "z" specified for port connections in instance "e" of module "example", 2 available \("x", "y"\)
 module example(
     input x, y
 );
