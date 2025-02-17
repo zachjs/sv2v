@@ -422,7 +422,7 @@ inlineInstance global ranges modportBindings items partName
         scoper = scopeModuleItem
             traverseDeclM traverseModuleItemM traverseGenItemM traverseStmtM
 
-        key = shortHash (partName, instanceName)
+        key = shortHash (partName, instanceName, hierarchyPath global)
 
         -- synthetic modports to be collected and removed after inlining
         bundleModport = Modport "" (impliedModport items)

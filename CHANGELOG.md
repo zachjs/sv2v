@@ -16,6 +16,8 @@
 * Fixed `logic` incorrectly converted to `wire` even when provided to a task or
   function output port
 * Fixed conversion of fields accessed from explicitly-cast structs
+* Fixed generated parameter name collisions when inlining interfaces and
+  interfaced-bound modules
 * Fixed conversion of enum item names and typenames nested deeply within the
   left-hand side of an assignment
 * Fixed `input signed` ports of interface-using modules producing invalid
