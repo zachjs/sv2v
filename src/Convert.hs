@@ -74,6 +74,7 @@ finalPhases _ =
     , Convert.EmptyArgs.convert
     , Convert.FuncRet.convert
     , Convert.TFBlock.convert
+    , Convert.Unsigned.convert
     , Convert.StringType.convert
     ]
 
@@ -96,7 +97,6 @@ mainPhases tops selectExclude =
     , Convert.Struct.convert
     , Convert.Typedef.convert
     , Convert.UnpackedArray.convert
-    , Convert.Unsigned.convert
     , Convert.Wildcard.convert
     , Convert.Enum.convert
     , Convert.StringParam.convert
