@@ -14,7 +14,10 @@
  - creating hierarchical or generate-scoped references.
  -}
 
-module Convert.UnbasedUnsized (convert) where
+module Convert.UnbasedUnsized
+    ( convert
+    , inlineConstants
+    ) where
 
 import Control.Monad.Writer.Strict
 import Data.Either (isLeft)
@@ -62,7 +65,7 @@ convertModuleItem parts (Instance moduleName params instanceName ds bindings) =
 
         -- checking whether we're ready to inline
         hasTypeParams = any (isLeft . snd) params
-        moduleIsResolved = isEntirelyResolved selectedStubItems
+        moduleIsResolved = isEntirelyResolved stubItems
 
         -- transform the existing bindings to reference extension declarations
         (bindings', extensionDeclLists) = unzip $
@@ -71,13 +74,18 @@ convertModuleItem parts (Instance moduleName params instanceName ds bindings) =
 
         -- inline the necessary portions of the module alongside the selected
         -- extension declarations
-        stubItems =
-            map (traverseDecls overrideParam) $
-            prefixItems blockName selectedStubItems
-        selectedStubItems = inject rawStubItems extensionDecls
-        rawStubItems = createModuleStub moduleItems
+        stubItems = inlineConstants blockName params moduleItems extensionDecls
         blockName = "sv2v_uu_" ++ instanceName
 
+convertModuleItem _ other = convertModuleItem' other
+
+inlineConstants :: Identifier -> [ParamBinding] -> [ModuleItem] -> [ModuleItem]
+    -> [ModuleItem]
+inlineConstants blockName params moduleItems =
+    map (traverseDecls overrideParam) .
+    prefixItems blockName .
+    inject (createModuleStub moduleItems)
+    where
         -- override a parameter value in the stub
         overrideParam :: Decl -> Decl
         overrideParam (Param Parameter t x e) =
@@ -88,8 +96,6 @@ convertModuleItem parts (Instance moduleName params instanceName ds bindings) =
                 Nothing -> e
             where xOrig = drop (length blockName + 1) x
         overrideParam decl = decl
-
-convertModuleItem _ other = convertModuleItem' other
 
 -- convert a port binding and produce a list of needed extension decls
 convertBinding :: Identifier -> PortBinding -> (PortBinding, [Decl])

@@ -2,6 +2,7 @@
 
 ### New Features
 
+* Added support for module and interface input ports with default values
 * Added conversion of severity system tasks and elaboration system tasks (e.g.,
   `$info`) into `$display` tasks that include source file and scope information;
   pass `-E SeverityTask` to disable this new conversion

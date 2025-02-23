@@ -43,6 +43,7 @@ import qualified Convert.Package
 import qualified Convert.ParamNoDefault
 import qualified Convert.ParamType
 import qualified Convert.PortDecl
+import qualified Convert.PortDefault
 import qualified Convert.RemoveComments
 import qualified Convert.ResolveBindings
 import qualified Convert.SeverityTask
@@ -75,6 +76,7 @@ finalPhases _ =
     , Convert.FuncRet.convert
     , Convert.TFBlock.convert
     , Convert.Unsigned.convert
+    , Convert.PortDefault.convert
     , Convert.StringType.convert
     ]
 

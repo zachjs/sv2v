@@ -631,10 +631,14 @@ inlineInstance global ranges modportBindings items partName
 
         removeDeclDir :: Decl -> Decl
         removeDeclDir (Variable _ t x a e) =
-            Variable Local t' x a e
-            where t' = case t of
+            Variable Local t' x a e'
+            where
+                t' = case t of
                     Implicit sg rs -> IntegerVector TLogic sg rs
                     _ -> t
+                e' = if isNothing (lookup x instancePorts)
+                    then e
+                    else Nil
         removeDeclDir decl@Net{} =
             traverseNetAsVar removeDeclDir decl
         removeDeclDir other = other
