@@ -1,7 +1,7 @@
 cabal-version: 2.4
 
 name: sv2v
-version: 0.0.12
+version: 0.0.13
 synopsis: SystemVerilog to Verilog conversion
 description:
   A tool for coverting SystemVerilog to Verilog. Originally forked from the
