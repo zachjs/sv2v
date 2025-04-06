@@ -353,7 +353,7 @@ stubIncr keepRunning (lhs, op, expr) =
         expr' = BinOp binop (lhsToExpr lhs) expr
 
 jumpStateType :: Type
-jumpStateType = IntegerVector TBit Unspecified [(RawNum 0, RawNum 1)]
+jumpStateType = IntegerVector TBit Unspecified [(RawNum 1, RawNum 0)]
 
 jumpState :: String
 jumpState = "_sv2v_jump"
