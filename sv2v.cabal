@@ -134,6 +134,7 @@ executable sv2v
     -funbox-strict-fields
     -Wall
     -Wno-incomplete-uni-patterns
+    -Wno-x-partial
 
 source-repository head
   type:     git
