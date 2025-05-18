@@ -1,3 +1,10 @@
+## Unreleased
+
+### Other Enhancements
+
+* `always_comb` blocks with sensitivities inherited from called functions or
+  tasks are no longer converted with duplicate expressions
+
 ## v0.0.13
 
 ### New Features

@@ -15,6 +15,7 @@ module Convert.AlwaysKW (convert) where
 import Control.Monad (when, zipWithM, (>=>))
 import Control.Monad.State.Strict
 import Control.Monad.Writer.Strict
+import Data.List (nub)
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Monoid (Any(Any), getAny)
 
@@ -234,7 +235,7 @@ findNonLocals item = do
     _ <- scoper item
     (anys, exprs) <- lift get
     lift $ put prev
-    let nonLocals = mapMaybe (longestStaticPrefix scopes) exprs
+    let nonLocals = mapMaybe (longestStaticPrefix scopes) $ nub exprs
     return (getAny anys, nonLocals)
 
 triggerIdent :: Identifier
