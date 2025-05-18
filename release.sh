@@ -38,4 +38,4 @@ notes=`pandoc --from markdown --to markdown --wrap none CHANGELOG.md | \
 gh release create v$version --title v$version --notes "$notes"
 
 # create the Hackage release candidate
-stack upload --test-tarball --candidate --pvp-bounds upper .
+stack upload --test-tarball --candidate .
