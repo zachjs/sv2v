@@ -118,6 +118,7 @@ data NInputGateKW
     | GateNand
     | GateOr
     | GateNor
+    | GateRpmos
     | GateXor
     | GateXnor
     deriving Eq
@@ -128,6 +129,7 @@ instance Show NInputGateKW where
     show GateNand = "nand"
     show GateOr   = "or"
     show GateNor  = "nor"
+    show GateRpmos  = "rpmos"
     show GateXor  = "xor"
     show GateXnor = "xnor"
 

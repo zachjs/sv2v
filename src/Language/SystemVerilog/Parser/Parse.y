@@ -877,6 +877,7 @@ NInputGateKW :: { NInputGateKW }
   | "nand" { GateNand }
   | "or"   { GateOr   }
   | "nor"  { GateNor  }
+  | "rpmos" { GateRpmos }
   | "xor"  { GateXor  }
   | "xnor" { GateXnor }
 NOutputGateKW :: { NOutputGateKW }
