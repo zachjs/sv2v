@@ -6,11 +6,13 @@ module top;
     wire output_and_delay;
     wire output_not;
     wire output_buf_delay;
+    wire output_bufif0_delay;
 
     and (output_and, input_a, input_b);
     and #1 (output_and_delay, input_a, input_b);
     not (output_not, input_a);
     buf #2 foo_name (output_buf_delay, input_a);
+    bufif0 (output_bufif0_delay, input_a, input_b);
 
     wire output_nand, output_or, output_nor, output_xor, output_xnor;
     nand (output_nand, input_a, input_b);
@@ -23,7 +25,7 @@ module top;
         $monitor("%3d ", $time,
             input_a, input_b,
             output_and, output_and_delay,
-            output_not, output_buf_delay,
+            output_not, output_buf_delay, output_bufif0_delay,
             output_nand, output_or, output_nor, output_xor, output_xnor);
 
         #1;

@@ -873,6 +873,7 @@ OptGateName :: { (Identifier, [Range]) }
 
 NInputGateKW :: { NInputGateKW }
   : "and"  { GateAnd  }
+  | "bufif0" { GateBufif0 }
   | "nand" { GateNand }
   | "or"   { GateOr   }
   | "nor"  { GateNor  }

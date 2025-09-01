@@ -114,6 +114,7 @@ instance Show AlwaysKW where
 
 data NInputGateKW
     = GateAnd
+    | GateBufif0
     | GateNand
     | GateOr
     | GateNor
@@ -123,6 +124,7 @@ data NInputGateKW
 
 instance Show NInputGateKW where
     show GateAnd  = "and"
+    show GateBufif0  = "bufif0"
     show GateNand = "nand"
     show GateOr   = "or"
     show GateNor  = "nor"
