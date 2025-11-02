@@ -1,4 +1,4 @@
-resolver: lts-23.23
+resolver: lts-24.18
 pvp-bounds: upper
 ghc-options:
     $locals: -j2
