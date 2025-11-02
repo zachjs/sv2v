@@ -872,14 +872,14 @@ OptGateName :: { (Identifier, [Range]) }
   | {- empty -} { ("", []) }
 
 NInputGateKW :: { NInputGateKW }
-  : "and"  { GateAnd  }
+  : "and"    { GateAnd    }
   | "bufif0" { GateBufif0 }
-  | "nand" { GateNand }
-  | "or"   { GateOr   }
-  | "nor"  { GateNor  }
-  | "rpmos" { GateRpmos }
-  | "xor"  { GateXor  }
-  | "xnor" { GateXnor }
+  | "nand"   { GateNand   }
+  | "or"     { GateOr     }
+  | "nor"    { GateNor    }
+  | "rpmos"  { GateRpmos  }
+  | "xor"    { GateXor    }
+  | "xnor"   { GateXnor   }
 NOutputGateKW :: { NOutputGateKW }
   : "buf"  { GateBuf  }
   | "not"  { GateNot  }

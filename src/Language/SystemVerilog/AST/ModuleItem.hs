@@ -124,14 +124,14 @@ data NInputGateKW
     deriving Eq
 
 instance Show NInputGateKW where
-    show GateAnd  = "and"
-    show GateBufif0  = "bufif0"
-    show GateNand = "nand"
-    show GateOr   = "or"
-    show GateNor  = "nor"
+    show GateAnd    = "and"
+    show GateBufif0 = "bufif0"
+    show GateNand   = "nand"
+    show GateOr     = "or"
+    show GateNor    = "nor"
     show GateRpmos  = "rpmos"
-    show GateXor  = "xor"
-    show GateXnor = "xnor"
+    show GateXor    = "xor"
+    show GateXnor   = "xnor"
 
 data NOutputGateKW
     = GateBuf
