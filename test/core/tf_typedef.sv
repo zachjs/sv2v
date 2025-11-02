@@ -1,12 +1,17 @@
 module top;
     task t;
-        typedef bit u;
-        $display("t = %d", u'(0));
+        typedef byte u;
+        $display("t %b", u'('1));
     endtask
-    function f;
-        typedef bit u;
-        return u'(1);
+    function integer f;
+        input reg signed i;
+        typedef shortint v;
+        $display("i %b", v'(i));
+        return $bits(v);
     endfunction
-    initial t();
-    initial $display("f = %d", f());
+    initial begin
+        t();
+        $display("f %b", f(0));
+        $display("f %b", f(1));
+    end
 endmodule

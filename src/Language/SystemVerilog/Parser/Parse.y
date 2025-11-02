@@ -33,7 +33,7 @@ import Language.SystemVerilog.Parser.Tokens
 %tokentype { Token }
 %error { parseErrorTok }
 
-%expect 4
+%expect 0
 
 %token
 
@@ -947,17 +947,9 @@ ImportOrExport :: { [PackageItem] }
   : "import" PackageImportItems ";" { map (uncurry Import) $2 }
   | "export" PackageImportItems ";" { map (uncurry Export) $2 }
   | "export" "*" "::" "*" ";"       { [Export "" ""] }
-BlockItemDecls ::                { [Decl] }
-  : {- empty -}                  { [] }
-  | ";" BlockItemDecls           { $2 }
-  | BlockItemDecl BlockItemDecls { $1 ++ $2 }
-BlockItemDecl :: { [Decl] }
-  : DataDecl { $1 }
-DataDecl :: { [Decl] }
-  : Typedef { [$1] }
 TaskOrFunction :: { PackageItem }
-  : "function" Lifetime FuncRetAndName    TFItems BlockItemDecls DeclsAndStmts endfunction StrTag {% checkTag (snd $3) $8 $ Function $2 (fst $3) (snd $3) (map makeInput $4 ++ $5 ++ fst $6) (snd $6) }
-  | "task"     Lifetime Identifier        TFItems BlockItemDecls DeclsAndStmts endtask     StrTag {% checkTag $3       $8 $ Task     $2 $3                ($4 ++ $5 ++ fst $6) (snd $6) }
+  : "function" Lifetime FuncRetAndName    TFItems DeclsAndStmts endfunction StrTag {% checkTag (snd $3) $7 $ Function $2 (fst $3) (snd $3) (map makeInput $4 ++ fst $5) (snd $5) }
+  | "task"     Lifetime Identifier        TFItems DeclsAndStmts endtask     StrTag {% checkTag $3       $7 $ Task     $2 $3                ($4 ++ fst $5) (snd $5) }
 Typedef :: { Decl }
   : "typedef" Type Identifier ";" { ParamType Localparam $3 $2 }
   | "typedef" Type Identifier DimensionsNonEmpty ";" { ParamType Localparam $3 (UnpackedType $2 $4) }
@@ -1234,6 +1226,7 @@ DeclsAndStmts :: { ([Decl], [Stmt]) }
 DeclOrStmt :: { ([Decl], [Stmt]) }
   : DeclTokens(";")    { parseDTsAsDeclOrStmt $1 }
   | ParameterDecl(";") { ($1, []) }
+  | Typedef            { ([$1], []) }
 
 ParameterDecl(delim) :: { [Decl] }
   : ParameterDeclKW           DeclAsgns delim { makeParamDecls $1 (Implicit Unspecified []) $2 }
