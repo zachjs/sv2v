@@ -18,9 +18,9 @@ jobs:
     strategy:
       matrix:
         os:
-          - ubuntu-22.04
-          - macOS-13
-          - windows-2022
+          - ubuntu-24.04
+          - macOS-15-intel
+          - windows-2025
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,8 +45,8 @@ jobs:
     strategy:
       matrix:
         os:
-          - ubuntu-22.04
-          - macOS-13
+          - ubuntu-24.04
+          - macOS-15-intel
     needs: build
     env:
       IVERILOG_REF: cbdaa865a10ce69d7c528cb2aa4c571641de0c62
@@ -104,7 +104,7 @@ jobs:
   release:
     permissions:
       contents: write
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         name: [macOS, Linux, Windows]
