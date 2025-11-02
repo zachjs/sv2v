@@ -509,6 +509,8 @@ postProcess stack (Token Id_escaped str pos : ts) =
     where
         t' = Token Id_escaped str' pos
         str' = (++ " ") $ init str
+postProcess _ (Token Unknown str pos : _) =
+    throwError $ show pos ++ ": unknown token '" ++ str ++ "'"
 postProcess [] (t : ts) = do
     ts' <- postProcess [] ts
     return $ t : ts'
