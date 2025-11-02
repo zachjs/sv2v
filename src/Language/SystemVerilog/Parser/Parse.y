@@ -873,13 +873,21 @@ OptGateName :: { (Identifier, [Range]) }
 
 NInputGateKW :: { NInputGateKW }
   : "and"    { GateAnd    }
-  | "bufif0" { GateBufif0 }
   | "nand"   { GateNand   }
   | "or"     { GateOr     }
   | "nor"    { GateNor    }
-  | "rpmos"  { GateRpmos  }
   | "xor"    { GateXor    }
   | "xnor"   { GateXnor   }
+  | "bufif0" { GateBufif0 }
+  | "bufif1" { GateBufif1 }
+  | "notif0" { GateNotif0 }
+  | "notif1" { GateNotif1 }
+  | "cmos"   { GateCmos   }
+  | "rcmos"  { GateRcmos  }
+  | "nmos"   { GateNmos   }
+  | "pmos"   { GatePmos   }
+  | "rnmos"  { GateRnmos  }
+  | "rpmos"  { GateRpmos  }
 NOutputGateKW :: { NOutputGateKW }
   : "buf"  { GateBuf  }
   | "not"  { GateNot  }
