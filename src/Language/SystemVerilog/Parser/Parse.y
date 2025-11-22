@@ -1226,6 +1226,7 @@ DeclsAndStmts :: { ([Decl], [Stmt]) }
 DeclOrStmt :: { ([Decl], [Stmt]) }
   : DeclTokens(";")    { parseDTsAsDeclOrStmt $1 }
   | ParameterDecl(";") { ($1, []) }
+  | Typedef            { ([$1], []) }
 
 ParameterDecl(delim) :: { [Decl] }
   : ParameterDeclKW           DeclAsgns delim { makeParamDecls $1 (Implicit Unspecified []) $2 }
