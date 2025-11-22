@@ -119,15 +119,37 @@ data NInputGateKW
     | GateNor
     | GateXor
     | GateXnor
+    | GateBufif0
+    | GateBufif1
+    | GateNotif0
+    | GateNotif1
+    | GateCmos
+    | GateRcmos
+    | GateNmos
+    | GatePmos
+    | GateRnmos
+    | GateRpmos
     deriving Eq
 
 instance Show NInputGateKW where
-    show GateAnd  = "and"
-    show GateNand = "nand"
-    show GateOr   = "or"
-    show GateNor  = "nor"
-    show GateXor  = "xor"
-    show GateXnor = "xnor"
+    show GateAnd    = "and"
+    show GateNand   = "nand"
+    show GateOr     = "or"
+    show GateNor    = "nor"
+    show GateXor    = "xor"
+    show GateXnor   = "xnor"
+    show GateBufif0 = "bufif0"
+    show GateBufif1 = "bufif1"
+    show GateNotif0 = "notif0"
+    show GateNotif1 = "notif1"
+    -- these technically require exactly 3 inputs: input, ncontrol, pcontrol
+    show GateCmos   = "cmos"
+    show GateRcmos  = "rcmos"
+    -- these technically require exactly 2 inputs: input, enable
+    show GateNmos   = "nmos"
+    show GatePmos   = "pmos"
+    show GateRnmos  = "rnmos"
+    show GateRpmos  = "rpmos"
 
 data NOutputGateKW
     = GateBuf
