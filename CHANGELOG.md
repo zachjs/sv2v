@@ -1,5 +1,11 @@
 ## Unreleased
 
+### New Features
+
+* Added support for `typdef` in the top level of tasks and functions.
+* Added support for `bufif0`, `bufif1`, `notif0`, `notif1`, `cmos`, `rcmos`,
+  `nmos`, `pmos`, `rnmos`, and `rpmos`.
+
 ### Other Enhancements
 
 * `always_comb` blocks with sensitivities inherited from called functions or
