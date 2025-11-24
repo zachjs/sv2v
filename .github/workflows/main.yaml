@@ -96,10 +96,11 @@ jobs:
           make ${{ github.event_name == 'schedule' && runner.os == 'Linux' && 'coverage' || 'test' }}
       - name: Upload Coverage
         uses: actions/upload-artifact@v4
-        if: hashFiles('.hpc/*.html') != ''
+        if: github.event_name == 'schedule' && runner.os == 'Linux'
         with:
           name: coverage
-          path: .hpc/*.html
+          path: .hpc
+          include-hidden-files: true
 
   release:
     permissions:
