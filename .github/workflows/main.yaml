@@ -22,7 +22,7 @@ jobs:
           - macOS-15
           - windows-2025
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           fetch-tags: true
@@ -35,7 +35,7 @@ jobs:
         shell: bash
         run: cp LICENSE NOTICE README.md CHANGELOG.md bin
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ runner.os }}
           path: bin
@@ -51,7 +51,7 @@ jobs:
     env:
       IVERILOG_REF: cbdaa865a10ce69d7c528cb2aa4c571641de0c62
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           fetch-tags: true
@@ -64,7 +64,7 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get install -y flex bison autoconf gperf
       - name: Cache iverilog
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.local
           key: ${{ runner.os }}-${{ env.IVERILOG_REF }}
@@ -85,7 +85,7 @@ jobs:
           chmod +x ~/.local/bin/shunit2
           echo "$HOME/.local/bin" >> $GITHUB_PATH
       - name: Download Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ runner.os }}
           path: bin
@@ -95,7 +95,7 @@ jobs:
           # rebuild and upload a code coverage report on scheduled linux runs
           make ${{ github.event_name == 'schedule' && runner.os == 'Linux' && 'coverage' || 'test' }}
       - name: Upload Coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: github.event_name == 'schedule' && runner.os == 'Linux'
         with:
           name: coverage
@@ -113,7 +113,7 @@ jobs:
     if: github.event_name == 'release'
     steps:
       - name: Download Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ matrix.name }}
           path: sv2v-${{ matrix.name }}

@@ -27,7 +27,7 @@ jobs:
           - lts-14
           - lts-13
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: stack build --resolver ${{ matrix.resolver }}
       - run: stack exec sv2v --resolver ${{ matrix.resolver }} -- --help
       - run: stack exec sv2v --resolver ${{ matrix.resolver }} -- test/basic/*.sv

@@ -13,7 +13,7 @@ jobs:
   notice:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Regenerate NOTICE
         run: ./notice.sh > NOTICE
       - name: Validate NOTICE
