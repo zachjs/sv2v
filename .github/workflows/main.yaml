@@ -19,7 +19,7 @@ jobs:
       matrix:
         os:
           - ubuntu-24.04
-          - macOS-15-intel
+          - macOS-15
           - windows-2025
     steps:
       - uses: actions/checkout@v4
@@ -46,7 +46,7 @@ jobs:
       matrix:
         os:
           - ubuntu-24.04
-          - macOS-15-intel
+          - macOS-15
     needs: build
     env:
       IVERILOG_REF: cbdaa865a10ce69d7c528cb2aa4c571641de0c62
@@ -58,7 +58,7 @@ jobs:
       - name: Install Dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install bison
+          brew install bison autoconf automake gperf
           echo "$(brew --prefix bison)/bin" >> $GITHUB_PATH
       - name: Install Dependencies (Linux)
         if: runner.os == 'Linux'
