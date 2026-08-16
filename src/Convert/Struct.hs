@@ -385,10 +385,12 @@ convertSubExpr scopes (Dot e x) =
     where
         (subExprType, e') = convertSubExpr scopes e
         (isHier, fieldType, bounds, dims) = lookupFieldInfo scopes subExprType e' x
-        base = fst bounds
-        len = rangeSize bounds
+        -- the offset and size are derived from the struct layout, whose field
+        -- widths may contain member accesses that must themselves be lowered
+        (_, base) = convertSubExpr scopes $ fst bounds
+        (_, len) = convertSubExpr scopes $ rangeSize bounds
         undotted = if null dims || rangeSize (head dims) == RawNum 1
-            then Bit e' (fst bounds)
+            then Bit e' base
             else Range e' IndexedMinus (base, len)
         -- retain signedness of fields which would otherwise be lost via the
         -- resulting bit or range selection

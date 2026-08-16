@@ -11,6 +11,11 @@
 * `always_comb` blocks with sensitivities inherited from called functions or
   tasks are no longer converted with duplicate expressions
 
+### Bug Fixes
+
+* Fixed conversion of struct field accesses when the struct's field widths
+  depend on a member of a struct-typed parameter
+
 ## v0.0.13
 
 ### New Features
