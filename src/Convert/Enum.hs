@@ -39,12 +39,23 @@ traverseDeclM decl = do
         Param    _ _ x   _ -> insertElem x Nil
         ParamType  _ x   _ -> insertElem x Nil
         CommentDecl{} -> return ()
-    traverseDeclTypesM traverseTypeM decl >>=
-        traverseDeclExprsM traverseExprM
+    case decl of
+        ParamType _ x _ | x == "_sv2v_keep_enum_for_params" ->
+            traverseDeclTypesM traverseTypeM decl >>=
+                traverseDeclExprsM traverseExprM
+        ParamType s x t -> do
+            t' <- traverseTypePreserveEnumM t
+            traverseDeclExprsM traverseExprM (ParamType s x t')
+        _ ->
+            traverseDeclTypesM traverseTypeM decl >>=
+                traverseDeclExprsM traverseExprM
 
 traverseModuleItemM :: ModuleItem -> SC ModuleItem
 traverseModuleItemM (Genvar x) =
     insertElem x Nil >> return (Genvar x)
+traverseModuleItemM item@Instance{} =
+    traverseNodesM traverseExprM return traverseTypePreserveEnumM traverseLHSM return item
+    where traverseLHSM = traverseNestedLHSsM $ traverseLHSExprsM traverseExprM
 traverseModuleItemM item =
     traverseNodesM traverseExprM return traverseTypeM traverseLHSM return item
     where traverseLHSM = traverseNestedLHSsM $ traverseLHSExprsM traverseExprM
@@ -60,6 +71,12 @@ traverseTypeM =
     traverseSinglyNestedTypesM traverseTypeM >=>
     traverseTypeExprsM traverseExprM >=>
     replaceEnum
+
+traverseTypePreserveEnumM :: Type -> SC Type
+traverseTypePreserveEnumM =
+    traverseSinglyNestedTypesM traverseTypePreserveEnumM >=>
+    traverseTypeExprsM traverseExprM >=>
+    replaceEnumPreserve
 
 traverseExprM :: Expr -> SC Expr
 traverseExprM (Ident x) = do
@@ -88,6 +105,22 @@ replaceEnum (Enum t v rs) =
     insertEnumItems t v >> return (tf $ rl ++ rs)
     where (tf, rl) = typeRanges t
 replaceEnum other = return other
+
+-- preserve Enum nodes in ParamType declarations so enum methods can convert
+-- after Convert.ParamType inlines type-parameter bindings
+replaceEnumPreserve :: Type -> SC Type
+replaceEnumPreserve t@(Enum Alias{} v _) =
+    mapM_ (flip insertElem Nil . fst) v >> return t
+replaceEnumPreserve (Enum (Implicit sg rl) v rs) =
+    replaceEnumPreserve $ Enum t' v rs
+    where
+        t' = IntegerVector TLogic sg rl'
+        rl' = if null rl
+            then [(RawNum 31, RawNum 0)]
+            else rl
+replaceEnumPreserve (Enum t v rs) =
+    insertEnumItems t v >> return (Enum t v rs)
+replaceEnumPreserve other = return other
 
 insertEnumItems :: Type -> [(Identifier, Expr)] -> SC ()
 insertEnumItems itemType items =

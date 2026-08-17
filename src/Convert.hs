@@ -21,6 +21,7 @@ import qualified Convert.DoWhile
 import qualified Convert.DuplicateGenvar
 import qualified Convert.EmptyArgs
 import qualified Convert.Enum
+import qualified Convert.EnumMethod
 import qualified Convert.EventEdge
 import qualified Convert.ExprAsgn
 import qualified Convert.ForAsgn
@@ -101,6 +102,7 @@ mainPhases tops selectExclude =
     , Convert.UnpackedArray.convert
     , Convert.Wildcard.convert
     , Convert.Enum.convert
+    , Convert.EnumMethod.convert
     , Convert.StringParam.convert
     , selectExclude Job.Interface $ Convert.Interface.convert tops
     , selectExclude Job.Succinct Convert.RemoveComments.convert

@@ -5,6 +5,16 @@
 * Added support for `typdef` in the top level of tasks and functions.
 * Added support for `bufif0`, `bufif1`, `notif0`, `notif1`, `cmos`, `rcmos`,
   `nmos`, `pmos`, `rnmos`, and `rpmos`.
+* Added conversion for enumerated type methods (`next`, `prev`, `first`, `last`,
+  and `num`) per IEEE 1800-2017 Section 6.19.5
+
+### Bug Fixes
+
+* Enum types inside `localparam type` declarations are preserved until after
+  type-parameter bindings are inlined, enabling enum method conversion on
+  instantiated type-parameter types when the enum item list is available
+* Resolved enum types in module type-parameter bindings are substituted directly
+  instead of being deferred for a separate template instantiation
 
 ### Other Enhancements
 
