@@ -49,7 +49,7 @@ jobs:
           - macOS-15
     needs: build
     env:
-      IVERILOG_REF: cbdaa865a10ce69d7c528cb2aa4c571641de0c62
+      IVERILOG_REF: f20865a5ea4ea7f5cdcbb6d19b0751a9390a8978
     steps:
       - uses: actions/checkout@v6
         with:
