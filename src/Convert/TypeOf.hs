@@ -19,7 +19,12 @@
  - the source intended to appease certain lint rules.
  -}
 
-module Convert.TypeOf (convert) where
+module Convert.TypeOf
+    ( convert
+    , popRange
+    , typeSignednessOverride
+    , injectRanges
+    ) where
 
 import Control.Monad.State.Strict
 import Data.Tuple (swap)
@@ -402,7 +407,7 @@ injectRanges (UnpackedType t rs) unpacked = UnpackedType t $ unpacked ++ rs
 injectRanges t unpacked = UnpackedType t unpacked
 
 -- removes the most significant range of the given type
-popRange :: Expr -> Type -> ST Type
+popRange :: Monad m => Expr -> Type -> ScoperT a m Type
 popRange _ (UnpackedType t [_]) = return t
 popRange _ (IntegerAtom TInteger sg) =
     return $ IntegerVector TLogic sg []
@@ -423,7 +428,7 @@ replaceRange e r t =
         _ -> indexedAtomError e t
 
 -- readable error message when looking up the type of a portion of an atom
-indexedAtomError :: Expr -> Type -> ST a
+indexedAtomError :: Monad m => Expr -> Type -> ScoperT a m b
 indexedAtomError e t =
     scopedErrorM $ "can't determine the type of " ++ show e ++ " because the"
         ++ " inner type " ++ show t ++ " can't be indexed"

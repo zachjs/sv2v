@@ -71,7 +71,6 @@ executable sv2v
     Convert.DoWhile
     Convert.DuplicateGenvar
     Convert.EmptyArgs
-    Convert.Enum
     Convert.EventEdge
     Convert.ExprAsgn
     Convert.ExprUtils
@@ -108,7 +107,7 @@ executable sv2v
     Convert.StructConst
     Convert.TFBlock
     Convert.Traverse
-    Convert.Typedef
+    Convert.TypeName
     Convert.TypeOf
     Convert.UnbasedUnsized
     Convert.Unique

@@ -20,7 +20,6 @@ import qualified Convert.DimensionQuery
 import qualified Convert.DoWhile
 import qualified Convert.DuplicateGenvar
 import qualified Convert.EmptyArgs
-import qualified Convert.Enum
 import qualified Convert.EventEdge
 import qualified Convert.ExprAsgn
 import qualified Convert.ForAsgn
@@ -54,7 +53,7 @@ import qualified Convert.StringType
 import qualified Convert.Struct
 import qualified Convert.StructConst
 import qualified Convert.TFBlock
-import qualified Convert.Typedef
+import qualified Convert.TypeName
 import qualified Convert.TypeOf
 import qualified Convert.UnbasedUnsized
 import qualified Convert.Unique
@@ -97,10 +96,9 @@ mainPhases tops selectExclude =
     , Convert.Simplify.convert
     , Convert.Stream.convert
     , Convert.Struct.convert
-    , Convert.Typedef.convert
+    , Convert.TypeName.convert
     , Convert.UnpackedArray.convert
     , Convert.Wildcard.convert
-    , Convert.Enum.convert
     , Convert.StringParam.convert
     , selectExclude Job.Interface $ Convert.Interface.convert tops
     , selectExclude Job.Succinct Convert.RemoveComments.convert

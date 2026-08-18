@@ -231,6 +231,7 @@ isSimpleType typ =
         Implicit     {} -> True
         Struct _ fields _ -> all (isSimpleType . fst) fields
         Union  _ fields _ -> all (isSimpleType . fst) fields
+        Enum baseType _ _ -> isSimpleType baseType
         _ -> False
 
 -- returns whether a top-level type contains any dimension queries or
