@@ -93,15 +93,19 @@ insertEnumItems :: Type -> [(Identifier, Expr)] -> SC ()
 insertEnumItems itemType items =
     -- check for obviously duplicate values
     if noDuplicates
-        then zipWithM_ insertEnumItem keys vals
+        then zipWithM_ insertEnumItem keys (enumVals castPrev)
         else scopedErrorM $ "enum conversion has duplicate vals: "
                 ++ show (zip keys vals)
     where
         insertEnumItem :: Identifier -> Expr -> SC ()
         insertEnumItem x = scopeExpr . Cast (Left itemType) >=> insertElem x
         (keys, valsRaw) = unzip items
-        vals = tail $ scanl step (UniOp UniSub $ RawNum 1) valsRaw
+        vals = enumVals id
+        enumVals wrap = tail $ scanl (step wrap) Nil valsRaw
         noDuplicates = all (null . tail . flip elemIndices vals) vals
-        step :: Expr -> Expr -> Expr
-        step expr Nil = simplify $ BinOp Add expr (RawNum 1)
-        step _ expr = expr
+        -- Keep the predecessor self-determined even if its cast is removed.
+        castPrev expr = Concat [Cast (Left itemType) expr]
+        step :: (Expr -> Expr) -> Expr -> Expr -> Expr
+        step _ Nil Nil = RawNum 0
+        step wrap expr Nil = simplify $ BinOp Add (wrap expr) (RawNum 1)
+        step _ _ expr = expr
