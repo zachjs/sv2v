@@ -219,6 +219,9 @@ typeof orig@(Bit e _) = do
     case t of
         TypeOf{} -> return $ TypeOf orig
         Alias{} -> return $ TypeOf orig
+        IntegerVector kw (SignedElements n) (_ : rs) ->
+            return $ packedArrayOf outer $ IntegerVector kw Signed inner
+            where (outer, inner) = splitAt (length rs - n) rs
         _ -> do
             t' <- popRange orig t
             return $ typeSignednessOverride t' Unsigned t'
@@ -357,10 +360,11 @@ binopSignedness Unspecified _ = Unspecified
 binopSignedness _ Unspecified = Unspecified
 binopSignedness Unsigned _ = Unsigned
 binopSignedness _ Unsigned = Unsigned
-binopSignedness Signed Signed = Signed
+binopSignedness _ _ = Signed
 
 -- returns the signedness of the given type, if possible
 typeSignedness :: Type -> Signing
+typeSignedness (IntegerVector _ SignedElements{} _) = Unsigned
 typeSignedness (IntegerVector _ sg _) = signednessFallback Unsigned sg
 typeSignedness (IntegerAtom   t sg  ) = signednessFallback fallback sg
     where fallback = if t == TTime then Unsigned else Signed

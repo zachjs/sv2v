@@ -109,6 +109,7 @@ mainPhases tops selectExclude =
 initialPhases :: [String] -> Selector -> [Phase]
 initialPhases tops selectExclude =
     [ Convert.ForAsgn.convert
+    , Convert.AsgnOp.convert -- before `a += b` loses the declared type of `a`
     , Convert.Jump.convert
     , Convert.ExprAsgn.convert
     , Convert.KWArgs.convert

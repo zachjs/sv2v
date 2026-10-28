@@ -22,6 +22,7 @@ module Language.SystemVerilog.AST.Type
     , ChargeStrength     (..)
     , pattern UnknownType
     , typeRanges
+    , packedArrayOf
     , elaborateIntegerAtom
     ) where
 
@@ -122,6 +123,19 @@ nullRange t rs1 =
         t' = elaborateIntegerAtom t
         (tf, rs2) = typeRanges t'
 
+-- adds packed dimensions outside of the given element type; per IEEE 1800-2017
+-- Section 7.4.1, the elements keep their signedness, but the array is unsigned
+packedArrayOf :: [Range] -> Type -> Type
+packedArrayOf [] t = t
+packedArrayOf rs1 t =
+    case t' of
+        IntegerVector kw Signed rs ->
+            IntegerVector kw (SignedElements $ length rs2) rs
+        _ -> t'
+    where
+        (tf, rs2) = typeRanges t
+        t' = tf $ rs1 ++ rs2
+
 elaborateIntegerAtom :: Type -> Type
 elaborateIntegerAtom (IntegerAtom TInt      sg) = baseIntType sg Signed 32
 elaborateIntegerAtom (IntegerAtom TShortint sg) = baseIntType sg Signed 16
@@ -144,10 +158,12 @@ data Signing
     = Unspecified
     | Signed
     | Unsigned
+    | SignedElements Int -- internal; packed dimensions in each element
     deriving Eq
 
 instance Show Signing where
     show Unspecified = ""
+    show SignedElements{} = ""
     show Signed = "signed"
     show Unsigned = "unsigned"
 

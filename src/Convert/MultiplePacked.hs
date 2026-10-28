@@ -28,6 +28,7 @@ module Convert.MultiplePacked (convert) where
 import Convert.ExprUtils
 import Control.Monad ((>=>))
 import Data.Bifunctor (first)
+import Data.Bitraversable (bimapM)
 import Data.Tuple (swap)
 import Data.Maybe (isJust)
 import qualified Data.Map.Strict as Map
@@ -37,6 +38,9 @@ import Convert.Traverse
 import Language.SystemVerilog.AST
 
 type TypeInfo = (Type, [Range])
+
+pattern MakeSigned :: Expr -> Expr
+pattern MakeSigned e = Call (Ident "$signed") (Args [e] [])
 
 convert :: [AST] -> [AST]
 convert = map $ traverseDescriptions convertDescription
@@ -81,6 +85,8 @@ flattenType t =
             Union  pk fields rs ->
                 (Union  pk fields', rs)
                 where fields' = flattenFields fields
+            IntegerVector kw (SignedElements n) rs | length rs == n + 1 ->
+                (IntegerVector kw Unspecified, rs)
             _ -> typeRanges t
         r1 : r2 : rest = ranges
         rangesFlat = combineRanges r1 r2 : rest
@@ -103,7 +109,11 @@ traverseModuleItemM :: ModuleItem -> Scoper TypeInfo ModuleItem
 traverseModuleItemM (Instance m p x rs l) = do
     -- converts multi-dimensional instances
     rs' <- traverseInstanceRanges x rs
-    traverseExprsM traverseExprM $ Instance m p x rs' l
+    p' <- mapM (mapM $ bimapM typeMapper traverseExprM) p
+    rs'' <- mapM (mapBothM traverseExprM) rs'
+    l' <- mapM (mapM traverseMaybeOutputM) l
+    return $ Instance m p' x rs'' l'
+    where typeMapper = traverseNestedTypesM $ traverseTypeExprsM traverseExprM
 traverseModuleItemM (NInputGate kw d x rs lhs exprs) = do
     rs' <- traverseInstanceRanges x rs
     traverseModuleItemM' $ NInputGate kw d x rs' lhs exprs
@@ -140,15 +150,34 @@ combineRanges r1 r2 = r
                             (binOp Sub lower (RawNum 1))
 
 traverseStmtM :: Stmt -> Scoper TypeInfo Stmt
-traverseStmtM =
-    traverseStmtLHSsM  traverseLHSM  >=>
+traverseStmtM stmt@(Subroutine (Ident ('$' : _)) _) =
+    traverseStmtExprsM traverseExprM stmt
+traverseStmtM stmt@Subroutine{} =
+    traverseStmtExprsM traverseMaybeOutputM stmt
+traverseStmtM stmt =
+    traverseStmtLHSsM  traverseLHSM  stmt >>=
     traverseStmtExprsM traverseExprM
 
 traverseExprM :: Expr -> Scoper TypeInfo Expr
-traverseExprM =
-    embedScopes convertExpr >=>
-    traverseExprTypesM traverseTypeM >=>
-    traverseSinglyNestedExprsM traverseExprM
+traverseExprM expr = do
+    expr' <- embedScopes convertExpr expr
+    case (expr, expr') of
+        -- avoid converting the select again
+        (Bit{}, MakeSigned select) -> fmap MakeSigned $ traverseSubExprsM select
+        _ -> traverseSubExprsM expr'
+    where
+        traverseSubExprsM =
+            traverseExprTypesM traverseTypeM >=>
+            traverseSinglyNestedExprsM traverseExprM
+
+-- ports and task arguments may be outputs, which must be lvalues
+traverseMaybeOutputM :: Expr -> Scoper TypeInfo Expr
+traverseMaybeOutputM expr@MakeSigned{} = traverseExprM expr
+traverseMaybeOutputM expr = fmap dropMakeSigned $ traverseExprM expr
+
+dropMakeSigned :: Expr -> Expr
+dropMakeSigned (MakeSigned expr) = expr
+dropMakeSigned expr = expr
 
 traverseTypeM :: Type -> Scoper TypeInfo Type
 traverseTypeM typ =
@@ -174,7 +203,7 @@ traverseLHSM = traverseNestedLHSsM traverseLHSSingleM
         traverseLHSSingleM lhs = do
             let expr = lhsToExpr lhs
             expr' <- embedScopes convertExpr expr
-            let Just lhs' = exprToLHS expr'
+            let Just lhs' = exprToLHS $ dropMakeSigned expr'
             return lhs'
 
 convertExpr :: Scopes TypeInfo -> Expr -> Expr
@@ -301,10 +330,14 @@ convertExpr scopes =
         rewriteExprLowPrec :: Expr -> Expr
         rewriteExprLowPrec orig@(Bit expr idx) =
             if isJust maybeDims && expr == rewriteExpr expr
-                then Range expr mode' range'
-                else orig
+                then retainSign $ Range expr mode' range'
+                else retainSign orig
             where
                 maybeDims = dims expr
+                retainSign = case levels expr of
+                    Just (IntegerVector _ (SignedElements n) rs, [])
+                        | length rs == n + 1 -> MakeSigned
+                    _ -> id
                 Just (dimInner, dimOuter) = maybeDims
                 mode' = IndexedPlus
                 idx' = orientIdx dimInner idx

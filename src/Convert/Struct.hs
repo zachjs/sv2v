@@ -97,8 +97,7 @@ convertType :: Type -> Type
 convertType t1 =
     case convertStruct t1 of
         Nothing -> traverseSinglyNestedTypes convertType t1
-        Just (t2, _) -> tf2 (rs1 ++ rs2)
-            where (tf2, rs2) = typeRanges t2
+        Just (t2, _) -> packedArrayOf rs1 t2
     where (_, rs1) = typeRanges t1
 
 -- write down the types of declarations

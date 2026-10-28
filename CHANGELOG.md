@@ -10,6 +10,7 @@
 
 * Fixed conversion of struct field accesses when the struct's field widths
   depend on a member of a struct-typed parameter
+* Fixed packed arrays of signed types losing the signedness of their elements
 
 ### Other Enhancements
 

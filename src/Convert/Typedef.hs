@@ -101,9 +101,7 @@ traverseDeclM decl = do
         Net  _ _ _ _ x _ _ -> insertElem x (NonType "net") >> return decl'
         Param s (UnpackedType t rs1) x e -> do
             insertElem x (NonType $ show s)
-            let (tf, rs2) = typeRanges t
-            let t' = tf $ rs1 ++ rs2
-            return $ Param s t' x e
+            return $ Param s (packedArrayOf rs1 t) x e
         Param s _ x _ ->
             insertElem x (NonType $ show s) >> return decl'
         ParamType Localparam x t -> do
@@ -124,9 +122,7 @@ traverseTypeM (Alias st rs1) = do
     details <- lookupElemM st
     rs1' <- mapM traverseRangeM rs1
     case details of
-        Just (_, _, Type typ) ->
-            return $ tf $ rs1' ++ rs2
-            where (tf, rs2) = typeRanges typ
+        Just (_, _, Type typ) -> return $ packedArrayOf rs1' typ
         Just (_, _, Pending) ->
             return $ Alias st rs1'
         Just (_, _, NonType kind) ->

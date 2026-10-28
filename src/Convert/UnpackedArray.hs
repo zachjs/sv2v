@@ -59,9 +59,8 @@ rewriteDeclM locations decl@(Variable d t x a e) = do
     let location = map accessName accesses
     case Map.lookup location locations of
         Just depth -> do
-            let (tf, rs) = typeRanges t
             let (unpacked, packed) = splitAt depth a
-            let t' = tf $ packed ++ rs
+            let t' = packedArrayOf packed t
             return $ Variable d t' x unpacked e
         Nothing -> return decl
 rewriteDeclM locations decl@Net{} =
